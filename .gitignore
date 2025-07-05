@@ -1,0 +1,6 @@
+ArduinoOutput/*
+code/test/*.txt
+*.bkp
+code/test/.ipynb_checkpoints/
+code/test/CMSIS/
+code/test/build/

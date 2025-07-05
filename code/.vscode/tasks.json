@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Unit Tests",
+      "type": "shell",
+      "command": "cd test/build && cmake .. && make && ctest --output-on-failure",
+      //"command": "cd test/build && cmake .. && make && ctest --rerun-failed --output-on-failure",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

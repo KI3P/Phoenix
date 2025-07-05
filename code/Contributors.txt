@@ -1,0 +1,11 @@
+This code base is heavily derived from the Teensy Convolution SDR, copyright Frank Dziock - DD4WH, substantially 
+modified by Jack Purdum, W8TEE, and Al Peter, AC8GY
+https://github.com/DD4WH/Teensy-ConvolutionSDR
+
+Known contributors to the code:
+* AFP: Al Peter, AC8GY
+* JJP: Jack Purdum, W8TEE
+* KF5N: Greg Raven, KF5N
+* GO0RX: John Melton, GO0RX
+* WMXZ: 
+* Michael Wild

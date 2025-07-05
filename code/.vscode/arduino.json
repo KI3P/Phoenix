@@ -1,0 +1,7 @@
+{
+    "sketch": "src/PhoenixSketch/PhoenixSketch.ino",
+    "configuration": "usb=serial2,speed=600,opt=o1lto,keys=en-us",
+    "board": "teensy:avr:teensy41",
+    "output": "../ArduinoOutput",
+    "port": "/dev/ttyACM0"
+}
