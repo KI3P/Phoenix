@@ -1,4 +1,4 @@
-#include "FFT.h"
+#include "DSP_FFT.h"
 #ifdef TESTMODE
 #include "../../test/SignalProcessing_mock.h"
 #endif

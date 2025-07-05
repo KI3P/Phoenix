@@ -1,7 +1,7 @@
 #ifndef SDT_H
 #define SDT_H
 
-//#define TESTMODE
+#define TESTMODE
 
 #ifndef TESTMODE
 #include <Arduino.h>
@@ -495,12 +495,12 @@ struct AGCConfig {
 
 // Others
 #include "Loop.h"
-#include "Display.h"
-#include "FFT.h"
-#include "Noise.h"
-#include "CWProcessing.h"
-#include "SignalProcessing.h"
-#include "AudioIO.h"
+#include "MainBoard_Display.h"
+#include "DSP_FFT.h"
+#include "DSP_Noise.h"
+#include "DSP_CWProcessing.h"
+#include "DSP.h"
+#include "MainBoard_AudioIO.h"
 #ifdef TESTMODE
 #include "../../test/SignalProcessing_mock.h" // remove from prod
 #endif

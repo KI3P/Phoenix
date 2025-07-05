@@ -1,4 +1,4 @@
-#include "Noise.h"
+#include "DSP_Noise.h"
 
 // DMAMEM places these in OCRAM, which is accessible by DMA and is slower
 float32_t DMAMEM NR_FFT_buffer[2 * NR_FFT_L] __attribute__((aligned(4)));
