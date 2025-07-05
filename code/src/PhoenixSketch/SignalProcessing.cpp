@@ -694,26 +694,6 @@ void InitializeSignalProcessing(void){
     InitializeCWProcessing(EEPROMData.currentWPM, &filters);
 }
 
-static uint32_t nbl;
-char strbuf[150];
-float32_t max_I[10];
-float32_t max_Q[10];
-void findmax(uint32_t pos){
-    float32_t mI = -10000;
-    float32_t mQ = -10000;
-    for (size_t k = 0; k<data.N; k++){
-        if (data.I[k] > mI) mI = data.I[k];
-        if (data.Q[k] > mQ) mQ = data.Q[k];
-    }
-    max_I[pos] = mI;
-    max_Q[pos] = mQ;
-}
-void printmax(void){
-    sprintf(strbuf,"%7.6f,%7.6f,%7.6f,%7.6f,%7.6f,%7.6f,%7.6f,%7.6f,%7.6f,%7.6f,%d,%d"
-        ,max_I[0],max_I[1],max_I[2],max_I[3],max_I[4],max_I[5]
-        ,max_I[6],max_I[7],max_I[8],max_I[9],n_clear,(int)EEPROMData.agc);
-    Debug(strbuf);
-}
 /**
  * Read a block of samples from the ADC and perform receive signal processing
  */
@@ -727,8 +707,6 @@ DataBlock * ReceiveProcessing(const char *fname){
         return NULL;
     }
     digitalWrite(31, 1);    //testcode
-    nbl++;
-    if((nbl)%100 == 0) findmax(0);
 
     // Clear overfull buffers
     ClearAudioBuffers();
@@ -747,7 +725,6 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Scale data channels by the overall system RF gain and the band-specified gain adjustment
     ApplyRFGain(&data, EEPROMData.rfGainAllBands_dB, bands[EEPROMData.currentBand].RFgain_dB);
-    if((nbl)%100 == 0) findmax(1);
 
     // Perform IQ correction
     ApplyIQCorrection(&data,
@@ -759,13 +736,11 @@ DataBlock * ReceiveProcessing(const char *fname){
         ZoomFFTExe(&data, EEPROMData.spectrum_zoom, &filters);
         displayFFTUpdated = true;
     }
-    if((nbl)%100 == 0) findmax(2);
 
     // First, frequency translation by Fs/4 without multiplication from 
     // Lyons (2011): chapter 13.1.2 page 646. Together with the savings of not 
     // having to shift/rotate the FFT_buffer, this saves about 1% of processor use
     FreqShiftFs4(&data);
-    if((nbl)%100 == 0) findmax(3);
 
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (EEPROMData.spectrum_zoom != SPECTRUM_ZOOM_1) {
@@ -776,7 +751,6 @@ DataBlock * ReceiveProcessing(const char *fname){
             displayFFTUpdated = true;
         }
     }
-    if((nbl)%100 == 0) findmax(4);
 
     // Now, translate by the fine tune frequency
     float32_t sideToneShift_Hz = 0;
@@ -790,22 +764,17 @@ DataBlock * ReceiveProcessing(const char *fname){
     float32_t shift = bands[EEPROMData.currentBand].freqVFO2_Hz + sideToneShift_Hz;
     FreqShiftF(&data,shift);
     
-    if((nbl)%100 == 0) findmax(5);
-
     // Decimate by 8
     DecimateBy8(&data, &filters);
 
     // Volume adjust for frequency cuts
     VolumeScale(&data);
-    if((nbl)%100 == 0) findmax(6);
 
     // Apply convolution filter
     ConvolutionFilter(&data, &filters, fname);
-    if((nbl)%100 == 0) findmax(7);
 
     // AGC
     AGC(&data, &agc);
-    if((nbl)%100 == 0) findmax(8);
 
     // Demodulate
     Demodulate(&data, &filters);
@@ -815,7 +784,6 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Noise reduction
     NoiseReduction(&data);
-    if((nbl)%100 == 0) findmax(9);
 
     // Notch filter
     if (EEPROMData.ANR_notchOn == 1) {
@@ -836,7 +804,6 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Volume adjust for audio volume setting. I and Q contain duplicate data, don't 
     // need to scale both
     AdjustVolume(&data, &filters);
-    if((nbl)%100 == 0) printmax();
 
     // Play sound on the speaker
     PlayBuffer(&data);
