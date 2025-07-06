@@ -12,6 +12,8 @@ void setup(void){
     pinMode(31,OUTPUT); //testcode
     digitalWrite(31, 0);  //testcode
 
+    FrontPanelInit();
+
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     EEPROMData.agc = AGCOff;
     EEPROMData.nrOptionSelect = NROff;

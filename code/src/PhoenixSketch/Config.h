@@ -30,3 +30,8 @@
 #define I2C_DELAY_LONG 10000L   // How long to show I2C screen with errors
 #define I2C_DELAY_SHORT 1000L   // How long to show I2C screen when no error
 #define STARTUP_BAND BAND_40M   // This is the 40M band
+
+#define VOLUME_REVERSED false
+#define FILTER_REVERSED false
+#define MAIN_TUNE_REVERSED false
+#define FINE_TUNE_REVERSED false

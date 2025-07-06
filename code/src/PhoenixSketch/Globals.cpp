@@ -45,6 +45,15 @@ struct band bands[NUMBER_OF_BANDS] =
     //1270000000, 0,1240000000, 1300000000, "23CM", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20  // 23CM
 };
 
+struct BIT bit_results = {
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  0
+};
 
 const struct SR_Descriptor SR[18] = {
   //   SR_n ,            rate,  text

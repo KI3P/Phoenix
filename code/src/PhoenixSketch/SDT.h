@@ -1,7 +1,7 @@
 #ifndef SDT_H
 #define SDT_H
 
-#define TESTMODE
+//#define TESTMODE
 
 #ifndef TESTMODE
 #include <Arduino.h>
@@ -230,6 +230,17 @@ extern struct config_t {
     float32_t SWRSlopeAdj[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // UNUSED
     int32_t SWR_R_Offset[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // UNUSED
 } EEPROMData;
+
+// Define a structure to hold the results of built-in-test routine
+struct BIT {
+  bool RF_I2C_present;
+  bool RF_Si5351_present;
+  bool BPF_I2C_present;
+  bool V12_LPF_I2C_present;
+  bool V12_LPF_AD7991_present;
+  bool FRONT_PANEL_I2C_present;
+  uint8_t AD7991_I2C_ADDR;
+};
 
 /** Contains the parameters that define a band */
 struct band {
@@ -501,10 +512,13 @@ struct AGCConfig {
 #include "DSP_CWProcessing.h"
 #include "DSP.h"
 #include "MainBoard_AudioIO.h"
+#include "FrontPanel.h"
+#include "FrontPanel_Rotary.h"
 #ifdef TESTMODE
 #include "../../test/SignalProcessing_mock.h" // remove from prod
 #endif
 
+extern struct BIT bit_results;
 extern struct band bands[];
 extern const struct SR_Descriptor SR[];
 extern FilterConfig filters;
