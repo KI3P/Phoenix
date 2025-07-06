@@ -1,7 +1,7 @@
 #ifndef SDT_H
 #define SDT_H
 
-//#define TESTMODE
+#define TESTMODE
 
 #ifndef TESTMODE
 #include <Arduino.h>

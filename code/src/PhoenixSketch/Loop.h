@@ -15,10 +15,18 @@ typedef enum {
     iCALIBRATE_TX_IQ,
     iKEY1_PRESSED,
     iKEY1_RELEASED,
-    iKEY2_PRESSED
+    iKEY2_PRESSED,
+    iVOLUME_INCREASE,
+    iVOLUME_DECREASE,
+    iFILTER_INCREASE,
+    iFILTER_DECREASE,
+    iCENTERTUNE_INCREASE,
+    iCENTERTUNE_DECREASE,
+    iFINETUNE_INCREASE,
+    iFINETUNE_DECREASE,
+    iBUTTON_PRESSED
 } InterruptType;
 
-void FrontPanelInterrupt(void);
 void ConsumeInterrupt(void);
 InterruptType GetInterrupt(void);
 void SetInterrupt(InterruptType i);

@@ -10,8 +10,8 @@
 #define INT_PIN_2 15
 
 void FrontPanelInit(void);
-//static void interrupt1(void);
-//static void interrupt2(void);
+void CheckForFrontPanelInterrupts(void);
+int32_t GetButton(void);
 
 #endif // FRONTPANEL_H
 

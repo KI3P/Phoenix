@@ -66,12 +66,6 @@ void SetInterrupt(InterruptType i){
 }
 
 /**
- * Called when an interrupt is received from the front panel.
- */
-void FrontPanelInterrupt(void){
-}
-
-/**
  * Called every 1 milliseconds by the system timer. It dispatches a DO event to the 
  * state machines.
  */
@@ -98,6 +92,9 @@ void ConsumeInterrupt(void){
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
             break;
         }
+        case (iMODE):{
+            break;
+        }
         case (iKEY1_PRESSED):{
             if (keyType == KeyTypeId_Straight){
                 ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
@@ -116,6 +113,44 @@ void ConsumeInterrupt(void){
             }else{
                 ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
             }
+            break;
+        }
+        case (iVOLUME_INCREASE):{
+            Debug("Volume increase");
+            break;
+        }
+        case (iVOLUME_DECREASE):{
+            Debug("Volume decrease");
+            break;
+        }
+        case (iFILTER_INCREASE):{
+            Debug("Filter increase");
+            break;
+        }
+        case (iFILTER_DECREASE):{
+            Debug("Filter decrease");
+            break;
+        }
+        case (iCENTERTUNE_INCREASE):{
+            Debug("Center tune increase");
+            break;
+        }
+        case (iCENTERTUNE_DECREASE):{
+            Debug("Center tune decrease");
+            break;
+        }
+        case (iFINETUNE_INCREASE):{
+            Debug("Fine tune increase");
+            break;
+        }
+        case (iFINETUNE_DECREASE):{
+            Debug("Fine tune decrease");
+            break;
+        }
+        case (iBUTTON_PRESSED):{
+            char strbuf[50];
+            sprintf(strbuf, "Pressed button: %d",GetButton());
+            Debug(strbuf);
             break;
         }
         default:
@@ -145,6 +180,7 @@ FASTRUN void loop(void){
     if (digitalRead(BEGIN_TEENSY_SHUTDOWN) == HIGH) ShutdownTeensy();
 
     // Step 1: Check for new events and handle them
+    CheckForFrontPanelInterrupts();
     ConsumeInterrupt();
     
     // Step 2: Perform signal processing

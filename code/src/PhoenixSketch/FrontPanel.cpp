@@ -25,22 +25,25 @@ static Rotary_V12 filterEncoder( FILTER_REVERSED );
 static Rotary_V12 tuneEncoder( MAIN_TUNE_REVERSED );
 static Rotary_V12 fineTuneEncoder( FINE_TUNE_REVERSED );
 
+int32_t GetButton(void){
+    return ButtonPressed;
+}
+
 FASTRUN
 static void interrupt1() {
     uint8_t pin;
     uint8_t state;
-    __disable_irq();
     while((pin = mcp1.getLastInterruptPin())!=MCP23XXX_INT_ERR) {
         state = mcp1.digitalRead(pin);
         if (state == PRESSED) {
             if ((millis()-button_press_ms)>DEBOUNCE_DELAY){
                 ButtonPressed = pin;
                 button_press_ms = millis();
-                Debug("Pressed button: " + String(ButtonPressed));
+                SetInterrupt(iBUTTON_PRESSED);
             }
         } 
     }
-    __enable_irq();
+    mcp1.clearInterrupts();
 }
 
 FASTRUN
@@ -50,7 +53,6 @@ static void interrupt2() {
     uint8_t a_state;
     uint8_t b_state;
 
-    __disable_irq();
     while((pin = mcp2.getLastInterruptPin())!=MCP23XXX_INT_ERR) {
         a_state = mcp2.readGPIOA();
         b_state = mcp2.readGPIOB();
@@ -79,42 +81,58 @@ static void interrupt2() {
             case 8:
                 e1.updateA(state);
                 change = e1.process();
-                if (change!=0) Debug("e1 Volume change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iVOLUME_DECREASE);
+                }
                 break;
             case 9:
                 e1.updateB(state);
                 change = e1.process();
-                if (change!=0) Debug("e1 Volume change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iVOLUME_INCREASE);
+                }
                 break;
             case 10:
                 e2.updateA(state);
                 change = e2.process();
-                if (change!=0) Debug("e2 Filter change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iFILTER_DECREASE);
+                }
                 break;
             case 11:
                 e2.updateB(state);
                 change = e2.process();
-                if (change!=0) Debug("e2 Filter change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iFILTER_INCREASE);
+                }
                 break;
             case 12:
                 e3.updateA(state);
                 change = e3.process();
-                if (change!=0) Debug("e3 Tune change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iCENTERTUNE_DECREASE);
+                }
                 break;
             case 13:
                 e3.updateB(state);
                 change = e3.process();
-                if (change!=0) Debug("e3 Tune change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iCENTERTUNE_INCREASE);
+                }
                 break;
             case 14:
                 e4.updateA(state);
                 change = e4.process();
-                if (change!=0) Debug("e4 Fine change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iFINETUNE_DECREASE);
+                }
                 break;
             case 15:
                 e4.updateB(state);
                 change = e4.process();
-                if (change!=0) Debug("e4 Fine change by " + String(change));
+                if (change!=0) {
+                    SetInterrupt(iFINETUNE_INCREASE);
+                }
                 break;
             case 0:
             case 1:
@@ -128,7 +146,7 @@ static void interrupt2() {
                     if ((millis()-button_press_ms)>DEBOUNCE_DELAY){
                         ButtonPressed = (pin+16);
                         button_press_ms = millis();
-                        Debug("Pressed button: " + String(ButtonPressed));
+                        SetInterrupt(iBUTTON_PRESSED);
                     }
                 }
                 break;
@@ -138,7 +156,7 @@ static void interrupt2() {
                 break;
         }
     }
-    __enable_irq();
+    mcp2.clearInterrupts();
 }
 
 void FrontPanelInit(void) {
@@ -163,7 +181,6 @@ void FrontPanelInit(void) {
     // setup the mcp23017 devices
     mcp1.setupInterrupts(true, true, LOW);
     mcp2.setupInterrupts(true, true, LOW);
-
     // setup switches 1..16
     for (int i = 0; i < 16; i++) {
         mcp1.pinMode(i, INPUT_PULLUP);
@@ -175,7 +192,6 @@ void FrontPanelInit(void) {
         mcp2.pinMode(i, INPUT_PULLUP);
         mcp2.setupInterruptPin(i, CHANGE);
     }
-
     mcp2.pinMode(LED_1_PORT, OUTPUT);  // LED1
     mcp2.digitalWrite(LED_1_PORT, LOW);
     mcp2.pinMode(LED_2_PORT, OUTPUT);  // LED2
@@ -186,15 +202,22 @@ void FrontPanelInit(void) {
         mcp2.pinMode(i, INPUT_PULLUP);
         mcp2.setupInterruptPin(i, CHANGE);
     }
-
     // clear interrupts
     mcp1.readGPIOAB(); // ignore any return value
     mcp2.readGPIOAB(); // ignore any return value
 
+    // Configure pins to check for button press interrupts
     pinMode(INT_PIN_1, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(INT_PIN_1), interrupt1, LOW);
+    pinMode(INT_PIN_2, INPUT_PULLUP);  
+}
 
-    pinMode(INT_PIN_2, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(INT_PIN_2), interrupt2, LOW);
-  
+void CheckForFrontPanelInterrupts(void){
+    if (digitalRead(INT_PIN_1) == 0){
+        // We received an interrupt on pin 1
+        interrupt1();
+    }
+    if (digitalRead(INT_PIN_2) == 0){
+        // We received an interrupt on pin 2
+        interrupt2();
+    }
 }
