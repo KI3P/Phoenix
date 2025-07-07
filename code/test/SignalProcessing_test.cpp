@@ -1841,7 +1841,7 @@ TEST(SignalProcessing, AdjustVolume){
     for (size_t i=0; i<data.N; i++){
         if (data.I[i] > amp) amp = data.I[i];
     }
-    EXPECT_FLOAT_EQ(amp, 0.1*filters.DF*VolumeToAmplification(audioVolume));
+    EXPECT_FLOAT_EQ(amp, 0.1*filters.DF*VolumeToAmplification(EEPROMData.audioVolume));
 }
 
 TEST(SignalProcessing, PlayBuffer){

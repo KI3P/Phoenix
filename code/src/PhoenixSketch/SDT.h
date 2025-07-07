@@ -153,7 +153,7 @@ enum MorseStates { state0,
 extern struct config_t {
     char versionSettings[10];                             // UNUSED
     AGCMode agc = AGCOff; // was AGCLong
-    int32_t audioVolume = 30;                             // UNUSED
+    int32_t audioVolume = 30;
     float32_t rfGainAllBands_dB = 0;
     int32_t tuneIndex = DEFAULTFREQINCREMENT;             // UNUSED
     int64_t stepFineTune = FAST_TUNE_INCREMENT;          // UNUSED
@@ -541,6 +541,5 @@ extern float32_t SAM_carrier_freq_offsetOld;
 
 extern char morseCharacter;
 extern bool morseCharacterUpdated;
-extern uint32_t audioVolume;
 
 #endif // SDT_H

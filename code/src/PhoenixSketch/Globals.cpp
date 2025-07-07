@@ -85,6 +85,5 @@ const float32_t CWToneOffsetsHz[] = {0, 562.5, 656.5, 750.0, 843.75 };
 
 float32_t SAM_carrier_freq_offset = 0;
 float32_t SAM_carrier_freq_offsetOld = 0;
-uint32_t audioVolume = 30;
 ModeSm modeSM;
 UISm uiSM;

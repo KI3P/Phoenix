@@ -117,10 +117,18 @@ void ConsumeInterrupt(void){
         }
         case (iVOLUME_INCREASE):{
             Debug("Volume increase");
+            EEPROMData.audioVolume++;
+            if (EEPROMData.audioVolume > 100) {  // In range?
+                EEPROMData.audioVolume = 100;
+            }
             break;
         }
         case (iVOLUME_DECREASE):{
             Debug("Volume decrease");
+            EEPROMData.audioVolume--;
+            if (EEPROMData.audioVolume < 0) {  // In range?
+                EEPROMData.audioVolume = 0;
+            }
             break;
         }
         case (iFILTER_INCREASE):{

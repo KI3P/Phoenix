@@ -12,14 +12,14 @@ static uint32_t n_clear;
 void PerformSignalProcessing(void){
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_RECEIVE):{
-            ReceiveProcessing("blah");
+            ReceiveProcessing(nullptr);
             break;
         }
         case (ModeSm_StateId_SSB_TRANSMIT):{
             break;
         }
         case (ModeSm_StateId_CW_RECEIVE):{
-            ReceiveProcessing("blah");
+            ReceiveProcessing(nullptr);
             break;
         }
         default:{
@@ -662,7 +662,7 @@ float32_t VolumeToAmplification(int32_t volume) {
  * Adjust the volume
  */
 void AdjustVolume(DataBlock *data, FilterConfig *filters){
-    arm_scale_f32(data->I, filters->DF * VolumeToAmplification(audioVolume), data->I, data->N);
+    arm_scale_f32(data->I, filters->DF * VolumeToAmplification(EEPROMData.audioVolume), data->I, data->N);
 }
 
 /**
