@@ -642,8 +642,8 @@ TEST(SignalProcessing, FrequencyTranslate){
 
     FreqShiftFs4(&data);
     WriteIQFile(I,Q,"frequencyTranslate_midcourse_IQ.txt",Nsamples);
-    bands[EEPROMData.currentBand].freqVFO2_Hz = 48000+3000;
-    float32_t shift = -bands[EEPROMData.currentBand].freqVFO2_Hz;
+    EEPROMData.fineTuneFreq_Hz = 48000+3000;
+    float32_t shift = -EEPROMData.fineTuneFreq_Hz;
     FreqShiftF(&data,shift);
 
     WriteIQFile(I,Q,"frequencyTranslate_posttranslate_IQ.txt",Nsamples);
@@ -1988,7 +1988,7 @@ TEST(SignalProcessing, ReceiveProcessing){
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     EEPROMData.agc = AGCOff;
     EEPROMData.nrOptionSelect = NROff;
-    bands[EEPROMData.currentBand].freqVFO2_Hz = -48000.0;
+    EEPROMData.fineTuneFreq_Hz = -48000.0;
 
     InitializeFilters(EEPROMData.spectrum_zoom,&filters);
     InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);

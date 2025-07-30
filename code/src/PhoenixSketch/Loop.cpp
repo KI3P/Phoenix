@@ -183,10 +183,14 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iCENTERTUNE_INCREASE):{
+            EEPROMData.centerFreq_Hz += (int64_t)EEPROMData.freqIncrement;
+            //SetFreq(EEPROMData.centerFreq_Hz);
             Debug("Center tune increase");
             break;
         }
         case (iCENTERTUNE_DECREASE):{
+            EEPROMData.centerFreq_Hz -= (int64_t)EEPROMData.freqIncrement;
+            //SetFreq(EEPROMData.centerFreq_Hz);
             Debug("Center tune decrease");
             break;
         }

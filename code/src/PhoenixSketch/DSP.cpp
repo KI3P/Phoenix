@@ -789,7 +789,7 @@ DataBlock * ReceiveProcessing(const char *fname){
             sideToneShift_Hz = -CWToneOffsetsHz[EEPROMData.CWToneIndex];
         }
     }
-    float32_t shift = bands[EEPROMData.currentBand].freqVFO2_Hz + sideToneShift_Hz;
+    float32_t shift = EEPROMData.fineTuneFreq_Hz + sideToneShift_Hz;
     FreqShiftF(&data,shift);
     #ifdef TESTMODE
     SaveData(&data, 2);

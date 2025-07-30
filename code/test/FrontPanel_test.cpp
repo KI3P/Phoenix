@@ -138,7 +138,7 @@ TEST(FrontPanel, FilterDecrease){
     Q_out_R.setName(nullptr);
     //setfilename("FilterDecrease");
 
-    bands[EEPROMData.currentBand].freqVFO2_Hz = -48000.0;
+    EEPROMData.fineTuneFreq_Hz = -48000.0;
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     EEPROMData.agc = AGCOff;
     EEPROMData.nrOptionSelect = NROff;
@@ -208,11 +208,41 @@ TEST(FrontPanel, FilterIncrease){
 
 
 TEST(FrontPanel, CenterTuneIncrease){
-    //EXPECT_EQ(1,0);
+    // I can't properly test this until the RF board works
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    InitializeSignalProcessing();
+    for (size_t k = 0; k < 4; k++){
+        loop();
+    }
+    int64_t tmpfreq = EEPROMData.centerFreq_Hz;
+    SetInterrupt(iCENTERTUNE_INCREASE);
+    for (size_t k = 0; k < 4; k++){
+        loop();
+    }
+    EXPECT_EQ(EEPROMData.centerFreq_Hz,tmpfreq+EEPROMData.freqIncrement);
 }
 
 TEST(FrontPanel, CenterTuneDecrease){
-    //EXPECT_EQ(1,0);
+    // I can't properly test this until the RF board works
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    InitializeSignalProcessing();
+    for (size_t k = 0; k < 4; k++){
+        loop();
+    }
+    int64_t tmpfreq = EEPROMData.centerFreq_Hz;
+    SetInterrupt(iCENTERTUNE_DECREASE);
+    for (size_t k = 0; k < 4; k++){
+        loop();
+    }
+    EXPECT_EQ(EEPROMData.centerFreq_Hz,tmpfreq-EEPROMData.freqIncrement);
 }
 
 TEST(FrontPanel, FineTuneIncrease){
