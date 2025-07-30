@@ -23,6 +23,7 @@ class AudioRecordQueue
         }
         int available(void);
         void setChannel(uint8_t);
+        void setChannel(uint8_t,int16_t*);
         uint8_t getChannel(void);
         void clear(void);
         int16_t * readBuffer(void);

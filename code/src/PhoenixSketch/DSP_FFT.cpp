@@ -272,6 +272,11 @@ void FreqShiftF2(float32_t *I, float32_t *Q, uint32_t blocksize,
     }
 }
 
+void UpdateFIRFilterMask(FilterConfig *filters){
+    // FIR filter mask
+    InitFilterMask(FIR_filter_mask, filters); 
+}
+
 /**
  * Calculate the filter coefficients. This is done once at startup.
  * @param spectrum_zoom The spectrum zoom state 

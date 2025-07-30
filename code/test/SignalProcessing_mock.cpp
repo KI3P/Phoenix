@@ -42,6 +42,10 @@ void AudioRecordQueue::setChannel(uint8_t chan) {
 
 }
 
+void AudioRecordQueue::setChannel(uint8_t chan, int16_t *dataChan) {
+    data = dataChan;
+}
+
 uint8_t AudioRecordQueue::getChannel(void) {
     return channel;
 }

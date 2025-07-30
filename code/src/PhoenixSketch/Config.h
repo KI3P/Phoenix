@@ -35,3 +35,6 @@
 #define FILTER_REVERSED false
 #define MAIN_TUNE_REVERSED false
 #define FINE_TUNE_REVERSED false
+
+#define ENCODER_FACTOR 0.25F  // use 0.25f with cheap encoders that have 4 detents per step,
+//                                                  for other encoders or libs we use 1.0f

@@ -15,6 +15,7 @@ void CalcFIRCoeffs(float *coeffs_I, int numCoeffs, float32_t fc_Hz, float32_t As
                   FilterType type, float dfc_Hz, float Fsamprate_Hz);
 void SetIIRCoeffs(float32_t *coefficient_set, float32_t f0, float32_t Q, 
                     float32_t sample_rate, FilterType filter_type);
+void UpdateFIRFilterMask(FilterConfig *filters);
 void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters);
 void ZoomFFTPrep(uint32_t spectrum_zoom, FilterConfig *filters);
 errno_t DecimateBy8(DataBlock *data, FilterConfig *filters);

@@ -175,7 +175,7 @@ extern struct config_t {
     int32_t activeVFO = 0;                                // UNUSED
     int32_t freqIncrement = 5;                            // UNUSED
     float32_t freqCorrectionFactor = 0;                   // UNUSED
-    int32_t currentBand = STARTUP_BAND;                   // UNUSED
+    int32_t currentBand = STARTUP_BAND;
     int32_t currentBandA = STARTUP_BAND;                  // UNUSED
     int32_t currentBandB = STARTUP_BAND;                  // UNUSED
     int64_t currentFreqA = CURRENT_FREQ_A;               // UNUSED

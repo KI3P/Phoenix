@@ -7,6 +7,7 @@
 //float32_t * GetRBufferAddress(void);
 float32_t GetAmpCorrectionFactor(uint32_t bandN);
 float32_t GetPhaseCorrectionFactor(uint32_t bandN);
+void setfilename(char *fnm);
 #endif
 void PerformSignalProcessing(void);
 DataBlock * ReceiveProcessing(const char *fname);

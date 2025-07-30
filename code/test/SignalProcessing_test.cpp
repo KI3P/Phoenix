@@ -997,6 +997,72 @@ TEST(SignalProcessing, ConvolutionFilter){
     EXPECT_GT(psdnew[bin0] - psdnew[bin0-90],10); // 100 dB of stopband attenuation
 }
 
+
+TEST(SignalProcessing, ConvolutionFilterChanges){
+    // What does the passband look like if we change the filter limits?
+    extern FilterConfig filters;
+    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    uint32_t Nsamples = 512+256; // 2048/8;
+    uint32_t sampleRate_Hz = 192000/8;
+    float I[Nsamples];
+    float Q[Nsamples];
+
+    float Iout[512];
+    float Qout[512];
+
+    // bin width is sample rate / number of bins
+    // 192000/8/512 = 46.875
+    float tone_Hz = 192000/8/512*10; // 468.75 Hz
+    ResetPSD();
+    for (int i=0; i<Nsamples; i++){
+        I[i] = 0;
+        Q[i] = 0;
+    }
+    // add comb of tones between -4687.5 and +4687.5
+    for (int i=1; i<11; i++){
+        add_second_tone(I, Q, -i*tone_Hz+192000/8/512/2, sampleRate_Hz, Nsamples);
+        add_second_tone(I, Q, +i*tone_Hz+192000/8/512/2, sampleRate_Hz, Nsamples);
+    }
+    //CreateIQChirp(I,Q,Nsamples,sampleRate_Hz);
+
+    WriteIQFile(I,Q,"ConvolutionFilterChange_original_IQ.txt",512);
+
+    // Change the band limits
+    bands[EEPROMData.currentBand].FLoCut_Hz = -2000;
+    bands[EEPROMData.currentBand].FHiCut_Hz = -1000;
+    UpdateFIRFilterMask(&filters);
+
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = 256;
+    data.sampleRate_Hz = sampleRate_Hz;
+    ConvolutionFilter(&data, &filters,"ConvolutionFilterChange_pass1.txt");
+    WriteIQFile(data.I,data.Q,"ConvolutionFilterChange_pass1_filtered_IQ.txt",256);
+
+    data.I = &I[256];
+    data.Q = &Q[256];
+    ConvolutionFilter(&data, &filters, "ConvolutionFilterChange_pass2.txt");
+    WriteIQFile(data.I,data.Q,"ConvolutionFilterChange_pass2_filtered_IQ.txt",256);
+    for (unsigned i = 0; i < 256; i++) {
+        Iout[i] = data.I[i];
+        Qout[i] = data.Q[i];
+    }
+
+    data.I = &I[256*2];
+    data.Q = &Q[256*2];
+    ConvolutionFilter(&data, &filters, "ConvolutionFilterChange_pass3.txt");
+    WriteIQFile(data.I,data.Q,"ConvolutionFilterChange_pass3_filtered_IQ.txt",256);
+    for (unsigned i = 0; i < 256; i++) {
+        Iout[256+i] = data.I[i];
+        Qout[256+i] = data.Q[i];
+    }
+    CalcPSD512(Iout,Qout);
+    WriteFile(psdnew,"ConvolutionFilterChange_filtered_PSD.txt",512);
+
+    // Analyse using analyze_filter_chain.ipynb to confirm change happened as expected
+}
+
 TEST(SignalProcessing, AGCInitializesCorrectly){
     EEPROMData.agc = AGCLong;
     EXPECT_FLOAT_EQ(agc.hangtime,0.25);

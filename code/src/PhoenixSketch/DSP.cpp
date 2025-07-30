@@ -8,6 +8,7 @@ DataBlock data;
 static int16_t *sp_L1;
 static int16_t *sp_R1;
 static uint32_t n_clear;
+static char *filename = nullptr;
 
 void PerformSignalProcessing(void){
     switch (modeSM.state_id){
@@ -694,6 +695,24 @@ void InitializeSignalProcessing(void){
     InitializeCWProcessing(EEPROMData.currentWPM, &filters);
 }
 
+#ifdef TESTMODE
+void setfilename(char *fnm){
+    filename = fnm;
+}
+
+void SaveData(DataBlock *data, uint32_t suffix){
+    if (filename != nullptr){
+        char fn2[100];
+        sprintf(fn2,"%s-%02d.txt",filename, suffix);
+        FILE *file2 = fopen(fn2, "w");
+        for (size_t i = 0; i < data->N; i++) {
+            fprintf(file2, "%d,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
+        }
+        fclose(file2);
+    }
+}
+#endif
+
 /**
  * Read a block of samples from the ADC and perform receive signal processing
  */
@@ -710,11 +729,15 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Clear overfull buffers
     ClearAudioBuffers();
-    
+
     #ifdef TESTMODE
+    SaveData(&data, 0);
     char fn2[100];
     if (fname != nullptr){
-        sprintf(fn2,"IQ_%s",fname);
+        filename = (char *)fname;
+    }
+    if (filename != nullptr){
+        sprintf(fn2,"IQ_%s",filename);
         FILE *file2 = fopen(fn2, "w");
         for (size_t i = 0; i < 2048; i++) {
             fprintf(file2, "%d,%7.6f,%7.6f\n", i,data.I[i],data.Q[i]);
@@ -737,11 +760,15 @@ DataBlock * ReceiveProcessing(const char *fname){
         displayFFTUpdated = true;
     }
 
-    // First, frequency translation by Fs/4 without multiplication from 
-    // Lyons (2011): chapter 13.1.2 page 646. Together with the savings of not 
-    // having to shift/rotate the FFT_buffer, this saves about 1% of processor use
+    // First, frequency translation by +Fs/4 without multiplication from Lyons 
+    // (2011): chapter 13.1.2 page 646. Together with the savings of not having 
+    // to shift/rotate the FFT_buffer, this saves about 1% of processor use.
+    // A signal at x Hz will be at x + 48,000 Hz after this step.
     FreqShiftFs4(&data);
 
+    #ifdef TESTMODE
+    SaveData(&data, 1);
+    #endif
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (EEPROMData.spectrum_zoom != SPECTRUM_ZOOM_1) {
         if(ZoomFFTExe(&data, EEPROMData.spectrum_zoom, &filters)) {
@@ -752,7 +779,8 @@ DataBlock * ReceiveProcessing(const char *fname){
         }
     }
 
-    // Now, translate by the fine tune frequency
+    // Now, translate by the fine tune frequency. A signal at x Hz will be at 
+    // x + shift Hz after this step.
     float32_t sideToneShift_Hz = 0;
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) {
         if (bands[EEPROMData.currentBand].mode == 1) {
@@ -763,21 +791,38 @@ DataBlock * ReceiveProcessing(const char *fname){
     }
     float32_t shift = bands[EEPROMData.currentBand].freqVFO2_Hz + sideToneShift_Hz;
     FreqShiftF(&data,shift);
+    #ifdef TESTMODE
+    SaveData(&data, 2);
+    #endif
     
-    // Decimate by 8
+    // Decimate by 8. Reduce the sampled band to -12,000 Hz to +12,000 Hz.
+    // The 3dB bandwidth is approximately -6,000 to +6,000 Hz
     DecimateBy8(&data, &filters);
+
+    #ifdef TESTMODE
+    SaveData(&data, 3);
+    #endif
 
     // Volume adjust for frequency cuts
     VolumeScale(&data);
 
-    // Apply convolution filter
-    ConvolutionFilter(&data, &filters, fname);
+    // Apply convolution filter. Restrict signals to those between 
+    // bands[EEPROMData.currentBand].FLoCut_Hz and bands[EEPROMData.currentBand].FHiCut_Hz
+    ConvolutionFilter(&data, &filters, filename);
+
+    #ifdef TESTMODE
+    SaveData(&data, 4);
+    #endif
 
     // AGC
     AGC(&data, &agc);
 
     // Demodulate
     Demodulate(&data, &filters);
+
+    #ifdef TESTMODE
+    SaveData(&data, 5);
+    #endif
 
     // Receive EQ
     BandEQ(&data, &filters, RX);
@@ -804,6 +849,10 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Volume adjust for audio volume setting. I and Q contain duplicate data, don't 
     // need to scale both
     AdjustVolume(&data, &filters);
+
+    #ifdef TESTMODE
+    SaveData(&data, 6);
+    #endif
 
     // Play sound on the speaker
     PlayBuffer(&data);

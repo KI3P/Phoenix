@@ -23,6 +23,8 @@ FREQ_ENC_DEC    Decrease the tune frequency by increment
 static InterruptType interrupt = iNONE; /** The internal InterruptType variable */
 static KeyTypeId keyType = KEYER_TYPE;
 static bool keyerFlip = KEYER_FLIP;
+static uint8_t switchFilterSideband = 0;
+char strbuf[100];
 
 /**
  * Sets the key type.
@@ -75,7 +77,48 @@ void TimerInterrupt(void){
 }
 
 /**
- * Considers the value of the interrupt and acts accordingly by either issueing as
+ * Change the FIR filter settings.
+ * @param filter_change The positive or negative increment to the filter bandwidth
+ */
+void FilterSetSSB(int32_t filter_change) {
+    // Change the band parameters
+    switch (bands[EEPROMData.currentBand].mode) {
+        case LSB:{
+            if (switchFilterSideband == 0)  // "0" = normal, "1" means change opposite filter
+            {
+                bands[EEPROMData.currentBand].FLoCut_Hz = 
+                  bands[EEPROMData.currentBand].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            } else {
+                bands[EEPROMData.currentBand].FHiCut_Hz = 
+                  bands[EEPROMData.currentBand].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            }
+            break;
+        }
+        case USB:{
+            if (switchFilterSideband == 0) {
+                bands[EEPROMData.currentBand].FHiCut_Hz = 
+                  bands[EEPROMData.currentBand].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+
+            } else {
+                bands[EEPROMData.currentBand].FLoCut_Hz = 
+                  bands[EEPROMData.currentBand].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            }
+            break;
+        }
+        case AM:
+        case SAM:{
+            bands[EEPROMData.currentBand].FHiCut_Hz = 
+              bands[EEPROMData.currentBand].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            bands[EEPROMData.currentBand].FLoCut_Hz = -bands[EEPROMData.currentBand].FHiCut_Hz;
+            break;
+        }
+    }
+    // Calculate the new FIR filter mask
+    UpdateFIRFilterMask(&filters);
+}
+
+/**
+ * Considers the value of the interrupt and acts accordingly by either issueing an
  * event to the state machines or by updating a system parameter. Interrupt is 
  * consumed and interrupt variable set to NONE.
  */
@@ -116,26 +159,26 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iVOLUME_INCREASE):{
-            Debug("Volume increase");
             EEPROMData.audioVolume++;
-            if (EEPROMData.audioVolume > 100) {  // In range?
-                EEPROMData.audioVolume = 100;
-            }
+            if (EEPROMData.audioVolume > 100) EEPROMData.audioVolume = 100;
+            sprintf(strbuf,"Volume: %d",EEPROMData.audioVolume);
+            Debug(strbuf);
             break;
         }
         case (iVOLUME_DECREASE):{
-            Debug("Volume decrease");
             EEPROMData.audioVolume--;
-            if (EEPROMData.audioVolume < 0) {  // In range?
-                EEPROMData.audioVolume = 0;
-            }
+            if (EEPROMData.audioVolume < 0) EEPROMData.audioVolume = 0;
+            sprintf(strbuf,"Volume: %d",EEPROMData.audioVolume);
+            Debug(strbuf);
             break;
         }
         case (iFILTER_INCREASE):{
+            FilterSetSSB(1);
             Debug("Filter increase");
             break;
         }
         case (iFILTER_DECREASE):{
+            FilterSetSSB(-1);
             Debug("Filter decrease");
             break;
         }
