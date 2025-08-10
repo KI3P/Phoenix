@@ -38,5 +38,41 @@ Install the StateSmith binary using [these](https://github.com/StateSmith/StateS
 
 The test framework isn't needed to compile and run the code. If you want to modify the code, using the test framework is highly recommended as it will help you discover when your changes break the code.
 
-The Test Driven Development framework we use is [Google Test](https://google.github.io/googletest/). You don't need to install it -- it is downloaded as part of the make process. You need to have [cmake](https://cmake.org/download/) installed.
+The Test Driven Development framework we use is [Google Test](https://google.github.io/googletest/). You don't need to install it -- it is downloaded as part of the make process. You need to have [cmake](https://cmake.org/download/) installed. 
+
+The first time you run the unit tests, do the following to create a build directory:
+
+```bash
+mkdir code/test/build
+```
+
+Then, to run the unit tests, do the following:
+
+```bash
+cd code/test/build
+cmake .. && make && ctest --output-on-failure
+```
+
+This will compile and run the unit test programs. You should see an output that looks something like this (but with all tests passed!):
+
+```bash
+...
+127/131 Test #127: FrontPanel.CenterTuneIncrease ...................................   Passed    0.02 sec
+        Start 128: FrontPanel.CenterTuneDecrease
+128/131 Test #128: FrontPanel.CenterTuneDecrease ...................................   Passed    0.01 sec
+        Start 129: FrontPanel.FineTuneIncrease
+129/131 Test #129: FrontPanel.FineTuneIncrease .....................................   Passed    0.02 sec
+        Start 130: FrontPanel.FineTuneDecrease
+130/131 Test #130: FrontPanel.FineTuneDecrease .....................................   Passed    0.01 sec
+        Start 131: FrontPanel.FineTuneLimits
+131/131 Test #131: FrontPanel.FineTuneLimits .......................................   Passed    0.01 sec
+
+98% tests passed, 2 tests failed out of 131
+
+Total Test time (real) =   5.91 sec
+
+The following tests FAILED:
+         96 - SignalProcessing.DemodulateAM (Failed)
+         97 - SignalProcessing.DemodulateSAM (Failed)
+```
 
