@@ -287,7 +287,7 @@ TEST(FrontPanel, FineTuneLimits){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.spectrum_zoom = 1; // Enable limits
+    EEPROMData.spectrum_zoom = 1;
     InitializeSignalProcessing();
 
     uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
