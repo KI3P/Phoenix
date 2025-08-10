@@ -198,3 +198,12 @@ errno_t SetRXAttenuator(float rxAttenuation_dB){
 errno_t SetTXAttenuator(float txAttenuation_dB){
     return SetAttenuator((int32_t)round(2*txAttenuation_dB), &GPB_state, WriteGPIOBRegister);
 }
+
+/**
+ * Set the frequency of the Si5351
+ * 
+ * @param centerFreq_Hz THe desired frequency in Hz
+ */
+errno_t SetFreq(int64_t centerFreq_Hz){
+
+}

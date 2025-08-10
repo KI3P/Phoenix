@@ -1,3 +1,5 @@
+// #define FAST_TUNE
+
 #define MY_LAT                                  39.07466 // Coordinates for QTH
 #define MY_LON                                  -84.42677
 #define MY_CALL                                 "ABCDE" // Default max is 10 chars

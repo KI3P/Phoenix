@@ -156,13 +156,13 @@ extern struct config_t {
     int32_t audioVolume = 30;
     float32_t rfGainAllBands_dB = 0;
     int32_t tuneIndex = DEFAULTFREQINCREMENT;             // UNUSED
-    int64_t stepFineTune = FAST_TUNE_INCREMENT;          // UNUSED
+    int64_t stepFineTune = FAST_TUNE_INCREMENT;
     int32_t powerLevel = DEFAULT_POWER_LEVEL;             // UNUSED
     int32_t xmtMode = 0;                                  // UNUSED
     NoiseReductionType nrOptionSelect = NROff;
     uint8_t ANR_notchOn = 0;
     int32_t spectrumScale = 1; // was currentScale
-    int32_t spectrum_zoom = 1;
+    uint32_t spectrum_zoom = 1;
     float32_t spectrum_display_scale = 20.0;              // UNUSED
     int32_t CWFilterIndex = 5;
     int32_t paddleDit = 36;                               // UNUSED
@@ -178,7 +178,7 @@ extern struct config_t {
     int32_t currentBand = STARTUP_BAND;
     int32_t currentBandA = STARTUP_BAND;                  // UNUSED
     int32_t currentBandB = STARTUP_BAND;                  // UNUSED
-    int64_t currentFreqA = CURRENT_FREQ_A;               // UNUSED
+    int64_t currentFreqA = CURRENT_FREQ_A;
     int64_t currentFreqB = CURRENT_FREQ_B;               // UNUSED
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
@@ -211,7 +211,7 @@ extern struct config_t {
     int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // UNUSED
     int32_t antennaSelection[NUMBER_OF_BANDS];            // UNUSED
     int64_t centerFreq_Hz = 7030000L;
-    float32_t fineTuneFreq_Hz = 0.0;
+    int64_t fineTuneFreq_Hz = 0.0;
     char mapFileName[50];                             // UNUSED
     char myCall[10];                                  // UNUSED
     char myTimeZone[10];                              // UNUSED

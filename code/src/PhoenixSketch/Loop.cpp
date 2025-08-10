@@ -26,6 +26,18 @@ static bool keyerFlip = KEYER_FLIP;
 static uint8_t switchFilterSideband = 0;
 char strbuf[100];
 
+#ifdef FAST_TUNE
+// The fast tune parameters
+static uint64_t MS_temp, FT_delay, FT_last_time;
+static bool FT_ON = false;
+const uint64_t FT_cancel_ms = 500;  // time between steps above which FT is cancelled
+const uint64_t FT_on_ms = 100;      // time between FTsteps below which increases the step size
+const int32_t FT_trig = 4;          // number of short steps to trigger fast tune,
+const int FT_step = 1000;           // Hz step in Fast Tune
+static int64_t last_FT_step_size = 1;
+static uint32_t FT_step_counter = 0;
+#endif
+
 /**
  * Sets the key type.
  * 
@@ -118,6 +130,57 @@ void FilterSetSSB(int32_t filter_change) {
 }
 
 /**
+ * Adjust the fine tune frequency (2nd stage software mixer)
+ * 
+ * @param filter_change The positive or negative increment to the filter setting
+ */
+void AdjustFineTune(int32_t filter_change){
+    #ifdef FAST_TUNE
+    MS_temp = millis();
+    FT_delay = MS_temp - FT_last_time;
+    FT_last_time = MS_temp;
+    if (FT_ON) {  // Check if FT should be cancelled (FT_delay>=FT_cancel_ms)
+        if (FT_delay >= FT_cancel_ms) {
+            FT_ON = false;
+            EEPROMData.stepFineTune = last_FT_step_size;
+        }
+    } else {  //  FT is off so check for short delays
+        if (FT_delay <= FT_on_ms) {
+            FT_step_counter += 1;
+        }
+        if (FT_step_counter >= FT_trig) {
+            last_FT_step_size = EEPROMData.stepFineTune;
+            EEPROMData.stepFineTune = FT_step;
+            FT_step_counter = 0;
+            FT_ON = true;
+        }
+    }
+    #endif  // FAST_TUNE
+
+    EEPROMData.fineTuneFreq_Hz += EEPROMData.stepFineTune * filter_change;
+
+    // If the zoom level is 0, then the valid range of fine tune window is between
+    // -samplerate/2 and +samplerate/2. 
+    int32_t lower_limit = -(int32_t)(SR[SampleRate].rate)/2;
+    int32_t upper_limit = (int32_t)(SR[SampleRate].rate)/2;
+    if (EEPROMData.spectrum_zoom != 0) {
+        // The fine tune frequency must stay within the visible tuning window, which
+        // is determined by the zoom level. The visible window is determined by shifting
+        // the spectrum by +48 kHz so the center is at EEPROMData.centerFreq_Hz - 48 kHz, 
+        // then zooming in around the new center frequency.
+        uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
+        lower_limit = -(int32_t)visible_bandwidth/2;
+        upper_limit = +(int32_t)visible_bandwidth/2;
+        if (EEPROMData.fineTuneFreq_Hz > upper_limit) EEPROMData.fineTuneFreq_Hz = upper_limit;
+        if (EEPROMData.fineTuneFreq_Hz < lower_limit) EEPROMData.fineTuneFreq_Hz = lower_limit;
+    }
+
+    // The fine tune is applied after the spectrum is shifted by samplerate/4. So the 
+    // actual frequency in the RF domain is: TXRXFreq = centerFreq+fineTuneFreq-48kHz
+    EEPROMData.currentFreqA = EEPROMData.centerFreq_Hz+EEPROMData.fineTuneFreq_Hz-(int32_t)SR[SampleRate].rate/4;
+}
+
+/**
  * Considers the value of the interrupt and acts accordingly by either issueing an
  * event to the state machines or by updating a system parameter. Interrupt is 
  * consumed and interrupt variable set to NONE.
@@ -184,21 +247,23 @@ void ConsumeInterrupt(void){
         }
         case (iCENTERTUNE_INCREASE):{
             EEPROMData.centerFreq_Hz += (int64_t)EEPROMData.freqIncrement;
-            //SetFreq(EEPROMData.centerFreq_Hz);
+            SetFreq(EEPROMData.centerFreq_Hz);
             Debug("Center tune increase");
             break;
         }
         case (iCENTERTUNE_DECREASE):{
             EEPROMData.centerFreq_Hz -= (int64_t)EEPROMData.freqIncrement;
-            //SetFreq(EEPROMData.centerFreq_Hz);
+            SetFreq(EEPROMData.centerFreq_Hz);
             Debug("Center tune decrease");
             break;
         }
         case (iFINETUNE_INCREASE):{
+            AdjustFineTune(+1);
             Debug("Fine tune increase");
             break;
         }
         case (iFINETUNE_DECREASE):{
+            AdjustFineTune(-1);
             Debug("Fine tune decrease");
             break;
         }

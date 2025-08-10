@@ -21,6 +21,6 @@ errno_t SetRXAttenuator(float rxAttenuation_dB);
 errno_t SetTXAttenuator(float txAttenuation_dB);
 float GetRXAttenuator();
 float GetTXAttenuator();
-
+errno_t SetFreq(int64_t centerFreq_Hz);
 
 #endif // RFBOARD_H
