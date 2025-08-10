@@ -28,9 +28,27 @@ State machines can be written entirely in C code, but it's easier to understand 
 
 ### Arduino
 
+This code has been tested with the Arduino IDE version 2.3.6. Configure your Arduino IDE to use the Teensyduino library following the instructions [here](https://www.pjrc.com/teensy/td_download.html). 
+
+Install the following libraries via the Arduino Library Manager:
+
+* Adafruit MCP23017 Arduino Library, by Adafruit (v2.3.2) (note: install with dependencies)
+
+Several libraries need to be installed manually. The manual process is:
+
+1. Go to the provided GitHub link for the library and download the library as a zip by clicking Code -> Download ZIP.
+2. Import it into the Arduino 2 IDE by clicking Sketch -> Include Library -> Add .ZIP library, and then selecting the file you just downloaded.
+
+The libraries to install using this process are:
+
+* OpenAudio: [https://github.com/chipaudette/OpenAudio_ArduinoLibrary](https://github.com/chipaudette/OpenAudio_ArduinoLibrary)
+
+
 ### StateSmith
 
 [StateSmith](https://github.com/StateSmith/StateSmith) is used to generate state machine code from UML diagrams. The diagrams are drawn in draw.io, a graphical diagram editor. draw.io is available in an online version and a desktop version; use the Desktop version which you can download [here](https://www.drawio.com/).
+
+You only need to install the StateSmith binary if you want to update the state machines. The code will compile without StateSmith installed.
 
 Install the StateSmith binary using [these](https://github.com/StateSmith/StateSmith/wiki/CLI:-Download-or-Install) instructions. For simplicity, we recommend using the pre-built binaries rather than building it from source.
 
