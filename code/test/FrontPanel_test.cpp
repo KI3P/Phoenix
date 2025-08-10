@@ -307,3 +307,28 @@ TEST(FrontPanel, FineTuneLimits){
     EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, lower_limit);
 }
 
+TEST(FrontPanel, FineTuneLimitsNoZoom){
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    EEPROMData.spectrum_zoom = 0; 
+    InitializeSignalProcessing();
+
+    uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
+    int32_t upper_limit = (int32_t)visible_bandwidth/2;
+    int32_t lower_limit = -(int32_t)visible_bandwidth/2;
+
+    // Test upper limit
+    EEPROMData.fineTuneFreq_Hz = upper_limit;
+    SetInterrupt(iFINETUNE_INCREASE);
+    loop();
+    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, upper_limit);
+
+    // Test lower limit
+    EEPROMData.fineTuneFreq_Hz = lower_limit;
+    SetInterrupt(iFINETUNE_DECREASE);
+    loop();
+    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, lower_limit);
+}

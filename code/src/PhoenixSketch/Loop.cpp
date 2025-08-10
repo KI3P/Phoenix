@@ -171,9 +171,9 @@ void AdjustFineTune(int32_t filter_change){
         uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
         lower_limit = -(int32_t)visible_bandwidth/2;
         upper_limit = +(int32_t)visible_bandwidth/2;
-        if (EEPROMData.fineTuneFreq_Hz > upper_limit) EEPROMData.fineTuneFreq_Hz = upper_limit;
-        if (EEPROMData.fineTuneFreq_Hz < lower_limit) EEPROMData.fineTuneFreq_Hz = lower_limit;
     }
+    if (EEPROMData.fineTuneFreq_Hz > upper_limit) EEPROMData.fineTuneFreq_Hz = upper_limit;
+    if (EEPROMData.fineTuneFreq_Hz < lower_limit) EEPROMData.fineTuneFreq_Hz = lower_limit;
 
     // The fine tune is applied after the spectrum is shifted by samplerate/4. So the 
     // actual frequency in the RF domain is: TXRXFreq = centerFreq+fineTuneFreq-48kHz
