@@ -23,4 +23,21 @@ float GetRXAttenuator();
 float GetTXAttenuator();
 errno_t SetFreq(int64_t centerFreq_Hz);
 
+// Transceiver mode selection
+void InitStateSelect(void);
+void SelectSSBState(void);
+void SelectCWState(void);
+void SelectCalState(void);
+
+// VFOs
+void InitVFOs(void);
+void SetVFO1Frequency(int32_t freq_Hz);
+void SetVFO1Power(int32_t power_dBm);
+void DisableVFO1Output(void);
+void EnableVFO1Output(void);
+void SetVFO2Frequency(int32_t freq_Hz);
+void SetVFO2Power(int32_t power_dBm);
+void DisableVFO2Output(void);
+void EnableVFO2Output(void);
+
 #endif // RFBOARD_H
