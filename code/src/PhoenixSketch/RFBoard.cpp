@@ -1,6 +1,8 @@
-#ifndef BEENHERE
+//#ifndef BEENHERE
+//#include "SDT.h"
+//#endif
+//#include "RFBoard.h"
 #include "SDT.h"
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 // Variables that are only visible from within this file
@@ -14,6 +16,7 @@ static uint8_t GPB_state;
 static uint8_t GPA_state;
 static bool boardInitialized = false;
 static errno_t error_state;
+ModeSm_StateId previousState = ModeSm_StateId_ROOT;
 
 #define MAX_ATTENUATION_VAL_DBx2 63
 #define MIN_ATTENUATION_VAL_DBx2 0
@@ -129,7 +132,7 @@ static errno_t AttenuatorCreate(float Attenuation_dB, errno_t (*SetAtten)(float)
  * 
  */
 errno_t RXAttenuatorCreate(float rxAttenuation_dB){
-    return AttenuatorCreate(rxAttenuation_dB, SetRXAttenuator);
+    return AttenuatorCreate(rxAttenuation_dB, SetRXAttenuation);
 }
 
 /**
@@ -146,7 +149,7 @@ errno_t RXAttenuatorCreate(float rxAttenuation_dB){
  * 
  */
 errno_t TXAttenuatorCreate(float txAttenuation_dB){
-    return AttenuatorCreate(txAttenuation_dB, SetTXAttenuator);
+    return AttenuatorCreate(txAttenuation_dB, SetTXAttenuation);
 }
 
 /**
@@ -155,7 +158,7 @@ errno_t TXAttenuatorCreate(float txAttenuation_dB){
  *  @return rxAttenuation_dB The RX attenuation in units of dB.
  * 
  */
-float GetRXAttenuator(){
+float GetRXAttenuation(){
     return ((float)GPA_state)/2.0;
 }
 
@@ -165,7 +168,7 @@ float GetRXAttenuator(){
  *  @return txAttenuation_dB The RX attenuation in units of dB.
  * 
  */
-float GetTXAttenuator(){
+float GetTXAttenuation(){
     return ((float)GPB_state)/2.0;
 }
 
@@ -180,7 +183,7 @@ float GetTXAttenuator(){
  * @return Error code. ESUCCESS if no failure. EGPIOWRITEFAIL if unable to write to GPIO bank.
  *  
  */
-errno_t SetRXAttenuator(float rxAttenuation_dB){
+errno_t SetRXAttenuation(float rxAttenuation_dB){
     return SetAttenuator((int32_t)round(2*rxAttenuation_dB), &GPA_state, WriteGPIOARegister);
 }
 
@@ -195,7 +198,7 @@ errno_t SetRXAttenuator(float rxAttenuation_dB){
  * @return Error code. ESUCCESS if no failure. EGPIOWRITEFAIL if unable to write to GPIO bank.
  *  
  */
-errno_t SetTXAttenuator(float txAttenuation_dB){
+errno_t SetTXAttenuation(float txAttenuation_dB){
     return SetAttenuator((int32_t)round(2*txAttenuation_dB), &GPB_state, WriteGPIOBRegister);
 }
 
@@ -216,11 +219,34 @@ void SelectCalState(void){}
 
 // VFOs
 void InitVFOs(void){}
-void SetVFO1Frequency(int32_t freq_Hz){}
+void SetVFO1Frequency(int64_t freq_Hz){}
 void SetVFO1Power(int32_t power_dBm){}
 void DisableVFO1Output(void){}
 void EnableVFO1Output(void){}
-void SetVFO2Frequency(int32_t freq_Hz){}
+void SetVFO2Frequency(int64_t freq_Hz){}
 void SetVFO2Power(int32_t power_dBm){}
 void DisableVFO2Output(void){}
 void EnableVFO2Output(void){}
+
+ModeSm_StateId GetRFBoardPreviousState(void){
+    return previousState;
+}
+
+void UpdateRFBoardState(void){
+    if (modeSM.state_id == previousState){
+        // Already in this state, no need to change
+        return;
+    }
+    switch (modeSM.state_id){
+        case (ModeSm_StateId_CW_RECEIVE):{
+            break;
+        }
+        case (ModeSm_StateId_SSB_RECEIVE):{
+            break;
+        }
+        default:{
+            break;
+        }
+    }
+    previousState = modeSM.state_id;
+}

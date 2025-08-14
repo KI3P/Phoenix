@@ -20,16 +20,16 @@ UIValueUpdateInt uiRFScaleUpdate = {
 
 UIValueUpdateFloat uiRXGainUpdate = {
     .base = TYPE_FLOAT,
-    .getValueFunction = GetRXAttenuator,
+    .getValueFunction = GetRXAttenuation,
     .incrementValue = 0.5,
-    .setValueFunction = SetRXAttenuator
+    .setValueFunction = SetRXAttenuation
 };
 
 UIValueUpdateFloat uiTXGainUpdate = {
     .base = TYPE_FLOAT,
-    .getValueFunction = GetTXAttenuator,
+    .getValueFunction = GetTXAttenuation,
     .incrementValue = 0.5,
-    .setValueFunction = SetTXAttenuator
+    .setValueFunction = SetTXAttenuation
 };
 
 /**

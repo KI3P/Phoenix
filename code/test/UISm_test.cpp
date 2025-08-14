@@ -82,7 +82,7 @@ TEST(UISm, RFMenuCancel){
 // Enter adjust state from RF_ADJUST_RX_GAIN properly configured
 TEST(UISm, RXGainToAdjustTransition){
     UISm_start(&uiSM);
-    SetRXAttenuator(20);
+    SetRXAttenuation(20);
     uiSM.state_id = UISm_StateId_RF_ADJUST_RX_GAIN;
     UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SHOW_VALUE);
@@ -93,7 +93,7 @@ TEST(UISm, RXGainToAdjustTransition){
 // Exit from adjust state
 TEST(UISm, AdjustToHomeTransition){
     UISm_start(&uiSM);
-    SetRXAttenuator(20);
+    SetRXAttenuation(20);
     uiSM.state_id = UISm_StateId_RF_ADJUST_RX_GAIN;
     UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SHOW_VALUE);
@@ -104,7 +104,7 @@ TEST(UISm, AdjustToHomeTransition){
 // Adjust RX_GAIN
 TEST(UISm, RXGainIncrementAndDecrement){
     UISm_start(&uiSM);
-    SetRXAttenuator(20);
+    SetRXAttenuation(20);
     uiSM.state_id = UISm_StateId_RF_ADJUST_RX_GAIN;
     UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
     UISm_dispatch_event(&uiSM, UISm_EventId_MENU_INC);
@@ -118,7 +118,7 @@ TEST(UISm, RXGainIncrementAndDecrement){
 // Adjust RX_GAIN past the max value via the menu
 TEST(UISm, RXGainIncreasePastMax){
     UISm_start(&uiSM);
-    SetRXAttenuator(63);
+    SetRXAttenuation(63);
     uiSM.state_id = UISm_StateId_RF_ADJUST_RX_GAIN;
     UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
     UISm_dispatch_event(&uiSM, UISm_EventId_MENU_INC);
@@ -129,8 +129,8 @@ TEST(UISm, RXGainIncreasePastMax){
 // Enter adjust state from RF_ADJUST_TX_GAIN properly configured
 TEST(UISm, TXGainToAdjustTransition){
     UISm_start(&uiSM);
-    SetRXAttenuator(20);
-    SetTXAttenuator(30);
+    SetRXAttenuation(20);
+    SetTXAttenuation(30);
     uiSM.state_id = UISm_StateId_RF_ADJUST_TX_GAIN;
     UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SHOW_VALUE);
@@ -141,8 +141,8 @@ TEST(UISm, TXGainToAdjustTransition){
 // Adjusting TX Gain doesn't affect RX Gain
 TEST(UISm, TXGainAdjustDoesNotAffectRXGain){
     UISm_start(&uiSM);
-    SetRXAttenuator(20);
-    SetTXAttenuator(30);
+    SetRXAttenuation(20);
+    SetTXAttenuation(30);
     uiSM.state_id = UISm_StateId_RF_ADJUST_TX_GAIN;
     UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SHOW_VALUE);
@@ -150,7 +150,7 @@ TEST(UISm, TXGainAdjustDoesNotAffectRXGain){
     EXPECT_EQ(foo->getValueFunction(),30);
     UISm_dispatch_event(&uiSM, UISm_EventId_MENU_INC);
     EXPECT_EQ(foo->getValueFunction(),30.5);
-    EXPECT_EQ(GetRXAttenuator(),20);
+    EXPECT_EQ(GetRXAttenuation(),20);
 }
 
 // Adjust an int32_t

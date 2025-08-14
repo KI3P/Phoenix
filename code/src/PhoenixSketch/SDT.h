@@ -515,6 +515,7 @@ struct AGCConfig {
 #include "MainBoard_AudioIO.h"
 #include "FrontPanel.h"
 #include "FrontPanel_Rotary.h"
+#include "RFBoard.h"
 #ifdef TESTMODE
 #include "../../test/SignalProcessing_mock.h" // remove from prod
 #endif

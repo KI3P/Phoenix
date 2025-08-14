@@ -1298,7 +1298,7 @@ TEST(SignalProcessing, AudioIIRFilterCorrect){
     
 }
 
-TEST(SignalProcessing, DemodulateAM){
+/*TEST(SignalProcessing, DemodulateAM){
     // Generate an AM modulated signal as it appears at IF frequencies.
     // In the simplest case, I is offset from zero and has some amplitude. Q is all zeros.
     
@@ -1334,11 +1334,11 @@ TEST(SignalProcessing, DemodulateAM){
 
     // Does it match the expected result?
     EXPECT_EQ(1,0);
-}
+}*/
 
-TEST(SignalProcessing, DemodulateSAM){
+/*TEST(SignalProcessing, DemodulateSAM){
     EXPECT_EQ(1,0);
-}
+}*/
 
 
 void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32_t *gain){

@@ -16,30 +16,30 @@ TEST(RFBoard, RXAttenuatorCreate_InitializesI2C) {
 // After creation, the GPIO register matches the defined startup state
 TEST(RFBoard, RXAttenuatorCreate_SetsValue) {
     errno_t rv = RXAttenuatorCreate(20.0);
-    float state = GetRXAttenuator();
+    float state = GetRXAttenuation();
     EXPECT_EQ(state, 20.0);
 }
 
 // After creation, the GPIO register pegs to max is the startup value is outside the allowed range
 TEST(RFBoard, RXAttenuatorCreate_SetsInvalidValue) {
     errno_t rv = RXAttenuatorCreate(80.0);
-    float state = GetRXAttenuator();
+    float state = GetRXAttenuation();
     EXPECT_EQ(state, 31.5);
 }
 
 // Setting the attenuation state to an allowed number is successful
 TEST(RFBoard, RXAttenuator_SetValueInAllowedRangePasses) {
     errno_t rv = RXAttenuatorCreate(30.0);
-    errno_t rv2 = SetRXAttenuator(20.0);
-    float state = GetRXAttenuator();
+    errno_t rv2 = SetRXAttenuation(20.0);
+    float state = GetRXAttenuation();
     EXPECT_EQ(state, 20.0);
 }
 
 // Setting the attenuation state to a disallowed number outside allowed range pegs it to max
 TEST(RFBoard, RXAttenuator_SetValueOutsideAllowedRangePegsToMax) {
     errno_t rv = RXAttenuatorCreate(30.0);
-    errno_t rv2 = SetRXAttenuator(64.0);
-    float state = GetRXAttenuator();
+    errno_t rv2 = SetRXAttenuation(64.0);
+    float state = GetRXAttenuation();
     EXPECT_EQ(state, 31.5);
 }
 
@@ -51,8 +51,8 @@ TEST(RFBoard, RXAttenuator_EveryAllowedValueWorks) {
     float state;
     int error = 0;
     for (int i=0;i<=63;i++){
-        rv2 = SetRXAttenuator(0.0 + ((float)i)/2.0);
-        state = GetRXAttenuator();
+        rv2 = SetRXAttenuation(0.0 + ((float)i)/2.0);
+        state = GetRXAttenuation();
         if (abs((float)i/2 - state)>0.01) error += 1;
     }
     EXPECT_EQ(error, 0);
@@ -68,30 +68,30 @@ TEST(RFBoard, TXAttenuatorCreate_InitializesI2C) {
 // After creation, the GPIO register matches the defined startup state
 TEST(RFBoard, TXAttenuatorCreate_SetsValue) {
     errno_t rv = TXAttenuatorCreate(30);
-    float state = GetTXAttenuator();
+    float state = GetTXAttenuation();
     EXPECT_EQ(state, 30);
 }
 
 // After creation, the GPIO register pegs to max is the startup value is outside the allowed range
 TEST(RFBoard, TXAttenuatorCreate_SetsInvalidValue) {
     errno_t rv = TXAttenuatorCreate(80.0);
-    float state = GetTXAttenuator();
+    float state = GetTXAttenuation();
     EXPECT_EQ(state, 31.5);
 }
 
 // Setting the attenuation state to an allowed number is successful
 TEST(RFBoard, TXAttenuator_SetValueInAllowedRangePasses) {
     errno_t rv = TXAttenuatorCreate(30);
-    errno_t rv2 = SetTXAttenuator(20);
-    float state = GetTXAttenuator();
+    errno_t rv2 = SetTXAttenuation(20);
+    float state = GetTXAttenuation();
     EXPECT_EQ(state, 20);
 }
 
 // Setting the attenuation state to a disallowed number outside allowed range pegs it to max
 TEST(RFBoard, TXAttenuator_SetValueOutsideAllowedRangePegsToMax) {
     errno_t rv = TXAttenuatorCreate(30);
-    errno_t rv2 = SetTXAttenuator(64);
-    float state = GetTXAttenuator();
+    errno_t rv2 = SetTXAttenuation(64);
+    float state = GetTXAttenuation();
     EXPECT_EQ(state, 31.5);
 }
 
@@ -102,8 +102,8 @@ TEST(RFBoard, TXAttenuator_EveryAllowedValueWorks) {
     float state;
     int error = 0;
     for (int i=0;i<=63;i++){
-        rv2 = SetTXAttenuator(0.0 + ((float)i)/2.0);
-        state = GetTXAttenuator();
+        rv2 = SetTXAttenuation(0.0 + ((float)i)/2.0);
+        state = GetTXAttenuation();
         if (abs((float)i/2 - state)>0.01) error += 1;
     }
     EXPECT_EQ(error, 0);
@@ -113,9 +113,9 @@ TEST(RFBoard, TXAttenuator_EveryAllowedValueWorks) {
 TEST(RFBoard, RXTXAttenuators_SettingTXDoesNotChangeRX) {
     errno_t rv = TXAttenuatorCreate(30);
     errno_t rv3 = RXAttenuatorCreate(20);
-    float RX_pre = GetRXAttenuator();
-    errno_t rv2 = SetTXAttenuator(10);
-    float RX_post = GetRXAttenuator();
+    float RX_pre = GetRXAttenuation();
+    errno_t rv2 = SetTXAttenuation(10);
+    float RX_post = GetRXAttenuation();
     float error = RX_pre - RX_post;
     EXPECT_EQ(error, 0);
 }
@@ -123,9 +123,9 @@ TEST(RFBoard, RXTXAttenuators_SettingTXDoesNotChangeRX) {
 TEST(RFBoard, RXTXAttenuators_SettingRXDoesNotChangeTX) {
     errno_t rv = TXAttenuatorCreate(30);
     errno_t rv3 = RXAttenuatorCreate(20);
-    float TX_pre = GetTXAttenuator();
-    errno_t rv2 = SetRXAttenuator(10);
-    float TX_post = GetTXAttenuator();
+    float TX_pre = GetTXAttenuation();
+    errno_t rv2 = SetRXAttenuation(10);
+    float TX_post = GetTXAttenuation();
     float error = TX_pre - TX_post;
     EXPECT_EQ(error, 0);
 }
@@ -134,21 +134,21 @@ TEST(RFBoard, RXTXAttenuators_SettingRXDoesNotChangeTX) {
 TEST(RFBoard, AttenuatorRoundingToNearestHalfdB) {
     errno_t rv;
     rv = TXAttenuatorCreate(30);
-    rv = SetTXAttenuator(10.1);
+    rv = SetTXAttenuation(10.1);
     float val;
-    val = GetTXAttenuator();
+    val = GetTXAttenuation();
     EXPECT_EQ(val, 10.0);
 
-    SetTXAttenuator(9.9);
-    val = GetTXAttenuator();
+    SetTXAttenuation(9.9);
+    val = GetTXAttenuation();
     EXPECT_EQ(val, 10.0);
 
-    SetTXAttenuator(9.76);
-    val = GetTXAttenuator();
+    SetTXAttenuation(9.76);
+    val = GetTXAttenuation();
     EXPECT_EQ(val, 10.0);
 
-    SetTXAttenuator(9.74);
-    val = GetTXAttenuator();
+    SetTXAttenuation(9.74);
+    val = GetTXAttenuation();
     EXPECT_EQ(val, 9.5);
 
 }
