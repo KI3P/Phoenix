@@ -1,7 +1,6 @@
 #include "gtest/gtest.h"
 
 #include "../src/PhoenixSketch/SDT.h"
-#include "SignalProcessing_mock.h"
 #include <sys/time.h>
 
 float32_t get_max(float32_t *d, uint32_t Nsamples){

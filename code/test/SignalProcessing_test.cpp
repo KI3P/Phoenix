@@ -1,7 +1,6 @@
 #include "gtest/gtest.h"
 
 #include "../src/PhoenixSketch/SDT.h"
-#include "SignalProcessing_mock.h"
 #include <sys/time.h>
 
 

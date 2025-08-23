@@ -1,7 +1,4 @@
 #include "DSP_FFT.h"
-#ifdef TESTMODE
-#include "../../test/SignalProcessing_mock.h"
-#endif
 
 float32_t DMAMEM buffer_spec_FFT[2*SPECTRUM_RES] __attribute__((aligned(4))); /** Used by multiple functions */
 float32_t DMAMEM iFFT_buffer[2*SPECTRUM_RES] __attribute__((aligned(4)));

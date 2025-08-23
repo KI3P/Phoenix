@@ -511,9 +511,6 @@ struct AGCConfig {
 #include "FrontPanel.h"
 #include "FrontPanel_Rotary.h"
 #include "RFBoard.h"
-#ifdef TESTMODE
-#include "../../test/SignalProcessing_mock.h" // remove from prod
-#endif
 
 extern struct BIT bit_results;
 extern struct band bands[];

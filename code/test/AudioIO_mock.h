@@ -1,8 +1,6 @@
 #ifndef AUDIOIOMOCK_H
 #define AUDIOIOMOCK_H
 
-#include "SignalProcessing_mock.h"
-
 #define LOW 0
 #define HIGH 1
 #define AUDIO_INPUT_MIC 1
