@@ -1,24 +1,20 @@
 #ifndef SDT_H
 #define SDT_H
 
-//#define TESTMODE
+#define TESTMODE
 
 #ifndef TESTMODE
-#include <Arduino.h>
-#include <Adafruit_MCP23X17.h>
-#include <arm_math.h>
-#include <arm_const_structs.h>
-#include <OpenAudio_ArduinoLibrary.h>  //https://github.com/chipaudette/OpenAudio_ArduinoLibrary
-#include <utility/imxrt_hw.h>  // for setting I2S freq, Thanks, FrankB!
 #define Debug(x) Serial.println(x)
 #else
-#include "../../test/arm_math.h"
-#include "../../test/arm_const_structs.h"
 #define Debug(x) serialprint(x)
 #endif 
 
-#define CLEAR_VAR(x) memset(x, 0, sizeof(x))
-
+#include <Arduino.h>
+#include <utility/imxrt_hw.h>
+#include <Adafruit_MCP23X17.h>
+#include <OpenAudio_ArduinoLibrary.h>  //https://github.com/chipaudette/OpenAudio_ArduinoLibrary
+#include <arm_math.h>
+#include <arm_const_structs.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -30,6 +26,8 @@
 #ifndef __STDC_LIB_EXT1__
 typedef int errno_t;
 #endif
+
+#define CLEAR_VAR(x) memset(x, 0, sizeof(x))
 
 #define BEGIN_TEENSY_SHUTDOWN 0
 #define SHUTDOWN_COMPLETE 1

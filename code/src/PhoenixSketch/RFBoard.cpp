@@ -258,8 +258,8 @@ void SetFreq(int64_t centerFreq_Hz){
  * @param power Expect one of the SI5351_DRIVE_?MA parameters
  */
 void SetSSBVFOPower(int32_t power){
-    si5351.drive_strength(SI5351_CLK0, power);
-    si5351.drive_strength(SI5351_CLK1, power);
+    si5351.drive_strength(SI5351_CLK0, (si5351_drive)power);
+    si5351.drive_strength(SI5351_CLK1, (si5351_drive)power);
 }
 
 /**
@@ -434,7 +434,7 @@ void DisableCWVFOOutput(void){
  * @param power Expect one of the SI5351_DRIVE_?MA parameters
  */
 void SetCWVFOPower(int32_t power){
-    si5351.drive_strength(SI5351_CLK2, power);
+    si5351.drive_strength(SI5351_CLK2, (si5351_drive)power);
 }
 
 /**
@@ -477,7 +477,7 @@ errno_t InitVFOs(void){
     MyDelay(100L);
     if (!si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, EEPROMData.freqCorrectionFactor)) {
         bit_results.RF_Si5351_present = false;
-        Serial.println("Initialize si5351 failed!");
+        Debug("Initialize si5351 failed!");
         return EFAIL;
     } else {
         bit_results.RF_Si5351_present = true;

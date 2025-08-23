@@ -30,14 +30,14 @@ void PerformSignalProcessing(void){
     }
 }
 
-#ifdef TESTMODE
+// #ifdef TESTMODE
 float32_t GetAmpCorrectionFactor(uint32_t bandN){
     return EEPROMData.IQAmpCorrectionFactor[bandN];
 }
 float32_t GetPhaseCorrectionFactor(uint32_t bandN){
     return EEPROMData.IQPhaseCorrectionFactor[bandN];
 }
-#endif
+// #endif
 
 /**
  * Apply gain factors to the data. Supplied factors are in units of dB, so 
@@ -95,11 +95,7 @@ errno_t ReadIQInputBuffer(DataBlock *data){
  * case, we clear the buffers to keep the whole audio chain running smoothly.
  */
 void ClearAudioBuffers(void){
-    #ifdef TESTMODE
     uint16_t threshold = 100;
-    #else
-    uint16_t threshold = 100;
-    #endif
     if (Q_in_L.available() > threshold) {
       Q_in_L.clear();
       n_clear++;  // just for debugging to check how often this occurs
@@ -695,11 +691,11 @@ void InitializeSignalProcessing(void){
     InitializeCWProcessing(EEPROMData.currentWPM, &filters);
 }
 
-#ifdef TESTMODE
 void setfilename(char *fnm){
     filename = fnm;
 }
 
+//#ifdef TESTMODE
 void SaveData(DataBlock *data, uint32_t suffix){
     if (filename != nullptr){
         char fn2[100];
@@ -711,7 +707,7 @@ void SaveData(DataBlock *data, uint32_t suffix){
         fclose(file2);
     }
 }
-#endif
+//#endif
 
 /**
  * Read a block of samples from the ADC and perform receive signal processing

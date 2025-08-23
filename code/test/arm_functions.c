@@ -8,7 +8,6 @@
  */
 
 
- 
 /* ----------------------------------------------------------------------    
 * Copyright (C) 2010-2014 ARM Limited. All rights reserved.    
 *    
@@ -50,6 +49,17 @@
 * -------------------------------------------------------------------- */
 
 #include "arm_math.h"
+
+void arm_float_to_q15(
+  float32_t * pSrc,
+  q15_t * pDst,
+  uint32_t blockSize)
+{
+    for (size_t k = 0; k < blockSize; k++){
+        pDst[k] = (q15_t)(pSrc[k]*32768);
+    }
+}
+ 
 
 /**    
  * @defgroup FIR_Interpolate Finite Impulse Response (FIR) Interpolator    
