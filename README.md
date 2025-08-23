@@ -64,11 +64,12 @@ The first time you run the unit tests, start in the Phoenix directory and run th
 mkdir code/test/build
 ```
 
-Then, to run the unit tests, do the following:
+Then, to build and run the unit tests, do the following:
 
 ```bash
 cd code/test/build
-cmake ../ && make && ctest --output-on-failure
+cmake ../ && make
+ctest --output-on-failure
 ```
 
 This will compile and run the unit test programs. You should see an output that looks something like this (but with all tests passed!):
