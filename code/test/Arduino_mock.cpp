@@ -90,3 +90,7 @@ int64_t millis(void){
 void SetMillisTime(uint64_t time_ms){
     tstart = millis()+tstart - time_ms;
 }
+
+void digitalWrite(uint16_t pin, uint8_t val){}
+uint8_t digitalRead(uint16_t pin){return 0;}
+void pinMode(uint16_t pin, uint8_t val){}

@@ -76,3 +76,17 @@ void AudioPlayQueue::playBuffer(void){
     return;
 }
 
+uint32_t CCM_CS1CDR;
+uint32_t CCM_CS1CDR_SAI1_CLK_PRED_MASK;
+uint32_t CCM_CS1CDR_SAI1_CLK_PODF_MASK;
+uint32_t CCM_CS2CDR;
+uint32_t CCM_CS2CDR_SAI2_CLK_PRED_MASK;
+uint32_t CCM_CS2CDR_SAI2_CLK_PODF_MASK;
+
+void AudioMemory(uint16_t mem){}
+void AudioMemory_F32(uint16_t mem){}
+void set_audioClock(int c0, int c1, int c2, bool b){}
+uint32_t CCM_CS1CDR_SAI1_CLK_PRED(int a){return 0;}
+uint32_t CCM_CS1CDR_SAI1_CLK_PODF(int a){return 0;}
+uint32_t CCM_CS2CDR_SAI2_CLK_PRED(int a){return 0;}
+uint32_t CCM_CS2CDR_SAI2_CLK_PODF(int a){return 0;}

@@ -14,6 +14,10 @@ typedef float float32_t;
 #define DMAMEM
 #define FASTRUN
 
+void digitalWrite(uint16_t pin, uint8_t val);
+uint8_t digitalRead(uint16_t pin);
+void pinMode(uint16_t pin, uint8_t val);
+
 void StartMillis(void);
 void AddMillisTime(uint64_t delta_ms);
 void SetMillisTime(uint64_t time_ms);
