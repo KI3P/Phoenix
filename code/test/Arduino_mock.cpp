@@ -1,4 +1,32 @@
 #include "Arduino.h"
+#include <iostream>
+#include <string>
+
+SerialClass Serial;
+
+void SerialClass::print(const char* s) {
+    std::cout << s;
+}
+
+void SerialClass::println(const char* s) {
+    std::cout << s << std::endl;
+}
+
+void SerialClass::print(int n) {
+    std::cout << n;
+}
+
+void SerialClass::println(int n) {
+    std::cout << n << std::endl;
+}
+
+void SerialClass::print(float f) {
+    std::cout << f;
+}
+
+void SerialClass::println(float f) {
+    std::cout << f << std::endl;
+}
 
 int64_t tstart;
 

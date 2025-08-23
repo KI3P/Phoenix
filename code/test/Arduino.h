@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <cstddef>
+#include <string>
+#include <vector>
 
 typedef float float32_t;
 #define AudioInterrupts()
@@ -20,5 +22,18 @@ void delayMicroseconds(uint32_t usec);
 int64_t millis(void);
 
 #define OUTPUT 1
+
+class SerialClass {
+public:
+    std::vector<std::string> lines;
+    void print(const char*);
+    void println(const char*);
+    void print(int);
+    void println(int);
+    void print(float);
+    void println(float);
+};
+
+extern SerialClass Serial;
 
 #endif
