@@ -500,7 +500,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
         sprintf(fn2,"fIQ_%s",fname);
         FILE *file2 = fopen(fn2, "w");
         for (size_t i = 0; i < data->N; i++) {
-            fprintf(file2, "%d,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
+            fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
         }
         fclose(file2);
     }
@@ -526,7 +526,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     if (fname != nullptr){
         FILE *file = fopen(fname, "w");
         for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
-            fprintf(file, "%d,%7.6f\n", i,buffer_spec_FFT[i]);
+            fprintf(file, "%zu,%7.6f\n", i,buffer_spec_FFT[i]);
         }
         fclose(file);
     }

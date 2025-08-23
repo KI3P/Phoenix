@@ -11,7 +11,9 @@ include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/release-1.12.1.zip
+  DOWNLOAD_EXTRACT_TIMESTAMP true
 )
+
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -21,7 +23,7 @@ set(CMAKE_BUILD_TYPE Debug)
 enable_testing()
 
 # Try to get rid of this if you can
-add_compile_options(-fpermissive)
+add_compile_options(-Wno-write-strings)
 
 include_directories(../src/PhoenixSketch)
 include_directories(../test)

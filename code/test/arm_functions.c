@@ -5902,7 +5902,7 @@ void arm_cfft_f32(
     // KI3P: NOTE THAT THIS LINE WAS MODIFIED FROM ORIGINAL ARM CODE TO GET IT TO COMPILE AND IS NOT CORRECT
     if( bitReverseFlag )
         //arm_bitreversal_32((uint32_t*)p1,S->bitRevLength,S->pBitRevTable);
-        arm_bitreversal_f32( p1, S->fftLen, 8u,S->pBitRevTable);
+        arm_bitreversal_f32( p1, S->fftLen, 8u,(uint16_t *)S->pBitRevTable);
 
     if(ifftFlag == 1u)
     {

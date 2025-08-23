@@ -5867,7 +5867,7 @@ void arm_rfft_fast_f32(
     *writeOffset = (uint16_t)wOffset;
   }
 
-
+#include <stdint.h> // The C header for uintptr_t
 
   /**
    * @brief floating-point Circular Read function.
@@ -5884,12 +5884,13 @@ void arm_rfft_fast_f32(
   uint32_t blockSize)
   {
     uint32_t i = 0u;
-    int32_t rOffset, dst_end;
+    int32_t rOffset;
+    uintptr_t dst_end; // Changed to uintptr_t to hold the pointer address
 
     /* Copy the value of Index pointer that points
      * to the current location from where the input samples to be read */
     rOffset = *readOffset;
-    dst_end = (int32_t) (dst_base + dst_length);
+    dst_end = (uintptr_t) (dst_base + dst_length);
 
     /* Loop over the blockSize */
     i = blockSize;
@@ -5983,13 +5984,14 @@ void arm_rfft_fast_f32(
   uint32_t blockSize)
   {
     uint32_t i = 0;
-    int32_t rOffset, dst_end;
+    int32_t rOffset;
+    uintptr_t dst_end; // Changed to uintptr_t to hold the pointer address
 
     /* Copy the value of Index pointer that points
      * to the current location from where the input samples to be read */
     rOffset = *readOffset;
 
-    dst_end = (int32_t) (dst_base + dst_length);
+    dst_end = (uintptr_t) (dst_base + dst_length);
 
     /* Loop over the blockSize */
     i = blockSize;
@@ -6083,14 +6085,14 @@ void arm_rfft_fast_f32(
   uint32_t blockSize)
   {
     uint32_t i = 0;
-    int32_t rOffset, dst_end;
+    int32_t rOffset;
+    uintptr_t dst_end; // Changed to uintptr_t to hold the pointer address
 
     /* Copy the value of Index pointer that points
      * to the current location from where the input samples to be read */
     rOffset = *readOffset;
 
-    dst_end = (int32_t) (dst_base + dst_length);
-
+    dst_end = (uintptr_t) (dst_base + dst_length);
     /* Loop over the blockSize */
     i = blockSize;
 
@@ -7194,6 +7196,12 @@ void arm_rfft_fast_f32(
 #endif
 
 #endif /* _ARM_MATH_H */
+
+void arm_bitreversal_f32(
+float32_t * pSrc,
+uint16_t fftSize,
+uint16_t bitRevFactor,
+uint16_t * pBitRevTab);
 
 /**
  *

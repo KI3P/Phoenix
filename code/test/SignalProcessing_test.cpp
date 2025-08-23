@@ -58,7 +58,7 @@ void CreateDoubleTone(float *buf, int Nsamples, int sampleRate_Hz,
 void WriteFile(float32_t *data, char *fname, int N){
     FILE *file = fopen(fname, "w");
     for (size_t i = 0; i < N; i++) {
-        fprintf(file, "%d,%7.6f\n", i,data[i]);
+        fprintf(file, "%zu,%7.6f\n", i,data[i]);
     }
     fclose(file);
 }
@@ -66,7 +66,7 @@ void WriteFile(float32_t *data, char *fname, int N){
 void WriteIQFile(float32_t *I, float32_t *Q, char *fname, int N){
     FILE *file = fopen(fname, "w");
     for (size_t i = 0; i < N; i++) {
-        fprintf(file, "%d,%7.6f,%7.6f\n", i,I[i],Q[i]);
+        fprintf(file, "%zu,%7.6f,%7.6f\n", i,I[i],Q[i]);
     }
     fclose(file);
 }
@@ -74,8 +74,8 @@ void WriteIQFile(float32_t *I, float32_t *Q, char *fname, int N){
 void WriteBiquadFilterState(arm_biquad_casd_df1_inst_f32 *bq, char *fname){
     FILE *file = fopen(fname, "w");
     fprintf(file,"Num stages:        %d\n",bq->numStages);
-    fprintf(file,"pState pointer:    %ld\n",bq->pState);
-    fprintf(file,"pCoeffs pointer:   %ld\n",bq->pCoeffs);
+    fprintf(file,"pState pointer:    %p\n",(void *)bq->pState);
+    fprintf(file,"pCoeffs pointer:   %p\n",(void *)bq->pCoeffs);
     fprintf(file, "Stage, pstate 1,2,3,4\n");
     for (int i=0; i<bq->numStages; i++){
         fprintf(file,"    %d,%6.5f,%6.5f,%6.5f,%6.5f\n",i,

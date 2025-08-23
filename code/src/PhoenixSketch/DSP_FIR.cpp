@@ -1270,7 +1270,7 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
   #ifdef TESTMODE
   FILE *file2 = fopen("FIR_filter_samples.txt", "w");
   for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
-      fprintf(file2, "%d,%7.6f\n", i, FIR_filter_mask[i]);
+      fprintf(file2, "%zu,%7.6f\n", i, FIR_filter_mask[i]);
   }
   fclose(file2);
   #endif

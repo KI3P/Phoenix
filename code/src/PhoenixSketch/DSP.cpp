@@ -702,7 +702,7 @@ void SaveData(DataBlock *data, uint32_t suffix){
         sprintf(fn2,"%s-%02d.txt",filename, suffix);
         FILE *file2 = fopen(fn2, "w");
         for (size_t i = 0; i < data->N; i++) {
-            fprintf(file2, "%d,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
+            fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
         }
         fclose(file2);
     }
@@ -736,7 +736,7 @@ DataBlock * ReceiveProcessing(const char *fname){
         sprintf(fn2,"IQ_%s",filename);
         FILE *file2 = fopen(fn2, "w");
         for (size_t i = 0; i < 2048; i++) {
-            fprintf(file2, "%d,%7.6f,%7.6f\n", i,data.I[i],data.Q[i]);
+            fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data.I[i],data.Q[i]);
         }
         fclose(file2);
     }
