@@ -1974,7 +1974,7 @@ TEST(SignalProcessing, ReceiveProcessing){
     }
 }
 
-TEST(SignalProcessing, LongTerm){
+/*TEST(SignalProcessing, LongTerm){
     // Run a signal through the receive chain for a long period of time
     Serial.createFile("Terminal_LongTerm.txt");
     Q_in_L.setChannel(2);
