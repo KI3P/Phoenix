@@ -58,7 +58,7 @@ The test framework isn't needed to compile and run the code. If you want to modi
 
 The Test Driven Development framework we use is [Google Test](https://google.github.io/googletest/). You don't need to install it -- it is downloaded as part of the make process. You need to have [cmake](https://cmake.org/download/) installed. 
 
-The first time you run the unit tests, do the following to create a build directory:
+The first time you run the unit tests, start in the Phoenix directory and run the following command to create a build directory:
 
 ```bash
 mkdir code/test/build
@@ -68,7 +68,7 @@ Then, to run the unit tests, do the following:
 
 ```bash
 cd code/test/build
-cmake .. && make && ctest --output-on-failure
+cmake ../ && make && ctest --output-on-failure
 ```
 
 This will compile and run the unit test programs. You should see an output that looks something like this (but with all tests passed!):
