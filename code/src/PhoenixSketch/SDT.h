@@ -1,7 +1,7 @@
 #ifndef SDT_H
 #define SDT_H
 
-#define TESTMODE
+//#define TESTMODE
 
 #ifndef TESTMODE
 #include <Arduino.h>
@@ -174,7 +174,7 @@ extern struct config_t {
     int64_t cwTransmitDelay = 750;                       // UNUSED
     int32_t activeVFO = 0;                                // UNUSED
     int32_t freqIncrement = 5;
-    float32_t freqCorrectionFactor = 0;                   // UNUSED
+    float32_t freqCorrectionFactor = 0;
     int32_t currentBand = STARTUP_BAND;
     int32_t currentBandA = STARTUP_BAND;                  // UNUSED
     int32_t currentBandB = STARTUP_BAND;                  // UNUSED
@@ -204,9 +204,9 @@ extern struct config_t {
     float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS];  // UNUSED
     float32_t IQXRecAmpCorrectionFactor[NUMBER_OF_BANDS]; // UNUSED
     float32_t IQXRecPhaseCorrectionFactor[NUMBER_OF_BANDS]; // UNUSED
-    int32_t XAttenCW[NUMBER_OF_BANDS];                    // UNUSED
-    int32_t XAttenSSB[NUMBER_OF_BANDS];                   // UNUSED
-    int32_t RAtten[NUMBER_OF_BANDS];                      // UNUSED
+    float32_t XAttenCW[NUMBER_OF_BANDS];
+    float32_t XAttenSSB[NUMBER_OF_BANDS];
+    float32_t RAtten[NUMBER_OF_BANDS];
     int64_t favoriteFreqs[MAX_FAVORITES];                // UNUSED
     int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // UNUSED
     int32_t antennaSelection[NUMBER_OF_BANDS];            // UNUSED
@@ -489,13 +489,10 @@ struct AGCConfig {
 #endif
 //////////////////////////////////////////////////
 
-#include "RFBoard.h"
-
 #define ESUCCESS             0
 #define ENOI2C              -1
 #define EGPIOWRITEFAIL      -2
 #define EFAIL               -10
-
 
 // Functions for the Mode state machine
 #include "Mode.h"
@@ -543,5 +540,18 @@ extern float32_t SAM_carrier_freq_offsetOld;
 
 extern char morseCharacter;
 extern bool morseCharacterUpdated;
+
+// Hardware definitions
+#define RXTX        22 // Transmit/Receive (H=TX,L=RX)
+#define CW_ON_OFF   33 // CW on / off (H=ON,L=OFF) (V12 hardware)
+#define XMIT_MODE   34 // Transmit mode (H=SSB,L=CW) (V12 hardware)
+#define KEY1        35 // Tip for Straight key
+#define KEY2        36 // Ring
+#define PTT         37
+#define FOR         26
+#define REV         27
+#define CAL         38  // RX board calibration control (H=CAL,L=normal)
+
+void MyDelay(unsigned long millisWait);
 
 #endif // SDT_H

@@ -25,7 +25,10 @@ add_compile_options(-fpermissive)
 
 include_directories(../src/PhoenixSketch)
 
-add_executable(all_RFboard_tests RFBoard_test.cpp ../src/PhoenixSketch/RFBoard.cpp)
+add_executable(all_RFboard_tests RFBoard_test.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp 
+  ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
+  ../src/PhoenixSketch/RFBoard.cpp  ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
+  ../src/PhoenixSketch/MainBoard_AudioIO.cpp AudioIO_mock.cpp FrontPanel_mock.cpp SignalProcessing_mock.cpp)
 target_link_libraries(all_RFboard_tests GTest::gtest_main)
 
 add_executable(all_ModeSm_tests ModeSm_test.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp

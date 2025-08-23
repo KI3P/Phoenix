@@ -2,36 +2,60 @@
 #define RFBOARD_H
 #include "SDT.h"
 
-//#include <stdint.h>
-#ifndef errno_t
-typedef int errno_t;
-#endif
-
 // This file lists the functions that are globally visible
-errno_t RXAttenuatorCreate(float rxAttenuation_dB);
-errno_t TXAttenuatorCreate(float txAttenuation_dB);
-errno_t SetRXAttenuation(float rxAttenuation_dB);
-errno_t SetTXAttenuation(float txAttenuation_dB);
-float GetRXAttenuation();
-float GetTXAttenuation();
-errno_t SetFreq(int64_t centerFreq_Hz);
 
-// Transceiver mode selection
-void InitStateSelect(void);
-void SelectSSBState(void);
-void SelectCWState(void);
-void SelectCalState(void);
+// Attenuator control functions
+errno_t TXAttenuatorCreate(float32_t txAttenuation_dB);
+errno_t RXAttenuatorCreate(float32_t rxAttenuation_dB);
+errno_t SetRXAttenuation(float32_t rxAttenuation_dB);
+errno_t SetTXAttenuation(float32_t txAttenuation_dB);
+float32_t GetRXAttenuation(void);
+float32_t GetTXAttenuation(void);
+errno_t InitAttenuation(void);
 
-// VFOs
-void InitVFOs(void);
-void SetVFO1Frequency(int64_t freq_Hz);
-void SetVFO1Power(int32_t power_dBm);
-void DisableVFO1Output(void);
-void EnableVFO1Output(void);
-void SetVFO2Frequency(int64_t freq_Hz);
-void SetVFO2Power(int32_t power_dBm);
-void DisableVFO2Output(void);
-void EnableVFO2Output(void);
+// SSB VFO Control Functions
+void SetSSBVFOFrequency(int64_t frequency_dHz);
+void SetSSBVFOPower(int32_t power);
+void EnableSSBVFOOutput(void);
+void DisableSSBVFOOutput(void);
+errno_t InitSSBVFO(void);
+
+// CW VFO Control Functions
+void SetCWVFOFrequency(int64_t frequency_dHz); // frequency in Hz * 100
+void SetCWVFOPower(int32_t power);
+void EnableCWVFOOutput(void);
+void DisableCWVFOOutput(void);
+errno_t InitCWVFO(void);
+void CWon(void);
+void CWoff(void);
+errno_t InitVFOs(void);
+
+
+// Transmit Modulation Control
+void SelectTXSSBModulation(void);
+void SelectTXCWModulation(void);
+errno_t InitTXModulation(void);
+
+// Calibration Control
+void EnableCalFeedback(void);
+void DisableCalFeedback(void);
+errno_t InitCalFeedbackControl(void);
+
+// RXTX Control
+void SelectTXMode(void);
+void SelectRXMode(void);
+errno_t InitRXTX(void);
+
+void SetFreq(int64_t centerFreq_Hz);
+
+// RF Board state machine functions
+enum RFBoardState {
+    RFBoardCWMark,
+    RFBoardCWSpace,
+    RFBoardReceive,
+    RFBoardSSBTransmit,
+    RFBoardCalIQ
+};
 
 ModeSm_StateId GetRFBoardPreviousState(void);
 void UpdateRFBoardState(void);

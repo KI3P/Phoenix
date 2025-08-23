@@ -40,3 +40,6 @@
 
 #define ENCODER_FACTOR 0.25F  // use 0.25f with cheap encoders that have 4 detents per step,
 //                                                  for other encoders or libs we use 1.0f
+
+
+#define SI5351_BUS_BASE_ADDR 0x60

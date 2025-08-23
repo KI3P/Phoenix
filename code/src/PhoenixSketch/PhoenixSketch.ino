@@ -1,5 +1,11 @@
 #include "SDT.h"
 
+void MyDelay(unsigned long millisWait) {
+    unsigned long now = millis();
+    while (millis() - now < millisWait)
+        ;  // Twiddle thumbs until delay ends...
+}
+
 void setup(void){
     Serial.begin(115200);
     delay(1000); //testcode

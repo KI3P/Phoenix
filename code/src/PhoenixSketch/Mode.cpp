@@ -1,7 +1,8 @@
 //#include "ModeSm.h"
 #include "SDT.h"
 
-void ModeSSBReceiveEnter(void){    
+void ModeSSBReceiveEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 
@@ -9,6 +10,7 @@ void ModeSSBReceiveExit(void){
 }
 
 void ModeSSBTransmitEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 
@@ -16,6 +18,7 @@ void ModeSSBTransmitExit(void){
 }
 
 void ModeCWReceiveEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 
@@ -23,6 +26,7 @@ void ModeCWReceiveExit(void){
 }
 
 void ModeCWTransmitMarkEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 
@@ -30,10 +34,12 @@ void ModeCWTransmitMarkExit(void){
 }
 
 void ModeCWTransmitSpaceEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 
 void ModeCWTransmitSpaceExit(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 
@@ -57,22 +63,27 @@ void TriggerCalibrateSSBPA(void){
 }
 
 void CalibrateFrequencyEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 void CalibrateFrequencyExit(void){}
 void CalibrateTXIQEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 void CalibrateTXIQExit(void){}
 void CalibrateRXIQEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 void CalibrateRXIQExit(void){}
 void CalibrateCWPAEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 void CalibrateCWPAExit(void){}
 void CalibrateSSBPAEnter(void){
+    UpdateRFBoardState();
     UpdateAudioIOState();
 }
 void CalibrateSSBPAExit(void){}

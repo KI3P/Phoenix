@@ -93,10 +93,10 @@ AudioControlSGTL5000     pcm5102_mainBoard;     //xy=586.75,611
 // type, so this variable is not included in the web tool's output.
 AudioControlSGTL5000_Extended sgtl5000_teensy;
 
-ModeSm_StateId previousState = ModeSm_StateId_ROOT;
+static ModeSm_StateId previousAudioIOState = ModeSm_StateId_ROOT;
 
 ModeSm_StateId GetAudioPreviousState(void){
-    return previousState;
+    return previousAudioIOState;
 }
 
 void SelectMixerChannel(AudioMixer4 *mixer, uint8_t channel){
@@ -113,7 +113,7 @@ void MuteMixerChannels(AudioMixer4 *mixer){
 }
 
 void UpdateAudioIOState(void){
-    if (modeSM.state_id == previousState){
+    if (modeSM.state_id == previousAudioIOState){
         // Already in this state, no need to change
         return;
     }
@@ -207,7 +207,7 @@ void UpdateAudioIOState(void){
             break;
         }
     }
-    previousState = modeSM.state_id;
+    previousAudioIOState = modeSM.state_id;
 }
 
 /**
