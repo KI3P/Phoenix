@@ -53,9 +53,10 @@ extern UIValueUpdateInt uiRFScaleUpdate;
 void UIIncValue(void);
 void UIDecValue(void);
 
-#ifdef TESTMODE
+//#ifdef TEST_MODE
+// TEST FUNCTIONS, USED IN GOOGLE TEST HARNESS. MAY BE UNNECESSARY
 int32_t GetInt(void);
 errno_t SetInt(int32_t val);
-#endif
+//#endif
 
 #endif //UI_H

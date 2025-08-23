@@ -5,9 +5,9 @@
 // Variables that are only visible from within this file
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef TESTMODE
+//#ifndef TESTMODE
 static Adafruit_MCP23X17 mcp;
-#endif
+//#endif
 #define MAX_ATTENUATION_VAL_DBx2 63
 #define MIN_ATTENUATION_VAL_DBx2 0
 

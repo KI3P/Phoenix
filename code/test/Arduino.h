@@ -11,6 +11,8 @@
 
 typedef float float32_t;
 #define AudioInterrupts()
+#define DMAMEM
+#define FASTRUN
 
 void StartMillis(void);
 void AddMillisTime(uint64_t delta_ms);

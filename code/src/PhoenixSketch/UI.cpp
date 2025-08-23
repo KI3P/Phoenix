@@ -1,6 +1,7 @@
 #include "SDT.h"
 
-#ifdef TESTMODE
+//#ifdef TEST_MODE
+// TEST FUNCTIONS, USED IN GOOGLE TEST HARNESS. MAY BE UNNECESSARY
 static int32_t intVal;
 int32_t GetInt(void){
     return intVal;
@@ -9,14 +10,13 @@ errno_t SetInt(int32_t val){
     intVal = val;
     return ESUCCESS;
 }
-// TEST FUNCTION, DO NOT USE IN PROD
 UIValueUpdateInt uiRFScaleUpdate = {
     .base = TYPE_INT32,
     .getValueFunction = GetInt,
     .incrementValue = 1,
     .setValueFunction = SetInt
 };
-#endif
+//#endif
 
 UIValueUpdateFloat uiRXGainUpdate = {
     .base = TYPE_FLOAT,

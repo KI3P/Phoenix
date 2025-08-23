@@ -474,15 +474,6 @@ struct AGCConfig {
     }
 };
 
-///////////////////////////////////////////////////
-// This enables some testing functions. Comment out for prod.
-#ifdef TESTMODE
-//typedef float float32_t;
-#define DMAMEM
-#define FASTRUN
-#endif
-//////////////////////////////////////////////////
-
 #define ESUCCESS             0
 #define ENOI2C              -1
 #define EGPIOWRITEFAIL      -2
