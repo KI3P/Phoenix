@@ -2,13 +2,11 @@
 #define SIGNALPROCESSING_H
 #include "SDT.h"
 
-#ifdef TESTMODE
-//float32_t * GetLBufferAddress(void);
-//float32_t * GetRBufferAddress(void);
+// Only used in TESTMODE
 float32_t GetAmpCorrectionFactor(uint32_t bandN);
 float32_t GetPhaseCorrectionFactor(uint32_t bandN);
 void setfilename(char *fnm);
-#endif
+
 void PerformSignalProcessing(void);
 DataBlock * ReceiveProcessing(const char *fname);
 errno_t ReadIQInputBuffer(DataBlock *data);
