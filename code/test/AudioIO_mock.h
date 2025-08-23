@@ -23,10 +23,6 @@ extern uint32_t CCM_CS2CDR_SAI2_CLK_PODF_MASK;
 void digitalWrite(uint16_t pin, uint8_t val);
 uint8_t digitalRead(uint16_t pin);
 void pinMode(uint16_t pin, uint8_t val);
-void serialprint(char *msg);
-void serialprintBegin(char *fname);
-void serialprintEnd(void);
-void serialprint(float *value);
 
 class AudioInputI2SQuad
 {

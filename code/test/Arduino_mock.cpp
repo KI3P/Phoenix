@@ -4,28 +4,65 @@
 
 SerialClass Serial;
 
+void SerialClass::createFile(const char* filename) {
+    if (filename != nullptr) {
+        file = fopen(filename, "w");
+    }
+}
+
+void SerialClass::closeFile() {
+    if (file != nullptr) {
+        fclose(file);
+        file = nullptr;
+    }
+}
+
 void SerialClass::print(const char* s) {
-    std::cout << s;
+    if (file) {
+        fprintf(file, "%s", s);
+    } else {
+        std::cout << s;
+    }
 }
 
 void SerialClass::println(const char* s) {
-    std::cout << s << std::endl;
+    if (file) {
+        fprintf(file, "%s\n", s);
+    } else {
+        std::cout << s << std::endl;
+    }
 }
 
 void SerialClass::print(int n) {
-    std::cout << n;
+    if (file) {
+        fprintf(file, "%d", n);
+    } else {
+        std::cout << n;
+    }
 }
 
 void SerialClass::println(int n) {
-    std::cout << n << std::endl;
+    if (file) {
+        fprintf(file, "%d\n", n);
+    } else {
+        std::cout << n << std::endl;
+    }
 }
 
 void SerialClass::print(float f) {
-    std::cout << f;
+    if (file) {
+        fprintf(file, "%f", f);
+    } else {
+        std::cout << f;
+    }
 }
 
 void SerialClass::println(float f) {
-    std::cout << f << std::endl;
+    if (file) {
+        fprintf(file, "%f\n", f);
+    } else {
+        std::cout << f << std::endl;
+    }
 }
 
 int64_t tstart;

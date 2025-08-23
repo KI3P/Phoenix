@@ -6,8 +6,8 @@
 #ifndef TESTMODE
 #define Debug(x) Serial.println(x)
 #else
-#define Debug(x) serialprint(x)
-#endif 
+#define Debug(x) Serial.print(x)
+#endif
 
 #include <Arduino.h>
 #include <utility/imxrt_hw.h>

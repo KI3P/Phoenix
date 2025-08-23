@@ -23,15 +23,21 @@ int64_t millis(void);
 
 #define OUTPUT 1
 
+#include <cstdio>
+
 class SerialClass {
 public:
     std::vector<std::string> lines;
+    void createFile(const char* filename);
+    void closeFile();
     void print(const char*);
     void println(const char*);
     void print(int);
     void println(int);
     void print(float);
     void println(float);
+private:
+    FILE* file = nullptr;
 };
 
 extern SerialClass Serial;

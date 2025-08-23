@@ -1974,9 +1974,9 @@ TEST(SignalProcessing, ReceiveProcessing){
     }
 }
 
-/*TEST(SignalProcessing, LongTerm){
+TEST(SignalProcessing, LongTerm){
     // Run a signal through the receive chain for a long period of time
-    serialprintBegin("Terminal_LongTerm.txt");
+    Serial.createFile("Terminal_LongTerm.txt");
     Q_in_L.setChannel(2);
     Q_in_R.setChannel(3);
     Q_in_L.clear();
@@ -1997,7 +1997,7 @@ TEST(SignalProcessing, ReceiveProcessing){
     for (size_t k=0; k<175*100; k++){
         data = ReceiveProcessing(nullptr);
     }
-    serialprintEnd();
+    Serial.closeFile();
     float32_t amp = -1e6;
     for (size_t i=0; i<data->N; i++){
         if (data->I[i] > amp) amp = data->I[i];
