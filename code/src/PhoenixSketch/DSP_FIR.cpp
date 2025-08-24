@@ -1269,23 +1269,14 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
     FIR_filter_mask[i] = 0.0;
   }
 
+  // Used by unit tests
   if (dspfirfilename != nullptr){
-    FILE *file2 = fopen(dspfirfilename, "w");
-    for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
-        fprintf(file2, "%zu,%7.6f\n", i, FIR_filter_mask[i]);
-    }
-    fclose(file2);
+    WriteFloatFile(FIR_filter_mask, 2*FFT_LENGTH, dspfirfilename);
   }
 
   // FFT of FIR_filter_mask
   // perform FFT (in-place), needs only to be done once (or every time the filter coeffs change)
-  #ifdef TESTMODE
-  arm_cfft_radix2_instance_f32 S;
-  arm_cfft_radix2_init_f32(&S, 512, 0, 1);
-  arm_cfft_radix2_f32(&S, FIR_filter_mask);
-  #else
-  arm_cfft_f32(&arm_cfft_sR_f32_len512, FIR_filter_mask, 0, 1);
-  #endif
+  FFT512Forward(FIR_filter_mask);
 }
 
 void setdspfirfilename(char *fnm){

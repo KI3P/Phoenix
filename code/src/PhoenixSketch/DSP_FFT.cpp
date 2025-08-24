@@ -87,25 +87,7 @@ void CalcPSD512(float32_t *I, float32_t *Q)
     }
     // perform complex FFT
     // calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
-    
-    // We use a different FFT function during testing because arm_cfft_f32 calls a function 
-    // for bit reversal that is written in assembly using the ARM ISA. This function won't 
-    // compile on an x86 processor. Based on testing on the Teensy4.1, the arm_cfft_f32 
-    // routine is about 38% faster than arm_cfft_radix2_f32.
-    //
-    // | Algorithm           | Time to complete one 512-point FFT |
-    // |---------------------|------------------------------------|
-    // | arm_cfft_f32        | 41 us                              |
-    // | arm_cfft_radix2_f32 | 66 us                              |
-    // Teensy 4.1 running at 600 MHz.
-
-    #ifdef TESTMODE
-    arm_cfft_radix2_instance_f32 S;
-    arm_cfft_radix2_init_f32(&S, 512, 0, 1);
-    arm_cfft_radix2_f32(&S,buffer_spec_FFT);
-    #else
-    arm_cfft_f32(&arm_cfft_sR_f32_len512, buffer_spec_FFT, 0, 1);
-    #endif
+    FFT512Forward(buffer_spec_FFT);
 
     // calculate magnitudes and put into FFT_spec
     // we do not need to calculate magnitudes with square roots, it would seem to be sufficient to
@@ -141,14 +123,7 @@ void CalcPSD256(float32_t *I, float32_t *Q)
     }
     // perform complex FFT
     // calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
-
-    #ifdef TESTMODE
-    arm_cfft_radix2_instance_f32 S;
-    arm_cfft_radix2_init_f32(&S, 256, 0, 1);
-    arm_cfft_radix2_f32(&S,buffer_spec_FFT);
-    #else
-    arm_cfft_f32(&arm_cfft_sR_f32_len256, buffer_spec_FFT, 0, 1);
-    #endif
+    FFT256Forward(buffer_spec_FFT);
     for (size_t i = 0; i < SPECTRUM_RES/4; i++) {
         FFT_spec[i + SPECTRUM_RES/4] = (buffer_spec_FFT[i * 2] * buffer_spec_FFT[i * 2] + buffer_spec_FFT[i * 2 + 1] * buffer_spec_FFT[i * 2 + 1]);
         FFT_spec[i]                  = (buffer_spec_FFT[(i + SPECTRUM_RES/4) * 2] * buffer_spec_FFT[(i + SPECTRUM_RES/4)  
@@ -494,11 +469,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     if (fname != nullptr){
         char fn2[100];
         sprintf(fn2,"fIQ_%s",fname);
-        FILE *file2 = fopen(fn2, "w");
-        for (size_t i = 0; i < data->N; i++) {
-            fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
-        }
-        fclose(file2);
+        WriteIQFile(data, fn2);
     }
 
     // fill first half of FFT buffer with previous event's audio samples
@@ -519,22 +490,12 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
 
     // used by unit tests
     if (fname != nullptr){
-        FILE *file = fopen(fname, "w");
-        for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
-            fprintf(file, "%zu,%7.6f\n", i,buffer_spec_FFT[i]);
-        }
-        fclose(file);
+        WriteFloatFile(buffer_spec_FFT, 2*FFT_LENGTH, fname);
     }
 
     //   Perform complex FFT on the audio time signals
     //   calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
-    #ifdef TESTMODE
-    arm_cfft_radix2_instance_f32 S;
-    arm_cfft_radix2_init_f32(&S, 512, 0, 1);
-    arm_cfft_radix2_f32(&S,buffer_spec_FFT);
-    #else
-    arm_cfft_f32(&arm_cfft_sR_f32_len512, buffer_spec_FFT, 0, 1);
-    #endif
+    FFT512Forward(buffer_spec_FFT);
 
     // The filter mask is initialized using InitFilterMask(). Only need to do 
     // this once for each filter setting.Allows efficient real-time variable LP 
@@ -545,13 +506,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     // After the frequency domain filter mask and other processes are complete, do a
     // complex inverse FFT to return to the time domain (if sample rate = 192kHz, 
     // we are in 24ksps now, because we decimated by 8)
-    // perform iFFT (in-place) by setting the IFFT flag=1 in the Arm CFFT function.
-    #ifdef TESTMODE
-    arm_cfft_radix2_init_f32(&S, 512, 1, 1);
-    arm_cfft_radix2_f32(&S,iFFT_buffer);
-    #else
-    arm_cfft_f32(&arm_cfft_sR_f32_len512, iFFT_buffer, 1, 1);
-    #endif
+    FFT512Reverse(iFFT_buffer);
 
     // Now discard the first 256 complex samples
     for (unsigned i = 0; i < data->N; i++) {

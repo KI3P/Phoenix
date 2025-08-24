@@ -2,7 +2,7 @@
 #define SIGNALPROCESSING_H
 #include "SDT.h"
 
-// Only used in TESTMODE
+// Only used during unit tests
 float32_t GetAmpCorrectionFactor(uint32_t bandN);
 float32_t GetPhaseCorrectionFactor(uint32_t bandN);
 void setfilename(char *fnm);

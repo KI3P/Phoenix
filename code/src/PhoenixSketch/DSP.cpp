@@ -694,17 +694,11 @@ void setfilename(char *fnm){
 }
 
 void SaveData(DataBlock *data, uint32_t suffix){
-    #ifdef TESTMODE
     if (filename != nullptr){
         char fn2[100];
         sprintf(fn2,"%s-%02lu.txt",filename, suffix);
-        FILE *file2 = fopen(fn2, "w");
-        for (size_t i = 0; i < data->N; i++) {
-            fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
-        }
-        fclose(file2);
+        WriteIQFile(data, fn2);
     }
-    #endif
 }
 
 /**
@@ -724,21 +718,15 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Clear overfull buffers
     ClearAudioBuffers();
 
-    #ifdef TESTMODE
     SaveData(&data, 0);
-    char fn2[100];
     if (fname != nullptr){
         filename = (char *)fname;
     }
     if (filename != nullptr){
+        char fn2[100];
         sprintf(fn2,"IQ_%s",filename);
-        FILE *file2 = fopen(fn2, "w");
-        for (size_t i = 0; i < 2048; i++) {
-            fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data.I[i],data.Q[i]);
-        }
-        fclose(file2);
+        WriteIQFile(&data, fn2);
     }
-    #endif
 
     // Scale data channels by the overall system RF gain and the band-specified gain adjustment
     ApplyRFGain(&data, EEPROMData.rfGainAllBands_dB, bands[EEPROMData.currentBand].RFgain_dB);

@@ -96,7 +96,6 @@ void InitializeKim1NoiseReduction(void){
     CLEAR_VAR(NR_Gts);
     CLEAR_VAR(NR_output_audio_buffer);
     CLEAR_VAR(NR_last_iFFT_result);
-    InitFFT256();
 }
 
 /**
@@ -322,7 +321,6 @@ void Xanr(DataBlock *data, uint8_t ANR_notch) {
 
 
 void InitializeSpectralNoiseReduction(void){
-    InitFFT256();
     for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++){
         NR_last_sample_buffer_L[bindx] = 0.1;
         NR_Hk_old[bindx] = 0.1; // old gain

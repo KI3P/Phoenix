@@ -1,8 +1,6 @@
 #ifndef SDT_H
 #define SDT_H
 
-#define TESTMODE
-
 #define Debug(x) Serial.println(x)
 
 #include <Arduino.h>
