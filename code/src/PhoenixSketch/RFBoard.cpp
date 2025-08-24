@@ -593,7 +593,7 @@ int64_t GetCWTXFreq_dHz(void){
 }
 
 void HandleRFBoardStateChange(RFBoardState newState){
-    if (newState = oldrfBoardState){
+    if (newState == oldrfBoardState){
         return;
     }
     // Following the state diagram in RF_board_api.drawio, implement the actions
@@ -741,7 +741,7 @@ void UpdateRFBoardState(void){
         default:{
             Debug("Unhandled modeSM.state_id state in UpdateRFBoardState!");
             char strbuf[10];
-            sprintf(strbuf, "> %d",(uint32_t)modeSM.state_id);
+            sprintf(strbuf, "> %lu",(uint32_t)modeSM.state_id);
             Debug(strbuf);
             break;
         }

@@ -124,6 +124,9 @@ void FilterSetSSB(int32_t filter_change) {
             bands[EEPROMData.currentBand].FLoCut_Hz = -bands[EEPROMData.currentBand].FHiCut_Hz;
             break;
         }
+        case IQ:
+        case DCF77:
+            break;
     }
     // Calculate the new FIR filter mask
     UpdateFIRFilterMask(&filters);
@@ -224,14 +227,14 @@ void ConsumeInterrupt(void){
         case (iVOLUME_INCREASE):{
             EEPROMData.audioVolume++;
             if (EEPROMData.audioVolume > 100) EEPROMData.audioVolume = 100;
-            sprintf(strbuf,"Volume: %d",EEPROMData.audioVolume);
+            sprintf(strbuf,"Volume: %ld",EEPROMData.audioVolume);
             Debug(strbuf);
             break;
         }
         case (iVOLUME_DECREASE):{
             EEPROMData.audioVolume--;
             if (EEPROMData.audioVolume < 0) EEPROMData.audioVolume = 0;
-            sprintf(strbuf,"Volume: %d",EEPROMData.audioVolume);
+            sprintf(strbuf,"Volume: %ld",EEPROMData.audioVolume);
             Debug(strbuf);
             break;
         }
@@ -269,7 +272,7 @@ void ConsumeInterrupt(void){
         }
         case (iBUTTON_PRESSED):{
             char strbuf[50];
-            sprintf(strbuf, "Pressed button: %d",GetButton());
+            sprintf(strbuf, "Pressed button: %ld",GetButton());
             Debug(strbuf);
             break;
         }

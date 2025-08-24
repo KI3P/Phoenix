@@ -699,7 +699,7 @@ void setfilename(char *fnm){
 void SaveData(DataBlock *data, uint32_t suffix){
     if (filename != nullptr){
         char fn2[100];
-        sprintf(fn2,"%s-%02d.txt",filename, suffix);
+        sprintf(fn2,"%s-%02lu.txt",filename, suffix);
         FILE *file2 = fopen(fn2, "w");
         for (size_t i = 0; i < data->N; i++) {
             fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
