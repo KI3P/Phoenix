@@ -30,14 +30,12 @@ void PerformSignalProcessing(void){
     }
 }
 
-// #ifdef TESTMODE
 float32_t GetAmpCorrectionFactor(uint32_t bandN){
     return EEPROMData.IQAmpCorrectionFactor[bandN];
 }
 float32_t GetPhaseCorrectionFactor(uint32_t bandN){
     return EEPROMData.IQPhaseCorrectionFactor[bandN];
 }
-// #endif
 
 /**
  * Apply gain factors to the data. Supplied factors are in units of dB, so 
@@ -695,8 +693,8 @@ void setfilename(char *fnm){
     filename = fnm;
 }
 
-//#ifdef TESTMODE
 void SaveData(DataBlock *data, uint32_t suffix){
+    #ifdef TESTMODE
     if (filename != nullptr){
         char fn2[100];
         sprintf(fn2,"%s-%02lu.txt",filename, suffix);
@@ -706,8 +704,8 @@ void SaveData(DataBlock *data, uint32_t suffix){
         }
         fclose(file2);
     }
+    #endif
 }
-//#endif
 
 /**
  * Read a block of samples from the ADC and perform receive signal processing
@@ -762,9 +760,8 @@ DataBlock * ReceiveProcessing(const char *fname){
     // A signal at x Hz will be at x + 48,000 Hz after this step.
     FreqShiftFs4(&data);
 
-    #ifdef TESTMODE
-    SaveData(&data, 1);
-    #endif
+    SaveData(&data, 1); // used by the unit tests
+
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (EEPROMData.spectrum_zoom != SPECTRUM_ZOOM_1) {
         if(ZoomFFTExe(&data, EEPROMData.spectrum_zoom, &filters)) {
@@ -787,17 +784,13 @@ DataBlock * ReceiveProcessing(const char *fname){
     }
     float32_t shift = EEPROMData.fineTuneFreq_Hz + sideToneShift_Hz;
     FreqShiftF(&data,shift);
-    #ifdef TESTMODE
-    SaveData(&data, 2);
-    #endif
+    SaveData(&data, 2); // used by the unit tests
     
     // Decimate by 8. Reduce the sampled band to -12,000 Hz to +12,000 Hz.
     // The 3dB bandwidth is approximately -6,000 to +6,000 Hz
     DecimateBy8(&data, &filters);
 
-    #ifdef TESTMODE
-    SaveData(&data, 3);
-    #endif
+    SaveData(&data, 3); // used by the unit tests
 
     // Volume adjust for frequency cuts
     VolumeScale(&data);
@@ -806,9 +799,7 @@ DataBlock * ReceiveProcessing(const char *fname){
     // bands[EEPROMData.currentBand].FLoCut_Hz and bands[EEPROMData.currentBand].FHiCut_Hz
     ConvolutionFilter(&data, &filters, filename);
 
-    #ifdef TESTMODE
-    SaveData(&data, 4);
-    #endif
+    SaveData(&data, 4); // used by the unit tests
 
     // AGC
     AGC(&data, &agc);
@@ -816,9 +807,7 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Demodulate
     Demodulate(&data, &filters);
 
-    #ifdef TESTMODE
-    SaveData(&data, 5);
-    #endif
+    SaveData(&data, 5); // used by the unit tests
 
     // Receive EQ
     BandEQ(&data, &filters, RX);
@@ -846,9 +835,7 @@ DataBlock * ReceiveProcessing(const char *fname){
     // need to scale both
     AdjustVolume(&data, &filters);
 
-    #ifdef TESTMODE
-    SaveData(&data, 6);
-    #endif
+    SaveData(&data, 6); // used by the unit tests
 
     // Play sound on the speaker
     PlayBuffer(&data);

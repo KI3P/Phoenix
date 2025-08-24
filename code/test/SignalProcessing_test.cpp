@@ -906,6 +906,7 @@ TEST(SignalProcessing, InitFIRFilterMask){
     extern FilterConfig filters;
     float32_t DMAMEM FIR_filter_mask[FFT_LENGTH * 2] __attribute__((aligned(4)));
     InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    setdspfirfilename("FIR_filter_samples.txt");
     InitFilterMask(FIR_filter_mask, &filters);
     WriteFile(FIR_filter_mask,"FIR_filter_mask.txt",1024);
     // Between frequency bins 460 and 500 we expect the magnitude of the

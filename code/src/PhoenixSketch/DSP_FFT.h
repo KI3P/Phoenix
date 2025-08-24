@@ -31,11 +31,10 @@ void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX);
 //void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf);
 void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXType TXRX);
 
-#ifdef TESTMODE
+// used by unit tests
 void CalcPSD256(float32_t *I, float32_t *Q);
 float32_t * GetFilteredBufferAddress(void);
-#endif
-
+void setdspfirfilename(char *fnm);
 
 void TXDecInit(void);
 void TXDecimateBy4(float32_t *I,float32_t *Q);

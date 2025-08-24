@@ -1,5 +1,7 @@
 #include "SDT.h"
 
+static char *dspfirfilename = nullptr;
+
 // 12 pole Chebyshev 24KSPS 840HZ Fc CW LPF
 //   b0                     b1                   b2   
 float32_t CW_AudioFilterCoeffs1[30] = {
@@ -1267,13 +1269,13 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
     FIR_filter_mask[i] = 0.0;
   }
 
-  #ifdef TESTMODE
-  FILE *file2 = fopen("FIR_filter_samples.txt", "w");
-  for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
-      fprintf(file2, "%zu,%7.6f\n", i, FIR_filter_mask[i]);
+  if (dspfirfilename != nullptr){
+    FILE *file2 = fopen(dspfirfilename, "w");
+    for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
+        fprintf(file2, "%zu,%7.6f\n", i, FIR_filter_mask[i]);
+    }
+    fclose(file2);
   }
-  fclose(file2);
-  #endif
 
   // FFT of FIR_filter_mask
   // perform FFT (in-place), needs only to be done once (or every time the filter coeffs change)
@@ -1284,4 +1286,8 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
   #else
   arm_cfft_f32(&arm_cfft_sR_f32_len512, FIR_filter_mask, 0, 1);
   #endif
+}
+
+void setdspfirfilename(char *fnm){
+    dspfirfilename = fnm; // "FIR_filter_samples.txt"
 }

@@ -22,12 +22,10 @@ static const float32_t zoomMultiplierCoeff[5] = {1.0, 1.0, 1.0, 1.0, 1.0};
 
 extern float32_t* mag_coeffs[]; // in FIR.cpp
 
-
-#ifdef TESTMODE
+// used by the unit tests
 float32_t * GetFilteredBufferAddress(void){
     return iFFT_buffer;
 }
-#endif
 
 /**
   * Fast algorithm for log10.
@@ -133,7 +131,6 @@ void CalcPSD512(float32_t *I, float32_t *Q)
     }
 }
 
-#ifdef TESTMODE
 void CalcPSD256(float32_t *I, float32_t *Q)
 {
     // interleave real and imaginary input values [real, imag, real, imag . . .]
@@ -171,7 +168,6 @@ void CalcPSD256(float32_t *I, float32_t *Q)
         psdnew[i] = log10f_fast(FFT_spec[i]);
     }
 }
-#endif
 
 /**
  * Frequency translation by Fs/4 without multiplication from Lyons (2011): 
@@ -494,9 +490,9 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
         return EFAIL;
     }
 
-    #ifdef TESTMODE
-    char fn2[100];
+    // used by unit tests
     if (fname != nullptr){
+        char fn2[100];
         sprintf(fn2,"fIQ_%s",fname);
         FILE *file2 = fopen(fn2, "w");
         for (size_t i = 0; i < data->N; i++) {
@@ -504,7 +500,6 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
         }
         fclose(file2);
     }
-    #endif
 
     // fill first half of FFT buffer with previous event's audio samples
     for (unsigned i = 0; i < data->N; i++) {
@@ -522,7 +517,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
         buffer_spec_FFT[FFT_LENGTH + i * 2 + 1] = data->Q[i];  // imaginary
     }
 
-    #ifdef TESTMODE
+    // used by unit tests
     if (fname != nullptr){
         FILE *file = fopen(fname, "w");
         for (size_t i = 0; i < 2*FFT_LENGTH; i++) {
@@ -530,7 +525,6 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
         }
         fclose(file);
     }
-    #endif
 
     //   Perform complex FFT on the audio time signals
     //   calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
