@@ -1,4 +1,4 @@
-// #define FAST_TUNE
+#define FAST_TUNE
 
 #define MY_LAT                                  39.07466 // Coordinates for QTH
 #define MY_LON                                  -84.42677
@@ -27,7 +27,7 @@
 #define CURRENT_FREQ_B 7030000  // VFO_B
 #define DEFAULTFREQINCREMENT 4  // Default: (10, 50, 100, 250, 1000, 10000Hz)
 #define DEFAULT_POWER_LEVEL 10  // Startup power level. Probably 20 for most people
-#define FAST_TUNE_INCREMENT 1   // Default from above for fine tune
+#define FAST_TUNE_INCREMENT 10  // Default from above for fine tune
 #define SPLASH_DELAY 1000L      // How long to show Splash screen. Use 4000 for testing, 1000 normally
 #define I2C_DELAY_LONG 10000L   // How long to show I2C screen with errors
 #define I2C_DELAY_SHORT 1000L   // How long to show I2C screen when no error

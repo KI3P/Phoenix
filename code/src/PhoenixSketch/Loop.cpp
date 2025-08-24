@@ -161,7 +161,7 @@ void AdjustFineTune(int32_t filter_change){
     #endif  // FAST_TUNE
 
     EEPROMData.fineTuneFreq_Hz += EEPROMData.stepFineTune * filter_change;
-
+    //Debug("Fine tune pre: " + String(EEPROMData.fineTuneFreq_Hz));
     // If the zoom level is 0, then the valid range of fine tune window is between
     // -samplerate/2 and +samplerate/2. 
     int32_t lower_limit = -(int32_t)(SR[SampleRate].rate)/2;
@@ -174,9 +174,13 @@ void AdjustFineTune(int32_t filter_change){
         uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
         lower_limit = -(int32_t)visible_bandwidth/2;
         upper_limit = +(int32_t)visible_bandwidth/2;
+        //Debug("Visible bandwidth: " + String(visible_bandwidth));
     }
+    //Debug("Upper limit: " + String(upper_limit));
+    //Debug("Lower limit: " + String(lower_limit));
     if (EEPROMData.fineTuneFreq_Hz > upper_limit) EEPROMData.fineTuneFreq_Hz = upper_limit;
     if (EEPROMData.fineTuneFreq_Hz < lower_limit) EEPROMData.fineTuneFreq_Hz = lower_limit;
+    //Debug("Fine tune post: " + String(EEPROMData.fineTuneFreq_Hz));
 
     // The fine tune is applied after the spectrum is shifted by samplerate/4. So the 
     // actual frequency in the RF domain is: TXRXFreq = centerFreq+fineTuneFreq-48kHz
@@ -240,34 +244,35 @@ void ConsumeInterrupt(void){
         }
         case (iFILTER_INCREASE):{
             FilterSetSSB(1);
-            Debug("Filter increase");
-            break;
+            Debug("Filter = " + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
+                     + " to " + String(bands[EEPROMData.currentBand].FLoCut_Hz) );            break;
         }
         case (iFILTER_DECREASE):{
             FilterSetSSB(-1);
-            Debug("Filter decrease");
+            Debug("Filter = " + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
+                     + " to " + String(bands[EEPROMData.currentBand].FLoCut_Hz) );
             break;
         }
         case (iCENTERTUNE_INCREASE):{
             EEPROMData.centerFreq_Hz += (int64_t)EEPROMData.freqIncrement;
             SetFreq(EEPROMData.centerFreq_Hz);
-            Debug("Center tune increase");
+            Debug("Center tune = " + String(EEPROMData.centerFreq_Hz));
             break;
         }
         case (iCENTERTUNE_DECREASE):{
             EEPROMData.centerFreq_Hz -= (int64_t)EEPROMData.freqIncrement;
             SetFreq(EEPROMData.centerFreq_Hz);
-            Debug("Center tune decrease");
+            Debug("Center tune = " + String(EEPROMData.centerFreq_Hz));
             break;
         }
         case (iFINETUNE_INCREASE):{
             AdjustFineTune(+1);
-            Debug("Fine tune increase");
+            Debug("Fine tune = " + String(EEPROMData.fineTuneFreq_Hz));
             break;
         }
         case (iFINETUNE_DECREASE):{
             AdjustFineTune(-1);
-            Debug("Fine tune decrease");
+            Debug("Fine tune = " + String(EEPROMData.fineTuneFreq_Hz));
             break;
         }
         case (iBUTTON_PRESSED):{
