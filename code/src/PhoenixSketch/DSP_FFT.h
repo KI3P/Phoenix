@@ -47,4 +47,9 @@ void TXInterpolateBy2(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout
 void TXInterpolateBy4(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout);
 void SidebandSelection(float32_t *I, float32_t *Q);
 
+// The functions that are placed in a stub to enable unit test substitution
+void InitFFT256(void);
+void FFT256Forward(float32_t *buffer);
+void FFT256Reverse(float32_t *buffer);
+
 #endif // FFT_H

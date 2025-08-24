@@ -49,11 +49,6 @@ uint32_t ANR_in_idx = 0;
 float32_t ANR_ngamma = 0.001;
 float32_t ANR_lidx = 120.0;
 
-#ifdef TESTMODE
-arm_cfft_radix2_instance_f32 Sfor;
-arm_cfft_radix2_instance_f32 Srev;
-#endif
-
 const float32_t sqrtHann[256] = {
   0, 0.01231966, 0.024637449, 0.036951499, 0.049259941, 0.061560906,
   0.073852527, 0.086132939, 0.098400278, 0.110652682, 0.122888291, 0.135105247, 0.147301698,
@@ -101,10 +96,7 @@ void InitializeKim1NoiseReduction(void){
     CLEAR_VAR(NR_Gts);
     CLEAR_VAR(NR_output_audio_buffer);
     CLEAR_VAR(NR_last_iFFT_result);
-    #ifdef TESTMODE
-    arm_cfft_radix2_init_f32(&Sfor, 256, 0, 1);
-    arm_cfft_radix2_init_f32(&Srev, 256, 1, 1);
-    #endif
+    InitFFT256();
 }
 
 /**
@@ -179,11 +171,7 @@ void Kim1_NR(DataBlock *data){
             float32_t temp_sample = 0.5 * (float32_t)(1.0 - (cosf(PI * 2.0 * (float32_t)idx / (float32_t)((NR_FFT_L) - 1))));
             NR_FFT_buffer[idx * 2] *= temp_sample;
         }
-        #ifdef TESTMODE
-        arm_cfft_radix2_f32(&Sfor,NR_FFT_buffer);
-        #else
-        arm_cfft_f32(&arm_cfft_sR_f32_len256, NR_FFT_buffer, 0, 1);
-        #endif
+        FFT256Forward(NR_FFT_buffer);
         // take first 128 bin values of the FFT result
         for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++) { 
             // it seems that taking power works better than taking magnitude . . . !?
@@ -256,11 +244,7 @@ void Kim1_NR(DataBlock *data){
         if (NR_E_pointer >= NR_N_frames) {
             NR_E_pointer = 0;
         }
-        #ifdef TESTMODE
-        arm_cfft_radix2_f32(&Srev,NR_FFT_buffer);
-        #else
-        arm_cfft_f32(&arm_cfft_sR_f32_len256, NR_FFT_buffer, 1, 1);
-        #endif
+        FFT256Reverse(NR_FFT_buffer);
         for (int i = 0; i < NR_FFT_L / 2; i++) { // take real part of first half of current iFFT result and add to 2nd half of last iFFT_result
             NR_output_audio_buffer[i + k * (NR_FFT_L / 2)] = NR_FFT_buffer[i * 2] + NR_last_iFFT_result[i];
         }
@@ -338,10 +322,7 @@ void Xanr(DataBlock *data, uint8_t ANR_notch) {
 
 
 void InitializeSpectralNoiseReduction(void){
-    #ifdef TESTMODE
-    arm_cfft_radix2_init_f32(&Sfor, 256, 0, 1);
-    arm_cfft_radix2_init_f32(&Srev, 256, 1, 1);
-    #endif
+    InitFFT256();
     for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++){
         NR_last_sample_buffer_L[bindx] = 0.1;
         NR_Hk_old[bindx] = 0.1; // old gain
@@ -458,11 +439,7 @@ void SpectralNoiseReduction(DataBlock *data){
 
         // NR_FFT
         // calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
-        #ifdef TESTMODE
-        arm_cfft_radix2_f32(&Sfor,NR_FFT_buffer);
-        #else
-        arm_cfft_f32(&arm_cfft_sR_f32_len256, NR_FFT_buffer, 0, 1);
-        #endif
+        FFT256Forward(NR_FFT_buffer);
 
         for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++) {
             // this is squared magnitude for the current frame
@@ -602,11 +579,7 @@ void SpectralNoiseReduction(DataBlock *data){
             NR_FFT_buffer[bindx * 2 + 1] *= 0.1; //NR_iFFT_buffer[idx] * 0.1;
         }
     #endif
-        #ifdef TESTMODE
-        arm_cfft_radix2_f32(&Srev,NR_FFT_buffer);
-        #else
-        arm_cfft_f32(&arm_cfft_sR_f32_len256, NR_FFT_buffer, 1, 1);
-        #endif
+        FFT256Reverse(NR_FFT_buffer);
         
         for (int idx = 0; idx < NR_FFT_L; idx++) {
             NR_FFT_buffer[idx * 2] *= sqrtHann[idx];      // sqrt Hann window
