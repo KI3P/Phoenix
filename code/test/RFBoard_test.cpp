@@ -425,3 +425,83 @@ TEST(RFBoard, CWoff_Test) {
     EXPECT_EQ(digital_write_pins.back(), CW_ON_OFF);
     EXPECT_EQ(digital_write_values.back(), 0);
 }
+
+TEST(RFBoard, StateStartInReceive){
+    InitializeRFBoard();
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateRFBoardState();
+    
+    // RECEIVE STATE
+    // We expect CLK0 and CLK1 to be enabled, and CLK2 to be disabled
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 0);
+    // CW is off
+    EXPECT_EQ(getCWState(), 0); // CW off
+    // RX mode
+    EXPECT_EQ(getRXTXState(), 0); // RX
+    // Cal feedback off
+    EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
+    // SSB mode
+    EXPECT_EQ(getModulationState(), 1); // XMIT_SSB
+}
+
+TEST(RFBoard, StateTransitionToSSBTransmit){
+    InitializeRFBoard();
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateRFBoardState();
+    
+    // SSB TRANSMIT STATE
+    // We expect CLK0 and CLK1 to be enabled, and CLK2 to be disabled
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 0);
+    // CW is off
+    EXPECT_EQ(getCWState(), 0); // CW off
+    // TX mode
+    EXPECT_EQ(getRXTXState(), 1); // TX
+    // Cal feedback off
+    EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
+    // SSB mode
+    EXPECT_EQ(getModulationState(), 1); // XMIT_SSB
+}
+
+TEST(RFBoard, StateTransitionToCWSpace){
+    InitializeRFBoard();
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateRFBoardState();
+    
+    // CW TRANSMIT SPACE STATE
+    // We expect CLK0 and CLK1 to be disabled, and CLK2 to be enabled
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1);
+    // CW is off
+    EXPECT_EQ(getCWState(), 0); // CW off
+    // TX mode
+    EXPECT_EQ(getRXTXState(), 1); // TX
+    // Cal feedback off
+    EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
+    // CW mode
+    EXPECT_EQ(getModulationState(), 0); // XMIT_CW
+}
+
+TEST(RFBoard, StateTransitionToCWMark){
+    InitializeRFBoard();
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFBoardState();
+    
+    // CW TRANSMIT MARK STATE
+    // We expect CLK0 and CLK1 to be disabled, and CLK2 to be enabled
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1);
+    // CW is on
+    EXPECT_EQ(getCWState(), 1); // CW on
+    // TX mode
+    EXPECT_EQ(getRXTXState(), 1); // TX
+    // Cal feedback off
+    EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
+    // CW mode
+    EXPECT_EQ(getModulationState(), 0); // XMIT_CW
+}

@@ -8,7 +8,7 @@
             "name": "Debug Unit Tests",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/test/build/all_FrontPanel_tests",
+        "program": "${workspaceFolder}/test/build/all_RFboard_tests",
         "args": [],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}/test/build/",

@@ -514,6 +514,10 @@ void CWoff(void){
     cwState = false;
 }
 
+bool getCWState(void){
+    return cwState;
+}
+
 /**
  * Set up the communication with the Si5351, initialize its capacitance and crystal
  * settings, and initialize the clock signals
@@ -567,6 +571,9 @@ void SelectTXCWModulation(void){
     modulationState = XMIT_CW;
 }
 
+bool getModulationState(void){
+    return modulationState;
+}
 
 // Calibration Control
 
@@ -594,6 +601,10 @@ void EnableCalFeedback(void){
 void DisableCalFeedback(void){
     if (calFeedbackState == CAL_ON) digitalWrite(CAL, CAL_OFF);
     calFeedbackState = CAL_OFF;
+}
+
+bool getCalFeedbackState(void){
+    return calFeedbackState;
 }
 
 // RXTX Control
@@ -624,6 +635,10 @@ void SelectRXMode(void){
     rxtxState = RX;
 }
 
+bool getRXTXState(void){
+    return rxtxState;
+}
+
 /**
  * Initialize the RF board by calling the initialization functions for each 
  * of the modules hosted on the RF board:
@@ -640,7 +655,11 @@ errno_t InitializeRFBoard(void){
     err += InitTXModulation();
     err += InitVFOs();
     err += InitRXTX();
-    HandleRFBoardStateChange(RFBoardReceive);
+
+    // force the initialization to RF receive
+    oldrfBoardState = RFBoardSSBTransmit;
+    HandleRFBoardStateChange(RFBoardReceive); // updates oldrfBoardState
+    previousRadioState = ModeSm_StateId_SSB_RECEIVE;
     return err;
 }
 

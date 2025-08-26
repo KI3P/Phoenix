@@ -49,6 +49,11 @@ errno_t InitRXTX(void);
 
 void SetFreq(int64_t centerFreq_Hz);
 
+bool getRXTXState(void);
+bool getCWState(void);
+bool getCalFeedbackState(void);
+bool getModulationState(void);
+
 // RF Board state machine functions
 enum RFBoardState {
     RFBoardCWMark,
