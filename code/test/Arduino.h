@@ -31,6 +31,8 @@ int64_t millis(void);
 
 #include <cstdio>
 
+class String;
+
 class SerialClass {
 public:
     std::vector<std::string> lines;
@@ -42,6 +44,7 @@ public:
     void println(int);
     void print(float);
     void println(float);
+    void println(const String& s);
 private:
     FILE* file = nullptr;
 };
@@ -54,6 +57,9 @@ public:
     String();
     String(const char* c_str);
     String(const String& other);
+    String(int val);
+    String(long val);
+    String(float val);
     ~String();
 
     // Member functions

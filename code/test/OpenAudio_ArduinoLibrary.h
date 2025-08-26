@@ -102,6 +102,8 @@ class AudioSynthWaveformSine
         AudioSynthWaveformSine(void){ }
         void begin(void) { }
         void end(void) {  }
+        void frequency(float f) { }
+        void amplitude(float f) { }
 };
 
 class AudioControlSGTL5000
