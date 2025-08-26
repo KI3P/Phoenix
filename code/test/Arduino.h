@@ -48,4 +48,25 @@ private:
 
 extern SerialClass Serial;
 
+class String {
+public:
+    // Constructors and Destructor
+    String();
+    String(const char* c_str);
+    String(const String& other);
+    ~String();
+
+    // Member functions
+    size_t length() const;
+    const char* c_str() const;
+
+    // Operator overloads
+    String& operator=(const String& other);
+    String operator+(const String& other) const;
+    String operator+(const char* other) const;
+
+private:
+    char* _data;
+};
+
 #endif

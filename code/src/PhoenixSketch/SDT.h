@@ -162,7 +162,7 @@ extern struct config_t {
     int32_t decoderFlag = DECODER_STATE; // CW decoder, 0=off, 1=on
     KeyTypeId keyType = KEYER_TYPE;                         // UNUSED
     int32_t currentWPM = DEFAULT_KEYER_WPM;
-    float32_t sidetoneVolume = 20.0;                  // UNUSED
+    float32_t sidetoneVolume = 20.0;
     int64_t cwTransmitDelay = 750;                       // UNUSED
     int32_t activeVFO = 0;                                // UNUSED
     int32_t freqIncrement = 5;

@@ -43,3 +43,7 @@
 
 
 #define SI5351_BUS_BASE_ADDR 0x60
+// Set the I2C addresses of the LPF, BPF, and RF boards
+#define V12_LPF_MCP23017_ADDR 0x25
+#define BPF_MCP23017_ADDR 0x24
+#define RF_MCP23017_ADDR 0x27

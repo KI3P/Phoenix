@@ -3,6 +3,7 @@
 #include "SDT.h"
 
 // This file lists the functions that are globally visible
+errno_t InitializeRFBoard(void);
 
 // Attenuator control functions
 errno_t TXAttenuatorCreate(float32_t txAttenuation_dB);
@@ -59,5 +60,6 @@ enum RFBoardState {
 
 ModeSm_StateId GetRFBoardPreviousState(void);
 void UpdateRFBoardState(void);
+void HandleRFBoardStateChange(RFBoardState newState);
 
 #endif // RFBOARD_H

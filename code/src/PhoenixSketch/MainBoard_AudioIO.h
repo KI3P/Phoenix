@@ -9,6 +9,8 @@
 #include <SerialFlash.h>
 #include <OpenAudio_ArduinoLibrary.h>
 
+#define SIDETONE_FREQUENCY 100
+
 int SetI2SFreq(int freq);
 void SetupAudio(void);
 void UpdateAudioIOState(void);

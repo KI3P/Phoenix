@@ -5,7 +5,7 @@
 // Variables that are only visible from within this file
 ///////////////////////////////////////////////////////////////////////////////
 
-static Adafruit_MCP23X17 mcp;
+static Adafruit_MCP23X17 mcpAtten;
 #define MAX_ATTENUATION_VAL_DBx2 63
 #define MIN_ATTENUATION_VAL_DBx2 0
 
@@ -48,7 +48,26 @@ static bool rxtxState = CAL_OFF;
  * 
  * Returns boolean true if the chip was found. Returns boolean false if it was not. 
  */
-static bool InitI2C(){
+static bool InitI2C(void){
+    Debug("Initializing RF board");
+    //mcp.begin_I2C(RF_MCP23017_ADDR);
+    if (!mcpAtten.begin_I2C(RF_MCP23017_ADDR)) {
+        bit_results.RF_I2C_present = false;
+        //ShowMessageOnWaterfall("RF MCP23017 not found at 0x"+String(RF_MCP23017_ADDR,HEX));
+    } else {
+        bit_results.RF_I2C_present = true;
+    }
+    
+    if(bit_results.RF_I2C_present) {
+        for (int i=0;i<16;i++){
+        mcpAtten.pinMode(i, OUTPUT);
+        }
+        // Set all pins to zero. This means no attenuation and in HF mode
+        GPA_state = 0x00;
+        GPB_state = 0x00;
+        mcpAtten.writeGPIOA(GPA_state); 
+        mcpAtten.writeGPIOB(GPB_state); 
+    }
     return true;
 }
 
@@ -57,7 +76,8 @@ static bool InitI2C(){
  * 
  * Returns boolean true if the write was successful. Returns boolean false if it was not. 
  */
-static bool WriteGPIOARegister(){
+static bool WriteGPIOARegister(void){
+    mcpAtten.writeGPIOA(GPA_state);
     return true;
 }
 
@@ -66,7 +86,8 @@ static bool WriteGPIOARegister(){
  * 
  * Returns boolean true if the write was successful. Returns boolean false if it was not. 
  */
-static bool WriteGPIOBRegister(){
+static bool WriteGPIOBRegister(void){
+    mcpAtten.writeGPIOB(GPB_state);
     return true;
 }
 
@@ -240,6 +261,30 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 }
 
 /**
+ * Return the effective transmit/receive frequency, which is a combination of the center
+ * frequency, the fine tune frequency, and the sample rate.
+ * 
+ * @return The effective transmit/receive frequency in units of Hz * 100
+ */
+int64_t GetTXRXFreq_dHz(void){
+    return 100*(EEPROMData.centerFreq_Hz + EEPROMData.fineTuneFreq_Hz - SR[SampleRate].rate/4);
+}
+
+/**
+ * Return the CW transmit frequency, which is a combination of the RX/TX frequency and the
+ * CW tone offset.
+ * 
+ * @return The CW tone transmit frequency in units of Hz * 100
+ */
+int64_t GetCWTXFreq_dHz(void){
+    if (bands[EEPROMData.currentBand].mode == LSB) {
+        return GetTXRXFreq_dHz() - (int64_t)(100*CWToneOffsetsHz[EEPROMData.CWToneIndex]);
+    } else {
+        return GetTXRXFreq_dHz() + (int64_t)(100*CWToneOffsetsHz[EEPROMData.CWToneIndex]);
+    }
+}
+
+/**
  * Set the frequency of the Si5351
  * 
  * @param centerFreq_Hz THe desired frequency in Hz
@@ -268,6 +313,7 @@ errno_t InitSSBVFO(void){
     // Set driveCurrentSSB_mA to appropriate value
     SetSSBVFOPower( SI5351_DRIVE_CURRENT );
     si5351.set_ms_source(SI5351_CLK0, SI5351_PLLA);
+    si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
     return ESUCCESS;
 }
 
@@ -410,7 +456,9 @@ void DisableSSBVFOOutput(void){
 }
 
 // CW VFO Control Functions
-void SetCWVFOFrequency(int64_t frequency_dHz){} // frequency in Hz * 100
+void SetCWVFOFrequency(int64_t frequency_dHz){
+    si5351.set_freq(GetCWTXFreq_dHz(), SI5351_CLK2);
+} // frequency in Hz * 100
 
 /**
  * Enable the CW VFO output (CLK2)
@@ -433,6 +481,7 @@ void DisableCWVFOOutput(void){
  */
 void SetCWVFOPower(int32_t power){
     si5351.drive_strength(SI5351_CLK2, (si5351_drive)power);
+    si5351.set_ms_source(SI5351_CLK2, SI5351_PLLA);
 }
 
 /**
@@ -575,6 +624,25 @@ void SelectRXMode(void){
     rxtxState = RX;
 }
 
+/**
+ * Initialize the RF board by calling the initialization functions for each 
+ * of the modules hosted on the RF board:
+ *   > Attenuators
+ *   > SSB VFO
+ *   > CW VFO
+ *   > Transmit modulation control
+ *   > Calibration control
+ *   > RXTX control
+ */
+errno_t InitializeRFBoard(void){
+    errno_t err = InitAttenuation();
+    err += InitCalFeedbackControl();
+    err += InitTXModulation();
+    err += InitVFOs();
+    err += InitRXTX();
+    HandleRFBoardStateChange(RFBoardReceive);
+    return err;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////
 // State machine code
@@ -582,14 +650,6 @@ void SelectRXMode(void){
 
 ModeSm_StateId GetRFBoardPreviousState(void){
     return previousRadioState;
-}
-
-int64_t GetTXRXFreq_dHz(void){
-    return 100*(EEPROMData.centerFreq_Hz + EEPROMData.fineTuneFreq_Hz - SR[SampleRate].rate/4);
-}
-
-int64_t GetCWTXFreq_dHz(void){
-    return GetTXRXFreq_dHz() + (int64_t)(100*CWToneOffsetsHz[EEPROMData.CWToneIndex]);
 }
 
 void HandleRFBoardStateChange(RFBoardState newState){

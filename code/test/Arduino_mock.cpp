@@ -94,3 +94,70 @@ void SetMillisTime(uint64_t time_ms){
 void digitalWrite(uint16_t pin, uint8_t val){}
 uint8_t digitalRead(uint16_t pin){return 0;}
 void pinMode(uint16_t pin, uint8_t val){}
+
+
+// A mock C++ class that mimics the Arduino String class
+class String {
+public:
+    // Default constructor
+    String() : _data(new char[1]) {
+        _data[0] = '\0';
+    }
+
+    // Constructor from C-style string
+    String(const char* c_str) {
+        if (c_str) {
+            _data = new char[strlen(c_str) + 1];
+            strcpy(_data, c_str);
+        } else {
+            _data = new char[1];
+            _data[0] = '\0';
+        }
+    }
+
+    // Copy constructor
+    String(const String& other) {
+        _data = new char[other.length() + 1];
+        strcpy(_data, other._data);
+    }
+
+    // Destructor to free dynamically allocated memory
+    ~String() {
+        delete[] _data;
+    }
+
+    // Get the length of the string
+    size_t length() const {
+        return strlen(_data);
+    }
+
+    // Get the C-style string pointer
+    const char* c_str() const {
+        return _data;
+    }
+
+    // Overloaded assignment operator
+    String& operator=(const String& other) {
+        if (this != &other) {
+            delete[] _data;
+            _data = new char[other.length() + 1];
+            strcpy(_data, other._data);
+        }
+        return *this;
+    }
+
+    // Overloaded concatenation operator
+    String operator+(const String& other) const {
+        char* new_data = new char[length() + other.length() + 1];
+        strcpy(new_data, _data);
+        strcat(new_data, other._data);
+        String result(new_data);
+        delete[] new_data;
+        return result;
+    }
+
+    String operator+(const char* other) const{}
+
+private:
+    char* _data;
+};

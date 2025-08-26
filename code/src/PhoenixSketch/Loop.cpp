@@ -244,35 +244,35 @@ void ConsumeInterrupt(void){
         }
         case (iFILTER_INCREASE):{
             FilterSetSSB(1);
-            Debug("Filter = " + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
-                     + " to " + String(bands[EEPROMData.currentBand].FLoCut_Hz) );            break;
+            Debug(String("Filter = ") + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
+                     + String(" to ") + String(bands[EEPROMData.currentBand].FLoCut_Hz) );            break;
         }
         case (iFILTER_DECREASE):{
             FilterSetSSB(-1);
-            Debug("Filter = " + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
-                     + " to " + String(bands[EEPROMData.currentBand].FLoCut_Hz) );
+            Debug(String("Filter = ") + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
+                     + String(" to ") + String(bands[EEPROMData.currentBand].FLoCut_Hz) );
             break;
         }
         case (iCENTERTUNE_INCREASE):{
             EEPROMData.centerFreq_Hz += (int64_t)EEPROMData.freqIncrement;
             SetFreq(EEPROMData.centerFreq_Hz);
-            Debug("Center tune = " + String(EEPROMData.centerFreq_Hz));
+            Debug(String("Center tune = ") + String(EEPROMData.centerFreq_Hz));
             break;
         }
         case (iCENTERTUNE_DECREASE):{
             EEPROMData.centerFreq_Hz -= (int64_t)EEPROMData.freqIncrement;
             SetFreq(EEPROMData.centerFreq_Hz);
-            Debug("Center tune = " + String(EEPROMData.centerFreq_Hz));
+            Debug(String("Center tune = ") + String(EEPROMData.centerFreq_Hz));
             break;
         }
         case (iFINETUNE_INCREASE):{
             AdjustFineTune(+1);
-            Debug("Fine tune = " + String(EEPROMData.fineTuneFreq_Hz));
+            Debug(String("Fine tune = ") + String(EEPROMData.fineTuneFreq_Hz));
             break;
         }
         case (iFINETUNE_DECREASE):{
             AdjustFineTune(-1);
-            Debug("Fine tune = " + String(EEPROMData.fineTuneFreq_Hz));
+            Debug(String("Fine tune = ") + String(EEPROMData.fineTuneFreq_Hz));
             break;
         }
         case (iBUTTON_PRESSED):{
