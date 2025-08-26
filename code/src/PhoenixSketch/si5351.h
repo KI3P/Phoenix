@@ -318,6 +318,12 @@ public:
 	uint64_t clk_freq[8];
 	uint64_t plla_freq;
 	uint64_t pllb_freq;
+    uint8_t output_enable_calls[8];
+    uint8_t drive_strength_calls[8];
+    uint8_t phase_calls[8];
+    uint8_t pll_reset_calls[2];
+    si5351_drive drive_strength_values[8];
+    uint8_t phase_values[8];
   enum si5351_pll_input plla_ref_osc;
   enum si5351_pll_input pllb_ref_osc;
 	uint32_t xtal_freq[2];

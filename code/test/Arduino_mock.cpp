@@ -3,6 +3,10 @@
 #include <string>
 
 SerialClass Serial;
+std::vector<uint16_t> pin_mode_pins;
+std::vector<uint8_t> pin_mode_values;
+std::vector<uint16_t> digital_write_pins;
+std::vector<uint8_t> digital_write_values;
 
 void SerialClass::createFile(const char* filename) {
     if (filename != nullptr) {
@@ -99,10 +103,15 @@ void SetMillisTime(uint64_t time_ms){
     tstart = millis()+tstart - time_ms;
 }
 
-void digitalWrite(uint16_t pin, uint8_t val){}
+void digitalWrite(uint16_t pin, uint8_t val){
+    digital_write_pins.push_back(pin);
+    digital_write_values.push_back(val);
+}
 uint8_t digitalRead(uint16_t pin){return 0;}
-void pinMode(uint16_t pin, uint8_t val){}
-
+void pinMode(uint16_t pin, uint8_t val){
+    pin_mode_pins.push_back(pin);
+    pin_mode_values.push_back(val);
+}
 
 #include <cstring>
 // A mock C++ class that mimics the Arduino String class

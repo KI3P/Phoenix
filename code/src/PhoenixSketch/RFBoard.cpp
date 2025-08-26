@@ -326,7 +326,7 @@ errno_t InitSSBVFO(void){
 int32_t EvenDivisor(int64_t freq2_Hz) {
     int32_t mult = 1;
     // Use phase method of time delay described by
-    // https://tj-lab.org/2020/08/27/si5351単体で3mhz以下の直交信号を出力する/
+    // https://tj-lab.org/2020/08/27/si5351%E5%8D%98%E4%BD%93%E3%81%A73mhz%E4%BB%A5%E4%B8%8B%E3%81%AE%E7%9B%B4%E4%BA%A4%E4%BF%A1%E5%8F%B7%E3%82%92%E5%87%BA%E5%8A%9B%E3%81%99%E3%82%8B/
     // for below 3.2MHz the ~limit of PLLA @ 400MHz for a 126 divider
     if (freq2_Hz < 100000)
         mult = 8192;
@@ -585,7 +585,7 @@ errno_t InitCalFeedbackControl(void){
  */
 void EnableCalFeedback(void){
     if (calFeedbackState == CAL_OFF) digitalWrite(CAL, CAL_ON);
-    modulationState = CAL_ON;
+    calFeedbackState = CAL_ON;
 }
 
 /**
@@ -593,7 +593,7 @@ void EnableCalFeedback(void){
  */
 void DisableCalFeedback(void){
     if (calFeedbackState == CAL_ON) digitalWrite(CAL, CAL_OFF);
-    modulationState = CAL_OFF;
+    calFeedbackState = CAL_OFF;
 }
 
 // RXTX Control

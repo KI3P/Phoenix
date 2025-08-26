@@ -82,6 +82,7 @@ void Si5351::reset(void){
  *   (use the si5351_clock enum)
  */
 uint8_t Si5351::set_freq(uint64_t freq, enum si5351_clock clk){
+    clk_freq[clk] = freq;
     return 0;
 }
 
@@ -101,6 +102,12 @@ uint8_t Si5351::set_freq(uint64_t freq, enum si5351_clock clk){
  *   (use the si5351_clock enum)
  */
 uint8_t Si5351::set_freq_manual(uint64_t freq, uint64_t pll_freq, enum si5351_clock clk){
+    clk_freq[clk] = freq;
+    if (pll_assignment[clk] == SI5351_PLLA) {
+        plla_freq = pll_freq;
+    } else {
+        pllb_freq = pll_freq;
+    }
     return 0;
 }
 
@@ -114,6 +121,11 @@ uint8_t Si5351::set_freq_manual(uint64_t freq, uint64_t pll_freq, enum si5351_cl
  *     (use the si5351_pll enum)
  */
 void Si5351::set_pll(uint64_t pll_freq, enum si5351_pll target_pll){
+    if (target_pll == SI5351_PLLA) {
+        plla_freq = pll_freq;
+    } else {
+        pllb_freq = pll_freq;
+    }
 }
 
 /*
@@ -141,7 +153,9 @@ void Si5351::set_ms(enum si5351_clock clk, struct Si5351RegSet ms_reg, uint8_t i
  * enable - Set to 1 to enable, 0 to disable
  */
 void Si5351::output_enable(enum si5351_clock clk, uint8_t enable)
-{}
+{
+    output_enable_calls[clk] = enable;
+}
 
 /*
  * drive_strength(enum si5351_clock clk, enum si5351_drive drive)
@@ -154,7 +168,10 @@ void Si5351::output_enable(enum si5351_clock clk, uint8_t enable)
  *   (use the si5351_drive enum)
  */
 void Si5351::drive_strength(enum si5351_clock clk, enum si5351_drive drive)
-{}
+{
+    drive_strength_calls[clk]++;
+    drive_strength_values[clk] = drive;
+}
 
 /*
  * update_status(void)
@@ -211,7 +228,10 @@ void Si5351::set_correction(int32_t corr, enum si5351_pll_input ref_osc)
  * calculate the proper tuning word based on the PLL period.
  */
 void Si5351::set_phase(enum si5351_clock clk, uint8_t phase)
-{}
+{
+    phase_calls[clk]++;
+    phase_values[clk] = phase;
+}
 
 /*
  * get_correction(enum si5351_pll_input ref_osc)
@@ -237,7 +257,9 @@ int32_t Si5351::get_correction(enum si5351_pll_input ref_osc)
  * Apply a reset to the indicated PLL.
  */
 void Si5351::pll_reset(enum si5351_pll target_pll)
-{}
+{
+    pll_reset_calls[target_pll]++;
+}
 
 /*
  * set_ms_source(enum si5351_clock clk, enum si5351_pll pll)
@@ -250,7 +272,9 @@ void Si5351::pll_reset(enum si5351_pll target_pll)
  * Set the desired PLL source for a multisynth.
  */
 void Si5351::set_ms_source(enum si5351_clock clk, enum si5351_pll pll)
-{}
+{
+    pll_assignment[clk] = pll;
+}
 
 /*
  * set_int(enum si5351_clock clk, uint8_t int_mode)

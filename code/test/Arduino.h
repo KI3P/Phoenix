@@ -26,6 +26,7 @@ void cli(void);
 void sei(void);
 void delayMicroseconds(uint32_t usec);
 int64_t millis(void);
+void MyDelay(unsigned long millisWait);
 
 #define OUTPUT 1
 
@@ -50,6 +51,11 @@ private:
 };
 
 extern SerialClass Serial;
+
+extern std::vector<uint16_t> pin_mode_pins;
+extern std::vector<uint8_t> pin_mode_values;
+extern std::vector<uint16_t> digital_write_pins;
+extern std::vector<uint8_t> digital_write_values;
 
 class String {
 public:
