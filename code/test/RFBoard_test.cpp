@@ -420,6 +420,7 @@ TEST(RFBoard, CWon_Test) {
 TEST(RFBoard, CWoff_Test) {
     digital_write_pins.clear();
     digital_write_values.clear();
+    CWon();
     CWoff();
     EXPECT_EQ(digital_write_pins.back(), CW_ON_OFF);
     EXPECT_EQ(digital_write_values.back(), 0);
