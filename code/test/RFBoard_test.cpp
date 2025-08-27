@@ -162,7 +162,7 @@ TEST(RFBoard, AttenuatorRoundingToNearestHalfdB) {
 // VFO Tests
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-extern struct config_t EEPROMData;
+extern struct config_t ED;
 extern Si5351 si5351;
 extern const struct SR_Descriptor SR[];
 extern uint8_t SampleRate;
@@ -211,30 +211,30 @@ TEST(RFBoard, EvenDivisorTest) {
 }
 
 TEST(RFBoard, GetTXRXFreq_dHz_Test) {
-    EEPROMData.centerFreq_Hz = 7074000;
-    EEPROMData.fineTuneFreq_Hz = 100;
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_48K;
     // Calculation is: 100 * (7074000 + 100 - 48000/4) = 100 * (7074100 - 12000) = 100 * 7062100 = 706210000
     EXPECT_EQ(GetTXRXFreq_dHz(), 706210000);
 }
 
 TEST(RFBoard, GetCWTXFreq_dHz_LSB_Test) {
-    EEPROMData.centerFreq_Hz = 7074000;
-    EEPROMData.fineTuneFreq_Hz = 100;
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_192K;
-    EEPROMData.currentBand = BAND_40M; // LSB
-    EEPROMData.CWToneIndex = 3; // 750 Hz
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 3; // 750 Hz
     // Calculation is: 100 * (7074000 + 100 - 192000/4) = 100 * (7074100 - 48000) = 702610000
     // GetTXRXFreq_dHz() - 100 * 750 = 702610000 - 75000 = 702535000
     EXPECT_EQ(GetCWTXFreq_dHz(), 702535000);
 }
 
 TEST(RFBoard, GetCWTXFreq_dHz_USB_Test) {
-    EEPROMData.centerFreq_Hz = 14074000;
-    EEPROMData.fineTuneFreq_Hz = 100;
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_192K;
-    EEPROMData.currentBand = BAND_20M; // USB
-    EEPROMData.CWToneIndex = 3; // 750 Hz
+    ED.currentBand[ED.activeVFO] = BAND_20M; // USB
+    ED.CWToneIndex = 3; // 750 Hz
     // Calculation is: 100 * (14074000 + 100 - 48000) = 1402610000
     // GetTXRXFreq_dHz() + 100 * 750 = 1402610000 + 75000 = 1402685000
     EXPECT_EQ(GetCWTXFreq_dHz(), 1402685000);
@@ -265,11 +265,11 @@ TEST(RFBoard, InitSSBVFO_Test) {
 
 TEST(RFBoard, SetCWVFOFrequency_Test) {
     si5351 = Si5351(); // Reset mock
-    EEPROMData.centerFreq_Hz = 7074000;
-    EEPROMData.fineTuneFreq_Hz = 100;
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_192K;
-    EEPROMData.currentBand = BAND_40M; // LSB
-    EEPROMData.CWToneIndex = 3; // 750 Hz
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 3; // 750 Hz
     SetCWVFOFrequency(GetCWTXFreq_dHz());
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702535000);
 }
@@ -304,7 +304,7 @@ TEST(RFBoard, InitCWVFO_Test) {
 
 TEST(RFBoard, InitVFOs_Test) {
     si5351 = Si5351(); // Reset mock
-    EEPROMData.freqCorrectionFactor = 0;
+    ED.freqCorrectionFactor = 0;
     InitVFOs();
     // Not much to test here since the mock is simple
     // We can at least check that the VFOs were initialized

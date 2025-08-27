@@ -15,8 +15,8 @@ void setup(void){
     FrontPanelInit();
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.agc = AGCOff;
-    EEPROMData.nrOptionSelect = NROff;
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
     SetupAudio();
     UpdateAudioIOState();
 
@@ -24,6 +24,6 @@ void setup(void){
     InitializeSignalProcessing();
     // If our input tone was at 1 kHz, then it will appear at 49 kHz after Fs/4
     // So make our VFO frequency the negative of this to shift it back to 1 kHz
-    EEPROMData.fineTuneFreq_Hz = -48000.0; //testcode
+    ED.fineTuneFreq_Hz = -48000.0; //testcode
 
 }

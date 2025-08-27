@@ -148,7 +148,7 @@ void UpdateAudioIOState(void){
             // Microphone input starts
             Q_in_L_Ex.begin(); 
             Q_in_R_Ex.begin();
-            sgtl5000_teensy.micGain(EEPROMData.currentMicGain);
+            sgtl5000_teensy.micGain(ED.currentMicGain);
 
             // Input is microphone
             SelectMixerChannel(&modeSelectInExL,0);
@@ -237,7 +237,7 @@ void SetupAudio(void){
     pcm5102_mainBoard.inputSelect(AUDIO_INPUT_LINEIN);
     pcm5102_mainBoard.volume(0.5);
 
-    sidetone_oscillator.amplitude(EEPROMData.sidetoneVolume / 500);
+    sidetone_oscillator.amplitude(ED.sidetoneVolume / 500);
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
 
 }

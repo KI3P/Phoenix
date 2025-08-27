@@ -273,9 +273,9 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
         filters->biquadAudioLowPass.pState[i] = 0.0;  // set state variables to zero
     }
     // adjust IIR AM filter
-    int32_t LP_F_help = bands[EEPROMData.currentBand].FHiCut_Hz;
-    if (LP_F_help < -bands[EEPROMData.currentBand].FLoCut_Hz)
-        LP_F_help = -bands[EEPROMData.currentBand].FLoCut_Hz;
+    int32_t LP_F_help = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+    if (LP_F_help < -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz)
+        LP_F_help = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
     SetIIRCoeffs(filters->biquad_lowpass1_coeffs, 
             (float32_t)LP_F_help, 1.3, 
             (float32_t)SR[SampleRate].rate / filters->DF, Lowpass);
@@ -520,8 +520,8 @@ void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXT
     int sign = 1;
     if (bf%2 == 0) sign = -1;
     float32_t scale;
-    if (TXRX == RX) scale = (float)EEPROMData.equalizerRec[bf] / 100.0;
-    else scale = (float)EEPROMData.equalizerXmt[bf] / 100.0;
+    if (TXRX == RX) scale = (float)ED.equalizerRec[bf] / 100.0;
+    else scale = (float)ED.equalizerXmt[bf] / 100.0;
     // Filter I with this band's biquad
     if (TXRX == RX)
         arm_biquad_cascade_df2T_f32(&filters->S_Rec[bf], data->I, filters->eqFiltBuffer, data->N);
@@ -734,7 +734,7 @@ void TXDecInit(void){
 
 void SidebandSelection(float32_t *I, float32_t *Q){
     // Math works out for selecting LSB by default
-    if (bands[EEPROMData.currentBand].mode == USB){
+    if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
         arm_scale_f32(I,-1,I,256);
     }
 }
@@ -860,20 +860,20 @@ void DoExciterEQ(float32_t *float_buffer_L_EX)
   arm_biquad_cascade_df2T_f32(&S13_Xmt, float_buffer_L_EX, xmt_EQ13_float_buffer_L, 256);
   arm_biquad_cascade_df2T_f32(&S14_Xmt, float_buffer_L_EX, xmt_EQ14_float_buffer_L, 256);
 
-  arm_scale_f32(xmt_EQ1_float_buffer_L, -EEPROMData.equalizerXmt[0]/100, xmt_EQ1_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ2_float_buffer_L, EEPROMData.equalizerXmt[1]/100, xmt_EQ2_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ3_float_buffer_L, -EEPROMData.equalizerXmt[2]/100, xmt_EQ3_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ4_float_buffer_L, EEPROMData.equalizerXmt[3]/100, xmt_EQ4_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ5_float_buffer_L, -EEPROMData.equalizerXmt[4]/100, xmt_EQ5_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ6_float_buffer_L, EEPROMData.equalizerXmt[5]/100, xmt_EQ6_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ7_float_buffer_L, -EEPROMData.equalizerXmt[6]/100, xmt_EQ7_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ8_float_buffer_L, EEPROMData.equalizerXmt[7]/100, xmt_EQ8_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ9_float_buffer_L, -EEPROMData.equalizerXmt[8]/100, xmt_EQ9_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ10_float_buffer_L, EEPROMData.equalizerXmt[9]/100, xmt_EQ10_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ11_float_buffer_L, -EEPROMData.equalizerXmt[10]/100, xmt_EQ11_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ12_float_buffer_L, EEPROMData.equalizerXmt[11]/100, xmt_EQ12_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ13_float_buffer_L, -EEPROMData.equalizerXmt[12]/100, xmt_EQ13_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ14_float_buffer_L, EEPROMData.equalizerXmt[13]/100, xmt_EQ14_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ1_float_buffer_L, -ED.equalizerXmt[0]/100, xmt_EQ1_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ2_float_buffer_L, ED.equalizerXmt[1]/100, xmt_EQ2_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ3_float_buffer_L, -ED.equalizerXmt[2]/100, xmt_EQ3_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ4_float_buffer_L, ED.equalizerXmt[3]/100, xmt_EQ4_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ5_float_buffer_L, -ED.equalizerXmt[4]/100, xmt_EQ5_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ6_float_buffer_L, ED.equalizerXmt[5]/100, xmt_EQ6_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ7_float_buffer_L, -ED.equalizerXmt[6]/100, xmt_EQ7_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ8_float_buffer_L, ED.equalizerXmt[7]/100, xmt_EQ8_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ9_float_buffer_L, -ED.equalizerXmt[8]/100, xmt_EQ9_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ10_float_buffer_L, ED.equalizerXmt[9]/100, xmt_EQ10_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ11_float_buffer_L, -ED.equalizerXmt[10]/100, xmt_EQ11_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ12_float_buffer_L, ED.equalizerXmt[11]/100, xmt_EQ12_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ13_float_buffer_L, -ED.equalizerXmt[12]/100, xmt_EQ13_float_buffer_L, 256);
+  arm_scale_f32(xmt_EQ14_float_buffer_L, ED.equalizerXmt[13]/100, xmt_EQ14_float_buffer_L, 256);
 
   arm_add_f32(xmt_EQ1_float_buffer_L, xmt_EQ2_float_buffer_L, float_buffer_L_EX, 256);
   arm_add_f32(float_buffer_L_EX, xmt_EQ3_float_buffer_L, float_buffer_L_EX, 256);

@@ -105,3 +105,13 @@ TEST(Loop, UpdateAudioIOState){
     prev = GetAudioPreviousState();
     EXPECT_EQ(prev, ModeSm_StateId_SSB_RECEIVE);
 }
+
+TEST(Loop, ChangeVFO){
+    uint8_t vfo = ED.activeVFO;
+    SetInterrupt(iVFO_CHANGE);
+    ConsumeInterrupt();
+    // check ED.activeVFO
+    EXPECT_NE(ED.activeVFO,vfo);
+    // check frequency
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],GetFreq());
+}

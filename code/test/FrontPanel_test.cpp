@@ -53,19 +53,19 @@ TEST(FrontPanel, VolumeIncrease){
     //setfilename("VolumeIncrease");
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.agc = AGCOff;
-    EEPROMData.nrOptionSelect = NROff;
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
     InitializeSignalProcessing();
 
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int32_t tmp = EEPROMData.audioVolume;
+    int32_t tmp = ED.audioVolume;
     SetInterrupt(iVOLUME_INCREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    EXPECT_EQ(EEPROMData.audioVolume,tmp+1);
+    EXPECT_EQ(ED.audioVolume,tmp+1);
 
     FILE* file = fopen("VolumeIncrease_ReceiveOut_L.txt", "r");
     int buffer[2048*8] = {0};
@@ -88,19 +88,19 @@ TEST(FrontPanel, VolumeDecrease){
     Q_out_R.setName(nullptr);
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.agc = AGCOff;
-    EEPROMData.nrOptionSelect = NROff;
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
     InitializeSignalProcessing();
 
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int32_t tmp = EEPROMData.audioVolume;
+    int32_t tmp = ED.audioVolume;
     SetInterrupt(iVOLUME_DECREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    EXPECT_EQ(EEPROMData.audioVolume,tmp-1);
+    EXPECT_EQ(ED.audioVolume,tmp-1);
 
     FILE* file = fopen("VolumeDecrease_ReceiveOut_L.txt", "r");
     int buffer[2048*8] = {0};
@@ -137,17 +137,17 @@ TEST(FrontPanel, FilterDecrease){
     Q_out_R.setName(nullptr);
     //setfilename("FilterDecrease");
 
-    EEPROMData.fineTuneFreq_Hz = -48000.0;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = -48000.0;
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.agc = AGCOff;
-    EEPROMData.nrOptionSelect = NROff;
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
    
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int32_t tmphi = bands[EEPROMData.currentBand].FHiCut_Hz;
-    int32_t tmplo = bands[EEPROMData.currentBand].FLoCut_Hz;
+    int32_t tmphi = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+    int32_t tmplo = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
 
     // Get the amplitude of the output tone:
     int32_t maxpre = FindMax("FilterDecrease_ReceiveOut_L.txt", 2048*4);
@@ -164,13 +164,13 @@ TEST(FrontPanel, FilterDecrease){
     int32_t maxpost = FindMax("FilterDecrease_ReceiveOut_L.txt", 2048*258); //4238
     EXPECT_LT(maxpost, maxpre*0.3);
 
-    if (bands[EEPROMData.currentBand].mode == USB){
-        EXPECT_LT(bands[EEPROMData.currentBand].FHiCut_Hz,tmphi);
-        EXPECT_EQ(bands[EEPROMData.currentBand].FHiCut_Hz,500);
+    if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
+        EXPECT_LT(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,tmphi);
+        EXPECT_EQ(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,500);
     }
-    if (bands[EEPROMData.currentBand].mode == LSB){
-        EXPECT_GT(bands[EEPROMData.currentBand].FLoCut_Hz,tmplo);
-        EXPECT_EQ(bands[EEPROMData.currentBand].FLoCut_Hz,-500);
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
+        EXPECT_GT(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz,tmplo);
+        EXPECT_EQ(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz,-500);
     }
 }
 
@@ -184,24 +184,24 @@ TEST(FrontPanel, FilterIncrease){
     Q_out_R.setName(nullptr);
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.agc = AGCOff;
-    EEPROMData.nrOptionSelect = NROff;
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int32_t tmphi = bands[EEPROMData.currentBand].FHiCut_Hz;
-    int32_t tmplo = bands[EEPROMData.currentBand].FLoCut_Hz;
+    int32_t tmphi = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+    int32_t tmplo = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
     SetInterrupt(iFILTER_INCREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    if (bands[EEPROMData.currentBand].mode == USB){
-        EXPECT_GT(bands[EEPROMData.currentBand].FHiCut_Hz,tmphi);
+    if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
+        EXPECT_GT(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,tmphi);
 
     }
-    if (bands[EEPROMData.currentBand].mode == LSB){
-        EXPECT_LT(bands[EEPROMData.currentBand].FLoCut_Hz,tmplo);
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
+        EXPECT_LT(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz,tmplo);
     }
 }
 
@@ -217,12 +217,12 @@ TEST(FrontPanel, CenterTuneIncrease){
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int64_t tmpfreq = EEPROMData.centerFreq_Hz;
+    int64_t tmpfreq = ED.centerFreq_Hz[ED.activeVFO];
     SetInterrupt(iCENTERTUNE_INCREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    EXPECT_EQ(EEPROMData.centerFreq_Hz,tmpfreq+EEPROMData.freqIncrement);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],tmpfreq+ED.freqIncrement);
 }
 
 TEST(FrontPanel, CenterTuneDecrease){
@@ -236,12 +236,12 @@ TEST(FrontPanel, CenterTuneDecrease){
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int64_t tmpfreq = EEPROMData.centerFreq_Hz;
+    int64_t tmpfreq = ED.centerFreq_Hz[ED.activeVFO];
     SetInterrupt(iCENTERTUNE_DECREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    EXPECT_EQ(EEPROMData.centerFreq_Hz,tmpfreq-EEPROMData.freqIncrement);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],tmpfreq-ED.freqIncrement);
 }
 
 TEST(FrontPanel, FineTuneIncrease){
@@ -254,12 +254,12 @@ TEST(FrontPanel, FineTuneIncrease){
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int64_t tmpfreq = EEPROMData.fineTuneFreq_Hz;
+    int64_t tmpfreq = ED.fineTuneFreq_Hz[ED.activeVFO];
     SetInterrupt(iFINETUNE_INCREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz,tmpfreq+EEPROMData.stepFineTune);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO],tmpfreq+ED.stepFineTune);
 }
 
 TEST(FrontPanel, FineTuneDecrease){
@@ -272,12 +272,12 @@ TEST(FrontPanel, FineTuneDecrease){
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    int64_t tmpfreq = EEPROMData.fineTuneFreq_Hz;
+    int64_t tmpfreq = ED.fineTuneFreq_Hz[ED.activeVFO];
     SetInterrupt(iFINETUNE_DECREASE);
     for (size_t k = 0; k < 4; k++){
         loop();
     }
-    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz,tmpfreq-EEPROMData.stepFineTune);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO],tmpfreq-ED.stepFineTune);
 }
 
 TEST(FrontPanel, FineTuneLimits){
@@ -286,24 +286,24 @@ TEST(FrontPanel, FineTuneLimits){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.spectrum_zoom = 1;
+    ED.spectrum_zoom = 1;
     InitializeSignalProcessing();
 
-    uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
+    uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << ED.spectrum_zoom);
     int32_t upper_limit = (int32_t)visible_bandwidth/2;
     int32_t lower_limit = -(int32_t)visible_bandwidth/2;
 
     // Test upper limit
-    EEPROMData.fineTuneFreq_Hz = upper_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = upper_limit;
     SetInterrupt(iFINETUNE_INCREASE);
     loop();
-    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, upper_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], upper_limit);
 
     // Test lower limit
-    EEPROMData.fineTuneFreq_Hz = lower_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = lower_limit;
     SetInterrupt(iFINETUNE_DECREASE);
     loop();
-    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, lower_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], lower_limit);
 }
 
 TEST(FrontPanel, FineTuneLimitsNoZoom){
@@ -312,22 +312,22 @@ TEST(FrontPanel, FineTuneLimitsNoZoom){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.spectrum_zoom = 0; 
+    ED.spectrum_zoom = 0; 
     InitializeSignalProcessing();
 
-    uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
+    uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << ED.spectrum_zoom);
     int32_t upper_limit = (int32_t)visible_bandwidth/2;
     int32_t lower_limit = -(int32_t)visible_bandwidth/2;
 
     // Test upper limit
-    EEPROMData.fineTuneFreq_Hz = upper_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = upper_limit;
     SetInterrupt(iFINETUNE_INCREASE);
     loop();
-    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, upper_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], upper_limit);
 
     // Test lower limit
-    EEPROMData.fineTuneFreq_Hz = lower_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = lower_limit;
     SetInterrupt(iFINETUNE_DECREASE);
     loop();
-    EXPECT_EQ(EEPROMData.fineTuneFreq_Hz, lower_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], lower_limit);
 }

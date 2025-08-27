@@ -641,8 +641,8 @@ TEST(SignalProcessing, FrequencyTranslate){
 
     FreqShiftFs4(&data);
     WriteIQFile(I,Q,"frequencyTranslate_midcourse_IQ.txt",Nsamples);
-    EEPROMData.fineTuneFreq_Hz = 48000+3000;
-    float32_t shift = -EEPROMData.fineTuneFreq_Hz;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 48000+3000;
+    float32_t shift = -ED.fineTuneFreq_Hz[ED.activeVFO];
     FreqShiftF(&data,shift);
 
     WriteIQFile(I,Q,"frequencyTranslate_posttranslate_IQ.txt",Nsamples);
@@ -1028,8 +1028,8 @@ TEST(SignalProcessing, ConvolutionFilterChanges){
     WriteIQFile(I,Q,"ConvolutionFilterChange_original_IQ.txt",512);
 
     // Change the band limits
-    bands[EEPROMData.currentBand].FLoCut_Hz = -2000;
-    bands[EEPROMData.currentBand].FHiCut_Hz = -1000;
+    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -2000;
+    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = -1000;
     UpdateFIRFilterMask(&filters);
 
     DataBlock data;
@@ -1064,7 +1064,7 @@ TEST(SignalProcessing, ConvolutionFilterChanges){
 }
 
 TEST(SignalProcessing, AGCInitializesCorrectly){
-    EEPROMData.agc = AGCLong;
+    ED.agc = AGCLong;
     EXPECT_FLOAT_EQ(agc.hangtime,0.25);
     InitializeAGC(&agc,SR[SampleRate].rate);
     EXPECT_FLOAT_EQ(agc.hangtime,2.0);
@@ -1072,7 +1072,7 @@ TEST(SignalProcessing, AGCInitializesCorrectly){
 
 TEST(SignalProcessing, AGCOffMultipliesByConstant){
     InitializeAGC(&agc,SR[SampleRate].rate);
-    EEPROMData.agc = AGCOff;
+    ED.agc = AGCOff;
     
     uint32_t Nsamples = 256;
     float I[Nsamples];
@@ -1125,19 +1125,19 @@ TEST(SignalProcessing, AGCRecoveryTime){
         
         switch (i){
             case 0:
-                EEPROMData.agc = AGCOff;
+                ED.agc = AGCOff;
                 break;
             case 1:
-                EEPROMData.agc = AGCLong;
+                ED.agc = AGCLong;
                 break;
             case 2:
-                EEPROMData.agc = AGCSlow;
+                ED.agc = AGCSlow;
                 break;
             case 3:
-                EEPROMData.agc = AGCMed;
+                ED.agc = AGCMed;
                 break;
             case 4:
-                EEPROMData.agc = AGCFast;
+                ED.agc = AGCFast;
                 break;
         }
         InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);
@@ -1167,7 +1167,7 @@ TEST(SignalProcessing, AGCRecoveryTime){
             EXPECT_NEAR(Imaxes[Nreps1+5],0.898494,0.001);
         }
         // The setting determines how long it takes the gain to recover to pre-spike levels
-        switch (EEPROMData.agc){
+        switch (ED.agc){
             case AGCOff:
                 // AGCOff, no recovery time
                 EXPECT_NEAR(Imaxes[Nreps1+Nreps2+1],Imaxes[50],0.001);
@@ -1214,7 +1214,7 @@ TEST(SignalProcessing, DemodulateLSB){
     data.sampleRate_Hz = sampleRate_Hz;
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz);
     
-    bands[EEPROMData.currentBand].mode = LSB;
+    bands[ED.currentBand[ED.activeVFO]].mode = LSB;
     InitializeFilters(SPECTRUM_ZOOM_1, &filters);
     float32_t preI = data.I[Nsamples/2];
     Demodulate(&data, &filters);
@@ -1241,7 +1241,7 @@ TEST(SignalProcessing, DemodulateUSB){
     data.sampleRate_Hz = sampleRate_Hz;
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz);
     
-    bands[EEPROMData.currentBand].mode = USB;
+    bands[ED.currentBand[ED.activeVFO]].mode = USB;
     InitializeFilters(SPECTRUM_ZOOM_1, &filters);
     float32_t preI = data.I[Nsamples/2];
     Demodulate(&data, &filters);
@@ -1316,7 +1316,7 @@ TEST(SignalProcessing, AudioIIRFilterCorrect){
     uint32_t phase = 0;
 
     InitializeFilters(SPECTRUM_ZOOM_1, &filters);
-    bands[EEPROMData.currentBand].mode = AM;
+    bands[ED.currentBand[ED.activeVFO]].mode = AM;
     char strbuf[50];
     for (size_t i = 0; i<3; i++){
         phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.5);
@@ -1612,7 +1612,7 @@ TEST(SignalProcessing, NoiseReduction){
     float I[Nsamples];
     float Q[Nsamples];
     float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
-    EEPROMData.spectrum_zoom = SPECTRUM_ZOOM_1;
+    ED.spectrum_zoom = SPECTRUM_ZOOM_1;
     InitializeFilters(SPECTRUM_ZOOM_1, &filters);
     InitializeSignalProcessing();
     DataBlock data;
@@ -1623,12 +1623,12 @@ TEST(SignalProcessing, NoiseReduction){
     uint32_t phase = 0;
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, 440.0, phase, 0.1);
     
-    EEPROMData.nrOptionSelect = NROff;
+    ED.nrOptionSelect = NROff;
     float32_t Ipre = data.I[0];
     NoiseReduction(&data);
     EXPECT_FLOAT_EQ(Ipre,data.I[0]);
     
-    EEPROMData.nrOptionSelect = NRKim;
+    ED.nrOptionSelect = NRKim;
     WriteIQFile(I,Q,"NR_preK.txt",Nsamples);
     NoiseReduction(&data);
     WriteIQFile(I,Q,"NR_postK.txt",Nsamples);
@@ -1638,7 +1638,7 @@ TEST(SignalProcessing, NoiseReduction){
     }
     EXPECT_GT(amp,0.4);
 
-    EEPROMData.nrOptionSelect = NRSpectral;
+    ED.nrOptionSelect = NRSpectral;
     phase = 0;
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, 440.0, phase, 0.1);
     WriteIQFile(I,Q,"NR_preS.txt",Nsamples);
@@ -1650,7 +1650,7 @@ TEST(SignalProcessing, NoiseReduction){
     }
     EXPECT_GT(amp,0.09);
     
-    EEPROMData.nrOptionSelect = NRLMS;
+    ED.nrOptionSelect = NRLMS;
     phase = 0;
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, 440.0, phase, 0.1);
     WriteIQFile(I,Q,"NR_preL.txt",Nsamples);
@@ -1712,9 +1712,9 @@ TEST(SignalProcessing, CWProcessing){
      *     inter-letter  = dit * 3
      *     inter-word    = dit * 7
      */
-    EEPROMData.decoderFlag = 1;
+    ED.decoderFlag = 1;
     InitializeCWProcessing(wpm, &filters);
-    InitializeFilters(EEPROMData.spectrum_zoom,&filters);
+    InitializeFilters(ED.spectrum_zoom,&filters);
     int16_t ddp = 0;
     for (size_t k = 0; k<sizeof(morseMsg); k++){
         switch (morseMsg[k]){
@@ -1759,7 +1759,7 @@ TEST(SignalProcessing, CWProcessing){
     FILE *file = fopen("CW_decoded_morse.txt", "w");    
     for (size_t k = 0; k<N_frames; k++){
         phase = CreateIQToneWithPhase(I, Q, 256, SR[SampleRate].rate/filters.DF, 
-            CWToneOffsetsHz[EEPROMData.CWToneIndex], phase, 0.1);
+            CWToneOffsetsHz[ED.CWToneIndex], phase, 0.1);
         for (size_t j = 0; j<256; j++){
             atomN = (uint32_t)(((float32_t)k*256 + (float32_t)j)/samples_per_atom);
             I[j] = ditdah[atomN]*I[j];
@@ -1825,7 +1825,7 @@ TEST(SignalProcessing, CWAudioFilterBandpassPlot){
     char strbuf[50];
 
     for (uint16_t bf = 0; bf < 5; bf++){
-        EEPROMData.CWFilterIndex = bf;
+        ED.CWFilterIndex = bf;
         for (int i = 0; i<Npoints; i++){
             freq[i] = fmin + (float32_t)i*fstep;
             CW_filter_tone(freq[i], dout, &gain[i]);
@@ -1840,7 +1840,7 @@ TEST(SignalProcessing, CWAudioFilterBandpassTest){
     DataBlock *dout;
     float32_t gain;
     for (uint16_t bf = 0; bf < 5; bf++){
-        EEPROMData.CWFilterIndex = bf;
+        ED.CWFilterIndex = bf;
         CW_filter_tone(fc[bf]*2, dout, &gain);
         EXPECT_LT(10*log10(gain),-35); // at least 35 dB of attnuation at 2x cutoff
         CW_filter_tone(fc[bf]*0.9, dout, &gain);
@@ -1907,7 +1907,7 @@ TEST(SignalProcessing, AdjustVolume){
     for (size_t i=0; i<data.N; i++){
         if (data.I[i] > amp) amp = data.I[i];
     }
-    EXPECT_FLOAT_EQ(amp, 0.1*filters.DF*VolumeToAmplification(EEPROMData.audioVolume));
+    EXPECT_FLOAT_EQ(amp, 0.1*filters.DF*VolumeToAmplification(ED.audioVolume));
 }
 
 TEST(SignalProcessing, PlayBuffer){
@@ -1952,9 +1952,9 @@ TEST(SignalProcessing, ReceiveProcessing){
     Q_out_L.setName("ReceiveOut_L.txt");
     Q_out_R.setName("ReceiveOut_R.txt");
 
-    EEPROMData.agc = AGCOff;
+    ED.agc = AGCOff;
 
-    InitializeFilters(EEPROMData.spectrum_zoom,&filters);
+    InitializeFilters(ED.spectrum_zoom,&filters);
     InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);
 
     DataBlock *data;
@@ -1986,11 +1986,11 @@ TEST(SignalProcessing, ReceiveProcessing){
     Q_out_R.setName(nullptr);
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    EEPROMData.agc = AGCOff;
-    EEPROMData.nrOptionSelect = NROff;
-    EEPROMData.fineTuneFreq_Hz = -48000.0;
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    ED.fineTuneFreq_Hz = -48000.0;
 
-    InitializeFilters(EEPROMData.spectrum_zoom,&filters);
+    InitializeFilters(ED.spectrum_zoom,&filters);
     InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);
 
     DataBlock *data;

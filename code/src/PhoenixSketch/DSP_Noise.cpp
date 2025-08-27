@@ -117,16 +117,16 @@ void Kim1_NR(DataBlock *data){
     uint8_t VAD_high = 127;
     float32_t lf_freq; // = (offset - width/2) / (12000 / NR_FFT_L); // bin BW is 46.9Hz [12000Hz / 256 bins] @96kHz
     float32_t uf_freq;
-    if (bands[EEPROMData.currentBand].FLoCut_Hz <= 0 && bands[EEPROMData.currentBand].FHiCut_Hz >= 0) {
+    if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz <= 0 && bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz >= 0) {
         lf_freq = 0.0;
-        uf_freq = fmax(-(float32_t)bands[EEPROMData.currentBand].FLoCut_Hz, (float32_t)bands[EEPROMData.currentBand].FHiCut_Hz);
+        uf_freq = fmax(-(float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz);
     } else {
-        if (bands[EEPROMData.currentBand].FLoCut_Hz > 0) {
-            lf_freq = (float32_t)bands[EEPROMData.currentBand].FLoCut_Hz;
-            uf_freq = (float32_t)bands[EEPROMData.currentBand].FHiCut_Hz;
+        if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz > 0) {
+            lf_freq = (float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+            uf_freq = (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
         } else {
-            uf_freq = -(float32_t)bands[EEPROMData.currentBand].FLoCut_Hz;
-            lf_freq = -(float32_t)bands[EEPROMData.currentBand].FHiCut_Hz;
+            uf_freq = -(float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+            lf_freq = -(float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
         }
     }
     lf_freq /= (data->sampleRate_Hz / NR_FFT_L); // bin BW is 46.9Hz [12000Hz / 256 bins] @96kHz
@@ -380,16 +380,16 @@ void SpectralNoiseReduction(DataBlock *data){
     float32_t ph1y[NR_FFT_L / 2];
     static int NR_first_time_2 = 1;
 
-    if (bands[EEPROMData.currentBand].FLoCut_Hz <= 0 && bands[EEPROMData.currentBand].FHiCut_Hz >= 0) {
+    if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz <= 0 && bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz >= 0) {
         lf_freq = 0.0;
-        uf_freq = fmax(-(float32_t)bands[EEPROMData.currentBand].FLoCut_Hz, (float32_t)bands[EEPROMData.currentBand].FHiCut_Hz);
+        uf_freq = fmax(-(float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz);
     } else {
-        if (bands[EEPROMData.currentBand].FLoCut_Hz > 0) {
-            lf_freq = (float32_t)bands[EEPROMData.currentBand].FLoCut_Hz;
-            uf_freq = (float32_t)bands[EEPROMData.currentBand].FHiCut_Hz;
+        if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz > 0) {
+            lf_freq = (float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+            uf_freq = (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
         } else {
-            uf_freq = -(float32_t)bands[EEPROMData.currentBand].FLoCut_Hz;
-            lf_freq = -(float32_t)bands[EEPROMData.currentBand].FHiCut_Hz;
+            uf_freq = -(float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+            lf_freq = -(float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
         }
     }
     // / rate DF SR[SampleRate].rate/DF

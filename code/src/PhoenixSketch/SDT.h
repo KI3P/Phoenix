@@ -164,14 +164,12 @@ extern struct config_t {
     int32_t currentWPM = DEFAULT_KEYER_WPM;
     float32_t sidetoneVolume = 20.0;
     int64_t cwTransmitDelay = 750;                       // UNUSED
-    int32_t activeVFO = 0;                                // UNUSED
     int32_t freqIncrement = 5;
     float32_t freqCorrectionFactor = 0;
-    int32_t currentBand = STARTUP_BAND;
-    int32_t currentBandA = STARTUP_BAND;                  // UNUSED
-    int32_t currentBandB = STARTUP_BAND;                  // UNUSED
-    int64_t currentFreqA = CURRENT_FREQ_A;
-    int64_t currentFreqB = CURRENT_FREQ_B;               // UNUSED
+    uint8_t activeVFO = 0;                                // 0(A) or 1(B)
+    int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND};
+    int64_t centerFreq_Hz[2] = {7030000L,7030000L};
+    int64_t fineTuneFreq_Hz[2] = {0, 0};
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t currentMicThreshold = -10;                    // UNUSED
@@ -202,8 +200,6 @@ extern struct config_t {
     int64_t favoriteFreqs[MAX_FAVORITES];                // UNUSED
     int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // UNUSED
     int32_t antennaSelection[NUMBER_OF_BANDS];            // UNUSED
-    int64_t centerFreq_Hz = 7030000L;
-    int64_t fineTuneFreq_Hz = 0.0;
     char mapFileName[50];                             // UNUSED
     char myCall[10];                                  // UNUSED
     char myTimeZone[10];                              // UNUSED
@@ -222,7 +218,7 @@ extern struct config_t {
     float32_t SWR_PowerAdj[NUMBER_OF_BANDS];              // UNUSED
     float32_t SWRSlopeAdj[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // UNUSED
     int32_t SWR_R_Offset[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // UNUSED
-} EEPROMData;
+} ED;
 
 // Define a structure to hold the results of built-in-test routine
 struct BIT {

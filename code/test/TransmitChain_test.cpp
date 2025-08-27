@@ -583,7 +583,7 @@ TEST(TransmitChain, EndToEnd){
         fstart[i] =  (float32_t)i*binwidth-bandwidth/2;
         fend[i] =    (float32_t)i*binwidth-bandwidth/2+binwidth;
     }
-    bands[EEPROMData.currentBand].mode = LSB;
+    bands[ED.currentBand[ED.activeVFO]].mode = LSB;
     float32_t amp;
     uint32_t phase = 0;
     for (int i = 0; i<Npoints; i++){
@@ -641,7 +641,7 @@ TEST(TransmitChain, TwoTone){
 
     uint32_t phase1 = 0;
     uint32_t phase2 = 0;
-    bands[EEPROMData.currentBand].mode = LSB;
+    bands[ED.currentBand[ED.activeVFO]].mode = LSB;
     for (int j=0; j<Nreps; j++){
         phase1 = CreateIQToneWithPhase(I,Q,2048,sampleRate_Hz,tone1_Hz,phase1,0.5);
         phase2 = AddIQToneWithPhase(I,Q,2048,sampleRate_Hz,tone2_Hz,phase2,0.5);

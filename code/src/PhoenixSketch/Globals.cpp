@@ -1,6 +1,6 @@
 #include "SDT.h"
 
-struct config_t EEPROMData;
+struct config_t ED;
 bool displayFFTUpdated;
 bool CWLocked;
 float32_t psdnew[SPECTRUM_RES];

@@ -24,7 +24,8 @@ typedef enum {
     iCENTERTUNE_DECREASE,
     iFINETUNE_INCREASE,
     iFINETUNE_DECREASE,
-    iBUTTON_PRESSED
+    iBUTTON_PRESSED,
+    iVFO_CHANGE
 } InterruptType;
 
 void ConsumeInterrupt(void);
@@ -34,6 +35,6 @@ void loop(void);
 void SetKeyType(KeyTypeId key);
 void SetKey1Dit(void);
 void SetKey1Dah(void);
-
+int64_t GetTXRXFreq_dHz(void);
 
 #endif // LOOP_H

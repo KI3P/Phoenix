@@ -94,34 +94,34 @@ void TimerInterrupt(void){
  */
 void FilterSetSSB(int32_t filter_change) {
     // Change the band parameters
-    switch (bands[EEPROMData.currentBand].mode) {
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
         case LSB:{
             if (switchFilterSideband == 0)  // "0" = normal, "1" means change opposite filter
             {
-                bands[EEPROMData.currentBand].FLoCut_Hz = 
-                  bands[EEPROMData.currentBand].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
             } else {
-                bands[EEPROMData.currentBand].FHiCut_Hz = 
-                  bands[EEPROMData.currentBand].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
             }
             break;
         }
         case USB:{
             if (switchFilterSideband == 0) {
-                bands[EEPROMData.currentBand].FHiCut_Hz = 
-                  bands[EEPROMData.currentBand].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
 
             } else {
-                bands[EEPROMData.currentBand].FLoCut_Hz = 
-                  bands[EEPROMData.currentBand].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
             }
             break;
         }
         case AM:
         case SAM:{
-            bands[EEPROMData.currentBand].FHiCut_Hz = 
-              bands[EEPROMData.currentBand].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            bands[EEPROMData.currentBand].FLoCut_Hz = -bands[EEPROMData.currentBand].FHiCut_Hz;
+            bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+              bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
             break;
         }
         case IQ:
@@ -145,46 +145,75 @@ void AdjustFineTune(int32_t filter_change){
     if (FT_ON) {  // Check if FT should be cancelled (FT_delay>=FT_cancel_ms)
         if (FT_delay >= FT_cancel_ms) {
             FT_ON = false;
-            EEPROMData.stepFineTune = last_FT_step_size;
+            ED.stepFineTune = last_FT_step_size;
         }
     } else {  //  FT is off so check for short delays
         if (FT_delay <= FT_on_ms) {
             FT_step_counter += 1;
         }
         if (FT_step_counter >= FT_trig) {
-            last_FT_step_size = EEPROMData.stepFineTune;
-            EEPROMData.stepFineTune = FT_step;
+            last_FT_step_size = ED.stepFineTune;
+            ED.stepFineTune = FT_step;
             FT_step_counter = 0;
             FT_ON = true;
         }
     }
     #endif  // FAST_TUNE
 
-    EEPROMData.fineTuneFreq_Hz += EEPROMData.stepFineTune * filter_change;
+    ED.fineTuneFreq_Hz[ED.activeVFO] += ED.stepFineTune * filter_change;
     //Debug("Fine tune pre: " + String(EEPROMData.fineTuneFreq_Hz));
     // If the zoom level is 0, then the valid range of fine tune window is between
     // -samplerate/2 and +samplerate/2. 
     int32_t lower_limit = -(int32_t)(SR[SampleRate].rate)/2;
     int32_t upper_limit = (int32_t)(SR[SampleRate].rate)/2;
-    if (EEPROMData.spectrum_zoom != 0) {
+    if (ED.spectrum_zoom != 0) {
         // The fine tune frequency must stay within the visible tuning window, which
         // is determined by the zoom level. The visible window is determined by shifting
         // the spectrum by +48 kHz so the center is at EEPROMData.centerFreq_Hz - 48 kHz, 
         // then zooming in around the new center frequency.
-        uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << EEPROMData.spectrum_zoom);
+        uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << ED.spectrum_zoom);
         lower_limit = -(int32_t)visible_bandwidth/2;
         upper_limit = +(int32_t)visible_bandwidth/2;
         //Debug("Visible bandwidth: " + String(visible_bandwidth));
     }
     //Debug("Upper limit: " + String(upper_limit));
     //Debug("Lower limit: " + String(lower_limit));
-    if (EEPROMData.fineTuneFreq_Hz > upper_limit) EEPROMData.fineTuneFreq_Hz = upper_limit;
-    if (EEPROMData.fineTuneFreq_Hz < lower_limit) EEPROMData.fineTuneFreq_Hz = lower_limit;
+    if (ED.fineTuneFreq_Hz[ED.activeVFO] > upper_limit) 
+        ED.fineTuneFreq_Hz[ED.activeVFO] = upper_limit;
+    if (ED.fineTuneFreq_Hz[ED.activeVFO] < lower_limit) 
+        ED.fineTuneFreq_Hz[ED.activeVFO] = lower_limit;
     //Debug("Fine tune post: " + String(EEPROMData.fineTuneFreq_Hz));
 
     // The fine tune is applied after the spectrum is shifted by samplerate/4. So the 
     // actual frequency in the RF domain is: TXRXFreq = centerFreq+fineTuneFreq-48kHz
-    EEPROMData.currentFreqA = EEPROMData.centerFreq_Hz+EEPROMData.fineTuneFreq_Hz-(int32_t)SR[SampleRate].rate/4;
+    //ED.currentFreq[ED.activeVFO] = GetTXRXFreq_dHz()/100;
+}
+
+/**
+ * Switch the active VFO. This involves retuning the radio.
+ */
+void ChangeVFO(void){
+    if (ED.activeVFO == 0){
+        ED.activeVFO = 1;
+    }else{
+        ED.activeVFO = 0;
+    }
+    // Retune
+    SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+    // Change filter bands
+    //SetBand(ED.currentBand[ED.activeVFO]);
+    // Change antenna
+    //SetAntenna(ED.currentBand[ED.activeVFO]);
+}
+
+/**
+ * Return the effective transmit/receive frequency, which is a combination of the center
+ * frequency, the fine tune frequency, and the sample rate.
+ * 
+ * @return The effective transmit/receive frequency in units of Hz * 100
+ */
+int64_t GetTXRXFreq_dHz(void){
+    return 100*(ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
 }
 
 /**
@@ -229,56 +258,59 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iVOLUME_INCREASE):{
-            EEPROMData.audioVolume++;
-            if (EEPROMData.audioVolume > 100) EEPROMData.audioVolume = 100;
-            sprintf(strbuf,"Volume: %ld",EEPROMData.audioVolume);
+            ED.audioVolume++;
+            if (ED.audioVolume > 100) ED.audioVolume = 100;
+            sprintf(strbuf,"Volume: %ld",ED.audioVolume);
             Debug(strbuf);
             break;
         }
         case (iVOLUME_DECREASE):{
-            EEPROMData.audioVolume--;
-            if (EEPROMData.audioVolume < 0) EEPROMData.audioVolume = 0;
-            sprintf(strbuf,"Volume: %ld",EEPROMData.audioVolume);
+            ED.audioVolume--;
+            if (ED.audioVolume < 0) ED.audioVolume = 0;
+            sprintf(strbuf,"Volume: %ld",ED.audioVolume);
             Debug(strbuf);
             break;
         }
         case (iFILTER_INCREASE):{
             FilterSetSSB(1);
-            Debug(String("Filter = ") + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
-                     + String(" to ") + String(bands[EEPROMData.currentBand].FLoCut_Hz) );            break;
+            Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                     + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );            break;
         }
         case (iFILTER_DECREASE):{
             FilterSetSSB(-1);
-            Debug(String("Filter = ") + String(bands[EEPROMData.currentBand].FHiCut_Hz) 
-                     + String(" to ") + String(bands[EEPROMData.currentBand].FLoCut_Hz) );
+            Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                     + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
             break;
         }
         case (iCENTERTUNE_INCREASE):{
-            EEPROMData.centerFreq_Hz += (int64_t)EEPROMData.freqIncrement;
-            SetFreq(EEPROMData.centerFreq_Hz);
-            Debug(String("Center tune = ") + String(EEPROMData.centerFreq_Hz));
+            ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
+            SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
         case (iCENTERTUNE_DECREASE):{
-            EEPROMData.centerFreq_Hz -= (int64_t)EEPROMData.freqIncrement;
-            SetFreq(EEPROMData.centerFreq_Hz);
-            Debug(String("Center tune = ") + String(EEPROMData.centerFreq_Hz));
+            ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
+            SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
         case (iFINETUNE_INCREASE):{
             AdjustFineTune(+1);
-            Debug(String("Fine tune = ") + String(EEPROMData.fineTuneFreq_Hz));
+            Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
             break;
         }
         case (iFINETUNE_DECREASE):{
             AdjustFineTune(-1);
-            Debug(String("Fine tune = ") + String(EEPROMData.fineTuneFreq_Hz));
+            Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
             break;
         }
         case (iBUTTON_PRESSED):{
-            char strbuf[50];
-            sprintf(strbuf, "Pressed button: %ld",GetButton());
-            Debug(strbuf);
+            Debug(String("Pressed button:") + String(GetButton()));
+            //HandleButtonPress(GetButton());
+            break;
+        }
+        case (iVFO_CHANGE):{
+            ChangeVFO();
             break;
         }
         default:

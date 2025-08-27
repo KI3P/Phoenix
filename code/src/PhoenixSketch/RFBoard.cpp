@@ -34,6 +34,7 @@ static bool calFeedbackState = CAL_OFF;
 #define RX  0
 #define TX  1
 static bool rxtxState = CAL_OFF;
+int64_t SSBcenterFreq_Hz;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions that are only visible from within this file
@@ -189,13 +190,13 @@ errno_t TXAttenuatorCreate(float32_t txAttenuation_dB){
  *        EGPIOWRITEFAIL if unable to write to GPIO bank.
  */
 errno_t InitAttenuation(void){
-    errno_t err = TXAttenuatorCreate(EEPROMData.XAttenSSB[EEPROMData.currentBand]);
+    errno_t err = TXAttenuatorCreate(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]);
     if (err != ESUCCESS){
         // it might be somehow possible that writing to the TX attenuator would fail
         // while writing to the RX attenuator would succeed. If this is the case,
         // handle this situation here.
     }
-    return RXAttenuatorCreate(EEPROMData.RAtten[EEPROMData.currentBand]);
+    return RXAttenuatorCreate(ED.RAtten[ED.currentBand[ED.activeVFO]]);
 }
 
 /**
@@ -261,26 +262,16 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 }
 
 /**
- * Return the effective transmit/receive frequency, which is a combination of the center
- * frequency, the fine tune frequency, and the sample rate.
- * 
- * @return The effective transmit/receive frequency in units of Hz * 100
- */
-int64_t GetTXRXFreq_dHz(void){
-    return 100*(EEPROMData.centerFreq_Hz + EEPROMData.fineTuneFreq_Hz - SR[SampleRate].rate/4);
-}
-
-/**
  * Return the CW transmit frequency, which is a combination of the RX/TX frequency and the
  * CW tone offset.
  * 
  * @return The CW tone transmit frequency in units of Hz * 100
  */
 int64_t GetCWTXFreq_dHz(void){
-    if (bands[EEPROMData.currentBand].mode == LSB) {
-        return GetTXRXFreq_dHz() - (int64_t)(100*CWToneOffsetsHz[EEPROMData.CWToneIndex]);
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB) {
+        return GetTXRXFreq_dHz() - (int64_t)(100*CWToneOffsetsHz[ED.CWToneIndex]);
     } else {
-        return GetTXRXFreq_dHz() + (int64_t)(100*CWToneOffsetsHz[EEPROMData.CWToneIndex]);
+        return GetTXRXFreq_dHz() + (int64_t)(100*CWToneOffsetsHz[ED.CWToneIndex]);
     }
 }
 
@@ -290,7 +281,12 @@ int64_t GetCWTXFreq_dHz(void){
  * @param centerFreq_Hz THe desired frequency in Hz
  */
 void SetFreq(int64_t centerFreq_Hz){
+    SSBcenterFreq_Hz = centerFreq_Hz;
     return SetSSBVFOFrequency(centerFreq_Hz*SI5351_FREQ_MULT);
+}
+
+int64_t GetFreq(void){
+    return SSBcenterFreq_Hz;
 }
 
 // SSB VFO Control Functions
@@ -524,9 +520,9 @@ bool getCWState(void){
  */
 errno_t InitVFOs(void){
     si5351.reset();
-    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, EEPROMData.freqCorrectionFactor);
+    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor);
     MyDelay(100L);
-    if (!si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, EEPROMData.freqCorrectionFactor)) {
+    if (!si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
         bit_results.RF_Si5351_present = false;
         Debug("Initialize si5351 failed!");
         return EFAIL;
@@ -680,13 +676,13 @@ void HandleRFBoardStateChange(RFBoardState newState){
     switch (newState){
         case RFBoardReceive:{
             // Set GPA_state to appropriate value
-            SetRXAttenuation( EEPROMData.RAtten[EEPROMData.currentBand] );
+            SetRXAttenuation( ED.RAtten[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
             // Set cwState to LO
             CWoff();
             // Set frequencySSB_Hz to appropriate value
-            SetSSBVFOFrequency( EEPROMData.centerFreq_Hz*100 );
+            SetSSBVFOFrequency( ED.centerFreq_Hz[ED.activeVFO]*100 );
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
@@ -699,7 +695,7 @@ void HandleRFBoardStateChange(RFBoardState newState){
         }
         case RFBoardSSBTransmit:{
             // Set GPB state to appropriate value
-            SetTXAttenuation( EEPROMData.XAttenSSB[EEPROMData.currentBand] );
+            SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
             // Set cwState to LO
@@ -720,7 +716,7 @@ void HandleRFBoardStateChange(RFBoardState newState){
         }
         case RFBoardCWMark:{
             // Set GPB state to appropriate value
-            SetTXAttenuation( EEPROMData.XAttenCW[EEPROMData.currentBand] );
+            SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableSSB to LO
             DisableSSBVFOOutput();
             // Set frequencyCW_Hz to appropriate value
@@ -741,7 +737,7 @@ void HandleRFBoardStateChange(RFBoardState newState){
         }
         case RFBoardCWSpace:{
             // Set GPB state to appropriate value
-            SetTXAttenuation( EEPROMData.XAttenCW[EEPROMData.currentBand] );
+            SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableSSB to LO
             DisableSSBVFOOutput();
             // Set frequencyCW_Hz to appropriate value

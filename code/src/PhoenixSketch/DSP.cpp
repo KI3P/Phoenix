@@ -31,10 +31,10 @@ void PerformSignalProcessing(void){
 }
 
 float32_t GetAmpCorrectionFactor(uint32_t bandN){
-    return EEPROMData.IQAmpCorrectionFactor[bandN];
+    return ED.IQAmpCorrectionFactor[bandN];
 }
 float32_t GetPhaseCorrectionFactor(uint32_t bandN){
-    return EEPROMData.IQPhaseCorrectionFactor[bandN];
+    return ED.IQPhaseCorrectionFactor[bandN];
 }
 
 /**
@@ -152,10 +152,10 @@ void ApplyIQCorrection(DataBlock *data, float32_t amp_factor, float32_t phs_fact
 void VolumeScale(DataBlock *data){
     float32_t freqKHzFcut;
     float32_t volScaleFactor;
-    if (bands[EEPROMData.currentBand].mode == LSB) {
-      freqKHzFcut = -(float32_t)bands[EEPROMData.currentBand].FLoCut_Hz * 0.001; // 3
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB) {
+      freqKHzFcut = -(float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz * 0.001; // 3
     } else {
-      freqKHzFcut = (float32_t)bands[EEPROMData.currentBand].FHiCut_Hz * 0.001;
+      freqKHzFcut = (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz * 0.001;
     }
     volScaleFactor = 7.0874 * pow(freqKHzFcut, -1.232);
     arm_scale_f32(data->I, volScaleFactor, data->I, data->N);
@@ -173,7 +173,7 @@ void InitializeAGC(AGCConfig *a, uint32_t sampleRate_Hz){
     float32_t sample_rate = (float32_t)sampleRate_Hz;
 
     //calculate internal parameters
-    switch (EEPROMData.agc){
+    switch (ED.agc){
         case AGCOff:
             break;
 
@@ -202,7 +202,7 @@ void InitializeAGC(AGCConfig *a, uint32_t sampleRate_Hz){
             break;
     }
 
-    a->max_gain = powf (10.0, (float32_t)bands[EEPROMData.currentBand].AGC_thresh / 20.0);
+    a->max_gain = powf (10.0, (float32_t)bands[ED.currentBand[ED.activeVFO]].AGC_thresh / 20.0);
     a->attack_buffsize = (uint32_t)ceil(sample_rate * a->n_tau * a->tau_attack);
     a->in_index = a->attack_buffsize + a->out_index;
     a->attack_mult = 1.0 - expf(-1.0 / (sample_rate * a->tau_attack));
@@ -249,7 +249,7 @@ void AGC(DataBlock *data, AGCConfig *a){
     float32_t abs_out_sample;
     float32_t out_sample[2];
 
-    if (EEPROMData.agc == AGCOff)  // AGC OFF
+    if (ED.agc == AGCOff)  // AGC OFF
     {
         for (unsigned i = 0; i < data->N; i++)
         {
@@ -572,7 +572,7 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
     // The demod mode is accomplished by selecting/combining the real and imaginary parts 
     // of the output of the IFFT process.
     float32_t audiotmp, w;
-    switch (bands[EEPROMData.currentBand].mode) {
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
       case LSB:
         // for SSB copy real part in both outputs
         arm_copy_f32(data->I, data->Q, data->N);
@@ -610,7 +610,7 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
  * Apply noise reduction algorithm to the audio
  */
 void NoiseReduction(DataBlock *data){
-    switch (EEPROMData.nrOptionSelect) {
+    switch (ED.nrOptionSelect) {
       case NROff:  // NR Off
         break;
       case NRKim:  // Kim NR
@@ -657,7 +657,7 @@ float32_t VolumeToAmplification(int32_t volume) {
  * Adjust the volume
  */
 void AdjustVolume(DataBlock *data, FilterConfig *filters){
-    arm_scale_f32(data->I, filters->DF * VolumeToAmplification(EEPROMData.audioVolume), data->I, data->N);
+    arm_scale_f32(data->I, filters->DF * VolumeToAmplification(ED.audioVolume), data->I, data->N);
 }
 
 /**
@@ -681,12 +681,12 @@ void PlayBuffer(DataBlock *data){
  * 3) Configure the noise reduction
  */
 void InitializeSignalProcessing(void){
-    InitializeFilters(EEPROMData.spectrum_zoom,&filters);
+    InitializeFilters(ED.spectrum_zoom,&filters);
     InitializeAGC(&agc, SR[SampleRate].rate/filters.DF);
     InitializeKim1NoiseReduction();
     InitializeXanrNoiseReduction();
     InitializeSpectralNoiseReduction();
-    InitializeCWProcessing(EEPROMData.currentWPM, &filters);
+    InitializeCWProcessing(ED.currentWPM, &filters);
 }
 
 void setfilename(char *fnm){
@@ -729,16 +729,16 @@ DataBlock * ReceiveProcessing(const char *fname){
     }
 
     // Scale data channels by the overall system RF gain and the band-specified gain adjustment
-    ApplyRFGain(&data, EEPROMData.rfGainAllBands_dB, bands[EEPROMData.currentBand].RFgain_dB);
+    ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
 
     // Perform IQ correction
     ApplyIQCorrection(&data,
-        EEPROMData.IQAmpCorrectionFactor[EEPROMData.currentBand],
-        EEPROMData.IQPhaseCorrectionFactor[EEPROMData.currentBand]);
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
 
     // Perform FFT of full spectrum for spectral display at this point if no zoom
-    if (EEPROMData.spectrum_zoom == SPECTRUM_ZOOM_1) {
-        ZoomFFTExe(&data, EEPROMData.spectrum_zoom, &filters);
+    if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
+        ZoomFFTExe(&data, ED.spectrum_zoom, &filters);
         displayFFTUpdated = true;
     }
 
@@ -751,8 +751,8 @@ DataBlock * ReceiveProcessing(const char *fname){
     SaveData(&data, 1); // used by the unit tests
 
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
-    if (EEPROMData.spectrum_zoom != SPECTRUM_ZOOM_1) {
-        if(ZoomFFTExe(&data, EEPROMData.spectrum_zoom, &filters)) {
+    if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) {
+        if(ZoomFFTExe(&data, ED.spectrum_zoom, &filters)) {
             // at high zoom levels, multiple calls to ZoomFFTExe might be needed to fill
             // the buffers before the FFT is actually calculated. ZoomFFTExe returns true
             // if it actually performed the FFT during this call.
@@ -764,13 +764,13 @@ DataBlock * ReceiveProcessing(const char *fname){
     // x + shift Hz after this step.
     float32_t sideToneShift_Hz = 0;
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) {
-        if (bands[EEPROMData.currentBand].mode == 1) {
-            sideToneShift_Hz = CWToneOffsetsHz[EEPROMData.CWToneIndex];
+        if (bands[ED.currentBand[ED.activeVFO]].mode == 1) {
+            sideToneShift_Hz = CWToneOffsetsHz[ED.CWToneIndex];
         } else {
-            sideToneShift_Hz = -CWToneOffsetsHz[EEPROMData.CWToneIndex];
+            sideToneShift_Hz = -CWToneOffsetsHz[ED.CWToneIndex];
         }
     }
-    float32_t shift = EEPROMData.fineTuneFreq_Hz + sideToneShift_Hz;
+    float32_t shift = ED.fineTuneFreq_Hz[ED.activeVFO] + sideToneShift_Hz;
     FreqShiftF(&data,shift);
     SaveData(&data, 2); // used by the unit tests
     
@@ -784,7 +784,7 @@ DataBlock * ReceiveProcessing(const char *fname){
     VolumeScale(&data);
 
     // Apply convolution filter. Restrict signals to those between 
-    // bands[EEPROMData.currentBand].FLoCut_Hz and bands[EEPROMData.currentBand].FHiCut_Hz
+    // bands[currentBand].FLoCut_Hz and bands[currentBand].FHiCut_Hz
     ConvolutionFilter(&data, &filters, filename);
 
     SaveData(&data, 4); // used by the unit tests
@@ -804,7 +804,7 @@ DataBlock * ReceiveProcessing(const char *fname){
     NoiseReduction(&data);
 
     // Notch filter
-    if (EEPROMData.ANR_notchOn == 1) {
+    if (ED.ANR_notchOn == 1) {
         Xanr(&data,1);
         arm_copy_f32(data.Q, data.I, data.N);
     }

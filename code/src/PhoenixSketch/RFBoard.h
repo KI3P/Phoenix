@@ -31,7 +31,6 @@ void CWon(void);
 void CWoff(void);
 errno_t InitVFOs(void);
 
-
 // Transmit Modulation Control
 void SelectTXSSBModulation(void);
 void SelectTXCWModulation(void);
@@ -48,6 +47,7 @@ void SelectRXMode(void);
 errno_t InitRXTX(void);
 
 void SetFreq(int64_t centerFreq_Hz);
+int64_t GetFreq(void);
 
 bool getRXTXState(void);
 bool getCWState(void);

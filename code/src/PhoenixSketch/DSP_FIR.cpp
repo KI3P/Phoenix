@@ -1256,8 +1256,8 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
   float32_t FIR_Coef_I[filters->m_NumTaps];
   float32_t FIR_Coef_Q[filters->m_NumTaps];
   CalcCplxFIRCoeffs(FIR_Coef_I, FIR_Coef_Q, filters->m_NumTaps, 
-    (float32_t)bands[EEPROMData.currentBand].FLoCut_Hz, 
-    (float32_t)bands[EEPROMData.currentBand].FHiCut_Hz, 
+    (float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, 
+    (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz, 
     (float)SR[SampleRate].rate / filters->DF);
 
   for (size_t i = 0; i < filters->m_NumTaps; i++) {

@@ -35,7 +35,7 @@ char *bigMorseCodeTree = (char *)"-EISH5--4--V---3--UF--------?-2--ARL---------.
 float32_t * InitializeCWProcessing(uint32_t wpm, FilterConfig *filters){
     float32_t theta = 0.0;
     // phs = 2 * PI * freqSideTone / 24000
-    float32_t phs = 2.0 * PI * CWToneOffsetsHz[EEPROMData.CWToneIndex] 
+    float32_t phs = 2.0 * PI * CWToneOffsetsHz[ED.CWToneIndex] 
             / ((float32_t)SR[SampleRate].rate/(float32_t)filters->DF);
     for (uint32_t kf = 0; kf < READ_BUFFER_SIZE/filters->DF; kf++) {
         theta = kf * phs;  
@@ -60,7 +60,7 @@ void DoCWReceiveProcessing(DataBlock *data, FilterConfig *filters) {
     // Note that data-Q contains duplicate data as this is after demod
     arm_fir_f32(&filters->FIR_CW_Decode, data->I, float_buffer_CW, 256);
 
-    if (EEPROMData.decoderFlag == 1) {
+    if (ED.decoderFlag == 1) {
         // Calculate correlation between calc sine and incoming signal
         arm_correlate_f32(float_buffer_CW, 256, sinBuffer, 256, float_Corr_Buffer);
         arm_max_f32(float_Corr_Buffer, 511, &corrResult, &corrResultIndex);
@@ -68,7 +68,7 @@ void DoCWReceiveProcessing(DataBlock *data, FilterConfig *filters) {
         aveCorrResult = .7 * corrResult + .3 * aveCorrResult;
         
         // Calculate Goertzel Magnitude of incomming signal
-        goertzelMagnitude = goertzel_mag(256, CWToneOffsetsHz[EEPROMData.CWToneIndex], 
+        goertzelMagnitude = goertzel_mag(256, CWToneOffsetsHz[ED.CWToneIndex], 
                                     data->sampleRate_Hz, float_buffer_CW);
 
         // Combine Correlation and Gowetzel Coefficients
@@ -300,7 +300,7 @@ void DoGapHistogram(int64_t gapLen) {
  */
 void SetDitLength(uint32_t wpm) {
     ditLength = 1200 / wpm;
-    EEPROMData.currentWPM = 1200 / ditLength;
+    ED.currentWPM = 1200 / ditLength;
 }
 
 /**
@@ -430,12 +430,12 @@ void ResetHistograms() {
     // Clear graph arrays
     memset(signalHistogram, 0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
     memset(gapHistogram, 0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
-    EEPROMData.currentWPM = 1200 / ditLength;
+    ED.currentWPM = 1200 / ditLength;
     //UpdateWPMField();
 }
 
 void CWAudioFilter(DataBlock *data, FilterConfig *filters){
-    switch (EEPROMData.CWFilterIndex) {
+    switch (ED.CWFilterIndex) {
         case 0: // 0.8 KHz
             arm_biquad_cascade_df2T_f32(&filters->S1_CW_AudioFilter1, data->I, data->Q, data->N);
             arm_copy_f32(data->Q, data->I, data->N);
