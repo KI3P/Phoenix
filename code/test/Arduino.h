@@ -17,6 +17,7 @@ typedef float float32_t;
 void digitalWrite(uint16_t pin, uint8_t val);
 uint8_t digitalRead(uint16_t pin);
 void pinMode(uint16_t pin, uint8_t val);
+uint8_t getPinMode(uint16_t pin);
 
 void StartMillis(void);
 void AddMillisTime(uint64_t delta_ms);
@@ -51,11 +52,6 @@ private:
 };
 
 extern SerialClass Serial;
-
-extern std::vector<uint16_t> pin_mode_pins;
-extern std::vector<uint8_t> pin_mode_values;
-extern std::vector<uint16_t> digital_write_pins;
-extern std::vector<uint8_t> digital_write_values;
 
 class String {
 public:

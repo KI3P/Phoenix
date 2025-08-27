@@ -295,17 +295,11 @@ TEST(RFBoard, SetCWVFOPower_Test) {
 
 TEST(RFBoard, InitCWVFO_Test) {
     si5351 = Si5351(); // Reset mock
-    pin_mode_pins.clear();
-    pin_mode_values.clear();
-    digital_write_pins.clear();
-    digital_write_values.clear();
     InitCWVFO();
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK2], SI5351_DRIVE_2MA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK1], SI5351_PLLA);
-    EXPECT_EQ(pin_mode_pins.back(), CW_ON_OFF);
-    EXPECT_EQ(pin_mode_values.back(), OUTPUT);
-    EXPECT_EQ(digital_write_pins.back(), CW_ON_OFF);
-    EXPECT_EQ(digital_write_values.back(), 0);
+    EXPECT_EQ(getPinMode(CW_ON_OFF), OUTPUT);
+    EXPECT_EQ(digitalRead(CW_ON_OFF),0);
 }
 
 TEST(RFBoard, InitVFOs_Test) {
@@ -319,111 +313,84 @@ TEST(RFBoard, InitVFOs_Test) {
 }
 
 TEST(RFBoard, InitTXModulation_Test) {
-    pin_mode_pins.clear();
-    pin_mode_values.clear();
-    digital_write_pins.clear();
-    digital_write_values.clear();
     InitTXModulation();
-    EXPECT_EQ(pin_mode_pins.back(), XMIT_MODE);
-    EXPECT_EQ(pin_mode_values.back(), OUTPUT);
-    EXPECT_EQ(digital_write_pins.back(), XMIT_MODE);
-    EXPECT_EQ(digital_write_values.back(), 1); // XMIT_SSB
+    EXPECT_EQ(getPinMode(XMIT_MODE), OUTPUT);
+    EXPECT_EQ(digitalRead(XMIT_MODE),1); // XMIT_SSB
 }
 
 TEST(RFBoard, SelectTXSSBModulation_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitTXModulation();
     SelectTXCWModulation(); // Start in CW mode
     SelectTXSSBModulation();
-    EXPECT_EQ(digital_write_pins.back(), XMIT_MODE);
-    EXPECT_EQ(digital_write_values.back(), 1); // XMIT_SSB
+    EXPECT_EQ(getPinMode(XMIT_MODE), OUTPUT);
+    EXPECT_EQ(digitalRead(XMIT_MODE),1); // XMIT_SSB
 }
 
 TEST(RFBoard, SelectTXCWModulation_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitTXModulation();
     SelectTXSSBModulation(); // Start in SSB mode
     SelectTXCWModulation();
-    EXPECT_EQ(digital_write_pins.back(), XMIT_MODE);
-    EXPECT_EQ(digital_write_values.back(), 0); // XMIT_CW
+    EXPECT_EQ(getPinMode(XMIT_MODE), OUTPUT);
+    EXPECT_EQ(digitalRead(XMIT_MODE),0); // XMIT_CW
 }
 
 TEST(RFBoard, InitCalFeedbackControl_Test) {
-    pin_mode_pins.clear();
-    pin_mode_values.clear();
-    digital_write_pins.clear();
-    digital_write_values.clear();
     InitCalFeedbackControl();
-    EXPECT_EQ(pin_mode_pins.back(), CAL);
-    EXPECT_EQ(pin_mode_values.back(), OUTPUT);
-    EXPECT_EQ(digital_write_pins.back(), CAL);
-    EXPECT_EQ(digital_write_values.back(), 0); // CAL_OFF
+    EXPECT_EQ(getPinMode(CAL), OUTPUT);
+    EXPECT_EQ(digitalRead(CAL),0); // CAL_OFF
 }
 
 TEST(RFBoard, EnableCalFeedback_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitCalFeedbackControl();
     DisableCalFeedback();
     EnableCalFeedback();
-    EXPECT_EQ(digital_write_pins.back(), CAL);
-    EXPECT_EQ(digital_write_values.back(), 1); // CAL_ON
+    EXPECT_EQ(getPinMode(CAL), OUTPUT);
+    EXPECT_EQ(digitalRead(CAL),1); // CAL_ON
 }
 
 TEST(RFBoard, DisableCalFeedback_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
     InitCalFeedbackControl();
     EnableCalFeedback();
     DisableCalFeedback();
-    EXPECT_EQ(digital_write_pins.back(), CAL);
-    EXPECT_EQ(digital_write_values.back(), 0); // CAL_OFF
+    EXPECT_EQ(getPinMode(CAL), OUTPUT);
+    EXPECT_EQ(digitalRead(CAL),0); // CAL_OFF
 }
 
 TEST(RFBoard, InitRXTX_Test) {
-    pin_mode_pins.clear();
-    pin_mode_values.clear();
-    digital_write_pins.clear();
-    digital_write_values.clear();
     InitRXTX();
-    EXPECT_EQ(pin_mode_pins.back(), RXTX);
-    EXPECT_EQ(pin_mode_values.back(), OUTPUT);
-    EXPECT_EQ(digital_write_pins.back(), RXTX);
-    EXPECT_EQ(digital_write_values.back(), 0); // RX
+    EXPECT_EQ(getPinMode(RXTX), OUTPUT);
+    EXPECT_EQ(digitalRead(RXTX),0); // RX
 }
 
 TEST(RFBoard, SelectTXMode_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitRXTX();
     SelectRXMode();
     SelectTXMode();
-    EXPECT_EQ(digital_write_pins.back(), RXTX);
-    EXPECT_EQ(digital_write_values.back(), 1); // TX
+    EXPECT_EQ(getPinMode(RXTX), OUTPUT);
+    EXPECT_EQ(digitalRead(RXTX),1); // TX
 }
 
 TEST(RFBoard, SelectRXMode_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitRXTX();
     SelectTXMode();
     SelectRXMode();
-    EXPECT_EQ(digital_write_pins.back(), RXTX);
-    EXPECT_EQ(digital_write_values.back(), 0); // RX
+    EXPECT_EQ(getPinMode(RXTX), OUTPUT);
+    EXPECT_EQ(digitalRead(RXTX),0); // RX
 }
 
 TEST(RFBoard, CWon_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitCWVFO();
     CWon();
-    EXPECT_EQ(digital_write_pins.back(), CW_ON_OFF);
-    EXPECT_EQ(digital_write_values.back(), 1);
+    EXPECT_EQ(getPinMode(CW_ON_OFF), OUTPUT);
+    EXPECT_EQ(digitalRead(CW_ON_OFF),1);
 }
 
 TEST(RFBoard, CWoff_Test) {
-    digital_write_pins.clear();
-    digital_write_values.clear();
+    InitCWVFO();
     CWon();
     CWoff();
-    EXPECT_EQ(digital_write_pins.back(), CW_ON_OFF);
-    EXPECT_EQ(digital_write_values.back(), 0);
+    EXPECT_EQ(getPinMode(CW_ON_OFF), OUTPUT);
+    EXPECT_EQ(digitalRead(CW_ON_OFF),0);
 }
 
 TEST(RFBoard, StateStartInReceive){

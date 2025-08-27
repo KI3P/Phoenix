@@ -7,7 +7,8 @@ Known contributors to the code:
 * JJP: Jack Purdum, W8TEE
 * KF5N: Greg Raven, KF5N
 * GO0RX: John Melton, GO0RX
+* KF6VB: Jerry Kaidor, KF6VB
 * WMXZ
-* DD4WH
+* DD4WH: Frank Dziock, DD4WH
 * Michael Wild
-* David Martin, VK3KQT
+* VK3KQT: David Martin, VK3KQT
