@@ -29,20 +29,22 @@ typedef int errno_t;
 // The structure that holds the configuration information
 #define EQUALIZER_CELL_COUNT                    14
 
-#define BAND_80M                                0
-#define BAND_60M                                1
-#define BAND_40M                                2
-#define BAND_30M                                3
-#define BAND_20M                                4
-#define BAND_17M                                5
-#define BAND_15M                                6
-#define BAND_12M                                7
-#define BAND_10M                                8
-#define BAND_6M                                 9
+#define BAND_160M                               0
+#define BAND_80M                                1
+#define BAND_60M                                2
+#define BAND_40M                                3
+#define BAND_30M                                4
+#define BAND_20M                                5
+#define BAND_17M                                6
+#define BAND_15M                                7
+#define BAND_12M                                8
+#define BAND_10M                                9
+#define BAND_6M                                 10
+#define BAND_4M                                 11
 
-#define FIRST_BAND                              BAND_80M
+#define FIRST_BAND                              BAND_160M
 #define LAST_BAND                               BAND_6M
-#define NUMBER_OF_BANDS                         10
+#define NUMBER_OF_BANDS                         12
 #define MAX_FAVORITES                           13
 
 #define DECODER_STATE                           0  // 0 = off, 1 = on
@@ -198,7 +200,7 @@ extern struct config_t {
     float32_t XAttenSSB[NUMBER_OF_BANDS];
     float32_t RAtten[NUMBER_OF_BANDS];
     int64_t favoriteFreqs[MAX_FAVORITES];                // UNUSED
-    int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // UNUSED
+    int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // center tune and fine tune
     int32_t antennaSelection[NUMBER_OF_BANDS];            // UNUSED
     char mapFileName[50];                             // UNUSED
     char myCall[10];                                  // UNUSED
@@ -492,6 +494,7 @@ struct AGCConfig {
 #include "FrontPanel.h"
 #include "FrontPanel_Rotary.h"
 #include "RFBoard.h"
+#include "CAT.h"
 
 extern struct BIT bit_results;
 extern struct band bands[];

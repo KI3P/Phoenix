@@ -47,3 +47,20 @@
 #define V12_LPF_MCP23017_ADDR 0x25
 #define BPF_MCP23017_ADDR 0x24
 #define RF_MCP23017_ADDR 0x27
+
+#define MENU_OPTION_SELECT 0
+#define MAIN_MENU_UP 1
+#define BAND_UP 2
+#define ZOOM 3
+#define NOISE_FLOOR 4
+#define BAND_DN 5
+#define SET_MODE 6
+#define DEMODULATION 7
+#define MAIN_TUNE_INCREMENT 8
+#define NOISE_REDUCTION 9
+#define NOTCH_FILTER 10
+#define FINE_TUNE_INCREMENT 11
+#define FILTER 12
+#define DECODER_TOGGLE 13
+#define DDE 14
+#define BEARING 15

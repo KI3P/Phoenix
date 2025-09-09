@@ -3,6 +3,7 @@
 #include <string>
 
 SerialClass Serial;
+SerialClass SerialUSB1;
 
 #define NUMPINS 41
 static bool pin_mode[NUMPINS];
@@ -74,6 +75,48 @@ void SerialClass::println(const String& s) {
         fprintf(file, "%s\n", s.c_str());
     } else {
         std::cout << s.c_str() << std::endl;
+    }
+}
+
+uint32_t SerialClass::available(void) {
+    if (readIndex >= inputBuffer.size()) {
+        return 0;
+    }
+    return inputBuffer.size() - readIndex;
+}
+
+uint8_t SerialClass::read(void) {
+    if (readIndex >= inputBuffer.size()) {
+        return 0;
+    }
+    return inputBuffer[readIndex++];
+}
+
+uint32_t SerialClass::availableForWrite(void) {
+    return 0;
+}
+
+void SerialClass::flush(void) {}
+
+void SerialClass::feedData(const char* data) {
+    if (data != nullptr) {
+        while (*data) {
+            inputBuffer.push_back(static_cast<uint8_t>(*data));
+            data++;
+        }
+    }
+}
+
+void SerialClass::clearBuffer(void) {
+    inputBuffer.clear();
+    readIndex = 0;
+}
+
+void SerialClass::println() {
+    if (file) {
+        fprintf(file, "\n");
+    } else {
+        std::cout << std::endl;
     }
 }
 
@@ -211,3 +254,8 @@ String String::operator+(const char* other) const{
     delete[] new_data;
     return result;
 }
+
+void SetLPFBand(int band){}
+void SetBPFBand(int band){}
+
+void flush(void){}

@@ -29,6 +29,10 @@ int32_t GetButton(void){
     return ButtonPressed;
 }
 
+void SetButton(int32_t bt){
+    ButtonPressed = bt;
+}
+
 FASTRUN
 static void interrupt1() {
     uint8_t pin;

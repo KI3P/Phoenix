@@ -12,6 +12,7 @@
 void FrontPanelInit(void);
 void CheckForFrontPanelInterrupts(void);
 int32_t GetButton(void);
+void SetButton(int32_t);
 
 #endif // FRONTPANEL_H
 

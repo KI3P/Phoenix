@@ -216,6 +216,80 @@ int64_t GetTXRXFreq_dHz(void){
     return 100*(ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
 }
 
+void ChangeBand(void){
+    SetLPFBand(ED.currentBand[ED.activeVFO]);
+    SetBPFBand(ED.currentBand[ED.activeVFO]);
+    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+    SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+    UpdateFIRFilterMask(&filters);
+}
+
+void HandleButtonPress(int32_t button){
+    switch (button){
+        case MENU_OPTION_SELECT:{
+            break;
+        }
+        case MAIN_MENU_UP:{
+            break;
+        }
+        case BAND_UP:{
+            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
+            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
+            if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
+                ED.currentBand[ED.activeVFO] = FIRST_BAND;
+            ChangeBand();
+            break;
+        }
+        case ZOOM:{
+            break;
+        }
+        case NOISE_FLOOR:{
+            break;
+        }
+        case BAND_DN:{
+            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
+            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
+            if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
+                ED.currentBand[ED.activeVFO] = LAST_BAND;
+            ChangeBand();
+            break;
+        }
+        case SET_MODE:{
+            break;
+        }
+        case DEMODULATION:{
+            break;
+        }
+        case MAIN_TUNE_INCREMENT:{
+            break;
+        }
+        case NOISE_REDUCTION:{
+            break;
+        }
+        case NOTCH_FILTER:{
+            break;
+        }
+        case FINE_TUNE_INCREMENT:{
+            break;
+        }
+        case FILTER:{
+            break;
+        }
+        case DECODER_TOGGLE:{
+            break;
+        }
+        case DDE:{
+            break;
+        }
+        case BEARING:{
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 /**
  * Considers the value of the interrupt and acts accordingly by either issueing an
  * event to the state machines or by updating a system parameter. Interrupt is 
@@ -306,7 +380,7 @@ void ConsumeInterrupt(void){
         }
         case (iBUTTON_PRESSED):{
             Debug(String("Pressed button:") + String(GetButton()));
-            //HandleButtonPress(GetButton());
+            HandleButtonPress(GetButton());
             break;
         }
         case (iVFO_CHANGE):{
@@ -328,6 +402,7 @@ void ConsumeInterrupt(void){
 void ShutdownTeensy(void)
 {
     // Do whatever is needed before cutting power here
+    // ... nothing yet
 
     // Tell the ATTiny that we have finished shutdown and it's safe to power off
     digitalWrite(SHUTDOWN_COMPLETE, 1);
@@ -341,6 +416,7 @@ FASTRUN void loop(void){
 
     // Step 1: Check for new events and handle them
     CheckForFrontPanelInterrupts();
+    CheckForCATSerialEvents();
     ConsumeInterrupt();
     
     // Step 2: Perform signal processing

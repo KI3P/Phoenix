@@ -28,44 +28,44 @@ add_compile_options(-Wno-write-strings)
 include_directories(../src/PhoenixSketch)
 include_directories(../test)
 
-add_executable(all_RFboard_tests RFBoard_test.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp 
+add_executable(all_RFboard_tests RFBoard_test.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp ../src/PhoenixSketch/CAT.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
   ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp  si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_RFboard_tests GTest::gtest_main)
 
-add_executable(all_ModeSm_tests ModeSm_test.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp
+add_executable(all_ModeSm_tests ModeSm_test.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/CAT.cpp
     ../src/PhoenixSketch/MainBoard_AudioIO.cpp  ../src/PhoenixSketch/Globals.cpp ../src/PhoenixSketch/DSP_FIR.cpp arm_functions.c
      ../src/PhoenixSketch/DSP.cpp ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
   ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_ModeSm_tests GTest::gtest_main)
 
-add_executable(all_UISm_tests UISm_test.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UI.cpp ../src/PhoenixSketch/RFBoard.cpp
+add_executable(all_UISm_tests UISm_test.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UI.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/CAT.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
   ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp   ../src/PhoenixSketch/DSP.cpp FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_UISm_tests GTest::gtest_main)
 
 add_executable(all_Loop_tests Loop_test.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp 
-  ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp  
+  ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp   ../src/PhoenixSketch/CAT.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_Loop_tests GTest::gtest_main)
 
-add_executable(all_SigProc_tests SignalProcessing_test.cpp  ../src/PhoenixSketch/DSP.cpp 
+add_executable(all_SigProc_tests SignalProcessing_test.cpp  ../src/PhoenixSketch/DSP.cpp  ../src/PhoenixSketch/CAT.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
   ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_SigProc_tests GTest::gtest_main)
 
-add_executable(all_TransmitChain_tests TransmitChain_test.cpp  ../src/PhoenixSketch/DSP.cpp 
+add_executable(all_TransmitChain_tests TransmitChain_test.cpp  ../src/PhoenixSketch/DSP.cpp  ../src/PhoenixSketch/CAT.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
   ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_TransmitChain_tests GTest::gtest_main)
 
-add_executable(all_FrontPanel_tests FrontPanel_test.cpp  ../src/PhoenixSketch/DSP.cpp 
+add_executable(all_FrontPanel_tests FrontPanel_test.cpp  ../src/PhoenixSketch/DSP.cpp  ../src/PhoenixSketch/CAT.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
   ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)

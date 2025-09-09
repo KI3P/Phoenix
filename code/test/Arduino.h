@@ -14,6 +14,9 @@ typedef float float32_t;
 #define DMAMEM
 #define FASTRUN
 
+void SetLPFBand(int32_t band);
+void SetBPFBand(int32_t band);
+
 void digitalWrite(uint16_t pin, uint8_t val);
 uint8_t digitalRead(uint16_t pin);
 void pinMode(uint16_t pin, uint8_t val);
@@ -42,16 +45,26 @@ public:
     void closeFile();
     void print(const char*);
     void println(const char*);
+    void println(void);
     void print(int);
     void println(int);
     void print(float);
     void println(float);
     void println(const String& s);
+    uint32_t available(void);
+    uint8_t read(void);
+    uint32_t availableForWrite(void);
+    void flush(void);
+    void feedData(const char* data);
+    void clearBuffer(void);
 private:
     FILE* file = nullptr;
+    std::vector<uint8_t> inputBuffer;
+    size_t readIndex = 0;
 };
 
 extern SerialClass Serial;
+extern SerialClass SerialUSB1;
 
 class String {
 public:
