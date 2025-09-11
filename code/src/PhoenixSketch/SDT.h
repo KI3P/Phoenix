@@ -93,6 +93,9 @@ typedef int errno_t;
 #define SIX_PI (3.0f * TWO_PI)
 #define FIR_FILTER_WINDOW 1
 
+#define VFO_A 0
+#define VFO_B 1
+
 enum KeyTypeId {
     KeyTypeId_Straight = 0,
     KeyTypeId_Keyer = 1

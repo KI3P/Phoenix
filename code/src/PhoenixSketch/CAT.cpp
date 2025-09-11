@@ -68,10 +68,9 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
 		{ "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
 		{ "BU", 3,  0, BU_write, unsupported_cmd }, //band up
-/*		{ "FA", 14, 3, FA_write, FA_read },  //VFO A
-
-		{ "FB", 14, 3, FB_write, FB_read }, //VFO B
-		{ "FR", 14, 3, FR_write, FR_read }, //RECEIVE VFO
+		{ "FA", 14, 3, FA_write, FA_read },  //VFO A
+		{ "FB", 14, 3, FB_write, FB_read },  //VFO B
+/*		{ "FR", 14, 3, FR_write, FR_read }, //RECEIVE VFO
 		{ "FT", 14, 3, FT_write, FT_read }, //XMT VFO
 		{ "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
 		{ "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
@@ -131,44 +130,25 @@ char *BD_write( char* cmd ){
   	return empty_string_p;
 }
 
-/*void set_vfo_a( long freq ){
-	lastFrequencies[ currentBand ][ VFO_A ] = currentFreq;
-  	lastFrequencies[ currentBand ][ VFO_A ] = freq;
-	centerFreq = TxRxFreq = currentFreq = lastFrequencies[ currentBand ][ VFO_A ] + NCOFreq;  
-  	if ( activeVFO == VFO_A ){
-    	// VFO A is active.  So we have to do more stuff.
-		NCOFreq = 0;
-		currentBand =  currentBandA = ChangeBand( freq, true );
-		EraseSpectrumDisplayContainer();
-		DrawSpectrumDisplayContainer();
-		DrawFrequencyBarValue();
-		SetBand();
-		SetFreq();
-		ShowFrequency();
-		ShowSpectrumdBScale();
-		MyDelay( 1L );
-		AudioInterrupts();
-    }
+void set_vfo(int64_t freq, uint8_t vfo){
+	// Save the current VFO settings to the lastFrequencies array
+	// lastFrequencies is [NUMBER_OF_BANDS][2]
+	// the current band for VFO A is ED.currentBand[0], B is ED.currentBand[1]
+	ED.lastFrequencies[ED.currentBand[vfo]][0] = ED.centerFreq_Hz[vfo];
+	ED.lastFrequencies[ED.currentBand[vfo]][1] = ED.fineTuneFreq_Hz[vfo];
+	ED.currentBand[vfo] = GetBand(freq);
+	// Set the frequencies
+	ED.centerFreq_Hz[vfo] = freq + SR[SampleRate].rate/4;
+	ED.fineTuneFreq_Hz[vfo] = 0;
+	SetInterrupt(iRECEIVE_TUNE);
+}
+
+void set_vfo_a( long freq ){
+	set_vfo(freq, VFO_A);
 }
 
 void set_vfo_b( long freq ){
-	lastFrequencies[ currentBand ][ VFO_B ] = currentFreq;
-  	lastFrequencies[ currentBand ][ VFO_B ] = freq;
-	centerFreq = TxRxFreq = currentFreq = lastFrequencies[ currentBand ][ VFO_B ] + NCOFreq;  
-  	if( activeVFO == VFO_B ){
-    	// VFO A is active.  So we have to do more stuff.
-		NCOFreq = 0;
-		currentBand =  currentBandB = ChangeBand( freq, true );
-		EraseSpectrumDisplayContainer();
-		DrawSpectrumDisplayContainer();
-		DrawFrequencyBarValue();
-		SetBand();
-		SetFreq();
-		ShowFrequency();
-		ShowSpectrumdBScale();
-		MyDelay( 1L );
-		AudioInterrupts();
-    }  
+	set_vfo(freq, VFO_B);
 }
 
 char *FA_write( char* cmd ){
@@ -178,21 +158,8 @@ char *FA_write( char* cmd ){
   	return obuf;
 }
 
-// Read vfo a without any decorations.  Let the calling routine
-// tag it as "receive VFO" or "Transmit VFO" or "VFO A"
-char *read_vfo_a( char* buf ){
-  	sprintf( buf, "%011ld;", currentFreqA );
-  	return buf; 
-}
-
-char *read_vfo_b( char* buf ){
-  	sprintf( buf, "%011ld;", currentFreqB );
-  	return buf;
-}
-
 char *FA_read(  char* cmd  ){
-  	char freq_buf[ 20 ];  //plenty long enough
-  	sprintf( obuf, "FA%s", read_vfo_a( freq_buf ) );  //read_vfo_a has semicolon
+	sprintf( obuf, "FA%011ld;", ED.centerFreq_Hz[VFO_A] ); 
   	return obuf;
 }
 
@@ -206,10 +173,11 @@ char *FB_write( char* cmd  ){
 
 //VFO B
 char *FB_read(  char* cmd  ){  
-  	sprintf( obuf, "FB%011ld;", currentFreqB );
+  	sprintf( obuf, "FB%011ld;", ED.centerFreq_Hz[VFO_B] );
   	return obuf;
 }
 
+/*
 // Transmit Frequency
 char *FT_write( char* cmd  ){
   	//Assuming not SPLIT;  fix it later.

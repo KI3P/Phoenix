@@ -278,11 +278,13 @@ int64_t GetCWTXFreq_dHz(void){
 /**
  * Set the frequency of the Si5351
  * 
- * @param centerFreq_Hz THe desired frequency in Hz
+ * @param centerFreq_Hz The desired frequency in Hz
  */
 void SetFreq(int64_t centerFreq_Hz){
-    SSBcenterFreq_Hz = centerFreq_Hz;
-    return SetSSBVFOFrequency(centerFreq_Hz*SI5351_FREQ_MULT);
+    if (centerFreq_Hz != SSBcenterFreq_Hz){
+        SSBcenterFreq_Hz = centerFreq_Hz;
+        SetSSBVFOFrequency(centerFreq_Hz*SI5351_FREQ_MULT);
+    }
 }
 
 int64_t GetFreq(void){

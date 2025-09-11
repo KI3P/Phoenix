@@ -16,6 +16,7 @@ typedef float float32_t;
 
 void SetLPFBand(int32_t band);
 void SetBPFBand(int32_t band);
+void SetAntenna(int32_t a);
 
 void digitalWrite(uint16_t pin, uint8_t val);
 uint8_t digitalRead(uint16_t pin);

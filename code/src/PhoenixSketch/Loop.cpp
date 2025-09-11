@@ -198,12 +198,7 @@ void ChangeVFO(void){
     }else{
         ED.activeVFO = 0;
     }
-    // Retune
-    SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
-    // Change filter bands
-    //SetBand(ED.currentBand[ED.activeVFO]);
-    // Change antenna
-    //SetAntenna(ED.currentBand[ED.activeVFO]);
+    ReceiveTune();
 }
 
 /**
@@ -216,13 +211,30 @@ int64_t GetTXRXFreq_dHz(void){
     return 100*(ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
 }
 
-void ChangeBand(void){
+/**
+ * Tune the receiver to the active VFO selection.
+ */
+void ReceiveTune(void){
     SetLPFBand(ED.currentBand[ED.activeVFO]);
     SetBPFBand(ED.currentBand[ED.activeVFO]);
+    SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+    SetAntenna(ED.currentBand[ED.activeVFO]);
+    UpdateFIRFilterMask(&filters);
+}
+
+int8_t GetBand(uint64_t freq){
+    for(uint8_t i = 0; i < NUMBER_OF_BANDS; i++){
+        if(freq >= bands[i].fBandLow_Hz && freq <= bands[i].fBandHigh_Hz){
+            return i;
+        }
+    }
+    return -1; // Frequency not within one of the defined ham bands
+}
+
+void ChangeBand(void){
     ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
     ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-    SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
-    UpdateFIRFilterMask(&filters);
+    ReceiveTune();
 }
 
 void HandleButtonPress(int32_t button){
@@ -384,8 +396,13 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iVFO_CHANGE):{
+            // The VFO has been updated. We might have selected a different active VFO,
+            // we might have changed frequency.
             ChangeVFO();
             break;
+        }
+        case (iRECEIVE_TUNE):{
+            ReceiveTune();
         }
         default:
             break;

@@ -93,7 +93,7 @@ uint8_t SerialClass::read(void) {
 }
 
 uint32_t SerialClass::availableForWrite(void) {
-    return 0;
+    return 64;  // Return a positive value to allow serial writing in tests
 }
 
 void SerialClass::flush(void) {}
@@ -255,7 +255,8 @@ String String::operator+(const char* other) const{
     return result;
 }
 
-void SetLPFBand(int band){}
-void SetBPFBand(int band){}
+void SetLPFBand(int32_t band){}
+void SetBPFBand(int32_t band){}
+void SetAntenna(int32_t a){}
 
 void flush(void){}

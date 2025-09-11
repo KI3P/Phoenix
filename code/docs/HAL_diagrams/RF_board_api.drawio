@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1">
   <diagram name="RF Board" id="B-j036tHILslb2G_n7PN">
-    <mxGraphModel dx="720" dy="1104" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="2336" math="0" shadow="0">
+    <mxGraphModel dx="770" dy="455" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="2336" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -1239,6 +1239,72 @@
           <mxGeometry x="479" width="80" height="28" as="geometry">
             <mxRectangle width="80" height="28" as="alternateBounds" />
           </mxGeometry>
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-2" value="int64_t frequencySSB_Hz" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1240" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-3" value="bool clockEnableSSB" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1320" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-4" value="uint8_t driveCurrentSSB_mA" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1280" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-5" value="int64_t frequencyCW_Hz" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="1240" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-6" value="uint8_t driveCurrentCW_mA" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="1280" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-7" value="bool clockEnableCW" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="1320" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-8" value="SSB VFO" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="830" y="1210" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-9" value="CW VFO" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="1210" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-10" value="ED.centerFreq_Hz" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="850" y="1400" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-11" value="ED.fineTuneFreq_Hz" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="850" y="1480" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="E0iXmqLrySQl37-EB1Gj-12" target="E0iXmqLrySQl37-EB1Gj-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="E0iXmqLrySQl37-EB1Gj-12" target="E0iXmqLrySQl37-EB1Gj-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="E0iXmqLrySQl37-EB1Gj-12" target="E0iXmqLrySQl37-EB1Gj-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="E0iXmqLrySQl37-EB1Gj-12" target="E0iXmqLrySQl37-EB1Gj-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-12" value="ED.activeVFO" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Courier New;fontStyle=1;strokeColor=default;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="1440" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-16" value="B" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1020" y="1400" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-17" value="A" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="990" y="1400" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-18" value="A" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="990" y="1480" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-19" value="B" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1020" y="1480" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E0iXmqLrySQl37-EB1Gj-28" target="E0iXmqLrySQl37-EB1Gj-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-28" value="Set VFO freq&lt;div&gt;to freq_Hz&lt;/div&gt;" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1540" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="E0iXmqLrySQl37-EB1Gj-29" value="&lt;div style=&quot;line-height: 19px; white-space: pre;&quot;&gt;&lt;span&gt;&lt;font&gt;&lt;span&gt;TXRX = centerFreq_Hz&lt;/span&gt;&lt;font&gt; &lt;/font&gt;&lt;span&gt;+&lt;/span&gt;&lt;font&gt; &lt;/font&gt;&lt;span&gt;fineTuneFreq_Hz&lt;/span&gt;&lt;font&gt; &lt;/font&gt;&lt;span&gt;-&lt;/span&gt;&lt;font&gt; &lt;/font&gt;&lt;span&gt;SR&lt;/span&gt;&lt;span&gt;&lt;font&gt;/&lt;/font&gt;&lt;/span&gt;&lt;span&gt;4&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left; line-height: 19px; white-space: pre;&quot;&gt;&lt;span&gt;&lt;font&gt;&lt;span&gt;     = freq_Hz&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left; line-height: 19px; white-space: pre;&quot;&gt;Let fineTuneFreq_Hz = 0&lt;/div&gt;&lt;div style=&quot;text-align: left; line-height: 19px; white-space: pre;&quot;&gt;Therefore: centerFreq_Hz = freq_Hz + SR/4&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontColor=#000000;fontFamily=Courier New;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="939.5" y="1535" width="280.5" height="90" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
