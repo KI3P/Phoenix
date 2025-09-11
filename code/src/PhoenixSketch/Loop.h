@@ -36,8 +36,6 @@ void loop(void);
 void SetKeyType(KeyTypeId key);
 void SetKey1Dit(void);
 void SetKey1Dah(void);
-int64_t GetTXRXFreq_dHz(void);
-int8_t GetBand(uint64_t freq);
-void ReceiveTune();
+
 
 #endif // LOOP_H

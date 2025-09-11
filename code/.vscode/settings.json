@@ -35,7 +35,8 @@
     "deque": "cpp",
     "unordered_map": "cpp",
     "vector": "cpp",
-    "any": "cpp"
+    "any": "cpp",
+    "numeric": "cpp"
   },
   "arduino.useArduinoCli": true,
   "arduino.logLevel": "info",

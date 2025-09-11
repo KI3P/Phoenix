@@ -177,16 +177,19 @@ char *FB_read(  char* cmd  ){
   	return obuf;
 }
 
-/*
 // Transmit Frequency
 char *FT_write( char* cmd  ){
   	//Assuming not SPLIT;  fix it later.
   	long freq = atol( &cmd[ 2 ] );
-  	if( activeVFO == VFO_A ){
-    	set_vfo_a( freq );
-    }else{
-    	set_vfo_b( freq );
-    }
+	// Are we in the SSB states?
+	if ((modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) | 
+	    (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)){
+		// In SSB transmit state, the SSB VFO centerFreq_Hz is set to the transmit frequency
+
+	} else {
+		// In CW states, the CW VFO frequency is set to the transmit frequency + cw tone offset
+
+	}
   	sprintf( obuf, "FT%011ld;", freq );
   	return obuf;
 }
@@ -194,15 +197,12 @@ char *FT_write( char* cmd  ){
 // Transmit Frequency
 char *FT_read(  char* cmd  ){
   	//Assuming not SPLIT; fix it later.
-  	if( activeVFO == VFO_A ){
-	    sprintf( obuf, "FT%011ld;", currentFreqA );
-    	return obuf;
-    }else{
-    	sprintf( obuf, "FT%011ld;", currentFreqB );
-    	return obuf;
-    }
+	sprintf( obuf, "FT%011ld;", ED.centerFreq_Hz[ED.activeVFO] );
+	return obuf;
 }
 
+
+/*
 // Receive Frequency
 char *FR_write( char* cmd  ){
   	long freq = atol( &cmd[ 2 ] );
