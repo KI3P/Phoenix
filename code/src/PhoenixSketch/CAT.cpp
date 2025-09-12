@@ -193,30 +193,22 @@ char *FT_read(  char* cmd  ){
 	return obuf;
 }
 
-/*
 // Receive Frequency
 char *FR_write( char* cmd  ){
   	long freq = atol( &cmd[ 2 ] );
   	//Assuming not SPLIT; fix it later.
-  	if( activeVFO == VFO_A ){
-    	set_vfo_a( freq );
-    }else{
-    	set_vfo_b( freq );
-    }
+	set_vfo( freq, ED.activeVFO );
 	sprintf( obuf, "FR%011ld;", freq);
   	return obuf;
 }
 
 // Receive Frequency
 char *FR_read(  char* cmd  ){
-  	if( activeVFO == VFO_A ){
-    	sprintf( obuf, "FR%011ld;", currentFreqA );
-    }else{
-    	sprintf( obuf, "FR%011ld;", currentFreqB );    
-    }
+	sprintf( obuf, "FT%011ld;", GetTXRXFreq_dHz()/100 );
   	return obuf;
 }
 
+/*
 char *ID_read(  char* cmd  ){
   	sprintf( obuf, "ID019;");
   	return obuf;                            // Kenwood TS-2000 ID

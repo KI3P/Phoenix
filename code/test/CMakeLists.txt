@@ -71,6 +71,12 @@ add_executable(all_FrontPanel_tests FrontPanel_test.cpp  ../src/PhoenixSketch/DS
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp  FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_FrontPanel_tests GTest::gtest_main)
 
+add_executable(all_CAT_tests CAT_test.cpp ../src/PhoenixSketch/CAT.cpp ../src/PhoenixSketch/DSP.cpp
+  ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/Tune.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp 
+  ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp 
+  ../src/PhoenixSketch/MainBoard_AudioIO.cpp FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
+target_link_libraries(all_CAT_tests GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(all_RFboard_tests)
 gtest_discover_tests(all_ModeSm_tests)
@@ -79,3 +85,4 @@ gtest_discover_tests(all_Loop_tests)
 gtest_discover_tests(all_SigProc_tests)
 gtest_discover_tests(all_TransmitChain_tests)
 gtest_discover_tests(all_FrontPanel_tests)
+gtest_discover_tests(all_CAT_tests)
