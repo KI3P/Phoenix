@@ -253,13 +253,15 @@ void ConsumeInterrupt(void){
         }
         case (iCENTERTUNE_INCREASE):{
             ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
-            SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            //SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            UpdateTuneState();
             Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
         case (iCENTERTUNE_DECREASE):{
             ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
-            SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            //SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            UpdateTuneState();
             Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
@@ -284,8 +286,8 @@ void ConsumeInterrupt(void){
             ChangeVFO();
             break;
         }
-        case (iRECEIVE_TUNE):{
-            ReceiveTune();
+        case (iUPDATE_TUNE):{
+            ChangeTune();
         }
         default:
             break;

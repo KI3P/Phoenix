@@ -140,7 +140,7 @@ void set_vfo(int64_t freq, uint8_t vfo){
 	// Set the frequencies
 	ED.centerFreq_Hz[vfo] = freq + SR[SampleRate].rate/4;
 	ED.fineTuneFreq_Hz[vfo] = 0;
-	SetInterrupt(iRECEIVE_TUNE);
+	SetInterrupt(iUPDATE_TUNE);
 }
 
 void set_vfo_a( long freq ){
@@ -181,26 +181,17 @@ char *FB_read(  char* cmd  ){
 char *FT_write( char* cmd  ){
   	//Assuming not SPLIT;  fix it later.
   	long freq = atol( &cmd[ 2 ] );
-	// Are we in the SSB states?
-	if ((modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) | 
-	    (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)){
-		// In SSB transmit state, the SSB VFO centerFreq_Hz is set to the transmit frequency
-
-	} else {
-		// In CW states, the CW VFO frequency is set to the transmit frequency + cw tone offset
-
-	}
-  	sprintf( obuf, "FT%011ld;", freq );
+	set_vfo( freq, ED.activeVFO );
+	sprintf( obuf, "FT%011ld;", freq );
   	return obuf;
 }
 
 // Transmit Frequency
 char *FT_read(  char* cmd  ){
   	//Assuming not SPLIT; fix it later.
-	sprintf( obuf, "FT%011ld;", ED.centerFreq_Hz[ED.activeVFO] );
+	sprintf( obuf, "FT%011ld;", GetTXRXFreq_dHz()/100 );
 	return obuf;
 }
-
 
 /*
 // Receive Frequency

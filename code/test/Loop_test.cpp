@@ -122,7 +122,7 @@ TEST(Loop, ChangeVFO){
     // check ED.activeVFO
     EXPECT_NE(ED.activeVFO,vfo);
     // check frequency
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],GetFreq());
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],GetSSBVFOFrequency());
 }
 
 TEST(Loop, ChangeBandUp){
@@ -573,6 +573,6 @@ TEST(Loop, CATSerialVFOChange){
     // Verify that changes happened as expected
     EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_20M);
     EXPECT_NE(ED.centerFreq_Hz[ED.activeVFO], initialCenterFreq);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetFreq());
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetSSBVFOFrequency());
 
 }

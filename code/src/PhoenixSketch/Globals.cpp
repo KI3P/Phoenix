@@ -82,7 +82,7 @@ FilterConfig filters;
 AGCConfig agc;
 uint8_t SampleRate = SAMPLE_RATE_192K;
 
-const float32_t CWToneOffsetsHz[] = {0, 562.5, 656.5, 750.0, 843.75 };
+const float32_t CWToneOffsetsHz[] = {400, 562.5, 656.5, 750.0, 843.75 };
 
 float32_t SAM_carrier_freq_offset = 0;
 float32_t SAM_carrier_freq_offsetOld = 0;

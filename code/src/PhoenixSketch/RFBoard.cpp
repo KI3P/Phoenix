@@ -34,7 +34,7 @@ static bool calFeedbackState = CAL_OFF;
 #define RX  0
 #define TX  1
 static bool rxtxState = CAL_OFF;
-int64_t SSBcenterFreq_Hz;
+int64_t SSBVFOFreq_dHz;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions that are only visible from within this file
@@ -261,34 +261,20 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
     }
 }
 
-/**
- * Return the CW transmit frequency, which is a combination of the RX/TX frequency and the
- * CW tone offset.
- * 
- * @return The CW tone transmit frequency in units of Hz * 100
- */
-int64_t GetCWTXFreq_dHz(void){
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB) {
-        return GetTXRXFreq_dHz() - (int64_t)(100*CWToneOffsetsHz[ED.CWToneIndex]);
-    } else {
-        return GetTXRXFreq_dHz() + (int64_t)(100*CWToneOffsetsHz[ED.CWToneIndex]);
-    }
-}
+///**
+// * Set the frequency of the Si5351
+// * 
+// * @param centerFreq_Hz The desired frequency in Hz
+// */
+//void SetFreq(int64_t centerFreq_Hz){
+//    if (centerFreq_Hz != SSBcenterFreq_Hz){
+//        SSBcenterFreq_Hz = centerFreq_Hz;
+//        SetSSBVFOFrequency(centerFreq_Hz*SI5351_FREQ_MULT);
+//    }
+//}
 
-/**
- * Set the frequency of the Si5351
- * 
- * @param centerFreq_Hz The desired frequency in Hz
- */
-void SetFreq(int64_t centerFreq_Hz){
-    if (centerFreq_Hz != SSBcenterFreq_Hz){
-        SSBcenterFreq_Hz = centerFreq_Hz;
-        SetSSBVFOFrequency(centerFreq_Hz*SI5351_FREQ_MULT);
-    }
-}
-
-int64_t GetFreq(void){
-    return SSBcenterFreq_Hz;
+int64_t GetSSBVFOFrequency(void){
+    return SSBVFOFreq_dHz/100;
 }
 
 // SSB VFO Control Functions
@@ -393,6 +379,10 @@ int32_t EvenDivisor(int64_t freq2_Hz) {
  * @param frequency_dHz The desired clock frequency in (Hz * 100)
  */
 void SetSSBVFOFrequency(int64_t frequency_dHz){
+    // No need to change if it's already at this setting
+    if (frequency_dHz == SSBVFOFreq_dHz) return;
+
+    SSBVFOFreq_dHz = frequency_dHz;
     int64_t Clk1SetFreq = frequency_dHz;
     multiple = EvenDivisor(Clk1SetFreq / SI5351_FREQ_MULT);
     uint64_t pll_freq = Clk1SetFreq * multiple;
@@ -684,7 +674,8 @@ void HandleRFBoardStateChange(RFBoardState newState){
             // Set cwState to LO
             CWoff();
             // Set frequencySSB_Hz to appropriate value
-            SetSSBVFOFrequency( ED.centerFreq_Hz[ED.activeVFO]*100 );
+            //SetSSBVFOFrequency( ED.centerFreq_Hz[ED.activeVFO]*100 );
+            UpdateTuneState();
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
@@ -703,7 +694,8 @@ void HandleRFBoardStateChange(RFBoardState newState){
             // Set cwState to LO
             CWoff();
             // Set frequencySSB_Hz to the TXRX frequency
-            SetSSBVFOFrequency( GetTXRXFreq_dHz() );
+            //SetSSBVFOFrequency( GetTXRXFreq_dHz() );
+            UpdateTuneState();
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI
@@ -722,7 +714,8 @@ void HandleRFBoardStateChange(RFBoardState newState){
             // Set clockEnableSSB to LO
             DisableSSBVFOOutput();
             // Set frequencyCW_Hz to appropriate value
-            SetCWVFOFrequency( GetCWTXFreq_dHz() );
+            //SetCWVFOFrequency( GetCWTXFreq_dHz() );
+            UpdateTuneState();
             // Set driveCurrentCW_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableCW to HI
@@ -743,7 +736,8 @@ void HandleRFBoardStateChange(RFBoardState newState){
             // Set clockEnableSSB to LO
             DisableSSBVFOOutput();
             // Set frequencyCW_Hz to appropriate value
-            SetCWVFOFrequency( GetCWTXFreq_dHz() );
+            //SetCWVFOFrequency( GetCWTXFreq_dHz() );
+            UpdateTuneState();
             // Set driveCurrentCW_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableCW to HI

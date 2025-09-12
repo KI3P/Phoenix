@@ -242,7 +242,8 @@ TEST(RFBoard, GetCWTXFreq_dHz_USB_Test) {
 
 TEST(RFBoard, SetFreq_Test) {
     si5351 = Si5351(); // Reset mock
-    SetFreq(7074000);
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    UpdateTuneState();
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000);
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 707400000);
 }
@@ -471,4 +472,256 @@ TEST(RFBoard, StateTransitionToCWMark){
     EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
     // CW mode
     EXPECT_EQ(getModulationState(), 0); // XMIT_CW
+}
+
+TEST(RFBoard, FrequenciesSetUponStateChange){
+    // Set up the arrays
+    ED.centerFreq_Hz[ED.activeVFO] = 7100000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 500L;
+    int64_t rxtx = 7100000L + 500L - 192000L/4;
+
+/*think about frequency control. How will this change as I switch between SSB mode and CW mode?
+and between SSB receive and SSB transmit mode? it changes from state to state.
+* CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
+* SSB Transmit:    TXfreq = centerFreq_Hz
+* CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
+*/
+
+    InitializeRFBoard();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFBoardState();    
+    EXPECT_EQ(GetSSBVFOFrequency(), 7100000L);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 500L);
+    EXPECT_EQ(GetTXRXFreq_dHz(),rxtx*100);
+
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Tune State Machine Tests
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromSSBReceive) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateTuneState();
+    
+    // Should set SSB VFO frequency to centerFreq_Hz * 100
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 707400000);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWReceive) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateTuneState();
+    
+    // Should set SSB VFO frequency to centerFreq_Hz * 100 (same as SSB receive)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 707400000);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromSSBTransmit) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    
+    // Should set SSB VFO frequency to GetTXRXFreq_dHz()
+    // Calculation: 7074000 + 100 - 48000/4 = 7062100 Hz * 100 = 706210000
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 706210000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 706210000);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWTransmitMark) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 3; // 750 Hz
+    
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateTuneState();
+    
+    // Should set CW VFO frequency to GetCWTXFreq_dHz()
+    // GetTXRXFreq_dHz() = (7074000 + 100 - 12000) * 100 = 706210000
+    // GetCWTXFreq_dHz() = 706210000 - 75000 = 706135000 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 706135000);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWTransmitSpace) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_20M; // USB
+    ED.CWToneIndex = 3; // 750 Hz
+    
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateTuneState();
+    
+    // Should set CW VFO frequency to GetCWTXFreq_dHz()
+    // GetTXRXFreq_dHz() = (14074000 + 100 - 12000) * 100 = 1406210000
+    // GetCWTXFreq_dHz() = 1406210000 + 75000 = 1406285000 (USB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 1406285000);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWTransmitDitMark) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 2; // 656.5 Hz
+    
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
+    UpdateTuneState();
+    
+    // Should set CW VFO frequency to GetCWTXFreq_dHz()
+    // GetTXRXFreq_dHz() = (7074000 + 100 - 12000) * 100 = 706210000
+    // GetCWTXFreq_dHz() = 706210000 - 65650 = 706144350 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 706144350);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWTransmitDahMark) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 200L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_20M; // USB
+    ED.CWToneIndex = 1; // 562.5 Hz
+    
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DAH_MARK;
+    UpdateTuneState();
+    
+    // Should set CW VFO frequency to GetCWTXFreq_dHz()
+    // GetTXRXFreq_dHz() = (14074000 + 200 - 12000) * 100 = 1406220000
+    // GetCWTXFreq_dHz() = 1406220000 + 56250 = 1406276250 (USB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 1406276250);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerSpace) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 3574000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 50L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_80M; // LSB
+    ED.CWToneIndex = 0; // 400 Hz
+    
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE;
+    UpdateTuneState();
+    
+    // Should set CW VFO frequency to GetCWTXFreq_dHz()
+    // GetTXRXFreq_dHz() = (3574000 + 50 - 12000) * 100 = 356205000
+    // GetCWTXFreq_dHz() = 356205000 - 40000 = 356165000 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 356165000);
+}
+
+TEST(RFBoard, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerWait) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 21074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = -50L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_15M; // USB
+    ED.CWToneIndex = 4; // 843.75 Hz
+    
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT;
+    UpdateTuneState();
+    
+    // Should set CW VFO frequency to GetCWTXFreq_dHz()
+    // GetTXRXFreq_dHz() = (21074000 + (-50) - 12000) * 100 = 2106195000
+    // GetCWTXFreq_dHz() = 2106195000 + 84375 = 2106275000 (USB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 2106279375);
+}
+
+TEST(RFBoard, TuneStateMachine_StateTransitionSequenceSSBToReceive) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 14230000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    
+    // Start in SSB receive
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(GetSSBVFOFrequency(), 14230000);
+    
+    // Transition to SSB transmit
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14230000 + 100 - 12000) * 100 = 1421810000
+    EXPECT_EQ(GetSSBVFOFrequency(), 14218100);
+    
+    // Back to SSB receive
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(GetSSBVFOFrequency(), 14230000);
+}
+
+TEST(RFBoard, TuneStateMachine_StateTransitionSequenceCWReceiveToTransmit) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 7030000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 200L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 3; // 750 Hz
+    
+    // Start in CW receive
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 703000000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 703000000);
+    
+    // Transition to CW transmit mark
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (7030000 + 200 - 12000) * 100 = 701820000
+    // GetCWTXFreq_dHz() = 701820000 - 75000 = 701745000 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 701745000);
+    
+    // Transition to CW transmit space
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 701745000);
+    
+    // Back to CW receive
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 703000000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 703000000);
+}
+
+TEST(RFBoard, TuneStateMachine_DifferentSampleRates) {
+    si5351 = Si5351(); // Reset mock
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    
+    // Test with 192kHz sample rate
+    SampleRate = SAMPLE_RATE_192K;
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14074000 + 100 - 192000/4) * 100 = (14074100 - 48000) * 100 = 1402610000
+    EXPECT_EQ(GetSSBVFOFrequency(), 14026100);
+    
+    // Test with 96kHz sample rate  
+    SampleRate = SAMPLE_RATE_96K;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14074000 + 100 - 96000/4) * 100 = (14074100 - 24000) * 100 = 1405010000
+    EXPECT_EQ(GetSSBVFOFrequency(), 14050100);
+    
+    // Test with 48kHz sample rate
+    SampleRate = SAMPLE_RATE_48K;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14074000 + 100 - 48000/4) * 100 = (14074100 - 12000) * 100 = 1406210000
+    EXPECT_EQ(GetSSBVFOFrequency(), 14062100);
 }

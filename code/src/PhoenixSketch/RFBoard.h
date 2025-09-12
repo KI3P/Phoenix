@@ -15,6 +15,7 @@ float32_t GetTXAttenuation(void);
 errno_t InitAttenuation(void);
 
 // SSB VFO Control Functions
+int64_t GetSSBVFOFrequency(void);
 void SetSSBVFOFrequency(int64_t frequency_dHz);
 void SetSSBVFOPower(int32_t power);
 void EnableSSBVFOOutput(void);
@@ -46,8 +47,8 @@ void SelectTXMode(void);
 void SelectRXMode(void);
 errno_t InitRXTX(void);
 
-void SetFreq(int64_t centerFreq_Hz);
-int64_t GetFreq(void);
+//void SetFreq(int64_t centerFreq_Hz);
+//int64_t GetFreq(void);
 
 bool getRXTXState(void);
 bool getCWState(void);

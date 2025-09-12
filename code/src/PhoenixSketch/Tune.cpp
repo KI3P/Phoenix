@@ -12,13 +12,6 @@ static int64_t last_FT_step_size = 1;
 static uint32_t FT_step_counter = 0;
 #endif
 
-/*think about frequency control. How will this change as I switch between SSB mode and CW mode?
-and between SSB receive and SSB transmit mode? it changes from state to state.
-* CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
-* SSB Transmit:    TXfreq = centerFreq_Hz
-* CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
-*/
-
 /**
  * Adjust the fine tune frequency (2nd stage software mixer)
  * 
@@ -85,7 +78,7 @@ void ChangeVFO(void){
     }else{
         ED.activeVFO = 0;
     }
-    ReceiveTune();
+    ChangeTune();
 }
 
 /**
@@ -95,16 +88,33 @@ void ChangeVFO(void){
  * @return The effective transmit/receive frequency in units of Hz * 100
  */
 int64_t GetTXRXFreq_dHz(void){
-    return 100*(ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
+    int64_t val = 100*(ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
+    return val;
+}
+
+/**
+ * Return the CW transmit frequency, which is a combination of the RX/TX frequency and the
+ * CW tone offset.
+ * 
+ * @return The CW tone transmit frequency in units of Hz * 100
+ */
+int64_t GetCWTXFreq_dHz(void){
+    int64_t txrx = GetTXRXFreq_dHz();
+    int64_t offset = (int64_t)(100*CWToneOffsetsHz[ED.CWToneIndex]);
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB) {
+        return txrx - offset;
+    } else {
+        return txrx + offset;
+    }
 }
 
 /**
  * Tune the receiver to the active VFO selection.
  */
-void ReceiveTune(void){
+void ChangeTune(void){
     SetLPFBand(ED.currentBand[ED.activeVFO]);
     SetBPFBand(ED.currentBand[ED.activeVFO]);
-    SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+    UpdateTuneState();
     SetAntenna(ED.currentBand[ED.activeVFO]);
     UpdateFIRFilterMask(&filters);
 }
@@ -121,6 +131,79 @@ int8_t GetBand(uint64_t freq){
 void ChangeBand(void){
     ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
     ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-    ReceiveTune();
+    ChangeTune();
 }
 
+static TuneState tuneState = TuneReceive;
+//static TuneState oldTuneState = TuneReceive;
+
+/*think about frequency control. How will this change as I switch between SSB mode and CW mode?
+and between SSB receive and SSB transmit mode? it changes from state to state.
+* CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
+* SSB Transmit:    TXfreq = centerFreq_Hz
+* CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
+*/
+
+void HandleTuneState(TuneState tuneState){
+    switch (tuneState){
+        case TuneReceive:{
+            // CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
+            int64_t newFreq = ED.centerFreq_Hz[ED.activeVFO]*100;
+            SetSSBVFOFrequency( newFreq );
+            break;
+        }
+        case TuneSSBTX:{
+            // SSB Transmit:    TXfreq = centerFreq_Hz
+            int64_t newFreq = GetTXRXFreq_dHz();
+            SetSSBVFOFrequency( newFreq );
+            break;
+        }
+        case TuneCWTX:{
+            // CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
+            int64_t newFreq = GetCWTXFreq_dHz();
+            SetCWVFOFrequency( newFreq );
+
+            break;
+        }
+    }
+}
+
+void UpdateTuneState(void){
+    switch (modeSM.state_id){
+        case (ModeSm_StateId_CW_RECEIVE):
+        case (ModeSm_StateId_SSB_RECEIVE):{
+            tuneState = TuneReceive;
+            break;
+        }
+        case (ModeSm_StateId_SSB_TRANSMIT):{
+            tuneState = TuneSSBTX;
+            break;
+        }
+        case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_SPACE):
+        case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
+        case (ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT):{
+            tuneState = TuneCWTX;
+            break;
+        }
+
+        //case (ModeSm_StateId_CALIBRATE_FREQUENCY):
+        //case (ModeSm_StateId_CALIBRATE_RX_IQ):
+        //case (ModeSm_StateId_CALIBRATE_TX_IQ):
+        //case (ModeSm_StateId_CALIBRATE_CW_PA):
+        //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
+        //    break;
+        //}
+
+        default:{
+            Debug("Unhandled modeSM.state_id state in UpdateTuneState!");
+            char strbuf[10];
+            sprintf(strbuf, "> %lu",(uint32_t)modeSM.state_id);
+            Debug(strbuf);
+            break;
+        }
+    }
+    HandleTuneState(tuneState);
+}
