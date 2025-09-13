@@ -204,6 +204,8 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iMODE):{
+            // mode has changed, recalc filters, change frequencies, etc
+            ChangeTune();
             break;
         }
         case (iKEY1_PRESSED):{
@@ -288,6 +290,7 @@ void ConsumeInterrupt(void){
         }
         case (iUPDATE_TUNE):{
             ChangeTune();
+            break;
         }
         default:
             break;

@@ -21,11 +21,16 @@ char *BD_write(char* cmd);
 char *command_parser(char* command);
 void CheckForCATSerialEvents(void);
 char *unsupported_cmd(char *cmd);
+char *MD_write(char* cmd);
+char *MD_read(char* cmd);
+char *IF_read(char* cmd);
+char *ID_read(char* cmd);
 
 // External variables needed for testing
 extern struct config_t ED;
 extern const struct SR_Descriptor SR[];
 extern uint8_t SampleRate;
+extern struct band bands[];
 
 TEST(CAT, ChangeBandUp){
     // Save the initial band
@@ -786,4 +791,503 @@ TEST(CAT, command_parser_RejectsInvalidLength) {
     char *result = command_parser(invalid_ag);
     
     EXPECT_STREQ(result, "?;");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Mode Function Tests  
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, MD_write_SetsLSBMode) {
+    // Set up test conditions
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M; // 40m band
+    
+    char command[] = "MD1;"; // LSB mode
+    char *result = MD_write(command);
+    
+    // Verify LSB mode was set
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, LSB);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iMODE);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_write_SetsUSBMode) {
+    // Set up test conditions
+    ED.activeVFO = VFO_B;
+    ED.currentBand[VFO_B] = BAND_20M; // 20m band
+    
+    char command[] = "MD2;"; // USB mode
+    char *result = MD_write(command);
+    
+    // Verify USB mode was set
+    EXPECT_EQ(bands[ED.currentBand[VFO_B]].mode, USB);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iMODE);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_write_SetsCWModeFromSSBReceive) {
+    // Set up test conditions - must be in SSB_RECEIVE mode for CW transition
+    ModeSm_start(&modeSM); // Start in SSB_RECEIVE mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M; // Low band - should set LSB
+    
+    char command[] = "MD3;"; // CW mode
+    char *result = MD_write(command);
+    
+    // Verify LSB mode was set for low band
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, LSB);
+    
+    // Verify mode state machine event was dispatched
+    // Note: We can't easily verify ModeSm_dispatch_event was called in unit test
+    // but we can verify the interrupt was set
+    EXPECT_EQ(GetInterrupt(), iMODE);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_write_SetsCWModeHighBandUSB) {
+    // Set up test conditions - must be in SSB_RECEIVE mode for CW transition
+    ModeSm_start(&modeSM); // Start in SSB_RECEIVE mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_15M; // High band (>= BAND_30M) - should set USB
+    
+    char command[] = "MD3;"; // CW mode
+    char *result = MD_write(command);
+    
+    // Verify USB mode was set for high band
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iMODE);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_write_CWModeIgnoredWhenNotInSSBReceive) {
+    // Set up test conditions - NOT in SSB_RECEIVE mode
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE; // Different mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB; // Set initial mode
+    
+    char command[] = "MD3;"; // CW mode
+    char *result = MD_write(command);
+    
+    // Verify mode was NOT changed (should remain USB)
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_write_SetsAMMode) {
+    // Set up test conditions
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_10M;
+    
+    char command[] = "MD5;"; // AM mode
+    char *result = MD_write(command);
+    
+    // Verify SAM mode was set (defaults to SAM rather than AM)
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, SAM);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iMODE);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_write_InvalidModeIgnored) {
+    // Set up test conditions
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB; // Set initial mode
+    
+    char command[] = "MD9;"; // Invalid mode
+    char *result = MD_write(command);
+    
+    // Verify mode was not changed
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MD_read_ReturnsCWModeWhenInCWReceive) {
+    // Set up test conditions
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    
+    char command[] = "MD;";
+    char *result = MD_read(command);
+    
+    // Should return CW mode (3)
+    EXPECT_STREQ(result, "MD3;");
+}
+
+TEST(CAT, MD_read_ReturnsLSBMode) {
+    // Set up test conditions
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+    bands[BAND_40M].mode = LSB;
+    
+    char command[] = "MD;";
+    char *result = MD_read(command);
+    
+    // Should return LSB mode (1)
+    EXPECT_STREQ(result, "MD1;");
+}
+
+TEST(CAT, MD_read_ReturnsUSBMode) {
+    // Set up test conditions
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
+    ED.activeVFO = VFO_B;
+    ED.currentBand[VFO_B] = BAND_20M;
+    bands[BAND_20M].mode = USB;
+    
+    char command[] = "MD;";
+    char *result = MD_read(command);
+    
+    // Should return USB mode (2)
+    EXPECT_STREQ(result, "MD2;");
+}
+
+TEST(CAT, MD_read_ReturnsAMMode) {
+    // Set up test conditions
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_10M;
+    bands[BAND_10M].mode = AM;
+    
+    char command[] = "MD;";
+    char *result = MD_read(command);
+    
+    // Should return AM mode (5)
+    EXPECT_STREQ(result, "MD5;");
+}
+
+TEST(CAT, MD_read_ReturnsSAMMode) {
+    // Set up test conditions
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_15M;
+    bands[BAND_15M].mode = SAM;
+    
+    char command[] = "MD;";
+    char *result = MD_read(command);
+    
+    // Should return AM mode (5) - SAM is returned as AM
+    EXPECT_STREQ(result, "MD5;");
+}
+
+TEST(CAT, MD_read_ReturnsErrorForUnknownMode) {
+    // Set up test conditions with invalid mode
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = (ModulationType)99; // Invalid mode
+    
+    char command[] = "MD;";
+    char *result = MD_read(command);
+    
+    // Should return error
+    EXPECT_STREQ(result, "?;");
+}
+
+TEST(CAT, command_parser_RecognizesMDCommands) {
+    // Clear any existing interrupts
+    ConsumeInterrupt();
+    
+    // Test MD write command
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    
+    char md_write[] = "MD2;"; // USB mode
+    char *result = command_parser(md_write);
+    
+    // Verify mode was set
+    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    EXPECT_STREQ(result, "");
+    
+    // Test MD read command
+    char md_read[] = "MD;";
+    result = command_parser(md_read);
+    EXPECT_STREQ(result, "MD2;");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Radio Status Function Tests (IF_read)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, IF_read_DebugOutput) {
+    // Debug test to understand the actual output format
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    ED.centerFreq_Hz[VFO_A] = 14200000L;
+    ED.freqIncrement = 1000;
+    bands[BAND_20M].mode = USB;
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // Print out the result and character positions for debugging
+    printf("DEBUG: IF_read result: [%s]\n", result);
+    printf("DEBUG: Length: %lu\n", strlen(result));
+    for(int i=0; i<(int)strlen(result) && i<35; i++) {
+        printf("DEBUG: pos[%02d] = '%c' (%d)\n", i, result[i], (int)result[i]);
+    }
+    
+    // Let this test always pass - it's just for debugging
+    EXPECT_TRUE(true);
+}
+
+TEST(CAT, IF_read_ReturnsCorrectFormatInSSBReceive) {
+    // Set up test conditions for SSB receive mode
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    ED.centerFreq_Hz[VFO_A] = 14200000L;
+    ED.freqIncrement = 1000;
+    bands[BAND_20M].mode = USB;
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // Verify the IF response format: 
+    // IF + 11-digit freq + 4-digit step + signed RIT + flags...
+    // Should start with "IF00014200000" (frequency)
+    EXPECT_EQ(strncmp(result, "IF00014200000", 13), 0);
+    
+    // Check that it contains "1000" for frequency increment
+    EXPECT_NE(strstr(result, "1000"), nullptr);
+    
+    // Should end with semicolon
+    size_t len = strlen(result);
+    EXPECT_EQ(result[len-1], ';');
+    
+    // Should indicate RX mode (0) - character at position 28 should be '0'
+    EXPECT_EQ(result[28], '0');
+    
+    // Should indicate USB mode (2) - character at position 29 should be '2' 
+    EXPECT_EQ(result[29], '2');
+}
+
+TEST(CAT, IF_read_ReturnsCorrectFormatInCWReceive) {
+    // Set up test conditions for CW receive mode
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    ED.activeVFO = VFO_B;
+    ED.currentBand[VFO_B] = BAND_40M;
+    ED.centerFreq_Hz[VFO_B] = 7074000L;
+    ED.freqIncrement = 500;
+    bands[BAND_40M].mode = LSB; // CW usually uses LSB on 40m
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // Should start with "IF00007074000" (frequency)
+    EXPECT_EQ(strncmp(result, "IF00007074000", 13), 0);
+    
+    // Check that it contains "0500" for frequency increment
+    EXPECT_NE(strstr(result, "0500"), nullptr);
+    
+    // Should indicate RX mode (0)
+    EXPECT_EQ(result[28], '0');
+    
+    // Should indicate CW mode (3) when in CW_RECEIVE state
+    EXPECT_EQ(result[29], '3');
+}
+
+TEST(CAT, IF_read_ReturnsCorrectFormatInSSBTransmit) {
+    // Set up test conditions for SSB transmit mode
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_15M;
+    ED.centerFreq_Hz[VFO_A] = 21200000L;
+    ED.freqIncrement = 2500;
+    bands[BAND_15M].mode = USB;
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // Should start with "IF00021200000" (frequency)
+    EXPECT_EQ(strncmp(result, "IF00021200000", 13), 0);
+    
+    // Should indicate TX mode (1)
+    EXPECT_EQ(result[28], '1'); 
+    
+    // Should indicate USB mode (2)
+    EXPECT_EQ(result[29], '2');
+}
+
+TEST(CAT, IF_read_ReturnsCorrectFormatInCWTransmitMark) {
+    // Set up test conditions for CW transmit mark mode
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_80M;
+    ED.centerFreq_Hz[VFO_A] = 3574000L;
+    ED.freqIncrement = 100;
+    bands[BAND_80M].mode = LSB;
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // Should start with "IF00003574000" (frequency)
+    EXPECT_EQ(strncmp(result, "IF00003574000", 13), 0);
+    
+    // Should indicate TX mode (1) 
+    EXPECT_EQ(result[28], '1');
+    
+    // Should indicate CW mode (3)
+    EXPECT_EQ(result[29], '3'); 
+}
+
+TEST(CAT, IF_read_ReturnsCorrectFormatInCWTransmitSpace) {
+    // Set up test conditions for CW transmit space mode
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    ED.activeVFO = VFO_B;
+    ED.currentBand[VFO_B] = BAND_10M;
+    ED.centerFreq_Hz[VFO_B] = 28200000L;
+    ED.freqIncrement = 10;
+    bands[BAND_10M].mode = USB;
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // Should start with "IF00028200000" (frequency)
+    EXPECT_EQ(strncmp(result, "IF00028200000", 13), 0);
+    
+    // Should indicate TX mode (1)
+    EXPECT_EQ(result[28], '1');
+    
+    // Should indicate CW mode (3)
+    EXPECT_EQ(result[29], '3');
+}
+
+TEST(CAT, IF_read_HandlesAllModeTypes) {
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    ED.centerFreq_Hz[VFO_A] = 14200000L;
+    ED.freqIncrement = 1000;
+    
+    // Test LSB mode
+    bands[BAND_20M].mode = LSB;
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    EXPECT_EQ(result[29], '1'); // LSB = mode 1
+    
+    // Test USB mode  
+    bands[BAND_20M].mode = USB;
+    result = IF_read(command);
+    EXPECT_EQ(result[29], '2'); // USB = mode 2
+    
+    // Test AM mode
+    bands[BAND_20M].mode = AM;
+    result = IF_read(command);
+    EXPECT_EQ(result[29], '5'); // AM = mode 5
+    
+    // Test SAM mode (should return as AM)
+    bands[BAND_20M].mode = SAM;
+    result = IF_read(command);
+    EXPECT_EQ(result[29], '5'); // SAM = mode 5 (reported as AM)
+}
+
+TEST(CAT, IF_read_HandlesFrequencyIncrement) {
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+    ED.centerFreq_Hz[VFO_A] = 7100000L;
+    bands[BAND_40M].mode = LSB;
+    
+    // Test various frequency increments
+    char command[] = "IF;";
+    
+    // Test small increment
+    ED.freqIncrement = 10;
+    char *result = IF_read(command);
+    EXPECT_NE(strstr(result, "0010"), nullptr);
+    
+    // Test larger increment
+    ED.freqIncrement = 5000;
+    result = IF_read(command);
+    EXPECT_NE(strstr(result, "5000"), nullptr);
+    
+    // Test maximum normal increment
+    ED.freqIncrement = 9999;
+    result = IF_read(command);
+    EXPECT_NE(strstr(result, "9999"), nullptr);
+}
+
+TEST(CAT, IF_read_FormatLength) {
+    // Set up basic test conditions
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    ED.centerFreq_Hz[VFO_A] = 14200000L;
+    ED.freqIncrement = 1000;
+    bands[BAND_20M].mode = USB;
+    
+    char command[] = "IF;";
+    char *result = IF_read(command);
+    
+    // IF command response should have specific length:
+    // IF + 11 freq + 4 step + 6 RIT + remaining fixed fields + ;
+    // Total should be around 38 characters
+    size_t len = strlen(result);
+    EXPECT_GT(len, 30); // Should be substantial length
+    EXPECT_LT(len, 50); // But not excessively long
+    EXPECT_EQ(result[0], 'I');
+    EXPECT_EQ(result[1], 'F');
+    EXPECT_EQ(result[len-1], ';');
+}
+
+TEST(CAT, command_parser_RecognizesIFCommand) {
+    // Set up test conditions
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    ED.centerFreq_Hz[VFO_A] = 14200000L;
+    ED.freqIncrement = 1000;
+    bands[BAND_20M].mode = USB;
+    
+    // Test IF read command through command parser
+    char if_read[] = "IF;";
+    char *result = command_parser(if_read);
+    
+    // Should return proper IF response
+    EXPECT_EQ(strncmp(result, "IF00014200000", 13), 0);
+    EXPECT_EQ(result[29], '2'); // USB mode
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT ID Function Tests
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, ID_read_ReturnsCorrectID) {
+    char command[] = "ID;";
+    char *result = ID_read(command);
+    
+    // Should return Kenwood TS-2000 ID
+    EXPECT_STREQ(result, "ID019;");
+}
+
+TEST(CAT, command_parser_RecognizesIDCommand) {
+    // Test ID read command through command parser
+    char id_read[] = "ID;";
+    char *result = command_parser(id_read);
+    
+    // Should return proper ID response
+    EXPECT_STREQ(result, "ID019;");
 }

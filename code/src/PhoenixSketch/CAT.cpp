@@ -62,7 +62,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 18
+#define NUM_SUPPORTED_COMMANDS 10
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -70,13 +70,13 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "BU", 3,  0, BU_write, unsupported_cmd }, //band up
 		{ "FA", 14, 3, FA_write, FA_read },  //VFO A
 		{ "FB", 14, 3, FB_write, FB_read },  //VFO B
-/*		{ "FR", 14, 3, FR_write, FR_read }, //RECEIVE VFO
+		{ "FR", 14, 3, FR_write, FR_read }, //RECEIVE VFO
 		{ "FT", 14, 3, FT_write, FT_read }, //XMT VFO
 		{ "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
 		{ "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
 
 		{ "MD", 4,  3, MD_write, MD_read }, //operating mode, CW, USB etc
-		{ "MG", 6,  3, MG_write, MG_read }, // mike gain
+		/*{ "MG", 6,  3, MG_write, MG_read }, // mike gain
 		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
@@ -208,10 +208,63 @@ char *FR_read(  char* cmd  ){
   	return obuf;
 }
 
-/*
 char *ID_read(  char* cmd  ){
   	sprintf( obuf, "ID019;");
   	return obuf;                            // Kenwood TS-2000 ID
+}
+
+char *IF_read(  char* cmd ){
+	int mode;
+	if (( modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) | 
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE )
+	 	){
+		mode = 3;
+	}else{
+		switch( bands[ ED.currentBand[ED.activeVFO] ].mode ){
+			case LSB:
+				mode = 1; // LSB
+				break;
+			case USB:
+				mode = 2; // USB
+				break;
+			case AM:
+			case SAM:
+				mode = 5; // AM
+				break;
+			default:
+				mode = 1; // LSB
+				break;
+		}
+	}
+	uint8_t rxtx;
+	if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) | (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE)){
+		rxtx = 0;
+	} else {
+		rxtx = 1;
+	}
+
+	sprintf( obuf,
+	         "IF%011ld%04d%+06d%d%d%d%02d%d%d%d%d%d%d%02d%d;",
+	         ED.centerFreq_Hz[ED.activeVFO],
+	         ED.freqIncrement, // freqIncrement 
+	         0, // rit
+	         0, // rit enabled
+	         0, // xit enabled
+	         0, 0, // Channel bank
+	         rxtx, // RX/TX (always RX in test)
+	         mode, // operating mode
+	         0, // RX VFO
+	         0, // Scan Status
+	         0, // split,
+	         0, // CTCSS enabled
+	         0, // CTCSS
+	         0 );
+  	return obuf;
 }
 
 char *MD_write( char* cmd  ){
@@ -219,69 +272,47 @@ char *MD_write( char* cmd  ){
   	bool xmtMode_changed = false;
 	switch( p1 ){
 		case 1: // LSB
-			bands[ currentBand ].mode = DEMOD_LSB;
-			if( xmtMode != SSB_MODE ){
-				xmtMode = SSB_MODE;
-				xmtMode_changed = true;
-			}
+			bands[ ED.currentBand[ED.activeVFO] ].mode = LSB;
+			SetInterrupt(iMODE);
 			break;
 		case 2: // USB
-			bands[currentBand].mode = DEMOD_USB;
-			if( xmtMode != SSB_MODE ){
-				xmtMode = SSB_MODE;
-				xmtMode_changed = true;
-			}
+			bands[ ED.currentBand[ED.activeVFO] ].mode = USB;
+			SetInterrupt(iMODE);
 			break;
 
 		case 3: // CW
-			xmtMode = CW_MODE;
-			if( bands[currentBand].mode != DEMOD_LSB && bands[currentBand].mode != DEMOD_USB ){
-				if( currentBand < BAND_20M ){
-					bands[ currentBand ].mode = DEMOD_LSB;
+			// Change to CW mode if in SSB receive mode, otherwise ignore:
+			if (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE){
+				if( ED.currentBand[ED.activeVFO] < BAND_30M ){
+					bands[ ED.currentBand[ED.activeVFO] ].mode = LSB;
 				}else{
-					bands[ currentBand ].mode = DEMOD_USB;
+					bands[ ED.currentBand[ED.activeVFO] ].mode = USB;
 				}
-      		}
-			xmtMode_changed = true;
-			break;
-		case 5: // AM
-			bands[ currentBand ].mode = DEMOD_SAM; // default to SAM rather than AM
-			break;
-		default:
-			bands[ currentBand ].mode = DEMOD_LSB;
-			if( xmtMode != SSB_MODE ){
-				xmtMode = SSB_MODE;
-				xmtMode_changed = true;
+				ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+				SetInterrupt(iMODE);
 			}
 			break;
-	}
-	if( xmtMode_changed ){
-		BandInformation();
-		SetupMode( bands[currentBand].mode );
-		ShowFrequency();
-		ControlFilterF();
-		tft.writeTo( L2 ); // Destroy the bandwidth indicator bar.  KF5N July 30, 2023
-		tft.clearMemory();
-		if( xmtMode == CW_MODE ) BandInformation();
-		DrawBandWidthIndicatorBar();  // Restory the bandwidth indicator bar.  KF5N July 30, 2023
-		FilterBandwidth();
-		DrawSMeterContainer();
-		ShowAnalogGain();
-		AudioInterrupts();
-		SetFreq();  // Must update frequency, for example moving from SSB to CW, the RX LO is shif
+		case 5: // AM
+			bands[ ED.currentBand[ED.activeVFO] ].mode = SAM; // default to SAM rather than AM
+			SetInterrupt(iMODE);
+			break;
+		default:
+			break;
 	}
   	return empty_string_p;
 }
 
 char *MD_read( char* cmd ){
-	if( xmtMode                   == CW_MODE   ){ sprintf( obuf, "MD3;" ); return obuf; }
-	if( bands[ currentBand ].mode == DEMOD_LSB ){ sprintf( obuf, "MD1;" ); return obuf; }
-	if( bands[ currentBand ].mode == DEMOD_USB ){ sprintf( obuf, "MD2;" ); return obuf; }
-	if( bands[ currentBand ].mode == DEMOD_AM  ){ sprintf( obuf, "MD5;" ); return obuf; }
-	if( bands[ currentBand ].mode == DEMOD_SAM ){ sprintf( obuf, "MD5;" ); return obuf; }
+	if( modeSM.state_id == ModeSm_StateId_CW_RECEIVE      ){ sprintf( obuf, "MD3;" ); return obuf; }
+	if( bands[ ED.currentBand[ED.activeVFO] ].mode == LSB ){ sprintf( obuf, "MD1;" ); return obuf; }
+	if( bands[ ED.currentBand[ED.activeVFO] ].mode == USB ){ sprintf( obuf, "MD2;" ); return obuf; }
+	if( bands[ ED.currentBand[ED.activeVFO] ].mode == AM  ){ sprintf( obuf, "MD5;" ); return obuf; }
+	if( bands[ ED.currentBand[ED.activeVFO] ].mode == SAM ){ sprintf( obuf, "MD5;" ); return obuf; }
 	sprintf( obuf, "?;");
 	return obuf;  //Huh? How'd we get here?
 }
+
+/*
 
 char *MG_write( char* cmd ){
 	  int g = atoi( &catCommand[2] );

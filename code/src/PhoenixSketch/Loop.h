@@ -26,7 +26,8 @@ typedef enum {
     iFINETUNE_DECREASE,
     iBUTTON_PRESSED,
     iVFO_CHANGE,
-    iUPDATE_TUNE
+    iUPDATE_TUNE,
+    iMODE_CHANGE
 } InterruptType;
 
 void ConsumeInterrupt(void);
