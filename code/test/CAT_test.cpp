@@ -27,6 +27,8 @@ char *IF_read(char* cmd);
 char *ID_read(char* cmd);
 char *MG_write(char* cmd);
 char *MG_read(char* cmd);
+char *NR_write(char* cmd);
+char *NR_read(char* cmd);
 void UpdateTransmitAudioGain(void);
 
 // External variables needed for testing
@@ -1487,4 +1489,246 @@ TEST(CAT, MG_read_write_RoundTripConsistency) {
     // 80 * 70 / 100 - 40 = 56 - 40 = 16 dB
     // (16 + 40) * 100 / 70 = 56 * 100 / 70 = 80
     EXPECT_STREQ(result, "MG080;");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Noise Reduction Function Tests (NR)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, NR_write_SetsNoiseReductionOff) {
+    // Test setting noise reduction to off (NROff = 0)
+    char command[] = "NR0;";
+    
+    char *result = NR_write(command);
+    
+    // Verify noise reduction was set to off
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NR_write_SetsNoiseReductionLevel1) {
+    // Test setting noise reduction to level 1
+    char command[] = "NR1;";
+    
+    char *result = NR_write(command);
+    
+    // Verify noise reduction was set to level 1
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)1);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NR_write_SetsNoiseReductionLevel2) {
+    // Test setting noise reduction to level 2
+    char command[] = "NR2;";
+    
+    char *result = NR_write(command);
+    
+    // Verify noise reduction was set to level 2
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)2);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NR_write_SetsNoiseReductionLevel3) {
+    // Test setting noise reduction to level 3
+    char command[] = "NR3;";
+    
+    char *result = NR_write(command);
+    
+    // Verify noise reduction was set to level 3
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)3);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NR_write_HandlesStringZero) {
+    // Test the special case where cmd[2] is character '0'
+    char command[] = "NR0;";
+    
+    char *result = NR_write(command);
+    
+    // Verify noise reduction was set to NROff (special case handling)
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NR_write_HandlesHigherLevels) {
+    // Test setting noise reduction to higher levels (if supported)
+    char command[] = "NR7;";
+    
+    char *result = NR_write(command);
+    
+    // Verify noise reduction was set to level 7
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)7);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NR_read_ReturnsNoiseReductionOff) {
+    // Set up test noise reduction to off
+    ED.nrOptionSelect = NROff;
+    
+    char command[] = "NR;";
+    char *result = NR_read(command);
+    
+    // Should return NR0 for off state
+    EXPECT_STREQ(result, "NR0;");
+}
+
+TEST(CAT, NR_read_ReturnsNoiseReductionLevel1) {
+    // Set up test noise reduction to level 1
+    ED.nrOptionSelect = (NoiseReductionType)1;
+    
+    char command[] = "NR;";
+    char *result = NR_read(command);
+    
+    // Should return NR1 for level 1
+    EXPECT_STREQ(result, "NR1;");
+}
+
+TEST(CAT, NR_read_ReturnsNoiseReductionLevel2) {
+    // Set up test noise reduction to level 2
+    ED.nrOptionSelect = (NoiseReductionType)2;
+    
+    char command[] = "NR;";
+    char *result = NR_read(command);
+    
+    // Should return NR2 for level 2
+    EXPECT_STREQ(result, "NR2;");
+}
+
+TEST(CAT, NR_read_ReturnsNoiseReductionLevel3) {
+    // Set up test noise reduction to level 3
+    ED.nrOptionSelect = (NoiseReductionType)3;
+    
+    char command[] = "NR;";
+    char *result = NR_read(command);
+    
+    // Should return NR3 for level 3
+    EXPECT_STREQ(result, "NR3;");
+}
+
+TEST(CAT, NR_read_ReturnsHigherLevels) {
+    // Test reading higher noise reduction levels
+    ED.nrOptionSelect = (NoiseReductionType)7;
+    
+    char command[] = "NR;";
+    char *result = NR_read(command);
+    
+    // Should return NR7 for level 7
+    EXPECT_STREQ(result, "NR7;");
+}
+
+TEST(CAT, NR_read_write_RoundTripConsistency) {
+    // Test that write followed by read gives consistent results
+    
+    // Test level 0 (off)
+    char write_command0[] = "NR0;";
+    NR_write(write_command0);
+    char read_command[] = "NR;";
+    char *result = NR_read(read_command);
+    EXPECT_STREQ(result, "NR0;");
+    
+    // Test level 2
+    char write_command2[] = "NR2;";
+    NR_write(write_command2);
+    result = NR_read(read_command);
+    EXPECT_STREQ(result, "NR2;");
+    
+    // Test level 5
+    char write_command5[] = "NR5;";
+    NR_write(write_command5);
+    result = NR_read(read_command);
+    EXPECT_STREQ(result, "NR5;");
+}
+
+TEST(CAT, command_parser_RecognizesNRCommands) {
+    // Clear any existing interrupts
+    ConsumeInterrupt();
+    
+    // Test NR write command
+    char nr_write[] = "NR3;"; // Set noise reduction to level 3
+    char *result = command_parser(nr_write);
+    
+    // Verify noise reduction was set
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)3);
+    EXPECT_STREQ(result, "");
+    
+    // Test NR read command
+    char nr_read[] = "NR;";
+    result = command_parser(nr_read);
+    
+    // Should return current noise reduction setting
+    EXPECT_STREQ(result, "NR3;");
+}
+
+TEST(CAT, command_parser_NRWriteCommandLevels) {
+    // Test various NR write commands through the command parser
+    
+    // Test NR0 (off)
+    char nr_off[] = "NR0;";
+    char *result = command_parser(nr_off);
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+    EXPECT_STREQ(result, "");
+    
+    // Test NR1
+    char nr_1[] = "NR1;";
+    result = command_parser(nr_1);
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)1);
+    EXPECT_STREQ(result, "");
+    
+    // Test NR7 (higher level)
+    char nr_7[] = "NR7;";
+    result = command_parser(nr_7);
+    EXPECT_EQ(ED.nrOptionSelect, (NoiseReductionType)7);
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, command_parser_NRReadCommandReflectsCurrentState) {
+    // Test that NR read commands return the current noise reduction state
+    
+    // Set to different levels and verify read reflects them
+    ED.nrOptionSelect = (NoiseReductionType)0;
+    char nr_read[] = "NR;";
+    char *result = command_parser(nr_read);
+    EXPECT_STREQ(result, "NR0;");
+    
+    ED.nrOptionSelect = (NoiseReductionType)2;
+    result = command_parser(nr_read);
+    EXPECT_STREQ(result, "NR2;");
+    
+    ED.nrOptionSelect = (NoiseReductionType)5;
+    result = command_parser(nr_read);
+    EXPECT_STREQ(result, "NR5;");
+}
+
+TEST(CAT, command_parser_NRCommandLengthValidation) {
+    // Test that NR commands with wrong lengths are rejected
+    
+    // Test command too long for NR write (should be exactly 4 chars: "NRx;")
+    char nr_too_long[] = "NR123;";
+    char *result = command_parser(nr_too_long);
+    
+    // Should return error for wrong length
+    EXPECT_STREQ(result, "?;");
+    
+    // Test command too short for NR write
+    char nr_too_short[] = "NR;"; // This should be read, not write
+    result = command_parser(nr_too_short);
+    
+    // This should succeed as a read command
+    // The result should be "NRx;" where x is the current level
+    EXPECT_EQ(strlen(result), 4);
+    EXPECT_EQ(result[0], 'N');
+    EXPECT_EQ(result[1], 'R');
+    EXPECT_EQ(result[3], ';');
 }

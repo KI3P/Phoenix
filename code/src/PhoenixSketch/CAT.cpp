@@ -62,7 +62,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 11
+#define NUM_SUPPORTED_COMMANDS 13
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -76,9 +76,9 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
 		{ "MD", 4,  3, MD_write, MD_read }, //operating mode, CW, USB etc
 		{ "MG", 6,  3, MG_write, MG_read }, // mike gain
-		/*{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
+		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
-		{ "PC", 6,  3, PC_write, PC_read }, // output power
+		/*{ "PC", 6,  3, PC_write, PC_read }, // output power
 
 		{ "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
 		{ "RX", 3,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
@@ -336,23 +336,22 @@ char *MG_read(  char* cmd ){
   	return obuf;
 }
 
-/*
+
 char *NR_write( char* cmd ){
   	if( cmd[ 2 ] == '0' ){
-		nrOptionSelect = 0;
+		ED.nrOptionSelect = NROff;
 	}else{
-		nrOptionSelect = atoi( &cmd[2] );
+		ED.nrOptionSelect = (NoiseReductionType) atoi( &cmd[2] );
 	}
-	NROptions();
-	UpdateNoiseField();
   	return empty_string_p;
 }
 
 //Noise reduction
 char *NR_read(  char* cmd ){
-  	sprintf( obuf, "NR%d;", nrOptionSelect );
+  	sprintf( obuf, "NR%d;", ED.nrOptionSelect );
   	return obuf;
 }
+
 
 //Auto-notch
 char *NT_write( char* cmd ){
@@ -364,6 +363,7 @@ char *NT_read(  char* cmd ){
   	return empty_string_p;
 }
 
+/*
 //output power - for now, just spit back what they gave us.
 char *PC_write( char* cmd ){
   	int requested_power = atoi( &cmd[ 3 ]);
@@ -418,45 +418,6 @@ char *TX_write( char* cmd ){
   	return obuf;
 }
 
-char *IF_read(  char* cmd ){
-	int mode;
-	if ( xmtMode == CW_MODE ){
-		mode = 3;
-	}else{
-		switch( bands[ currentBand ].mode ){
-			case DEMOD_LSB:
-				mode = 1; // LSB
-				break;
-			case DEMOD_USB:
-				mode = 2; // USB
-				break;
-			case DEMOD_AM:
-			case DEMOD_SAM:
-				mode = 5; // AM
-				break;
-			default:
-				mode = 1; // LSB
-				break;
-		}
-	}
-	sprintf( obuf,
-	         "IF%011ld%04d%+06d%d%d%d%02d%d%d%d%d%d%d%02d%d;",
-	         currentFreqA,
-	         freqIncrement < 10000 ? freqIncrement : 1000,
-	         0, // rit
-	         0, // rit enabled
-	         0, // xit enabled
-	         0, 0, // Channel bank
-	         my_ptt == LOW ? 1 : 0, // RX/TX
-	         mode, // operating mode (SSB)
-	         0, // RX VFO
-	         0, // Scan Status
-	         0, // split,
-	         0, // CTCSS enabled
-	         0, // CTCSS
-	         0 );
-  	return obuf;
-}
 */
 
 void CheckForCATSerialEvents(void){

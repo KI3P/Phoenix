@@ -170,3 +170,48 @@ TEST(Loop, CATFrequencyChangeViaRepeatedLoop){
     // Clean up - clear buffer for next test
     SerialUSB1.clearBuffer();
 }
+
+TEST(Loop, CATMicGainChangeViaRepeatedLoop){
+    // Save initial microphone gain state
+    int32_t initialMicGain = ED.currentMicGain;
+    
+    // Clear any existing data in the serial buffer and interrupts
+    SerialUSB1.clearBuffer();
+    ConsumeInterrupt();
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Feed a CAT command to change microphone gain to 75% (which should be +12 dB)
+    // MG075; -> 75 * 70 / 100 - 40 = 52.5 - 40 = 12.5 -> 12 dB (integer truncation)
+    SerialUSB1.feedData("MG075;");
+    
+    // Execute loop() to process the CAT serial event
+    // The loop() function calls CheckForCATSerialEvents() which processes the CAT command
+    // Unlike frequency changes, MG commands don't set interrupts - they directly modify ED.currentMicGain
+    loop();
+    
+    // After one loop() execution, the microphone gain change should be complete
+    // Verify that no interrupt was set (MG commands don't generate interrupts)
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Verify that the microphone gain was changed from the initial value
+    EXPECT_NE(ED.currentMicGain, initialMicGain);
+    
+    // Verify the microphone gain was set correctly
+    // 75 * 70 / 100 - 40 = 52.5 - 40 = 12.5 -> 12 dB (integer conversion)
+    EXPECT_EQ(ED.currentMicGain, 12);
+    
+    // Test a second command to verify loop continues to process CAT commands correctly
+    SerialUSB1.feedData("MG025;");
+    loop();
+    
+    // Verify the second command was processed
+    // 25 * 70 / 100 - 40 = 17.5 - 40 = -22.5 -> -22 dB (integer conversion)
+    EXPECT_EQ(ED.currentMicGain, -22);
+    
+    // Execute loop() one more time to ensure system stability
+    loop();
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Clean up - clear buffer for next test
+    SerialUSB1.clearBuffer();
+}
