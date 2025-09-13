@@ -94,7 +94,7 @@ char *unsupported_cmd( char *cmd ){
  */
 char *AG_read(  char* cmd ){
   	Serial.print( "AG_read()!\n");
-  	sprintf( obuf, "AG%c%03d;", cmd[ 2 ], ( int32_t )( ( ( float32_t )ED.audioVolume * 255.0 ) / 100.0 ) );
+  	sprintf( obuf, "AG%c%03ld;", cmd[ 2 ], ( int32_t )( ( ( float32_t )ED.audioVolume * 255.0 ) / 100.0 ) );
   	return obuf;
 }
 
@@ -155,7 +155,7 @@ char *FA_write( char* cmd ){
 }
 
 char *FA_read(  char* cmd  ){
-	sprintf( obuf, "FA%011ld;", ED.centerFreq_Hz[VFO_A] ); 
+	sprintf( obuf, "FA%011lld;", ED.centerFreq_Hz[VFO_A] ); 
   	return obuf;
 }
 
@@ -169,7 +169,7 @@ char *FB_write( char* cmd  ){
 
 //VFO B
 char *FB_read(  char* cmd  ){  
-  	sprintf( obuf, "FB%011ld;", ED.centerFreq_Hz[VFO_B] );
+  	sprintf( obuf, "FB%011lld;", ED.centerFreq_Hz[VFO_B] );
   	return obuf;
 }
 
@@ -185,7 +185,7 @@ char *FT_write( char* cmd  ){
 // Transmit Frequency
 char *FT_read(  char* cmd  ){
   	//Assuming not SPLIT; fix it later.
-	sprintf( obuf, "FT%011ld;", GetTXRXFreq_dHz()/100 );
+	sprintf( obuf, "FT%011lld;", GetTXRXFreq_dHz()/100 );
 	return obuf;
 }
 
@@ -200,7 +200,7 @@ char *FR_write( char* cmd  ){
 
 // Receive Frequency
 char *FR_read(  char* cmd  ){
-	sprintf( obuf, "FT%011ld;", GetTXRXFreq_dHz()/100 );
+	sprintf( obuf, "FT%011lld;", GetTXRXFreq_dHz()/100 );
   	return obuf;
 }
 
@@ -245,7 +245,7 @@ char *IF_read(  char* cmd ){
 	}
 
 	sprintf( obuf,
-	         "IF%011ld%04d%+06d%d%d%d%02d%d%d%d%d%d%d%02d%d;",
+	         "IF%011lld%04ld%+06d%d%d%d%02d%d%d%d%d%d%d%02d%d;",
 	         ED.centerFreq_Hz[ED.activeVFO],
 	         ED.freqIncrement, // freqIncrement 
 	         0, // rit
@@ -265,7 +265,6 @@ char *IF_read(  char* cmd ){
 
 char *MD_write( char* cmd  ){
   	int p1 = atoi( &cmd[2] );
-  	bool xmtMode_changed = false;
 	switch( p1 ){
 		case 1: // LSB
 			bands[ ED.currentBand[ED.activeVFO] ].mode = LSB;

@@ -9,7 +9,7 @@ enum TuneState {
 
 int64_t GetTXRXFreq_dHz(void);
 int64_t GetCWTXFreq_dHz(void);
-int8_t GetBand(uint64_t freq);
+int8_t GetBand(int64_t freq);
 void ChangeTune(void);
 void ChangeBand(void);
 void ChangeVFO(void);

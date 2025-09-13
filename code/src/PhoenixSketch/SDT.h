@@ -537,4 +537,9 @@ extern bool morseCharacterUpdated;
 
 void MyDelay(unsigned long millisWait);
 
+void SetLPFBand(int val);
+void SetBPFBand(int val);
+void SetAntenna(int val);
+
+
 #endif // SDT_H

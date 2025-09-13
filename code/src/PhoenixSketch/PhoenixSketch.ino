@@ -1,4 +1,56 @@
 #include "SDT.h"
+#include <RA8875.h>
+
+// pins for the display CS and reset
+#define TFT_CS 10
+#define TFT_RESET 9 // any pin or nothing!
+
+// screen size
+#define XPIXELS 800
+#define YPIXELS 480
+
+RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
+
+
+void Splash() 
+{
+    int centerCall;
+    tft.clearScreen(RA8875_BLACK);
+
+    tft.setTextColor(RA8875_MAGENTA);
+    tft.setCursor(50, YPIXELS / 10);
+    tft.setFontScale(2);
+    tft.print("Experimental Phoenix Code Base");
+
+    tft.setFontScale(3);
+    tft.setTextColor(RA8875_GREEN);
+    tft.setCursor(XPIXELS / 3 - 120, YPIXELS / 10 + 53);
+    tft.print("T41-EP SDR Radio");
+    
+    tft.setFontScale(1);
+    tft.setTextColor(RA8875_YELLOW);
+    tft.setCursor(XPIXELS / 2 - (2 * tft.getFontWidth() / 2), YPIXELS / 3);
+    tft.print("By");
+    tft.setFontScale(1);
+    tft.setTextColor(RA8875_WHITE);
+    tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 15, YPIXELS / 4 + 80);  // 38 = letters in string
+    tft.print("           Oliver King, KI3P");
+    
+    //tft.setFontScale(2);
+    tft.setTextColor(RA8875_GREEN);
+    centerCall = (XPIXELS - 25 * tft.getFontWidth()) / 2;
+    tft.setCursor(centerCall, YPIXELS / 2 + 160);
+    tft.print("Nothing to see here");
+
+    tft.drawCircle(400,350, 30, RA8875_YELLOW);
+    tft.drawCircle(400,350, 28, RA8875_YELLOW);
+    tft.fillCircle(400,350, 26, RA8875_PINK);
+}
+
+void SetLPFBand(int val){}
+void SetBPFBand(int val){}
+void SetAntenna(int val){}
+
 
 void setup(void){
     Serial.begin(115200);
@@ -24,6 +76,14 @@ void setup(void){
     InitializeSignalProcessing();
     // If our input tone was at 1 kHz, then it will appear at 49 kHz after Fs/4
     // So make our VFO frequency the negative of this to shift it back to 1 kHz
-    ED.fineTuneFreq_Hz = -48000.0; //testcode
+    ED.fineTuneFreq_Hz[ED.activeVFO] = -48000L; //testcode
+
+    // Display code
+    pinMode(TFT_CS, OUTPUT);
+    digitalWrite(TFT_CS, HIGH);
+
+    tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);  // parameter list from library code
+    tft.setRotation(0);
+    Splash();
 
 }
