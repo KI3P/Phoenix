@@ -25,6 +25,9 @@ char *MD_write(char* cmd);
 char *MD_read(char* cmd);
 char *IF_read(char* cmd);
 char *ID_read(char* cmd);
+char *MG_write(char* cmd);
+char *MG_read(char* cmd);
+void UpdateTransmitAudioGain(void);
 
 // External variables needed for testing
 extern struct config_t ED;
@@ -96,17 +99,15 @@ TEST(CAT, CATChangeVolume){
     // Save the initial volume
     int32_t initialVolume = ED.audioVolume;
     
-    // Test AG_write function directly since command_parser has issues with catCommand access
-    // AG_write expects catCommand[3] onwards to contain the volume value
+    // Test AG_write function - now fixed to use cmd parameter correctly
     // This tests the volume conversion logic: 127/255 * 100 ≈ 49.8 → 49
     char command[] = "AG0127;";
     
-    // Call AG_write directly (note: this will fail due to catCommand bug, but tests the interface)
+    // Call AG_write directly
     char* result = AG_write(command);
     
-    // Due to bug in AG_write using catCommand instead of cmd parameter, volume will be 0
-    // This test documents the current (buggy) behavior
-    EXPECT_EQ(ED.audioVolume, 0);  // Should be 49, but bug causes 0
+    // Verify volume conversion: 127 * 100 / 255 ≈ 49.8 → 49
+    EXPECT_EQ(ED.audioVolume, 49);
     
     // Test that AG_write returns empty string for successful completion
     EXPECT_STREQ(result, "");
@@ -668,9 +669,8 @@ TEST(CAT, AG_write_SetsAudioVolume) {
     
     char *result = AG_write(command);
     
-    // Due to bug in AG_write using catCommand instead of cmd parameter, volume will be 0
-    // This test documents the current (buggy) behavior
-    EXPECT_EQ(ED.audioVolume, 0);  // Should be 50, but bug causes 0
+    // Verify volume conversion: 128 * 100 / 255 ≈ 50.2 → 50
+    EXPECT_EQ(ED.audioVolume, 50);
     
     // Should return empty string
     EXPECT_STREQ(result, "");
@@ -681,9 +681,8 @@ TEST(CAT, AG_write_ClampsMagnitudeMax) {
     
     char *result = AG_write(command);
     
-    // Due to bug in AG_write using catCommand instead of cmd parameter, volume will be 0
-    // This test documents the current (buggy) behavior
-    EXPECT_EQ(ED.audioVolume, 0);  // Should be 100 (clamped), but bug causes 0
+    // Verify volume conversion and clamping: 300 * 100 / 255 ≈ 117.6 → 100 (clamped)
+    EXPECT_EQ(ED.audioVolume, 100);
     
     // Should return empty string
     EXPECT_STREQ(result, "");
@@ -1290,4 +1289,202 @@ TEST(CAT, command_parser_RecognizesIDCommand) {
     
     // Should return proper ID response
     EXPECT_STREQ(result, "ID019;");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Microphone Gain Function Tests (MG)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, MG_write_SetsCurrentMicGain) {
+    // Test setting microphone gain to mid-range value
+    char command[] = "MG050;"; // 50% = 0 dB
+    
+    char *result = MG_write(command);
+    
+    // Verify microphone gain was set correctly
+    // 50 * 70 / 100 - 40 = 35 - 40 = -5 dB
+    EXPECT_EQ(ED.currentMicGain, -5);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MG_write_SetsMinimumMicGain) {
+    // Test setting microphone gain to minimum value
+    char command[] = "MG000;"; // 0% = -40 dB
+    
+    char *result = MG_write(command);
+    
+    // Verify microphone gain was set to minimum
+    // 0 * 70 / 100 - 40 = 0 - 40 = -40 dB
+    EXPECT_EQ(ED.currentMicGain, -40);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MG_write_SetsMaximumMicGain) {
+    // Test setting microphone gain to maximum value
+    char command[] = "MG100;"; // 100% = +30 dB
+    
+    char *result = MG_write(command);
+    
+    // Verify microphone gain was set to maximum
+    // 100 * 70 / 100 - 40 = 70 - 40 = +30 dB
+    EXPECT_EQ(ED.currentMicGain, 30);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, MG_write_CallsUpdateTransmitAudioGainDuringTransmit) {
+    // Set up test conditions - radio in SSB transmit mode
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    
+    char command[] = "MG075;"; // 75% gain
+    
+    char *result = MG_write(command);
+    
+    // Verify microphone gain was set correctly
+    // 75 * 70 / 100 - 40 = 52.5 - 40 = 12.5 → 12 dB (integer conversion)
+    EXPECT_EQ(ED.currentMicGain, 12);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+    
+    // Note: We can't easily verify UpdateTransmitAudioGain() was called in unit test,
+    // but we can verify the function doesn't crash when called during transmit
+}
+
+TEST(CAT, MG_write_DoesNotCallUpdateTransmitAudioGainDuringReceive) {
+    // Set up test conditions - radio in SSB receive mode
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    
+    char command[] = "MG025;"; // 25% gain
+    
+    char *result = MG_write(command);
+    
+    // Verify microphone gain was set correctly
+    // 25 * 70 / 100 - 40 = 17.5 - 40 = -22.5 → -22 dB (integer conversion)
+    EXPECT_EQ(ED.currentMicGain, -22);
+    
+    // Should return empty string
+    EXPECT_STREQ(result, "");
+    
+    // Function should complete successfully even when not transmitting
+}
+
+TEST(CAT, MG_read_ReturnsCurrentMicGain) {
+    // Set up test microphone gain
+    ED.currentMicGain = 0; // 0 dB
+    
+    char command[] = "MG;";
+    char *result = MG_read(command);
+    
+    // Expected: (0 + 40) * 100 / 70 = 40 * 100 / 70 ≈ 57.14 → 57
+    EXPECT_STREQ(result, "MG057;");
+}
+
+TEST(CAT, MG_read_ReturnsMinimumMicGain) {
+    // Set up test microphone gain to minimum
+    ED.currentMicGain = -40; // -40 dB (minimum)
+    
+    char command[] = "MG;";
+    char *result = MG_read(command);
+    
+    // Expected: (-40 + 40) * 100 / 70 = 0 * 100 / 70 = 0
+    EXPECT_STREQ(result, "MG000;");
+}
+
+TEST(CAT, MG_read_ReturnsMaximumMicGain) {
+    // Set up test microphone gain to maximum
+    ED.currentMicGain = 30; // +30 dB (maximum)
+    
+    char command[] = "MG;";
+    char *result = MG_read(command);
+    
+    // Expected: (30 + 40) * 100 / 70 = 70 * 100 / 70 = 100
+    EXPECT_STREQ(result, "MG100;");
+}
+
+TEST(CAT, MG_read_ReturnsNegativeMicGain) {
+    // Set up test microphone gain to negative value
+    ED.currentMicGain = -20; // -20 dB
+    
+    char command[] = "MG;";
+    char *result = MG_read(command);
+    
+    // Expected: (-20 + 40) * 100 / 70 = 20 * 100 / 70 ≈ 28.57 → 28
+    EXPECT_STREQ(result, "MG028;");
+}
+
+TEST(CAT, MG_read_ReturnsPositiveMicGain) {
+    // Set up test microphone gain to positive value
+    ED.currentMicGain = 15; // +15 dB
+    
+    char command[] = "MG;";
+    char *result = MG_read(command);
+    
+    // Expected: (15 + 40) * 100 / 70 = 55 * 100 / 70 ≈ 78.57 → 78
+    EXPECT_STREQ(result, "MG078;");
+}
+
+TEST(CAT, command_parser_RecognizesMGCommands) {
+    // Clear any existing interrupts
+    ConsumeInterrupt();
+    
+    // Test MG write command
+    char mg_write[] = "MG060;"; // 60% gain
+    char *result = command_parser(mg_write);
+    
+    // Verify microphone gain was set
+    // 60 * 70 / 100 - 40 = 42 - 40 = +2 dB
+    EXPECT_EQ(ED.currentMicGain, 2);
+    EXPECT_STREQ(result, "");
+    
+    // Test MG read command
+    char mg_read[] = "MG;";
+    result = command_parser(mg_read);
+    
+    // Expected: (2 + 40) * 100 / 70 = 42 * 100 / 70 = 60
+    EXPECT_STREQ(result, "MG060;");
+}
+
+TEST(CAT, MG_write_HandlesBoundaryValues) {
+    // Test conversion precision at various boundary points
+    
+    // Test value that should convert to exactly 0 dB
+    char command1[] = "MG057;"; // Should be close to 0 dB
+    MG_write(command1);
+    // 57 * 70 / 100 - 40 = 39.9 - 40 = -0.1 → 0 dB (rounded)
+    EXPECT_EQ(ED.currentMicGain, -0);
+    
+    // Test value that should be exactly -10 dB
+    char command2[] = "MG043;"; // Should be close to -10 dB
+    MG_write(command2);
+    // 43 * 70 / 100 - 40 = 30.1 - 40 = -9.9 → -9 dB (rounded)
+    EXPECT_EQ(ED.currentMicGain, -9);
+    
+    // Test value that should be exactly +10 dB
+    char command3[] = "MG071;"; // Should be close to +10 dB
+    MG_write(command3);
+    // 71 * 70 / 100 - 40 = 49.7 - 40 = 9.7 → 9 dB (rounded)
+    EXPECT_EQ(ED.currentMicGain, 9);
+}
+
+TEST(CAT, MG_read_write_RoundTripConsistency) {
+    // Test that write followed by read gives consistent results
+    
+    // Set a specific gain value
+    char write_command[] = "MG080;"; // 80%
+    MG_write(write_command);
+    
+    // Read it back
+    char read_command[] = "MG;";
+    char *result = MG_read(read_command);
+    
+    // Should read back close to the original value
+    // 80 * 70 / 100 - 40 = 56 - 40 = 16 dB
+    // (16 + 40) * 100 / 70 = 56 * 100 / 70 = 80
+    EXPECT_STREQ(result, "MG080;");
 }

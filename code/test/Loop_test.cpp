@@ -124,3 +124,49 @@ TEST(Loop, ChangeVFO){
     // check frequency
     EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],GetSSBVFOFrequency());
 }
+
+TEST(Loop, CATFrequencyChangeViaRepeatedLoop){
+    // Save initial state
+    ED.activeVFO = VFO_A;
+    int64_t initialCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
+    int64_t initialFineTuneFreq = ED.fineTuneFreq_Hz[ED.activeVFO];
+    int32_t initialBand = ED.currentBand[ED.activeVFO];
+    
+    // Clear any existing data in the serial buffer and interrupts
+    SerialUSB1.clearBuffer();
+    ConsumeInterrupt();
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Feed a CAT command to change VFO A frequency to 20m band (14.200 MHz)
+    SerialUSB1.feedData("FA00014200000;");
+    
+    // Execute loop() to process the CAT serial event and frequency change
+    // The loop() function calls CheckForCATSerialEvents() which processes the CAT command,
+    // then calls ConsumeInterrupt() which handles the iUPDATE_TUNE interrupt set by the CAT command
+    loop();
+    
+    // After one loop() execution, the frequency change should be complete
+    // Verify that the interrupt has been consumed
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Verify that the frequency change was applied correctly
+    EXPECT_NE(ED.centerFreq_Hz[ED.activeVFO], initialCenterFreq);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_20M);
+    
+    // Verify the frequency was set correctly (accounting for SR offset)
+    int64_t expectedCenterFreq = 14200000L + SR[SampleRate].rate/4;
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], expectedCenterFreq);
+    
+    // Verify fine tune was reset to 0
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 0);
+    
+    // Verify that the tuning system has been updated with the new frequency
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetSSBVFOFrequency());
+    
+    // Execute loop() one more time to ensure system stability
+    loop();
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Clean up - clear buffer for next test
+    SerialUSB1.clearBuffer();
+}

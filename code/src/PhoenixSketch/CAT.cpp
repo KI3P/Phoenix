@@ -62,7 +62,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 10
+#define NUM_SUPPORTED_COMMANDS 11
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -74,10 +74,9 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "FT", 14, 3, FT_write, FT_read }, //XMT VFO
 		{ "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
 		{ "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
-
 		{ "MD", 4,  3, MD_write, MD_read }, //operating mode, CW, USB etc
-		/*{ "MG", 6,  3, MG_write, MG_read }, // mike gain
-		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
+		{ "MG", 6,  3, MG_write, MG_read }, // mike gain
+		/*{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
 
@@ -106,7 +105,7 @@ char *AG_read(  char* cmd ){
  * Set the audio volume to the passed paramter, scaling before doing so
  */
 char *AG_write( char* cmd  ){
-  	ED.audioVolume = ( int32_t )( ( ( float32_t )atoi( &catCommand[3] ) * 100.0 ) / 255.0 );
+  	ED.audioVolume = ( int32_t )( ( ( float32_t )atoi( &cmd[3] ) * 100.0 ) / 255.0 );
 	if( ED.audioVolume > 100 ) ED.audioVolume = 100;
 	if( ED.audioVolume < 0 ) ED.audioVolume = 0;
   	return empty_string_p;
@@ -303,7 +302,13 @@ char *MD_write( char* cmd  ){
 }
 
 char *MD_read( char* cmd ){
-	if( modeSM.state_id == ModeSm_StateId_CW_RECEIVE      ){ sprintf( obuf, "MD3;" ); return obuf; }
+	if( ( modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) | 
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK ) |
+		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE ) ){ sprintf( obuf, "MD3;" ); return obuf; }
 	if( bands[ ED.currentBand[ED.activeVFO] ].mode == LSB ){ sprintf( obuf, "MD1;" ); return obuf; }
 	if( bands[ ED.currentBand[ED.activeVFO] ].mode == USB ){ sprintf( obuf, "MD2;" ); return obuf; }
 	if( bands[ ED.currentBand[ED.activeVFO] ].mode == AM  ){ sprintf( obuf, "MD5;" ); return obuf; }
@@ -312,29 +317,26 @@ char *MD_read( char* cmd ){
 	return obuf;  //Huh? How'd we get here?
 }
 
-/*
-
 char *MG_write( char* cmd ){
-	  int g = atoi( &catCommand[2] );
+	int g = atoi( &cmd[2] );
 	// convert from 0..100 to -40..30
 	g = ( int )( ( ( double )g * 70.0 / 100.0 ) - 40.0 );
-	currentMicGain = g;
-	if( radioState == SSB_TRANSMIT_STATE ){
-		comp1.setPreGain_dB( currentMicGain );
-		comp2.setPreGain_dB( currentMicGain );
+	ED.currentMicGain = g;
+	if( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ){
+		// we're actively transmitting, increase gain without interrupting transmit
+		UpdateTransmitAudioGain();
 	}
-	ED.currentMicGain = currentMicGain;
-	EEPROMWrite();
   	return empty_string_p;
 }
 
 char *MG_read(  char* cmd ){
 	// convert from -40 .. 30 to 0..100
-	int g = ( int )( ( double )( currentMicGain + 40 ) * 100.0 / 70.0 );
+	int g = ( int )( ( double )( ED.currentMicGain + 40 ) * 100.0 / 70.0 );
 	sprintf( obuf, "MG%03d;", g );
   	return obuf;
 }
 
+/*
 char *NR_write( char* cmd ){
   	if( cmd[ 2 ] == '0' ){
 		nrOptionSelect = 0;

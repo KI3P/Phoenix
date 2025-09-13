@@ -112,6 +112,10 @@ void MuteMixerChannels(AudioMixer4 *mixer){
     }
 }
 
+void UpdateTransmitAudioGain(void){
+    sgtl5000_teensy.micGain(ED.currentMicGain);
+}
+
 void UpdateAudioIOState(void){
     if (modeSM.state_id == previousAudioIOState){
         // Already in this state, no need to change
