@@ -215,3 +215,68 @@ TEST(Loop, CATMicGainChangeViaRepeatedLoop){
     // Clean up - clear buffer for next test
     SerialUSB1.clearBuffer();
 }
+
+TEST(Loop, CATTransmitCommandViaRepeatedLoop){
+    // Test that TX commands work correctly via loop() execution
+    // This verifies the complete chain: CAT serial -> command parser -> state machine
+    
+    // Clear any existing data in the serial buffer and interrupts
+    SerialUSB1.clearBuffer();
+    ConsumeInterrupt();
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Test SSB mode transition
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    
+    // Feed a CAT command to trigger transmit
+    SerialUSB1.feedData("TX0;");
+    
+    // Execute loop() to process the CAT serial event
+    // The loop() function calls CheckForCATSerialEvents() which processes the TX command
+    // This should trigger the PTT_PRESSED event and change state to SSB_TRANSMIT
+    loop();
+    
+    // After one loop() execution, the transmit state should be set
+    // Verify that no interrupt was set (TX commands don't generate interrupts)
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Verify that the state changed from SSB_RECEIVE to SSB_TRANSMIT
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
+    
+    // Test CW mode transition
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+    
+    // Feed another TX command for CW mode
+    SerialUSB1.feedData("TX1;");
+    
+    // Execute loop() to process the second CAT command
+    loop();
+    
+    // Verify that the state changed from CW_RECEIVE to CW_TRANSMIT_MARK
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
+    
+    // Test that TX command has no effect when already transmitting
+    // Set to SSB transmit state first
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    ModeSm_StateId initial_transmit_state = modeSM.state_id;
+    
+    // Send TX command - should have no effect since already transmitting
+    SerialUSB1.feedData("TX0;");
+    loop();
+    
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    EXPECT_EQ(modeSM.state_id, initial_transmit_state); // State should remain unchanged
+    
+    // Execute loop() one more time to ensure system stability
+    loop();
+    EXPECT_EQ(GetInterrupt(), iNONE);
+    
+    // Clean up - clear buffer for next test
+    SerialUSB1.clearBuffer();
+}

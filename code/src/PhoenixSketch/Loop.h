@@ -27,7 +27,8 @@ typedef enum {
     iBUTTON_PRESSED,
     iVFO_CHANGE,
     iUPDATE_TUNE,
-    iMODE_CHANGE
+    iMODE_CHANGE,
+    iPOWER_CHANGE
 } InterruptType;
 
 void ConsumeInterrupt(void);
@@ -37,6 +38,6 @@ void loop(void);
 void SetKeyType(KeyTypeId key);
 void SetKey1Dit(void);
 void SetKey1Dah(void);
-
+void ShutdownTeensy(void);
 
 #endif // LOOP_H

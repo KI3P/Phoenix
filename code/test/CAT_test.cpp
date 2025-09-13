@@ -29,7 +29,16 @@ char *MG_write(char* cmd);
 char *MG_read(char* cmd);
 char *NR_write(char* cmd);
 char *NR_read(char* cmd);
+char *NT_write(char* cmd);
+char *NT_read(char* cmd);
+char *PC_write(char* cmd);
+char *PC_read(char* cmd);
+char *PS_write(char* cmd);
+char *PS_read(char* cmd);
+char *RX_write(char* cmd);
+char *TX_write(char* cmd);
 void UpdateTransmitAudioGain(void);
+void ShutdownTeensy(void);
 
 // External variables needed for testing
 extern struct config_t ED;
@@ -1731,4 +1740,561 @@ TEST(CAT, command_parser_NRCommandLengthValidation) {
     EXPECT_EQ(result[0], 'N');
     EXPECT_EQ(result[1], 'R');
     EXPECT_EQ(result[3], ';');
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Auto Notch Function Tests (NT)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, NT_write_ReturnsEmptyString) {
+    // Test that NT_write currently returns empty string (stub implementation)
+    char command[] = "NT1;";
+    
+    char *result = NT_write(command);
+    
+    // Should return empty string as it's currently a stub
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, NT_write_AcceptsVariousCommands) {
+    // Test that NT_write accepts different commands without crashing
+    char command0[] = "NT0;";
+    char command1[] = "NT1;";
+    
+    char *result0 = NT_write(command0);
+    char *result1 = NT_write(command1);
+    
+    // Both should return empty string
+    EXPECT_STREQ(result0, "");
+    EXPECT_STREQ(result1, "");
+}
+
+TEST(CAT, NT_read_ReturnsEmptyString) {
+    // Test that NT_read currently returns empty string (stub implementation)
+    char command[] = "NT;";
+    
+    char *result = NT_read(command);
+    
+    // Should return empty string as it's currently a stub
+    EXPECT_STREQ(result, "");
+}
+
+TEST(CAT, command_parser_RecognizesNTCommands) {
+    // Test that NT commands are recognized by the command parser
+    
+    // Test NT write command
+    char nt_write[] = "NT1;"; // Auto notch on
+    char *result = command_parser(nt_write);
+    
+    // Should return empty string (stub implementation)
+    EXPECT_STREQ(result, "");
+    
+    // Test NT read command
+    char nt_read[] = "NT;";
+    result = command_parser(nt_read);
+    
+    // Should return empty string (stub implementation)
+    EXPECT_STREQ(result, "");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Power Control Function Tests (PC)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, PC_write_SetsSSBPowerOutput) {
+    // Set radio to SSB mode
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    
+    // Clear any existing interrupts
+    ConsumeInterrupt();
+    
+    char command[] = "PC050;"; // Set power to 50%
+    
+    char *result = PC_write(command);
+    
+    // Verify SSB power was set correctly
+    EXPECT_EQ(ED.powerOutSSB[ED.activeVFO], 50);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
+    
+    // Should return the set value
+    EXPECT_STREQ(result, "PC050;");
+    
+    // Clean up interrupt
+    ConsumeInterrupt();
+}
+
+TEST(CAT, PC_write_SetsCWPowerOutput) {
+    // Set radio to CW mode
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    ED.activeVFO = VFO_B;
+    
+    // Clear any existing interrupts
+    ConsumeInterrupt();
+    
+    char command[] = "PC075;"; // Set power to 75%
+    
+    char *result = PC_write(command);
+    
+    // Verify CW power was set correctly
+    EXPECT_EQ(ED.powerOutCW[ED.activeVFO], 75);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
+    
+    // Should return the set value
+    EXPECT_STREQ(result, "PC075;");
+    
+    // Clean up interrupt
+    ConsumeInterrupt();
+}
+
+TEST(CAT, PC_write_HandlesSSBTransmitMode) {
+    // Test that SSB transmit mode uses SSB power settings
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    ED.activeVFO = VFO_A;
+    
+    // Clear any existing interrupts
+    ConsumeInterrupt();
+    
+    char command[] = "PC025;"; // Set power to 25%
+    
+    char *result = PC_write(command);
+    
+    // Verify SSB power was set (not CW)
+    EXPECT_EQ(ED.powerOutSSB[ED.activeVFO], 25);
+    
+    // Verify interrupt was set
+    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
+    
+    // Should return the set value
+    EXPECT_STREQ(result, "PC025;");
+    
+    // Clean up interrupt
+    ConsumeInterrupt();
+}
+
+TEST(CAT, PC_write_HandlesCWTransmitModes) {
+    // Test various CW transmit modes use CW power settings
+    
+    // Test CW transmit mark
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    ED.activeVFO = VFO_A;
+    ConsumeInterrupt();
+    
+    char command1[] = "PC040;";
+    char *result = PC_write(command1);
+    EXPECT_EQ(ED.powerOutCW[ED.activeVFO], 40);
+    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
+    EXPECT_STREQ(result, "PC040;");
+    ConsumeInterrupt();
+    
+    // Test CW transmit dit mark
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
+    char command2[] = "PC060;";
+    result = PC_write(command2);
+    EXPECT_EQ(ED.powerOutCW[ED.activeVFO], 60);
+    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
+    ConsumeInterrupt();
+}
+
+TEST(CAT, PC_read_ReturnsSSBPowerInSSBMode) {
+    // Set up SSB mode with known power
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.powerOutSSB[ED.activeVFO] = 80;
+    
+    char command[] = "PC;";
+    char *result = PC_read(command);
+    
+    // Should return SSB power setting
+    EXPECT_STREQ(result, "PC080;");
+}
+
+TEST(CAT, PC_read_ReturnsCWPowerInCWMode) {
+    // Set up CW mode with known power
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    ED.activeVFO = VFO_B;
+    ED.powerOutCW[ED.activeVFO] = 45;
+    
+    char command[] = "PC;";
+    char *result = PC_read(command);
+    
+    // Should return CW power setting
+    EXPECT_STREQ(result, "PC045;");
+}
+
+TEST(CAT, PC_read_HandlesRoundingCorrectly) {
+    // Test that floating point power values are rounded correctly
+    
+    // Test SSB mode rounding
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    ED.activeVFO = VFO_A;
+    ED.powerOutSSB[ED.activeVFO] = 33.7; // Should round to 34
+    
+    char command[] = "PC;";
+    char *result = PC_read(command);
+    EXPECT_STREQ(result, "PC034;");
+    
+    // Test CW mode rounding
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    ED.powerOutCW[ED.activeVFO] = 66.2; // Should round to 66
+    
+    result = PC_read(command);
+    EXPECT_STREQ(result, "PC066;");
+}
+
+TEST(CAT, command_parser_RecognizesPCCommands) {
+    // Test PC commands through the command parser
+    
+    // Set up initial state
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ConsumeInterrupt();
+    
+    // Test PC write command
+    char pc_write[] = "PC090;"; // Set power to 90%
+    char *result = command_parser(pc_write);
+    
+    // Verify power was set
+    EXPECT_EQ(ED.powerOutSSB[ED.activeVFO], 90);
+    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
+    EXPECT_STREQ(result, "PC090;");
+    ConsumeInterrupt();
+    
+    // Test PC read command
+    char pc_read[] = "PC;";
+    result = command_parser(pc_read);
+    
+    // Should return current power setting
+    EXPECT_STREQ(result, "PC090;");
+}
+
+TEST(CAT, PC_read_write_RoundTripConsistency) {
+    // Test that write followed by read gives consistent results
+    
+    // Test in SSB mode
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ConsumeInterrupt();
+    
+    char write_command[] = "PC055;";
+    char *write_result = PC_write(write_command);
+    EXPECT_STREQ(write_result, "PC055;");
+    ConsumeInterrupt();
+    
+    char read_command[] = "PC;";
+    char *read_result = PC_read(read_command);
+    EXPECT_STREQ(read_result, "PC055;");
+    
+    // Test in CW mode
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    ED.activeVFO = VFO_B;
+    
+    char write_command2[] = "PC038;";
+    write_result = PC_write(write_command2);
+    EXPECT_STREQ(write_result, "PC038;");
+    ConsumeInterrupt();
+    
+    read_result = PC_read(read_command);
+    EXPECT_STREQ(read_result, "PC038;");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Power Status Function Tests (PS)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, PS_write_CallsShutdownTeensy) {
+    // Test that PS_write calls ShutdownTeensy function
+    char command[] = "PS0;";
+    
+    char *result = PS_write(command);
+    
+    // Should return PS0 response (indicating shutdown initiated)
+    EXPECT_STREQ(result, "PS0;");
+    
+    // Note: We can't easily verify ShutdownTeensy() was called in unit test,
+    // but we can verify the function completes and returns the expected response
+}
+
+TEST(CAT, PS_write_AcceptsVariousCommands) {
+    // Test that PS_write handles different input commands
+    char command0[] = "PS0;";
+    char command1[] = "PS1;";
+    
+    char *result0 = PS_write(command0);
+    char *result1 = PS_write(command1);
+    
+    // Both should return PS0 (shutdown response)
+    EXPECT_STREQ(result0, "PS0;");
+    EXPECT_STREQ(result1, "PS0;");
+}
+
+TEST(CAT, PS_read_ReturnsPowerOnStatus) {
+    // Test that PS_read returns power on status
+    char command[] = "PS;";
+    
+    char *result = PS_read(command);
+    
+    // Should return PS1 (power is on)
+    EXPECT_STREQ(result, "PS1;");
+}
+
+TEST(CAT, PS_read_ConsistentResponse) {
+    // Test that PS_read always returns the same response
+    char command[] = "PS;";
+    
+    char *result1 = PS_read(command);
+    char *result2 = PS_read(command);
+    
+    // Both calls should return PS1
+    EXPECT_STREQ(result1, "PS1;");
+    EXPECT_STREQ(result2, "PS1;");
+}
+
+TEST(CAT, command_parser_RecognizesPSCommands) {
+    // Test PS commands through the command parser
+    
+    // Test PS write command
+    char ps_write[] = "PS1;"; // Power control command
+    char *result = command_parser(ps_write);
+    
+    // Should return PS0 (shutdown initiated)
+    EXPECT_STREQ(result, "PS0;");
+    
+    // Test PS read command
+    char ps_read[] = "PS;";
+    result = command_parser(ps_read);
+    
+    // Should return PS1 (power is on)
+    EXPECT_STREQ(result, "PS1;");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CAT Receiver Selection Function Tests (RX)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, RX_write_ReturnsRX0Response) {
+    // Test that RX_write returns RX0 response
+    char command[] = "RX0;";
+    
+    char *result = RX_write(command);
+    
+    // Should return RX0 response
+    EXPECT_STREQ(result, "RX0;");
+}
+
+TEST(CAT, RX_write_AcceptsVariousCommands) {
+    // Test that RX_write handles different receiver selection commands
+    char command0[] = "RX0;"; // Main receiver
+    char command1[] = "RX1;"; // Sub receiver (if supported)
+    
+    char *result0 = RX_write(command0);
+    char *result1 = RX_write(command1);
+    
+    // Both should return RX0 (indicating main receiver selected/only supported)
+    EXPECT_STREQ(result0, "RX0;");
+    EXPECT_STREQ(result1, "RX0;");
+}
+
+TEST(CAT, RX_write_ConsistentResponse) {
+    // Test that RX_write always returns consistent response
+    char command[] = "RX0;";
+    
+    char *result1 = RX_write(command);
+    char *result2 = RX_write(command);
+    
+    // Both calls should return RX0
+    EXPECT_STREQ(result1, "RX0;");
+    EXPECT_STREQ(result2, "RX0;");
+}
+
+TEST(CAT, command_parser_RecognizesRXCommands) {
+    // Test RX commands through the command parser
+    
+    // Test RX write command
+    char rx_write[] = "RX1;"; // Select sub receiver
+    char *result = command_parser(rx_write);
+    
+    // Should return RX0 (main receiver selected/supported)
+    EXPECT_STREQ(result, "RX0;");
+    
+    // Test with main receiver selection
+    char rx_main[] = "RX0;";
+    result = command_parser(rx_main);
+    
+    // Should return RX0
+    EXPECT_STREQ(result, "RX0;");
+}
+
+TEST(CAT, command_parser_NewCommandsLengthValidation) {
+    // Test that new commands with wrong lengths are rejected
+    
+    // Test PS command too long
+    char ps_too_long[] = "PS123;";
+    char *result = command_parser(ps_too_long);
+    EXPECT_STREQ(result, "?;");
+    
+    // Test RX command too long  
+    char rx_too_long[] = "RX123;";
+    result = command_parser(rx_too_long);
+    EXPECT_STREQ(result, "?;");
+    
+    // Test PS with missing semicolon
+    char ps_no_semi[] = "PS1";
+    result = command_parser(ps_no_semi);
+    EXPECT_STREQ(result, "?;");
+    
+    // Test RX with missing semicolon
+    char rx_no_semi[] = "RX0";
+    result = command_parser(rx_no_semi);
+    EXPECT_STREQ(result, "?;");
+}
+
+TEST(CAT, command_parser_AllNewCommandsIntegration) {
+    // Test integration of all newly added commands
+    
+    // Test NT (Auto Notch)
+    char nt_cmd[] = "NT1;";
+    char *result = command_parser(nt_cmd);
+    EXPECT_STREQ(result, ""); // Stub implementation
+    
+    // Test PC (Power Control)
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ConsumeInterrupt();
+    char pc_cmd[] = "PC050;";
+    result = command_parser(pc_cmd);
+    EXPECT_STREQ(result, "PC050;");
+    ConsumeInterrupt();
+    
+    // Test PS (Power Status)
+    char ps_cmd[] = "PS1;";
+    result = command_parser(ps_cmd);
+    EXPECT_STREQ(result, "PS0;");
+    
+    // Test RX (Receiver Selection)
+    char rx_cmd[] = "RX0;";
+    result = command_parser(rx_cmd);
+    EXPECT_STREQ(result, "RX0;");
+    
+    // Test TX (Transmit)
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    char tx_cmd[] = "TX0;";
+    result = command_parser(tx_cmd);
+    EXPECT_STREQ(result, "TX0;");
+}
+
+// TX function tests
+TEST(CAT, TX_write_ReturnsTX0Response){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    char command[] = "TX0;";
+    char *result = TX_write(command);
+    EXPECT_STREQ(result, "TX0;");
+}
+
+TEST(CAT, TX_write_AcceptsVariousCommands){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    // Test with TX0;
+    char command1[] = "TX0;";
+    char *result1 = TX_write(command1);
+    EXPECT_STREQ(result1, "TX0;");
+    
+    // Test with TX1;
+    char command2[] = "TX1;";
+    char *result2 = TX_write(command2);
+    EXPECT_STREQ(result2, "TX0;");
+    
+    // Test with TX;
+    char command3[] = "TX;";
+    char *result3 = TX_write(command3);
+    EXPECT_STREQ(result3, "TX0;");
+}
+
+TEST(CAT, TX_write_TriggersSSBTransmitFromSSBReceive){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    // Ensure we're in SSB receive state
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ModeSm_StateId initial_state = modeSM.state_id;
+    EXPECT_EQ(initial_state, ModeSm_StateId_SSB_RECEIVE);
+    
+    char command[] = "TX0;";
+    char *result = TX_write(command);
+    EXPECT_STREQ(result, "TX0;");
+    
+    // Verify state changed to SSB transmit
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
+}
+
+TEST(CAT, TX_write_TriggersCWTransmitFromCWReceive){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    // Set to CW receive state
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    ModeSm_StateId initial_state = modeSM.state_id;
+    EXPECT_EQ(initial_state, ModeSm_StateId_CW_RECEIVE);
+    
+    char command[] = "TX0;";
+    char *result = TX_write(command);
+    EXPECT_STREQ(result, "TX0;");
+    
+    // Verify state changed to CW transmit mark (straight key behavior)
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
+}
+
+TEST(CAT, TX_write_NoStateChangeFromTransmitStates){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    // Test from SSB transmit state - should have no effect
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    ModeSm_StateId initial_state = modeSM.state_id;
+    
+    char command[] = "TX0;";
+    char *result = TX_write(command);
+    EXPECT_STREQ(result, "TX0;");
+    
+    // State should remain unchanged
+    EXPECT_EQ(modeSM.state_id, initial_state);
+}
+
+TEST(CAT, TX_write_ConsistentResponse){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    // Call TX_write multiple times and verify consistent response
+    char command[] = "TX0;";
+    
+    char *result1 = TX_write(command);
+    char *result2 = TX_write(command);
+    char *result3 = TX_write(command);
+    
+    EXPECT_STREQ(result1, "TX0;");
+    EXPECT_STREQ(result2, "TX0;");
+    EXPECT_STREQ(result3, "TX0;");
+}
+
+TEST(CAT, command_parser_RecognizesTXCommands){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    
+    // Test TX1; command
+    char tx1_cmd[] = "TX1;";
+    char *result = command_parser(tx1_cmd);
+    EXPECT_STREQ(result, "TX0;");
+    
+    // Test TX0; command
+    char tx0_cmd[] = "TX0;";
+    result = command_parser(tx0_cmd);
+    EXPECT_STREQ(result, "TX0;");
 }

@@ -292,6 +292,10 @@ void ConsumeInterrupt(void){
             ChangeTune();
             break;
         }
+        case (iPOWER_CHANGE):{
+            // Nothing here yet
+            break;
+        }
         default:
             break;
     }

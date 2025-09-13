@@ -62,7 +62,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 13
+#define NUM_SUPPORTED_COMMANDS 17
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -78,13 +78,10 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "MG", 6,  3, MG_write, MG_read }, // mike gain
 		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
-		/*{ "PC", 6,  3, PC_write, PC_read }, // output power
-
+		{ "PC", 6,  3, PC_write, PC_read }, // output power
 		{ "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
-		{ "RX", 3,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
-		{ "SA", 10, 3, SA_write, SA_read },  //Satellite mode
+		{ "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
 		{ "TX", 4, 0, TX_write, unsupported_cmd } // set transceiver to transmit.
-*/
 	};
 
 char *unsupported_cmd( char *cmd ){
@@ -363,11 +360,16 @@ char *NT_read(  char* cmd ){
   	return empty_string_p;
 }
 
-/*
-//output power - for now, just spit back what they gave us.
+//output power
 char *PC_write( char* cmd ){
   	int requested_power = atoi( &cmd[ 3 ]);
-  	//SetRF_OutputPower( (float)requested_power );  now SetRF_OutAtten()... figure out  the dB's later. JLK
+	if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) | 
+		( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
+		ED.powerOutSSB[ED.activeVFO] = requested_power;
+	} else {
+		ED.powerOutCW[ED.activeVFO] = requested_power;
+	}
+	SetInterrupt(iPOWER_CHANGE);
   	sprintf( obuf, "PC%03d;", requested_power );
   	return obuf;
 }
@@ -375,50 +377,53 @@ char *PC_write( char* cmd ){
 //output power
 char *PC_read(  char* cmd ){
   	unsigned int o_param;
-  	o_param = round( transmitPowerLevel );
+	if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) | 
+		( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
+		o_param = round( ED.powerOutSSB[ED.activeVFO] );
+	} else {
+		o_param = round( ED.powerOutCW[ED.activeVFO] );
+	}
   	sprintf( obuf, "PC%03d;", o_param );
   	return obuf;
 }
 
 // Turn the power off
 char *PS_write( char* cmd ){
- 	// Ask the AtTiny to do it?
-  	sprintf( obuf, "?;");
+ 	// Ask the AtTiny to do it
+	ShutdownTeensy();
+  	sprintf( obuf, "PS0;");
   	return obuf;    //Nope.  Not doing that.
 }
 
 // Tell them that the power's on.
 char *PS_read(  char* cmd ){
-  	sprintf( obuf, "PS0;");
+  	sprintf( obuf, "PS1;");
   	return obuf;          // The power's on.  Otherwise, we're not answering!
 }
 
 //Choose main or subreceiver
 char *RX_write( char* cmd ){
-  	catTX = false;
 	sprintf( obuf, "RX0;");
   	return obuf;   // We'll support that later.
 }
 
-char *SA_write( char* cmd ){
-  	sprintf( obuf, "?;");
-  	return obuf;//Nope, we ain't doing that.  Yet.  
-}
-
-//Satellite Mode - not supporting for now
-char *SA_read(  char* cmd ){
-  	sprintf( obuf, "SA000000000000000;" );
-  	return obuf;
-}
-
 //Transmit NOW!
 char *TX_write( char* cmd ){
-  	catTX = true;
+	switch (modeSM.state_id){
+		case (ModeSm_StateId_SSB_RECEIVE):{
+			ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+			break;
+		} 
+		case (ModeSm_StateId_CW_RECEIVE):{
+			ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
+			break;
+		}
+		default:
+			break;
+	}
   	sprintf( obuf, "TX0;");
   	return obuf;
 }
-
-*/
 
 void CheckForCATSerialEvents(void){
 	int i;

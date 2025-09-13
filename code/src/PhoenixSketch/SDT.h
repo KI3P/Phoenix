@@ -189,8 +189,8 @@ extern struct config_t {
     //float32_t NR_beta = 0.0;                              // UNUSED
     float32_t omegaN = 0.0;                               // UNUSED
     float32_t pll_fmax = 4000.0;                          // UNUSED
-    float32_t powerOutCW[NUMBER_OF_BANDS];                // UNUSED
-    float32_t powerOutSSB[NUMBER_OF_BANDS];               // UNUSED
+    float32_t powerOutCW[NUMBER_OF_BANDS];       
+    float32_t powerOutSSB[NUMBER_OF_BANDS];  
     float32_t CWPowerCalibrationFactor[NUMBER_OF_BANDS];  // UNUSED
     float32_t SSBPowerCalibrationFactor[NUMBER_OF_BANDS]; // UNUSED
     float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1};
