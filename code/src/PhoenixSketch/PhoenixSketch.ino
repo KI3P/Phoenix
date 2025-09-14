@@ -11,6 +11,19 @@
 
 RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
 
+//extern const uint32_t phoenix_image[65536];
+#include "phoenix.cpp"
+
+void drawArray(const uint32_t * image, uint32_t isize, uint16_t iwidth, uint16_t x, uint16_t y){
+  uint16_t pixels[iwidth]; // container
+  uint32_t i, idx;
+  for (idx = 0; idx < isize/iwidth; idx++){
+    for (i = (iwidth*idx); i < iwidth*(idx+1); i++){
+      pixels[i - (iwidth*idx)] = tft.Color24To565(image[i]);
+    }
+    tft.drawPixels(pixels, iwidth, x, idx+y);
+  }
+}
 
 void Splash() 
 {
@@ -33,18 +46,9 @@ void Splash()
     tft.print("By");
     tft.setFontScale(1);
     tft.setTextColor(RA8875_WHITE);
-    tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 15, YPIXELS / 4 + 80);  // 38 = letters in string
+    tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 0, YPIXELS / 4 + 70);  // 38 = letters in string
     tft.print("           Oliver King, KI3P");
     
-    //tft.setFontScale(2);
-    tft.setTextColor(RA8875_GREEN);
-    centerCall = (XPIXELS - 25 * tft.getFontWidth()) / 2;
-    tft.setCursor(centerCall, YPIXELS / 2 + 160);
-    tft.print("Nothing to see here");
-
-    tft.drawCircle(400,350, 30, RA8875_YELLOW);
-    tft.drawCircle(400,350, 28, RA8875_YELLOW);
-    tft.fillCircle(400,350, 26, RA8875_PINK);
 }
 
 void SetLPFBand(int val){}
@@ -85,5 +89,8 @@ void setup(void){
     tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);  // parameter list from library code
     tft.setRotation(0);
     Splash();
+
+    // Display the image at bottom middle
+    drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
 
 }
