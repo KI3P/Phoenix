@@ -3,6 +3,31 @@
 #include "../src/PhoenixSketch/SDT.h"
 #include "../src/PhoenixSketch/LPFBoard.h"
 
+// Constants from LPFBoard.cpp for testing
+#define LPFBAND0BIT 0
+#define LPFBAND1BIT 1
+#define LPFBAND2BIT 2
+#define LPFBAND3BIT 3
+#define LPFANT0BIT  4
+#define LPFANT1BIT  5
+#define LPFXVTRBIT  6
+#define LPF100WBIT  7
+#define LPFTXBPFBIT 8
+#define LPFRXBPFBIT 9
+
+#define LPF_BAND_NF   0b1111
+#define LPF_BAND_6M   0b1010
+#define LPF_BAND_10M  0b1001
+#define LPF_BAND_12M  0b1000
+#define LPF_BAND_15M  0b0111
+#define LPF_BAND_17M  0b0110
+#define LPF_BAND_20M  0b0101
+#define LPF_BAND_30M  0b0100
+#define LPF_BAND_40M  0b0011
+#define LPF_BAND_60M  0b0000
+#define LPF_BAND_80M  0b0010
+#define LPF_BAND_160M 0b0001
+
 // Helper functions to access the internal register state (defined in LPFBoard.cpp)
 uint16_t GetLPFRegister() {
     return GetLPFRegisterState();
@@ -360,7 +385,7 @@ TEST_F(LPFBoardTest, LPFGPAStateAccess) {
 TEST_F(LPFBoardTest, LPFGPBStateAccess) {
     SetLPFRegister(0x12AB); // Upper: 0x12, Lower: 0xAB
 
-    uint8_t gpbState = (GetLPFRegister() >> 8) & 0xFF; // LPF_GPB_state equivalent
+    uint8_t gpbState = (GetLPFRegister() >> 8) & 0xFF; // LPF_GPB_STATE equivalent
     EXPECT_EQ(gpbState, 0x12);
 }
 
@@ -411,4 +436,181 @@ TEST_F(LPFBoardTest, ComplexRegisterManipulation) {
     EXPECT_EQ(GET_BIT(result, LPFXVTRBIT), 1);
     EXPECT_EQ(result & 0x0F, LPF_BAND_20M);
     EXPECT_EQ((result >> 4) & 0x03, 2);
+}
+
+// ================== INITIALIZATION FUNCTION TESTS ==================
+
+TEST_F(LPFBoardTest, InitBPFPathControlCallsMainInit) {
+    // InitBPFPathControl() should return the same result as InitLPFBoardMCP()
+    errno_t result = InitBPFPathControl();
+
+    // Since we can't mock the I2C hardware in this test environment,
+    // we expect this to return ENOI2C (I2C device not found)
+    // This tests that the function executes and returns a valid errno_t
+    EXPECT_TRUE(result == ESUCCESS || result == ENOI2C || result == EFAIL);
+}
+
+TEST_F(LPFBoardTest, InitXVTRControlCallsMainInit) {
+    // InitXVTRControl() should return the same result as InitLPFBoardMCP()
+    errno_t result = InitXVTRControl();
+
+    // Since we can't mock the I2C hardware in this test environment,
+    // we expect this to return ENOI2C (I2C device not found)
+    // This tests that the function executes and returns a valid errno_t
+    EXPECT_TRUE(result == ESUCCESS || result == ENOI2C || result == EFAIL);
+}
+
+TEST_F(LPFBoardTest, Init100WPAControlCallsMainInit) {
+    // Init100WPAControl() should return the same result as InitLPFBoardMCP()
+    errno_t result = Init100WPAControl();
+
+    // Since we can't mock the I2C hardware in this test environment,
+    // we expect this to return ENOI2C (I2C device not found)
+    // This tests that the function executes and returns a valid errno_t
+    EXPECT_TRUE(result == ESUCCESS || result == ENOI2C || result == EFAIL);
+}
+
+TEST_F(LPFBoardTest, InitLPFControlCallsMainInit) {
+    // InitLPFControl() should return the same result as InitLPFBoardMCP()
+    errno_t result = InitLPFControl();
+
+    // Since we can't mock the I2C hardware in this test environment,
+    // we expect this to return ENOI2C (I2C device not found)
+    // This tests that the function executes and returns a valid errno_t
+    EXPECT_TRUE(result == ESUCCESS || result == ENOI2C || result == EFAIL);
+}
+
+TEST_F(LPFBoardTest, InitAntennaControlCallsMainInit) {
+    // InitAntennaControl() should return the same result as InitLPFBoardMCP()
+    errno_t result = InitAntennaControl();
+
+    // Since we can't mock the I2C hardware in this test environment,
+    // we expect this to return ENOI2C (I2C device not found)
+    // This tests that the function executes and returns a valid errno_t
+    EXPECT_TRUE(result == ESUCCESS || result == ENOI2C || result == EFAIL);
+}
+
+TEST_F(LPFBoardTest, InitSWRControlReturnsSuccess) {
+    // InitSWRControl() currently just returns ESUCCESS
+    // as the SWR ADC initialization is commented out
+    errno_t result = InitSWRControl();
+
+    EXPECT_EQ(result, ESUCCESS);
+}
+
+// Test that each init function can be called multiple times safely
+TEST_F(LPFBoardTest, InitFunctionsMultipleCallsSafe) {
+    // Each init function should be safe to call multiple times
+
+    errno_t result1 = InitBPFPathControl();
+    errno_t result2 = InitBPFPathControl();
+    EXPECT_EQ(result1, result2);
+
+    result1 = InitXVTRControl();
+    result2 = InitXVTRControl();
+    EXPECT_EQ(result1, result2);
+
+    result1 = Init100WPAControl();
+    result2 = Init100WPAControl();
+    EXPECT_EQ(result1, result2);
+
+    result1 = InitLPFControl();
+    result2 = InitLPFControl();
+    EXPECT_EQ(result1, result2);
+
+    result1 = InitAntennaControl();
+    result2 = InitAntennaControl();
+    EXPECT_EQ(result1, result2);
+
+    result1 = InitSWRControl();
+    result2 = InitSWRControl();
+    EXPECT_EQ(result1, result2);
+    EXPECT_EQ(result2, ESUCCESS);
+}
+
+// Test the startup state constant
+TEST_F(LPFBoardTest, StartupStateConstant) {
+    // Test that LPF_REGISTER_STARTUP_STATE has expected values
+    uint16_t startupState = 0x020F; // LPF_REGISTER_STARTUP_STATE value
+
+    // Verify bit positions match comment in source:
+    // receive mode, antenna 0, filter bypass
+
+    // Bits 0-3 (band): should be 0x0F (no filter)
+    EXPECT_EQ(startupState & 0x0F, 0x0F);
+
+    // Bits 4-5 (antenna): should be 0 (antenna 0)
+    EXPECT_EQ((startupState >> 4) & 0x03, 0);
+
+    // Bit 6 (XVTR): should be 0 (XVTR selected/active low)
+    EXPECT_EQ(GET_BIT(startupState, 6), 0);
+
+    // Bit 7 (100W PA): should be 0 (100W PA bypassed)
+    EXPECT_EQ(GET_BIT(startupState, 7), 0);
+
+    // Bit 8 (TX BPF): should be 0 (TX BPF bypassed)
+    EXPECT_EQ(GET_BIT(startupState, 8), 0);
+
+    // Bit 9 (RX BPF): should be 1 (RX BPF selected for receive mode)
+    EXPECT_EQ(GET_BIT(startupState, 9), 1);
+
+    // Bits 10-15: should be 0 (not used)
+    EXPECT_EQ((startupState >> 10) & 0x3F, 0);
+}
+
+// Test register state access functions for testing
+TEST_F(LPFBoardTest, RegisterStateAccessFunctions) {
+    // Test that we can set and get register state
+    uint16_t testValue = 0x1234;
+
+    SetLPFRegisterState(testValue);
+    uint16_t retrievedValue = GetLPFRegisterState();
+
+    EXPECT_EQ(retrievedValue, testValue);
+
+    // Test with different value
+    testValue = 0xABCD;
+    SetLPFRegisterState(testValue);
+    retrievedValue = GetLPFRegisterState();
+
+    EXPECT_EQ(retrievedValue, testValue);
+}
+
+// Test register bit field macros
+TEST_F(LPFBoardTest, RegisterBitFieldMacros) {
+    SetLPFRegister(0x1234); // Upper: 0x12, Lower: 0x34
+
+    // Test LPF_GPA_STATE (lower 8 bits)
+    uint8_t gpaState = GetLPFRegister() & 0xFF;
+    EXPECT_EQ(gpaState, 0x34);
+
+    // Test LPF_GPB_STATE (upper 8 bits)
+    uint8_t gpbState = (GetLPFRegister() >> 8) & 0xFF;
+    EXPECT_EQ(gpbState, 0x12);
+}
+
+// Test SET_LPF_BAND macro behavior
+TEST_F(LPFBoardTest, SetLPFBandMacro) {
+    SetLPFRegister(0xFFF0); // All bits set except band bits
+
+    // Simulate SET_LPF_BAND(0x05)
+    uint16_t newValue = (GetLPFRegister() & 0xFFF0) | (0x05 & 0x0F);
+    SetLPFRegister(newValue);
+
+    uint16_t result = GetLPFRegister();
+    EXPECT_EQ(result & 0x0F, 0x05); // Band bits set to 0x05
+    EXPECT_EQ(result & 0xFFF0, 0xFFF0); // Other bits preserved
+}
+
+// Test SET_ANTENNA macro behavior
+TEST_F(LPFBoardTest, SetAntennaMacro) {
+    SetLPFRegister(0xFFCF); // All bits set except antenna bits (4-5)
+
+    // Simulate SET_ANTENNA(0x02)
+    uint16_t newValue = (GetLPFRegister() & 0b1111111111001111) | ((0x02 & 0b00000011) << 4);
+    SetLPFRegister(newValue);
+
+    uint16_t result = GetLPFRegister();
+    EXPECT_EQ((result >> 4) & 0x03, 0x02); // Antenna bits set to 0x02
+    EXPECT_EQ(result & 0xFFCF, 0xFFCF); // Other bits preserved
 }

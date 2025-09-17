@@ -10,6 +10,8 @@ public:
 
     bool begin(uint8_t addr = 0, TwoWire *theWire = nullptr) { return true; }
     bool begin_I2C(uint8_t addr = 0){ return true; }
+    bool begin_I2C(uint8_t addr, void *theWire){ return true; }
+    void enableAddrPins() {}
     void pinMode(uint8_t pin, uint8_t mode) {}
     void digitalWrite(uint8_t pin, uint8_t value) {}
     uint8_t digitalRead(uint8_t pin) { return 0; }

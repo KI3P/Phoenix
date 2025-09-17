@@ -77,7 +77,10 @@ add_executable(all_CAT_tests CAT_test.cpp ../src/PhoenixSketch/CAT.cpp ../src/Ph
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp ../src/PhoenixSketch/LPFBoard.cpp FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_CAT_tests GTest::gtest_main)
 
-add_executable(all_LPFBoard_tests LPFBoard_test.cpp ../src/PhoenixSketch/LPFBoard.cpp Arduino_mock.cpp)
+add_executable(all_LPFBoard_tests LPFBoard_test.cpp ../src/PhoenixSketch/LPFBoard.cpp ../src/PhoenixSketch/DSP.cpp ../src/PhoenixSketch/CAT.cpp
+  ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/Tune.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp
+  ../src/PhoenixSketch/RFBoard.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp
+  ../src/PhoenixSketch/MainBoard_AudioIO.cpp FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_LPFBoard_tests GTest::gtest_main)
 
 include(GoogleTest)

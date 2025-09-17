@@ -1,6 +1,92 @@
 #include "SDT.h"
 
-static uint16_t LPF_register;
+#define LPFBAND0BIT 0
+#define LPFBAND1BIT 1
+#define LPFBAND2BIT 2
+#define LPFBAND3BIT 3
+#define LPFANT0BIT  4
+#define LPFANT1BIT  5
+#define LPFXVTRBIT  6
+#define LPF100WBIT  7
+#define LPFTXBPFBIT 8
+#define LPFRXBPFBIT 9
+
+#define LPF_BAND_NF   0b1111
+#define LPF_BAND_6M   0b1010
+#define LPF_BAND_10M  0b1001
+#define LPF_BAND_12M  0b1000
+#define LPF_BAND_15M  0b0111
+#define LPF_BAND_17M  0b0110
+#define LPF_BAND_20M  0b0101
+#define LPF_BAND_30M  0b0100
+#define LPF_BAND_40M  0b0011
+#define LPF_BAND_60M  0b0000
+#define LPF_BAND_80M  0b0010
+#define LPF_BAND_160M 0b0001
+
+// LPF_Register bit map:
+// Bit   Pin    Description     Receive            Transmit
+// 0     GPB0   Band I2C0       b                  b
+// 1     GPB1   Band I2C1       b                  b
+// 2     GPB2   Band I2C2       b                  b
+// 3     GPB3   Band I2C3       b                  b
+// 4     GPB4   Antenna I2C0    a                  a
+// 5     GPB5   Antenna I2C1    a                  a
+// 6     GPB6   XVTR_SEL        0                  1
+// 7     GPB7   100W_PA_SEL     0                  0
+// 8     GPA0   TX BPF          0                  1
+// 9     GPA1   RX BPF          1                  0
+// 10-15 GPA2-GPA7   Not used   0                  0
+
+#define LPF_REGISTER_STARTUP_STATE 0x020F // receive mode, antenna 0, filter bypass
+
+static uint16_t LPF_register = LPF_REGISTER_STARTUP_STATE;
+static Adafruit_MCP23X17 mcpLPF;
+static bool LPFinitialized = false;
+static errno_t LPFerrno = EFAIL;
+static uint8_t mcpA_old = 0x00;
+static uint8_t mcpB_old = 0x00;
+//static AD7991 swrADC;
+
+#define LPF_GPA_STATE (uint8_t)(LPF_register & 0xFF)          // Lower 8 bits
+#define LPF_GPB_STATE (uint8_t)((LPF_register >> 8) & 0xFF)   // Upper 8 bits
+
+#define SET_LPF_GPA(val) (LPF_register = (LPF_register & 0xFF00) | ((val) & 0xFF))
+#define SET_LPF_GPB(val) (LPF_register = (LPF_register & 0x00FF) | (((val) & 0xFF) << 8))
+
+#define SET_LPF_BAND(val) (LPF_register = (LPF_register & 0xFFF0) | ((val) & 0x0F))
+#define SET_ANTENNA(val) (LPF_register = (LPF_register & 0b1111111111001111) | (((val) & 0b00000011) << 4))
+
+errno_t InitLPFBoardMCP(void){
+    if (LPFinitialized) return LPFerrno;
+
+    /******************************************************************
+     * Set up the V12 LPF which is connected via the BANDS connector *
+     ******************************************************************/
+    SET_LPF_BAND(ED.currentBand[ED.activeVFO]);
+    SET_ANTENNA(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);;
+    if (mcpLPF.begin_I2C(V12_LPF_MCP23017_ADDR,&Wire2)){
+        Debug("Initializing V12 LPF board");
+        mcpLPF.enableAddrPins();
+        // Set all pins to be outputs
+        for (int i=0;i<16;i++){
+            mcpLPF.pinMode(i, OUTPUT);
+        }
+        mcpLPF.writeGPIOA(LPF_GPA_STATE); 
+        mcpLPF.writeGPIOB(LPF_GPB_STATE);
+        mcpA_old = LPF_GPA_STATE;
+        mcpB_old = LPF_GPB_STATE;
+        Debug("Startup LPF GPB state: "+String(LPF_GPB_STATE,BIN));
+        bit_results.V12_LPF_I2C_present = true;
+        LPFerrno = ESUCCESS;
+    } else {
+        Debug("LPF MCP23017 not found at 0x"+String(V12_LPF_MCP23017_ADDR,HEX));
+        bit_results.V12_LPF_I2C_present = false;
+        LPFerrno = ENOI2C;
+    }
+    LPFinitialized = true;
+    return LPFerrno;
+}
 
 // For unit testing - functions to access the static register
 uint16_t GetLPFRegisterState(void) {
@@ -10,15 +96,6 @@ uint16_t GetLPFRegisterState(void) {
 void SetLPFRegisterState(uint16_t value) {
     LPF_register = value;
 }
-
-#define LPF_GPA_state (LPF_register & 0xFF)          // Lower 8 bits
-#define LPF_GPB_state ((LPF_register >> 8) & 0xFF)   // Upper 8 bits
-
-#define SET_LPF_GPA(val) (LPF_register = (LPF_register & 0xFF00) | ((val) & 0xFF))
-#define SET_LPF_GPB(val) (LPF_register = (LPF_register & 0x00FF) | (((val) & 0xFF) << 8))
-
-#define SET_LPF_BAND(val) (LPF_register = (LPF_register & 0xFFF0) | ((val) & 0x0F))
-#define SET_ANTENNA(val) (LPF_register = (LPF_register & 0b1111111111001111) | (((val) & 0b00000011) << 4))
 
 void TXSelectBPF(void){
     SET_BIT(LPF_register, LPFTXBPFBIT);
@@ -45,7 +122,7 @@ void RXBypassBPF(void){
 }
 
 errno_t InitBPFPathControl(void){
-    return 0;
+    return InitLPFBoardMCP();
 }
 
 void SelectXVTR(void){
@@ -62,7 +139,7 @@ void BypassXVTR(void){
 }
 
 errno_t InitXVTRControl(void){
-    return 0;
+    return InitLPFBoardMCP();
 }   
 
 void Select100WPA(void){
@@ -74,7 +151,7 @@ void Bypass100WPA(void){
 }
 
 errno_t Init100WPAControl(void){
-    return 0;
+    return InitLPFBoardMCP();
 }
 
 void SelectLPFBand(int32_t band){
@@ -121,7 +198,7 @@ void SelectLPFBand(int32_t band){
 }
 
 errno_t InitLPFControl(void){
-    return 0;
+    return InitLPFBoardMCP();
 }
 
 void SelectAntenna(uint8_t antennaNum){
@@ -135,7 +212,7 @@ void SelectAntenna(uint8_t antennaNum){
 }
 
 errno_t InitAntennaControl(void){
-    return 0;
+    return InitLPFBoardMCP();
 }
 
 float32_t ReadSWR(void){
@@ -151,6 +228,19 @@ float32_t ReadReflectedPower(void){
 }
 
 errno_t InitSWRControl(void){
-    return 0;
+
+    /*if (!swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
+        bit_results.V12_LPF_AD7991_present = false;
+        Debug("AD7991 not found at 0x"+String(AD7991_I2C_ADDR1,HEX));
+
+        if (!swrADC.begin(AD7991_I2C_ADDR2,&Wire2)){
+            bit_results.V12_LPF_AD7991_present = true;
+            bit_results.AD7991_I2C_ADDR = AD7991_I2C_ADDR2;
+            Debug("AD7991 found at alternative 0x"+String(AD7991_I2C_ADDR2,HEX));
+            return ESUCCESS;
+        }
+        return ENOI2C;
+    }*/
+    return ESUCCESS;
 }
 

@@ -34,6 +34,8 @@ int64_t millis(void);
 void MyDelay(unsigned long millisWait);
 
 #define OUTPUT 1
+#define HEX 16
+#define BIN 2
 
 #include <cstdio>
 
@@ -74,7 +76,9 @@ public:
     String(const char* c_str);
     String(const String& other);
     String(int val);
+    String(int val, int base);
     String(long val);
+    String(long val, int base);
     String(float val);
     ~String();
 
@@ -90,5 +94,8 @@ public:
 private:
     char* _data;
 };
+
+// Free function to allow const char* + String
+String operator+(const char* left, const String& right);
 
 #endif

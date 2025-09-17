@@ -1,9 +1,12 @@
 #include "Arduino.h"
+#include "Wire.h"
 #include <iostream>
 #include <string>
 
 SerialClass Serial;
 SerialClass SerialUSB1;
+TwoWire Wire;
+TwoWire Wire2;
 
 #define NUMPINS 41
 static bool pin_mode[NUMPINS];
@@ -190,9 +193,65 @@ String::String(int val) {
     strcpy(_data, buf);
 }
 
+String::String(int val, int base) {
+    char buf[34]; // Large enough for binary representation
+    if (base == 16) {
+        sprintf(buf, "%X", val);
+    } else if (base == 2) {
+        // Convert to binary
+        if (val == 0) {
+            strcpy(buf, "0");
+        } else {
+            int index = 0;
+            char temp[34];
+            while (val > 0) {
+                temp[index++] = (val % 2) + '0';
+                val /= 2;
+            }
+            // Reverse the string
+            for (int i = 0; i < index; i++) {
+                buf[i] = temp[index - 1 - i];
+            }
+            buf[index] = '\0';
+        }
+    } else {
+        sprintf(buf, "%d", val); // Default to decimal
+    }
+    _data = new char[strlen(buf) + 1];
+    strcpy(_data, buf);
+}
+
 String::String(long val) {
     char buf[22];
     sprintf(buf, "%ld", val);
+    _data = new char[strlen(buf) + 1];
+    strcpy(_data, buf);
+}
+
+String::String(long val, int base) {
+    char buf[66]; // Large enough for binary representation of long
+    if (base == 16) {
+        sprintf(buf, "%lX", val);
+    } else if (base == 2) {
+        // Convert to binary
+        if (val == 0) {
+            strcpy(buf, "0");
+        } else {
+            int index = 0;
+            char temp[66];
+            while (val > 0) {
+                temp[index++] = (val % 2) + '0';
+                val /= 2;
+            }
+            // Reverse the string
+            for (int i = 0; i < index; i++) {
+                buf[i] = temp[index - 1 - i];
+            }
+            buf[index] = '\0';
+        }
+    } else {
+        sprintf(buf, "%ld", val); // Default to decimal
+    }
     _data = new char[strlen(buf) + 1];
     strcpy(_data, buf);
 }
@@ -250,6 +309,16 @@ String String::operator+(const char* other) const{
     char* new_data = new char[length() + strlen(other) + 1];
     strcpy(new_data, _data);
     strcat(new_data, other);
+    String result(new_data);
+    delete[] new_data;
+    return result;
+}
+
+// Free function to allow const char* + String
+String operator+(const char* left, const String& right) {
+    char* new_data = new char[strlen(left) + right.length() + 1];
+    strcpy(new_data, left);
+    strcat(new_data, right.c_str());
     String result(new_data);
     delete[] new_data;
     return result;
