@@ -3,31 +3,6 @@
 #include "../src/PhoenixSketch/SDT.h"
 #include "../src/PhoenixSketch/LPFBoard.h"
 
-// Constants from LPFBoard.cpp for testing
-#define LPFBAND0BIT 0
-#define LPFBAND1BIT 1
-#define LPFBAND2BIT 2
-#define LPFBAND3BIT 3
-#define LPFANT0BIT  4
-#define LPFANT1BIT  5
-#define LPFXVTRBIT  6
-#define LPF100WBIT  7
-#define LPFTXBPFBIT 8
-#define LPFRXBPFBIT 9
-
-#define LPF_BAND_NF   0b1111
-#define LPF_BAND_6M   0b1010
-#define LPF_BAND_10M  0b1001
-#define LPF_BAND_12M  0b1000
-#define LPF_BAND_15M  0b0111
-#define LPF_BAND_17M  0b0110
-#define LPF_BAND_20M  0b0101
-#define LPF_BAND_30M  0b0100
-#define LPF_BAND_40M  0b0011
-#define LPF_BAND_60M  0b0000
-#define LPF_BAND_80M  0b0010
-#define LPF_BAND_160M 0b0001
-
 // Helper functions to access the internal register state (defined in LPFBoard.cpp)
 uint16_t GetLPFRegister() {
     return GetLPFRegisterState();
@@ -129,19 +104,19 @@ TEST_F(LPFBoardTest, TXSelectBPF) {
     TXSelectBPF();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 1);
-    EXPECT_EQ(result & (1 << LPFTXBPFBIT), 1 << LPFTXBPFBIT);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 1);
+    EXPECT_EQ(result & (1 << TXBPFBIT), 1 << TXBPFBIT);
 }
 
 TEST_F(LPFBoardTest, TXBypassBPF) {
     // Start with TX BPF bit set
-    SetLPFRegister(1 << LPFTXBPFBIT);
+    SetLPFRegister(1 << TXBPFBIT);
 
     TXBypassBPF();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 0);
-    EXPECT_EQ(result & (1 << LPFTXBPFBIT), 0);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 0);
+    EXPECT_EQ(result & (1 << TXBPFBIT), 0);
 }
 
 TEST_F(LPFBoardTest, RXSelectBPF) {
@@ -151,19 +126,19 @@ TEST_F(LPFBoardTest, RXSelectBPF) {
     RXSelectBPF();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 1);
-    EXPECT_EQ(result & (1 << LPFRXBPFBIT), 1 << LPFRXBPFBIT);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 1);
+    EXPECT_EQ(result & (1 << RXBPFBIT), 1 << RXBPFBIT);
 }
 
 TEST_F(LPFBoardTest, RXBypassBPF) {
     // Start with RX BPF bit set
-    SetLPFRegister(1 << LPFRXBPFBIT);
+    SetLPFRegister(1 << RXBPFBIT);
 
     RXBypassBPF();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 0);
-    EXPECT_EQ(result & (1 << LPFRXBPFBIT), 0);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 0);
+    EXPECT_EQ(result & (1 << RXBPFBIT), 0);
 }
 
 TEST_F(LPFBoardTest, BPFControlIndependence) {
@@ -174,13 +149,13 @@ TEST_F(LPFBoardTest, BPFControlIndependence) {
     RXSelectBPF();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 1);
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 1);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 1);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 1);
 
     TXBypassBPF();
     result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 0);
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 1); // RX should remain set
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 0);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 1); // RX should remain set
 }
 
 // ================== XVTR CONTROL FUNCTION TESTS ==================
@@ -192,8 +167,8 @@ TEST_F(LPFBoardTest, SelectXVTR) {
     SelectXVTR();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFXVTRBIT), 0);
-    EXPECT_EQ(result & (1 << LPFXVTRBIT), 0);
+    EXPECT_EQ(GET_BIT(result, XVTRBIT), 0);
+    EXPECT_EQ(result & (1 << XVTRBIT), 0);
 }
 
 TEST_F(LPFBoardTest, BypassXVTR) {
@@ -203,8 +178,8 @@ TEST_F(LPFBoardTest, BypassXVTR) {
     BypassXVTR();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPFXVTRBIT), 1);
-    EXPECT_EQ(result & (1 << LPFXVTRBIT), 1 << LPFXVTRBIT);
+    EXPECT_EQ(GET_BIT(result, XVTRBIT), 1);
+    EXPECT_EQ(result & (1 << XVTRBIT), 1 << XVTRBIT);
 }
 
 TEST_F(LPFBoardTest, XVTRControlToggle) {
@@ -212,10 +187,10 @@ TEST_F(LPFBoardTest, XVTRControlToggle) {
     SetLPFRegister(0x0000);
 
     BypassXVTR();
-    EXPECT_EQ(GET_BIT(GetLPFRegister(), LPFXVTRBIT), 1);
+    EXPECT_EQ(GET_BIT(GetLPFRegister(), XVTRBIT), 1);
 
     SelectXVTR();
-    EXPECT_EQ(GET_BIT(GetLPFRegister(), LPFXVTRBIT), 0);
+    EXPECT_EQ(GET_BIT(GetLPFRegister(), XVTRBIT), 0);
 }
 
 // ================== 100W PA CONTROL FUNCTION TESTS ==================
@@ -226,18 +201,18 @@ TEST_F(LPFBoardTest, Select100WPA) {
     Select100WPA();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPF100WBIT), 1);
-    EXPECT_EQ(result & (1 << LPF100WBIT), 1 << LPF100WBIT);
+    EXPECT_EQ(GET_BIT(result, PA100WBIT), 1);
+    EXPECT_EQ(result & (1 << PA100WBIT), 1 << PA100WBIT);
 }
 
 TEST_F(LPFBoardTest, Bypass100WPA) {
-    SetLPFRegister(1 << LPF100WBIT); // Start with 100W PA bit set
+    SetLPFRegister(1 << PA100WBIT); // Start with 100W PA bit set
 
     Bypass100WPA();
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(GET_BIT(result, LPF100WBIT), 0);
-    EXPECT_EQ(result & (1 << LPF100WBIT), 0);
+    EXPECT_EQ(GET_BIT(result, PA100WBIT), 0);
+    EXPECT_EQ(result & (1 << PA100WBIT), 0);
 }
 
 // ================== LPF BAND SELECTION TESTS ==================
@@ -314,13 +289,13 @@ TEST_F(LPFBoardTest, SelectLPFBandInvalidDefaultsToNF) {
 
 TEST_F(LPFBoardTest, LPFBandSelectionPreservesOtherBits) {
     // Set non-band bits and verify they are preserved
-    SetLPFRegister(0xFFF0); // All bits set except band bits
+    SetLPFRegister(0x03F0); // All bits set except band bits
 
     SelectLPFBand(BAND_20M);
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result & 0xFFF0, 0xFFF0); // Upper bits preserved
-    EXPECT_EQ(result & 0x0F, LPF_BAND_20M); // Band bits set correctly
+    EXPECT_EQ(result & 0x03F0, 0x03F0); // Upper bits preserved
+    EXPECT_EQ(result & 0x000F, LPF_BAND_20M); // Band bits set correctly
 }
 
 // ================== ANTENNA SELECTION TESTS ==================
@@ -364,12 +339,12 @@ TEST_F(LPFBoardTest, SelectAntennaInvalidIgnored) {
 
 TEST_F(LPFBoardTest, AntennaSelectionPreservesOtherBits) {
     // Set all other bits except antenna bits
-    SetLPFRegister(0xFFCF); // All bits set except antenna bits (4-5)
+    SetLPFRegister(0x03CF); // All bits set except antenna bits (4-5)
 
     SelectAntenna(1);
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result & 0xFFCF, 0xFFCF); // Non-antenna bits preserved
+    EXPECT_EQ(result & 0x03CF, 0x03CF); // Non-antenna bits preserved
     EXPECT_EQ((result >> 4) & 0x03, 1); // Antenna bits set correctly
 }
 
@@ -383,36 +358,36 @@ TEST_F(LPFBoardTest, LPFGPAStateAccess) {
 }
 
 TEST_F(LPFBoardTest, LPFGPBStateAccess) {
-    SetLPFRegister(0x12AB); // Upper: 0x12, Lower: 0xAB
+    SetLPFRegister(0x02AB); // Upper: 0x02, Lower: 0xAB
 
     uint8_t gpbState = (GetLPFRegister() >> 8) & 0xFF; // LPF_GPB_STATE equivalent
-    EXPECT_EQ(gpbState, 0x12);
-}
-
-TEST_F(LPFBoardTest, SetLPFGPAMacro) {
-    SetLPFRegister(0x1234);
-
-    // Simulate SET_LPF_GPA(0xAB)
-    uint16_t newValue = (GetLPFRegister() & 0xFF00) | (0xAB & 0xFF);
-    SetLPFRegister(newValue);
-
-    uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result, 0x12AB);
-    EXPECT_EQ(result & 0xFF, 0xAB); // Lower byte
-    EXPECT_EQ((result >> 8) & 0xFF, 0x12); // Upper byte unchanged
+    EXPECT_EQ(gpbState, 0x02);
 }
 
 TEST_F(LPFBoardTest, SetLPFGPBMacro) {
-    SetLPFRegister(0x1234);
+    SetLPFRegister(0x0234);
 
-    // Simulate SET_LPF_GPB(0xCD)
-    uint16_t newValue = (GetLPFRegister() & 0x00FF) | ((0xCD & 0xFF) << 8);
+    // Simulate SET_LPF_GPB(0xAB)
+    uint16_t newValue = (GetLPFRegister() & 0xFF00) | 0xAB;
     SetLPFRegister(newValue);
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result, 0xCD34);
+    EXPECT_EQ(result, 0x02AB);
+    EXPECT_EQ(result & 0xFF, 0xAB); // Lower byte
+    EXPECT_EQ((result >> 8) & 0xFF, 0x02); // Upper byte unchanged
+}
+
+TEST_F(LPFBoardTest, SetLPFGPAMacro) {
+    SetLPFRegister(0x0234);
+
+    // Simulate SET_LPF_GPA(0x00)
+    uint16_t newValue = (GetLPFRegister() & 0x00FF) | (0x00 << 8);
+    SetLPFRegister(newValue);
+
+    uint16_t result = GetLPFRegister();
+    EXPECT_EQ(result, 0x0034);
     EXPECT_EQ(result & 0xFF, 0x34); // Lower byte unchanged
-    EXPECT_EQ((result >> 8) & 0xFF, 0xCD); // Upper byte
+    EXPECT_EQ((result >> 8) & 0xFF, 0x00); // Upper byte
 }
 
 TEST_F(LPFBoardTest, ComplexRegisterManipulation) {
@@ -430,10 +405,10 @@ TEST_F(LPFBoardTest, ComplexRegisterManipulation) {
     uint16_t result = GetLPFRegister();
 
     // Verify all bits are set correctly
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 1);
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 1);
-    EXPECT_EQ(GET_BIT(result, LPF100WBIT), 1);
-    EXPECT_EQ(GET_BIT(result, LPFXVTRBIT), 1);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 1);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 1);
+    EXPECT_EQ(GET_BIT(result, PA100WBIT), 1);
+    EXPECT_EQ(GET_BIT(result, XVTRBIT), 1);
     EXPECT_EQ(result & 0x0F, LPF_BAND_20M);
     EXPECT_EQ((result >> 4) & 0x03, 2);
 }
@@ -561,7 +536,7 @@ TEST_F(LPFBoardTest, StartupStateConstant) {
 // Test register state access functions for testing
 TEST_F(LPFBoardTest, RegisterStateAccessFunctions) {
     // Test that we can set and get register state
-    uint16_t testValue = 0x1234;
+    uint16_t testValue = 0x0234;
 
     SetLPFRegisterState(testValue);
     uint16_t retrievedValue = GetLPFRegisterState();
@@ -569,7 +544,7 @@ TEST_F(LPFBoardTest, RegisterStateAccessFunctions) {
     EXPECT_EQ(retrievedValue, testValue);
 
     // Test with different value
-    testValue = 0xABCD;
+    testValue = 0x01CD;
     SetLPFRegisterState(testValue);
     retrievedValue = GetLPFRegisterState();
 
@@ -578,11 +553,11 @@ TEST_F(LPFBoardTest, RegisterStateAccessFunctions) {
 
 // Test register bit field macros
 TEST_F(LPFBoardTest, RegisterBitFieldMacros) {
-    SetLPFRegister(0x1234); // Upper: 0x12, Lower: 0x34
+    SetLPFRegister(0x0234); // Upper: 0x02, Lower: 0x34
 
     // Test LPF_GPA_STATE (upper 8 bits)
     uint8_t gpaState = (GetLPFRegister() >> 8) & 0xFF;
-    EXPECT_EQ(gpaState, 0x12);
+    EXPECT_EQ(gpaState, 0x02);
 
     // Test LPF_GPB_STATE (lower 8 bits)
     uint8_t gpbState = GetLPFRegister() & 0xFF;
@@ -591,87 +566,87 @@ TEST_F(LPFBoardTest, RegisterBitFieldMacros) {
 
 // Test SET_LPF_BAND macro behavior
 TEST_F(LPFBoardTest, SetLPFBandMacro) {
-    SetLPFRegister(0xFFF0); // All bits set except band bits
+    SetLPFRegister(0x03F0); // All bits set except band bits
 
     // Simulate SET_LPF_BAND(0x05)
-    uint16_t newValue = (GetLPFRegister() & 0xFFF0) | (0x05 & 0x0F);
+    uint16_t newValue = (GetLPFRegister() & 0xFFF0) | 0x0005;
     SetLPFRegister(newValue);
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, 0x05); // Band bits set to 0x05
-    EXPECT_EQ(result & 0xFFF0, 0xFFF0); // Other bits preserved
+    EXPECT_EQ(result & 0x000F, 0x05); // Band bits set to 0x05
+    EXPECT_EQ(result & 0xFFF0, 0x03F0); // Other bits preserved
 }
 
 // Test SET_ANTENNA macro behavior
 TEST_F(LPFBoardTest, SetAntennaMacro) {
-    SetLPFRegister(0xFFCF); // All bits set except antenna bits (4-5)
+    SetLPFRegister(0x03CF); // All bits set except antenna bits (4-5)
 
     // Simulate SET_ANTENNA(0x02)
-    uint16_t newValue = (GetLPFRegister() & 0b1111111111001111) | ((0x02 & 0b00000011) << 4);
+    uint16_t newValue = (GetLPFRegister() & 0b0000001111001111) | (0x02 << 4);
     SetLPFRegister(newValue);
 
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ((result >> 4) & 0x03, 0x02); // Antenna bits set to 0x02
-    EXPECT_EQ(result & 0xFFCF, 0xFFCF); // Other bits preserved
+    EXPECT_EQ((result >> 4) & 0x0003, 0x0002); // Antenna bits set to 0x02
+    EXPECT_EQ(result & 0xFFCF, 0x03CF); // Other bits preserved
 }
 
 // ================== UPDATEMCPREGISTERS FUNCTION TESTS ==================
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersNoChangeNoUpdate) {
     // Set up a scenario where the register state matches the old values
-    SetLPFRegister(0x1234);
-    SetMCPAOld(0x12); // Upper 8 bits of register (GPA)
+    SetLPFRegister(0x0234);
+    SetMCPAOld(0x02); // Upper 8 bits of register (GPA)
     SetMCPBOld(0x34); // Lower 8 bits of register (GPB)
 
     // Call UpdateMCPRegisters - should not call writeGPIO since values match
     UpdateMCPRegisters();
 
     // Old values should remain unchanged since no update was needed
-    EXPECT_EQ(GetMCPAOld(), 0x12);
+    EXPECT_EQ(GetMCPAOld(), 0x02);
     EXPECT_EQ(GetMCPBOld(), 0x34);
 }
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersGPAChanged) {
     // Set up a scenario where GPA register changed
-    SetLPFRegister(0x12AB);
-    SetMCPAOld(0x34); // Different from current GPA state (0x12)
+    SetLPFRegister(0x02AB);
+    SetMCPAOld(0x03); // Different from current GPA state (0x02)
     SetMCPBOld(0xAB); // Same as current GPB state
 
     // Call UpdateMCPRegisters - should update GPA but not GPB
     UpdateMCPRegisters();
 
     // Old GPA value should be updated to match current state
-    EXPECT_EQ(GetMCPAOld(), 0x12);
+    EXPECT_EQ(GetMCPAOld(), 0x02);
     // Old GPB value should remain unchanged
     EXPECT_EQ(GetMCPBOld(), 0xAB);
 }
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersGPBChanged) {
     // Set up a scenario where GPB register changed
-    SetLPFRegister(0xCD56);
-    SetMCPAOld(0xCD); // Same as current GPA state
+    SetLPFRegister(0x0256);
+    SetMCPAOld(0x02); // Same as current GPA state
     SetMCPBOld(0x78); // Different from current GPB state (0x56)
 
     // Call UpdateMCPRegisters - should update GPB but not GPA
     UpdateMCPRegisters();
 
     // Old GPA value should remain unchanged
-    EXPECT_EQ(GetMCPAOld(), 0xCD);
+    EXPECT_EQ(GetMCPAOld(), 0x02);
     // Old GPB value should be updated to match current state
     EXPECT_EQ(GetMCPBOld(), 0x56);
 }
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersBothChanged) {
     // Set up a scenario where both GPA and GPB registers changed
-    SetLPFRegister(0xABCD);
-    SetMCPAOld(0x12); // Different from current GPA state (0xAB)
+    SetLPFRegister(0x02CD);
+    SetMCPAOld(0x03); // Different from current GPA state (0x02)
     SetMCPBOld(0x34); // Different from current GPB state (0xCD)
 
     // Call UpdateMCPRegisters - should update both GPA and GPB
     UpdateMCPRegisters();
 
     // Both old values should be updated to match current state
-    EXPECT_EQ(GetMCPAOld(), 0xAB);
+    EXPECT_EQ(GetMCPAOld(), 0x02);
     EXPECT_EQ(GetMCPBOld(), 0xCD);
 }
 
@@ -689,19 +664,19 @@ TEST_F(LPFBoardTest, TXSelectBPFUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the TX BPF bit is set
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 1);
-    EXPECT_EQ(result & (1 << LPFTXBPFBIT), 1 << LPFTXBPFBIT);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 1);
+    EXPECT_EQ(result & (1 << TXBPFBIT), 1 << TXBPFBIT);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
-    // Since LPFTXBPFBIT is bit 8, it affects the GPA register (upper 8 bits)
+    // Since TXBPFBIT is bit 8, it affects the GPA register (upper 8 bits)
     uint8_t expectedGPA = (result >> 8) & 0xFF;
     EXPECT_EQ(GetMCPAOld(), expectedGPA);
 }
 
 TEST_F(LPFBoardTest, TXSelectBPFWithExistingRegisterState) {
     // Start with a register that has some bits already set
-    SetLPFRegister(0x1234);
-    SetMCPAOld(0x12); // Same as current GPA state initially
+    SetLPFRegister(0x0234);
+    SetMCPAOld(0x02); // Same as current GPA state initially
     SetMCPBOld(0x34); // Same as current GPB state initially
 
     // Call TXSelectBPF - should set the TX BPF bit and update hardware
@@ -710,10 +685,10 @@ TEST_F(LPFBoardTest, TXSelectBPFWithExistingRegisterState) {
     uint16_t result = GetLPFRegister();
 
     // Verify the TX BPF bit is set
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 1);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 1);
 
     // Verify other bits are preserved
-    uint16_t expectedResult = 0x1234 | (1 << LPFTXBPFBIT);
+    uint16_t expectedResult = 0x0234 | (1 << TXBPFBIT);
     EXPECT_EQ(result, expectedResult);
 
     // Verify that hardware state was updated appropriately
@@ -746,8 +721,8 @@ TEST_F(LPFBoardTest, MCPOldValueAccessors) {
 
 TEST_F(LPFBoardTest, TXBypassBPFUpdatesRegisterAndHardware) {
     // Start with TX BPF bit set and known old values
-    SetLPFRegister(1 << LPFTXBPFBIT);
-    SetMCPAOld((1 << LPFTXBPFBIT) >> 8); // GPA (upper 8 bits) - LPFTXBPFBIT is bit 8
+    SetLPFRegister(1 << TXBPFBIT);
+    SetMCPAOld((1 << TXBPFBIT) >> 8); // GPA (upper 8 bits) - TXBPFBIT is bit 8
     SetMCPBOld(0x00); // GPB (lower 8 bits)
 
     // Call TXBypassBPF - should clear the bit and update hardware
@@ -756,8 +731,8 @@ TEST_F(LPFBoardTest, TXBypassBPFUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the TX BPF bit is cleared
-    EXPECT_EQ(GET_BIT(result, LPFTXBPFBIT), 0);
-    EXPECT_EQ(result & (1 << LPFTXBPFBIT), 0);
+    EXPECT_EQ(GET_BIT(result, TXBPFBIT), 0);
+    EXPECT_EQ(result & (1 << TXBPFBIT), 0);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPA = (result >> 8) & 0xFF;
@@ -776,8 +751,8 @@ TEST_F(LPFBoardTest, RXSelectBPFUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the RX BPF bit is set
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 1);
-    EXPECT_EQ(result & (1 << LPFRXBPFBIT), 1 << LPFRXBPFBIT);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 1);
+    EXPECT_EQ(result & (1 << RXBPFBIT), 1 << RXBPFBIT);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPA = (result >> 8) & 0xFF;
@@ -786,8 +761,8 @@ TEST_F(LPFBoardTest, RXSelectBPFUpdatesRegisterAndHardware) {
 
 TEST_F(LPFBoardTest, RXBypassBPFUpdatesRegisterAndHardware) {
     // Start with RX BPF bit set and known old values
-    SetLPFRegister(1 << LPFRXBPFBIT);
-    SetMCPAOld((1 << LPFRXBPFBIT) >> 8); // GPA (upper 8 bits) - LPFRXBPFBIT is bit 9
+    SetLPFRegister(1 << RXBPFBIT);
+    SetMCPAOld((1 << RXBPFBIT) >> 8); // GPA (upper 8 bits) - RXBPFBIT is bit 9
     SetMCPBOld(0x00); // GPB (lower 8 bits)
 
     // Call RXBypassBPF - should clear the bit and update hardware
@@ -796,8 +771,8 @@ TEST_F(LPFBoardTest, RXBypassBPFUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the RX BPF bit is cleared
-    EXPECT_EQ(GET_BIT(result, LPFRXBPFBIT), 0);
-    EXPECT_EQ(result & (1 << LPFRXBPFBIT), 0);
+    EXPECT_EQ(GET_BIT(result, RXBPFBIT), 0);
+    EXPECT_EQ(result & (1 << RXBPFBIT), 0);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPA = (result >> 8) & 0xFF;
@@ -808,9 +783,9 @@ TEST_F(LPFBoardTest, RXBypassBPFUpdatesRegisterAndHardware) {
 
 TEST_F(LPFBoardTest, SelectXVTRUpdatesRegisterAndHardware) {
     // Start with XVTR bypassed (bit set) and known old values
-    SetLPFRegister(1 << LPFXVTRBIT);
+    SetLPFRegister(1 << XVTRBIT);
     SetMCPAOld(0x00); // GPA (upper 8 bits)
-    SetMCPBOld(1 << LPFXVTRBIT); // GPB (lower 8 bits)
+    SetMCPBOld(1 << XVTRBIT); // GPB (lower 8 bits)
 
     // Call SelectXVTR - should clear the bit (active low) and update hardware
     SelectXVTR();
@@ -818,8 +793,8 @@ TEST_F(LPFBoardTest, SelectXVTRUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the XVTR bit is cleared (active low)
-    EXPECT_EQ(GET_BIT(result, LPFXVTRBIT), 0);
-    EXPECT_EQ(result & (1 << LPFXVTRBIT), 0);
+    EXPECT_EQ(GET_BIT(result, XVTRBIT), 0);
+    EXPECT_EQ(result & (1 << XVTRBIT), 0);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
@@ -838,8 +813,8 @@ TEST_F(LPFBoardTest, BypassXVTRUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the XVTR bit is set (bypass mode)
-    EXPECT_EQ(GET_BIT(result, LPFXVTRBIT), 1);
-    EXPECT_EQ(result & (1 << LPFXVTRBIT), 1 << LPFXVTRBIT);
+    EXPECT_EQ(GET_BIT(result, XVTRBIT), 1);
+    EXPECT_EQ(result & (1 << XVTRBIT), 1 << XVTRBIT);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
@@ -860,8 +835,8 @@ TEST_F(LPFBoardTest, Select100WPAUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the 100W PA bit is set
-    EXPECT_EQ(GET_BIT(result, LPF100WBIT), 1);
-    EXPECT_EQ(result & (1 << LPF100WBIT), 1 << LPF100WBIT);
+    EXPECT_EQ(GET_BIT(result, PA100WBIT), 1);
+    EXPECT_EQ(result & (1 << PA100WBIT), 1 << PA100WBIT);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
@@ -870,9 +845,9 @@ TEST_F(LPFBoardTest, Select100WPAUpdatesRegisterAndHardware) {
 
 TEST_F(LPFBoardTest, Bypass100WPAUpdatesRegisterAndHardware) {
     // Start with 100W PA bit set and known old values
-    SetLPFRegister(1 << LPF100WBIT);
+    SetLPFRegister(1 << PA100WBIT);
     SetMCPAOld(0x00); // GPA (upper 8 bits)
-    SetMCPBOld(1 << LPF100WBIT); // GPB (lower 8 bits)
+    SetMCPBOld(1 << PA100WBIT); // GPB (lower 8 bits)
 
     // Call Bypass100WPA - should clear the bit and update hardware
     Bypass100WPA();
@@ -880,8 +855,8 @@ TEST_F(LPFBoardTest, Bypass100WPAUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the 100W PA bit is cleared
-    EXPECT_EQ(GET_BIT(result, LPF100WBIT), 0);
-    EXPECT_EQ(result & (1 << LPF100WBIT), 0);
+    EXPECT_EQ(GET_BIT(result, PA100WBIT), 0);
+    EXPECT_EQ(result & (1 << PA100WBIT), 0);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
@@ -892,8 +867,8 @@ TEST_F(LPFBoardTest, Bypass100WPAUpdatesRegisterAndHardware) {
 
 TEST_F(LPFBoardTest, SelectLPFBandUpdatesRegisterAndHardware) {
     // Start with all band bits set and known old values
-    SetLPFRegister(0xFFFF);
-    SetMCPAOld(0xFF);
+    SetLPFRegister(0x03FF);
+    SetMCPAOld(0x03);
     SetMCPBOld(0xFF);
 
     // Call SelectLPFBand with a specific band
@@ -902,11 +877,11 @@ TEST_F(LPFBoardTest, SelectLPFBandUpdatesRegisterAndHardware) {
     uint16_t result = GetLPFRegister();
 
     // Verify the band bits are set correctly
-    uint16_t bandBits = result & 0x0F;
+    uint16_t bandBits = result & 0x000F;
     EXPECT_EQ(bandBits, LPF_BAND_20M);
 
     // Verify other bits are preserved
-    EXPECT_EQ(result & 0xFFF0, 0xFFF0);
+    EXPECT_EQ(result & 0xFFF0, 0x03F0);
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;

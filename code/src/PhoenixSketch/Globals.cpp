@@ -88,6 +88,7 @@ float32_t SAM_carrier_freq_offset = 0;
 float32_t SAM_carrier_freq_offsetOld = 0;
 ModeSm modeSM;
 UISm uiSM;
+uint32_t hardwareRegister;
 
 void MyDelay(unsigned long millisWait) {
     unsigned long now = millis();

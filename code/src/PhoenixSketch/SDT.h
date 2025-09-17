@@ -536,6 +536,49 @@ extern bool morseCharacterUpdated;
 #define REV         27
 #define CAL         38  // RX board calibration control (H=CAL,L=normal)
 
+// The 32 bit register that records the state of the radio hardware
+extern uint32_t hardwareRegister;
+
+// The bit map for hardwareRegister
+#define BAND0BIT  0
+#define BAND1BIT  1
+#define BAND2BIT  2
+#define BAND3BIT  3
+#define ANT0BIT   4
+#define ANT1BIT   5
+#define XVTRBIT   6
+#define PA100WBIT 7
+#define TXBPFBIT  8
+#define RXBPFBIT  9
+#define RXTXBIT   10
+#define CWBIT     11
+#define MODEBIT   12
+#define CALBIT    13
+#define CWVFOBIT  14
+#define SSBVFOBIT 15
+#define TXATTLSB  16
+#define TXATTMSD  21
+#define RXATTLSB  24
+#define TXATTMSB  29
+
+#define LPF_BAND_NF   0b1111
+#define LPF_BAND_6M   0b1010
+#define LPF_BAND_10M  0b1001
+#define LPF_BAND_12M  0b1000
+#define LPF_BAND_15M  0b0111
+#define LPF_BAND_17M  0b0110
+#define LPF_BAND_20M  0b0101
+#define LPF_BAND_30M  0b0100
+#define LPF_BAND_40M  0b0011
+#define LPF_BAND_60M  0b0000
+#define LPF_BAND_80M  0b0010
+#define LPF_BAND_160M 0b0001
+
+#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
+#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)))
+#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)))
+#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)))
+
 void MyDelay(unsigned long millisWait);
 
 void SetBPFBand(int val);

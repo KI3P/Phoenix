@@ -2,12 +2,6 @@
 #define LPFBOARD_H
 #include "SDT.h"
 
-#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
-#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)))
-#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)))
-#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)))
-
-
 errno_t InitLPFBoard(void);
 void TXSelectBPF(void);
 void TXBypassBPF(void);
