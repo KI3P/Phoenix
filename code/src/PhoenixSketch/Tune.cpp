@@ -112,7 +112,7 @@ int64_t GetCWTXFreq_dHz(void){
  * Tune the receiver to the active VFO selection.
  */
 void ChangeTune(void){
-    SetLPFBand(ED.currentBand[ED.activeVFO]);
+    SelectLPFBand(ED.currentBand[ED.activeVFO]);
     SetBPFBand(ED.currentBand[ED.activeVFO]);
     UpdateTuneState();
     SetAntenna(ED.currentBand[ED.activeVFO]);

@@ -43,5 +43,7 @@
   "arduino.allowPDEFiletype": false,
   "arduino.enableUSBDetection": true,
   "arduino.disableTestingOpen": false,
-  "arduino.skipHeaderProvider": false
+  "arduino.skipHeaderProvider": false,
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": []
 }

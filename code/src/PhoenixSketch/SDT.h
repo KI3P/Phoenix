@@ -498,6 +498,7 @@ struct AGCConfig {
 #include "FrontPanel.h"
 #include "FrontPanel_Rotary.h"
 #include "RFBoard.h"
+#include "LPFBoard.h"
 #include "CAT.h"
 
 extern struct BIT bit_results;
@@ -537,7 +538,6 @@ extern bool morseCharacterUpdated;
 
 void MyDelay(unsigned long millisWait);
 
-void SetLPFBand(int val);
 void SetBPFBand(int val);
 void SetAntenna(int val);
 

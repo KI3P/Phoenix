@@ -51,7 +51,6 @@ void Splash()
     
 }
 
-void SetLPFBand(int val){}
 void SetBPFBand(int val){}
 void SetAntenna(int val){}
 

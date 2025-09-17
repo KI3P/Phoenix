@@ -219,64 +219,367 @@ TEST(Loop, CATMicGainChangeViaRepeatedLoop){
 TEST(Loop, CATTransmitCommandViaRepeatedLoop){
     // Test that TX commands work correctly via loop() execution
     // This verifies the complete chain: CAT serial -> command parser -> state machine
-    
+
     // Clear any existing data in the serial buffer and interrupts
     SerialUSB1.clearBuffer();
     ConsumeInterrupt();
     EXPECT_EQ(GetInterrupt(), iNONE);
-    
+
     // Test SSB mode transition
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-    
+
     // Feed a CAT command to trigger transmit
     SerialUSB1.feedData("TX0;");
-    
+
     // Execute loop() to process the CAT serial event
     // The loop() function calls CheckForCATSerialEvents() which processes the TX command
     // This should trigger the PTT_PRESSED event and change state to SSB_TRANSMIT
     loop();
-    
+
     // After one loop() execution, the transmit state should be set
     // Verify that no interrupt was set (TX commands don't generate interrupts)
     EXPECT_EQ(GetInterrupt(), iNONE);
-    
+
     // Verify that the state changed from SSB_RECEIVE to SSB_TRANSMIT
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
-    
+
     // Test CW mode transition
     ModeSm_start(&modeSM);
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
-    
+
     // Feed another TX command for CW mode
     SerialUSB1.feedData("TX1;");
-    
+
     // Execute loop() to process the second CAT command
     loop();
-    
+
     // Verify that the state changed from CW_RECEIVE to CW_TRANSMIT_MARK
     EXPECT_EQ(GetInterrupt(), iNONE);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
-    
+
     // Test that TX command has no effect when already transmitting
     // Set to SSB transmit state first
     ModeSm_start(&modeSM);
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     ModeSm_StateId initial_transmit_state = modeSM.state_id;
-    
+
     // Send TX command - should have no effect since already transmitting
     SerialUSB1.feedData("TX0;");
     loop();
-    
+
     EXPECT_EQ(GetInterrupt(), iNONE);
     EXPECT_EQ(modeSM.state_id, initial_transmit_state); // State should remain unchanged
-    
+
     // Execute loop() one more time to ensure system stability
     loop();
     EXPECT_EQ(GetInterrupt(), iNONE);
-    
+
     // Clean up - clear buffer for next test
     SerialUSB1.clearBuffer();
+}
+
+// ================== MODE CHANGE TRANSITION TESTS ==================
+
+TEST(Loop, ModeChangeSSBToCW){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Trigger mode change from SSB to CW
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+TEST(Loop, ModeChangeCWToSSB){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+    // Trigger mode change from CW to SSB
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+// ================== KEY RELEASE TRANSITION TESTS ==================
+
+TEST(Loop, StraightKeyReleasedFromTransmitMark){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    SetKeyType(KeyTypeId_Straight);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+
+    // Release straight key
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
+}
+
+TEST(Loop, KeyerDitMarkIgnoresKeyReleased){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    SetKeyType(KeyTypeId_Keyer);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
+
+    // Keyer states ignore KEY_RELEASED - they use timers instead
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+}
+
+TEST(Loop, KeyerDahMarkIgnoresKeyReleased){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    SetKeyType(KeyTypeId_Keyer);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DAH_MARK;
+
+    // Keyer states ignore KEY_RELEASED - they use timers instead
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DAH_MARK);
+}
+
+// ================== TIMER-BASED CW KEYER TRANSITION TESTS ==================
+
+TEST(Loop, DitMarkToKeyerSpaceOnTimer){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
+
+    // Set timer variables
+    modeSM.vars.ditDuration_ms = 100;
+    modeSM.vars.markCount_ms = 0;
+
+    // Simulate time passing by calling DO event repeatedly
+    for(int i = 0; i < 100; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+
+    // Should transition to keyer space when markCount_ms >= ditDuration_ms
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+}
+
+TEST(Loop, DahMarkToKeyerSpaceOnTimer){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DAH_MARK;
+
+    // Set timer variables - dah is 3x dit duration
+    modeSM.vars.ditDuration_ms = 100;
+    modeSM.vars.markCount_ms = 0;
+
+    // Simulate time passing by calling DO event repeatedly (3x dit duration)
+    for(int i = 0; i < 300; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+
+    // Should transition to keyer space when markCount_ms >= 3*ditDuration_ms
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+}
+
+TEST(Loop, KeyerSpaceToKeyerWaitOnTimer){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE;
+
+    // Set timer variables
+    modeSM.vars.ditDuration_ms = 100;
+    modeSM.vars.spaceCount_ms = 0;
+
+    // Simulate time passing by calling DO event repeatedly
+    for(int i = 0; i < 100; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+
+    // Should transition to keyer wait when spaceCount_ms >= ditDuration_ms
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
+}
+
+TEST(Loop, KeyerWaitToCWReceiveOnTimer){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT;
+
+    // Set timer variables
+    modeSM.vars.waitDuration_ms = 200;
+    modeSM.vars.spaceCount_ms = 0;
+
+    // Simulate time passing by calling DO event repeatedly
+    for(int i = 0; i < 200; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+
+    // Should transition to CW receive when spaceCount_ms >= waitDuration_ms
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+// ================== STRAIGHT KEY TIMER TRANSITION TESTS ==================
+
+TEST(Loop, StraightKeySpaceToCWReceiveOnTimer){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+
+    // Set timer variables
+    modeSM.vars.waitDuration_ms = 300;
+    modeSM.vars.spaceCount_ms = 0;
+
+    // Simulate time passing by calling DO event repeatedly
+    for(int i = 0; i < 300; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+
+    // Should transition to CW receive when spaceCount_ms >= waitDuration_ms
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+// ================== CALIBRATION STATE TRANSITION TESTS ==================
+
+TEST(Loop, CalibrationFrequencyTransition){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Trigger calibration frequency mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_FREQUENCY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_FREQUENCY);
+}
+
+TEST(Loop, CalibrationRXIQTransition){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Trigger calibration RX IQ mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_RX_IQ);
+}
+
+TEST(Loop, CalibrationTXIQTransition){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Trigger calibration TX IQ mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ);
+}
+
+TEST(Loop, CalibrationSSBPATransition){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Trigger calibration SSB PA mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_SSB_PA);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_SSB_PA);
+}
+
+TEST(Loop, CalibrationCWPATransition){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Trigger calibration CW PA mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_CW_PA);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_CW_PA);
+}
+
+TEST(Loop, CalibrationExitTransition){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_CALIBRATE_FREQUENCY;
+
+    // Exit calibration mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_EXIT);
+    // Should return to normal operation (SSB_RECEIVE by default)
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+// ================== COMPLEX MULTI-STEP CW SEQUENCE TESTS ==================
+
+TEST(Loop, CompleteCWDitSequence){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    SetKeyType(KeyTypeId_Keyer);
+    SetKey1Dit();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+    // Set timing parameters
+    modeSM.vars.ditDuration_ms = 50;
+    modeSM.vars.waitDuration_ms = 100;
+
+    // Start dit transmission
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+
+    // Simulate dit mark duration (50ms)
+    for(int i = 0; i < 50; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+
+    // Simulate space duration (50ms)
+    for(int i = 0; i < 50; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
+
+    // Simulate wait duration (100ms)
+    for(int i = 0; i < 100; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+TEST(Loop, CompleteCWDahSequence){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    SetKeyType(KeyTypeId_Keyer);
+    SetKey1Dah();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+    // Set timing parameters
+    modeSM.vars.ditDuration_ms = 50;
+    modeSM.vars.waitDuration_ms = 100;
+
+    // Start dah transmission
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DAH_MARK);
+
+    // Simulate dah mark duration (3 * 50ms = 150ms)
+    for(int i = 0; i < 150; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+
+    // Simulate space duration (50ms)
+    for(int i = 0; i < 50; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
+
+    // Simulate wait duration (100ms)
+    for(int i = 0; i < 100; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+TEST(Loop, CompleteStraightKeySequence){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    SetKeyType(KeyTypeId_Straight);
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+    // Set timing parameters
+    modeSM.vars.waitDuration_ms = 200;
+
+    // Start straight key transmission
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
+
+    // Release straight key
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
+
+    // Simulate wait duration (200ms)
+    for(int i = 0; i < 200; i++) {
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
 }
