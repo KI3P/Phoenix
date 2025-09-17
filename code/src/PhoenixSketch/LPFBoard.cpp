@@ -48,11 +48,11 @@ static uint8_t mcpA_old = 0x00;
 static uint8_t mcpB_old = 0x00;
 //static AD7991 swrADC;
 
-#define LPF_GPA_STATE (uint8_t)(LPF_register & 0xFF)          // Lower 8 bits
-#define LPF_GPB_STATE (uint8_t)((LPF_register >> 8) & 0xFF)   // Upper 8 bits
+#define LPF_GPA_STATE (uint8_t)((LPF_register >> 8) & 0xFF)   // Upper 8 bits
+#define LPF_GPB_STATE (uint8_t)(LPF_register & 0xFF)          // Lower 8 bits
 
-#define SET_LPF_GPA(val) (LPF_register = (LPF_register & 0xFF00) | ((val) & 0xFF))
-#define SET_LPF_GPB(val) (LPF_register = (LPF_register & 0x00FF) | (((val) & 0xFF) << 8))
+#define SET_LPF_GPA(val) (LPF_register = (LPF_register & 0x00FF) | (((val) & 0xFF) << 8))
+#define SET_LPF_GPB(val) (LPF_register = (LPF_register & 0xFF00) | ((val) & 0xFF))
 
 #define SET_LPF_BAND(val) (LPF_register = (LPF_register & 0xFFF0) | ((val) & 0x0F))
 #define SET_ANTENNA(val) (LPF_register = (LPF_register & 0b1111111111001111) | (((val) & 0b00000011) << 4))
@@ -97,28 +97,55 @@ void SetLPFRegisterState(uint16_t value) {
     LPF_register = value;
 }
 
+uint8_t GetMCPAOld(void) {
+    return mcpA_old;
+}
+
+uint8_t GetMCPBOld(void) {
+    return mcpB_old;
+}
+
+void SetMCPAOld(uint8_t value) {
+    mcpA_old = value;
+}
+
+void SetMCPBOld(uint8_t value) {
+    mcpB_old = value;
+}
+
+void UpdateMCPRegisters(void){
+    if (mcpA_old != LPF_GPA_STATE){
+        mcpLPF.writeGPIOA(LPF_GPA_STATE); 
+        mcpA_old = LPF_GPA_STATE;
+    }
+    if (mcpB_old != LPF_GPB_STATE){
+        mcpLPF.writeGPIOB(LPF_GPB_STATE); 
+        mcpB_old = LPF_GPB_STATE;
+    }
+}
+
 void TXSelectBPF(void){
     SET_BIT(LPF_register, LPFTXBPFBIT);
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 void TXBypassBPF(void){
     CLEAR_BIT(LPF_register, LPFTXBPFBIT);
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 void RXSelectBPF(void){
     SET_BIT(LPF_register, LPFRXBPFBIT);
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 void RXBypassBPF(void){
     CLEAR_BIT(LPF_register, LPFRXBPFBIT);
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 errno_t InitBPFPathControl(void){
@@ -129,13 +156,13 @@ void SelectXVTR(void){
     // XVTR is active low
     CLEAR_BIT(LPF_register, LPFXVTRBIT);
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 void BypassXVTR(void){
     SET_BIT(LPF_register, LPFXVTRBIT);
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 errno_t InitXVTRControl(void){
@@ -144,10 +171,12 @@ errno_t InitXVTRControl(void){
 
 void Select100WPA(void){
     SET_BIT(LPF_register, LPF100WBIT);
+    UpdateMCPRegisters();
 }
 
 void Bypass100WPA(void){
     CLEAR_BIT(LPF_register, LPF100WBIT);
+    UpdateMCPRegisters();
 }
 
 errno_t Init100WPAControl(void){
@@ -194,7 +223,7 @@ void SelectLPFBand(int32_t band){
             break;
     }
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 errno_t InitLPFControl(void){
@@ -208,7 +237,7 @@ void SelectAntenna(uint8_t antennaNum){
         Debug(String("V12 LPF Control: Invalid antenna selection! ") + String(antennaNum));
     }
     // And now actually change the hardware...
-
+    UpdateMCPRegisters();
 }
 
 errno_t InitAntennaControl(void){

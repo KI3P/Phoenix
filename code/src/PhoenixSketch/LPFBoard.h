@@ -32,5 +32,10 @@ errno_t InitSWRControl(void);
 // For unit testing - access to internal register state
 uint16_t GetLPFRegisterState(void);
 void SetLPFRegisterState(uint16_t value);
+void UpdateMCPRegisters(void);
+uint8_t GetMCPAOld(void);
+uint8_t GetMCPBOld(void);
+void SetMCPAOld(uint8_t value);
+void SetMCPBOld(uint8_t value);
 
 #endif // LPFBOARD_H
