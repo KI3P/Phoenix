@@ -56,6 +56,32 @@ static uint8_t mcpB_old = 0x00;
 #define SET_LPF_BAND(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFF0) | ((uint32_t)val & 0x0000000F))
 #define SET_ANTENNA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFCF) | (((uint32_t)val & 0x00000003) << 4))
 
+// For unit testing - functions to access the static register
+uint16_t GetLPFRegisterState(void) {
+    return (uint16_t)(hardwareRegister & 0x000003FF);
+}
+
+void SetLPFRegisterState(uint16_t value) {
+    hardwareRegister = (hardwareRegister & 0xFFFFFC00) | (value & 0x03FF);
+}
+
+uint8_t GetMCPAOld(void) {
+    return mcpA_old;
+}
+
+uint8_t GetMCPBOld(void) {
+    return mcpB_old;
+}
+
+void SetMCPAOld(uint8_t value) {
+    mcpA_old = value;
+}
+
+void SetMCPBOld(uint8_t value) {
+    mcpB_old = value;
+}
+// end of unit testing section
+
 errno_t InitLPFBoardMCP(void){
     if (LPFinitialized) return LPFerrno;
 
@@ -85,31 +111,6 @@ errno_t InitLPFBoardMCP(void){
     }
     LPFinitialized = true;
     return LPFerrno;
-}
-
-// For unit testing - functions to access the static register
-uint16_t GetLPFRegisterState(void) {
-    return (uint16_t)(hardwareRegister & 0x000003FF);
-}
-
-void SetLPFRegisterState(uint16_t value) {
-    hardwareRegister = (hardwareRegister & 0xFFFFFC00) | (value & 0x03FF);
-}
-
-uint8_t GetMCPAOld(void) {
-    return mcpA_old;
-}
-
-uint8_t GetMCPBOld(void) {
-    return mcpB_old;
-}
-
-void SetMCPAOld(uint8_t value) {
-    mcpA_old = value;
-}
-
-void SetMCPBOld(uint8_t value) {
-    mcpB_old = value;
 }
 
 void UpdateMCPRegisters(void){

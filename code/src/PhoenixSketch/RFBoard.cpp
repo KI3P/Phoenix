@@ -9,9 +9,6 @@ static Adafruit_MCP23X17 mcpAtten;
 #define MAX_ATTENUATION_VAL_DBx2 63
 #define MIN_ATTENUATION_VAL_DBx2 0
 
-//static bool failed;
-static uint8_t GPB_state;
-static uint8_t GPA_state;
 static bool boardInitialized = false;
 static errno_t error_state;
 static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
@@ -24,17 +21,22 @@ Si5351 si5351;
 #define SI5351_LOAD_CAPACITANCE SI5351_CRYSTAL_LOAD_8PF
 #define Si_5351_crystal 25000000L
 static int32_t multiple, oldMultiple;
-static bool cwState = false;
 #define XMIT_SSB 1
 #define XMIT_CW  0
-static bool modulationState = XMIT_SSB;
 #define CAL_OFF 0
 #define CAL_ON  1
-static bool calFeedbackState = CAL_OFF;
 #define RX  0
 #define TX  1
-static bool rxtxState = CAL_OFF;
 int64_t SSBVFOFreq_dHz;
+
+static uint8_t mcpA_old = 0x00;
+static uint8_t mcpB_old = 0x00;
+
+#define RF_GPA_RXATT_STATE (uint8_t)((hardwareRegister >> 24) & 0x0000003F) // 4th (highest) byte
+#define RF_GPB_TXATT_STATE (uint8_t)((hardwareRegister >> 16) & 0x0000003F) // 3rd byte
+
+#define SET_RF_GPA_RXATT(val) (hardwareRegister = (hardwareRegister & 0xC0FFFFFF) | (((uint32_t)val & 0x0000003F) << 24))
+#define SET_RF_GPB_TXATT(val) (hardwareRegister = (hardwareRegister & 0xFFC0FFFF) | (((uint32_t)val & 0x0000003F) << 16))
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions that are only visible from within this file
@@ -61,13 +63,15 @@ static bool InitI2C(void){
     
     if(bit_results.RF_I2C_present) {
         for (int i=0;i<16;i++){
-        mcpAtten.pinMode(i, OUTPUT);
+            mcpAtten.pinMode(i, OUTPUT);
         }
-        // Set all pins to zero. This means no attenuation and in HF mode
-        GPA_state = 0x00;
-        GPB_state = 0x00;
-        mcpAtten.writeGPIOA(GPA_state); 
-        mcpAtten.writeGPIOB(GPB_state); 
+        // Set all pins to zero. This means no attenuation
+        SET_RF_GPA_RXATT(0x00);
+        SET_RF_GPB_TXATT(0x00);
+        mcpAtten.writeGPIOA(RF_GPA_RXATT_STATE); 
+        mcpAtten.writeGPIOB(RF_GPB_TXATT_STATE);
+        mcpA_old = RF_GPA_RXATT_STATE;
+        mcpB_old = RF_GPB_TXATT_STATE;
     }
     return true;
 }
@@ -75,10 +79,13 @@ static bool InitI2C(void){
 /**
  * PRIVATE: Write the value of the GPIOA register to the MCP23017 chip.
  * 
- * Returns boolean true if the write was successful. Returns boolean false if it was not. 
+ * Returns boolean true if the write was performed. Returns boolean false if it was not
+ * because the new register value matches the old value. 
  */
 static bool WriteGPIOARegister(void){
-    mcpAtten.writeGPIOA(GPA_state);
+    if (RF_GPA_RXATT_STATE == mcpA_old) return false;
+    mcpAtten.writeGPIOA(RF_GPA_RXATT_STATE);
+    mcpA_old = RF_GPA_RXATT_STATE;
     return true;
 }
 
@@ -88,7 +95,9 @@ static bool WriteGPIOARegister(void){
  * Returns boolean true if the write was successful. Returns boolean false if it was not. 
  */
 static bool WriteGPIOBRegister(void){
-    mcpAtten.writeGPIOB(GPB_state);
+    if (RF_GPB_TXATT_STATE == mcpB_old) return false;
+    mcpAtten.writeGPIOB(RF_GPB_TXATT_STATE);
+    mcpB_old = RF_GPB_TXATT_STATE;
     return true;
 }
 
@@ -109,14 +118,19 @@ static int32_t check_range(int32_t val){
  * would be 60.
  *
  * @param Attenuation_dBx2 The attenuation in units of 2x dB. [0 to 63]
- * @param GPIO_register A pointer to the register for this attenuator
+ * @param GPIO_register A flag identifying the register for this attenuator
  * @param RegisterWriteFunc The function that writes the register to the attenuator
  * 
  * @return Error code. ESUCCESS if no failure. EGPIOWRITEFAIL if unable to write to GPIO bank.
  *  
  */
-static errno_t SetAttenuator(int32_t Attenuation_dBx2, uint8_t *GPIO_register, bool (*RegisterWriteFunc)(void)){
-    *GPIO_register = (uint8_t)check_range(Attenuation_dBx2);
+static errno_t SetAttenuator(int32_t Attenuation_dBx2, uint8_t GPIO_register, bool (*RegisterWriteFunc)(void)){
+    if (GPIO_register == TX) {
+        SET_RF_GPB_TXATT( (uint8_t)check_range(Attenuation_dBx2) );
+    }
+    if (GPIO_register == RX) {
+        SET_RF_GPA_RXATT( (uint8_t)check_range(Attenuation_dBx2) );
+    }
     if (RegisterWriteFunc()){
         error_state = ESUCCESS;
     } else {
@@ -206,7 +220,7 @@ errno_t InitAttenuation(void){
  * 
  */
 float32_t GetRXAttenuation(){
-    return ((float32_t)GPA_state)/2.0;
+    return ((float32_t)RF_GPA_RXATT_STATE)/2.0;
 }
 
 /**
@@ -216,7 +230,7 @@ float32_t GetRXAttenuation(){
  * 
  */
 float32_t GetTXAttenuation(){
-    return ((float32_t)GPB_state)/2.0;
+    return ((float32_t)RF_GPB_TXATT_STATE)/2.0;
 }
 
 /**
@@ -233,10 +247,10 @@ errno_t SetRXAttenuation(float32_t rxAttenuation_dB){
     // Only do this if the attenuation value has changed from the current value. This avoids
     // unecessary I2C writes that slow things down and generates noise
     uint8_t newRegisterValue = (uint8_t)check_range((int32_t)round(2*rxAttenuation_dB));
-    if (newRegisterValue == GPA_state){
+    if (newRegisterValue == RF_GPA_RXATT_STATE){
         return ESUCCESS;
     } else {
-        return SetAttenuator((int32_t)round(2*rxAttenuation_dB), &GPA_state, WriteGPIOARegister);
+        return SetAttenuator((int32_t)round(2*rxAttenuation_dB), RX, WriteGPIOARegister);
     }
 }
 
@@ -254,10 +268,10 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
     // Only do this if the attenuation value has changed from the current value. This avoids
     // unecessary I2C writes that slow things down and generates noise
     uint8_t newRegisterValue = (uint8_t)check_range((int32_t)round(2*txAttenuation_dB));
-    if (newRegisterValue == GPB_state){
+    if (newRegisterValue == RF_GPB_TXATT_STATE){
         return ESUCCESS;
     } else {
-        return SetAttenuator((int32_t)round(2*txAttenuation_dB), &GPB_state, WriteGPIOBRegister);
+        return SetAttenuator((int32_t)round(2*txAttenuation_dB), TX, WriteGPIOBRegister);
     }
 }
 
@@ -401,6 +415,7 @@ void SetSSBVFOFrequency(int64_t frequency_dHz){
             si5351.pll_reset(SI5351_PLLA);                         // reset PLLA to align outputs 
             si5351.output_enable(SI5351_CLK0, 1);                  // set outputs on or off
             si5351.output_enable(SI5351_CLK1, 1);
+            SET_BIT(hardwareRegister,SSBVFOBIT);
             //si5351.output_enable(SI5351_CLK2, 0);
         }
         else {        // this is the timed delay technique for frequencies below 3.2MHz as detailed in 
@@ -420,6 +435,7 @@ void SetSSBVFOFrequency(int64_t frequency_dHz){
             sei();
             si5351.output_enable(SI5351_CLK0, 1);                      // switch them on to be sure
             si5351.output_enable(SI5351_CLK1, 1);                      //    ""        ""
+            SET_BIT(hardwareRegister,SSBVFOBIT);
             //si5351.output_enable(SI5351_CLK2, 0);
             
         }
@@ -433,6 +449,7 @@ void SetSSBVFOFrequency(int64_t frequency_dHz){
 void EnableSSBVFOOutput(void){
     si5351.output_enable(SI5351_CLK0, 1);
     si5351.output_enable(SI5351_CLK1, 1);
+    SET_BIT(hardwareRegister,SSBVFOBIT);
 }
 
 /**
@@ -441,6 +458,7 @@ void EnableSSBVFOOutput(void){
 void DisableSSBVFOOutput(void){
     si5351.output_enable(SI5351_CLK0, 0);
     si5351.output_enable(SI5351_CLK1, 0);
+    CLEAR_BIT(hardwareRegister,SSBVFOBIT);
 }
 
 // CW VFO Control Functions
@@ -453,6 +471,7 @@ void SetCWVFOFrequency(int64_t frequency_dHz){
  */
 void EnableCWVFOOutput(void){
     si5351.output_enable(SI5351_CLK2, 1);
+    SET_BIT(hardwareRegister,CWVFOBIT);
 }
 
 /**
@@ -460,6 +479,7 @@ void EnableCWVFOOutput(void){
  */
 void DisableCWVFOOutput(void){
     si5351.output_enable(SI5351_CLK2, 0);
+    CLEAR_BIT(hardwareRegister,CWVFOBIT);
 }
 
 /**
@@ -481,8 +501,8 @@ errno_t InitCWVFO(void){
     SetCWVFOPower( SI5351_DRIVE_CURRENT );
     si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
     pinMode(CW_ON_OFF, OUTPUT);
+    CLEAR_BIT(hardwareRegister,CWBIT);
     digitalWrite(CW_ON_OFF, 0);
-    cwState = false;
     return ESUCCESS;
 }
 
@@ -490,20 +510,20 @@ errno_t InitCWVFO(void){
  * Turn on CW output
  */
 void CWon(void){
-    if (!cwState) digitalWrite(CW_ON_OFF, 1);
-    cwState = true;
+    if (!GET_BIT(hardwareRegister,CWBIT)) digitalWrite(CW_ON_OFF, 1);
+    SET_BIT(hardwareRegister,CWBIT);
 }
 
 /**
  * Turn off CW output
  */
 void CWoff(void){
-    if (cwState) digitalWrite(CW_ON_OFF, 0);
-    cwState = false;
+    if (GET_BIT(hardwareRegister,CWBIT)) digitalWrite(CW_ON_OFF, 0);
+    CLEAR_BIT(hardwareRegister,CWBIT);
 }
 
 bool getCWState(void){
-    return cwState;
+    return GET_BIT(hardwareRegister,CWBIT);
 }
 
 /**
@@ -537,7 +557,7 @@ errno_t InitVFOs(void){
 errno_t InitTXModulation(void){
     pinMode(XMIT_MODE, OUTPUT);
     digitalWrite(XMIT_MODE, XMIT_SSB);
-    modulationState = XMIT_SSB;
+    SET_BIT(hardwareRegister,MODEBIT); // XMIT_SSB
     return ESUCCESS;
 }
 
@@ -546,8 +566,8 @@ errno_t InitTXModulation(void){
  * the modulation type is changing.
  */
 void SelectTXSSBModulation(void){
-    if (modulationState == XMIT_CW) digitalWrite(XMIT_MODE, XMIT_SSB);
-    modulationState = XMIT_SSB;
+    if (GET_BIT(hardwareRegister,MODEBIT) == XMIT_CW) digitalWrite(XMIT_MODE, XMIT_SSB);
+    SET_BIT(hardwareRegister,MODEBIT); // XMIT_SSB
 }
 
 /**
@@ -555,12 +575,12 @@ void SelectTXSSBModulation(void){
  * the modulation type is changing.
  */
 void SelectTXCWModulation(void){
-    if (modulationState == XMIT_SSB) digitalWrite(XMIT_MODE, XMIT_CW);
-    modulationState = XMIT_CW;
+    if (GET_BIT(hardwareRegister,MODEBIT) == XMIT_SSB) digitalWrite(XMIT_MODE, XMIT_CW);
+    CLEAR_BIT(hardwareRegister,MODEBIT); // XMIT_CW
 }
 
 bool getModulationState(void){
-    return modulationState;
+    return GET_BIT(hardwareRegister,MODEBIT);
 }
 
 // Calibration Control
@@ -571,7 +591,7 @@ bool getModulationState(void){
 errno_t InitCalFeedbackControl(void){
     pinMode(CAL, OUTPUT);
     digitalWrite(CAL, CAL_OFF);
-    calFeedbackState = CAL_OFF;
+    CLEAR_BIT(hardwareRegister,CALBIT); // CAL_OFF
     return ESUCCESS;
 }
 
@@ -579,20 +599,20 @@ errno_t InitCalFeedbackControl(void){
  * Enable cal feedback. Only change the digital control line if state is changing.
  */
 void EnableCalFeedback(void){
-    if (calFeedbackState == CAL_OFF) digitalWrite(CAL, CAL_ON);
-    calFeedbackState = CAL_ON;
+    if (GET_BIT(hardwareRegister,CALBIT) == CAL_OFF) digitalWrite(CAL, CAL_ON);
+    SET_BIT(hardwareRegister,CALBIT); // CAL_ON
 }
 
 /**
  * Disable cal feedback. Only change the digital control line if state is changing.
  */
 void DisableCalFeedback(void){
-    if (calFeedbackState == CAL_ON) digitalWrite(CAL, CAL_OFF);
-    calFeedbackState = CAL_OFF;
+    if (GET_BIT(hardwareRegister,CALBIT) == CAL_ON) digitalWrite(CAL, CAL_OFF);
+    CLEAR_BIT(hardwareRegister,CALBIT); // CAL_OFF
 }
 
 bool getCalFeedbackState(void){
-    return calFeedbackState;
+    return GET_BIT(hardwareRegister,CALBIT);
 }
 
 // RXTX Control
@@ -603,7 +623,7 @@ bool getCalFeedbackState(void){
 errno_t InitRXTX(void){
     pinMode(RXTX, OUTPUT);
     digitalWrite(RXTX, RX);
-    rxtxState = RX;
+    CLEAR_BIT(hardwareRegister,RXTXBIT); //RX
     return ESUCCESS;
 }
 
@@ -611,20 +631,20 @@ errno_t InitRXTX(void){
  * Select TX mode. Only change the digital control line if state is changing.
  */
 void SelectTXMode(void){
-    if (rxtxState == RX) digitalWrite(RXTX, TX);
-    rxtxState = TX;
+    if (GET_BIT(hardwareRegister,RXTXBIT) == RX) digitalWrite(RXTX, TX);
+    SET_BIT(hardwareRegister,RXTXBIT); //TX
 }
 
 /**
  * Select RX mode. Only change the digital control line if state is changing.
  */
 void SelectRXMode(void){
-    if (rxtxState == TX) digitalWrite(RXTX, RX);
-    rxtxState = RX;
+    if (GET_BIT(hardwareRegister,RXTXBIT) == TX) digitalWrite(RXTX, RX);
+    CLEAR_BIT(hardwareRegister,RXTXBIT); //RX
 }
 
 bool getRXTXState(void){
-    return rxtxState;
+    return GET_BIT(hardwareRegister,RXTXBIT);
 }
 
 /**
@@ -667,7 +687,7 @@ void HandleRFBoardStateChange(RFBoardState newState){
     // required to enter the new state.
     switch (newState){
         case RFBoardReceive:{
-            // Set GPA_state to appropriate value
+            // Set GPA state to appropriate value
             SetRXAttenuation( ED.RAtten[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
@@ -753,7 +773,7 @@ void HandleRFBoardStateChange(RFBoardState newState){
             break;
         }
         case RFBoardCalIQ:{
-            // Set GPA_state to appropriate value
+            // Set GPA state to appropriate value
             // Set GPB state to appropriate value
             // Set frequencySSB_Hz to appropriate value
             // Set driveCurrentSSB_mA to appropriate value
