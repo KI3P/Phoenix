@@ -11,11 +11,17 @@ enum RFHardwareState {
     RFCalIQ
 };
 
+enum TuneState {
+    TuneReceive,
+    TuneSSBTX,
+    TuneCWTX
+};
+
 ModeSm_StateId GetRFHardwarePreviousState(void);
 void UpdateRFHardwareState(void);
 void HandleRFHardwareStateChange(RFHardwareState newState);
 errno_t InitializeRFHardware(void);
-//errno_t InitializeRFBoard(void);
+void UpdateTuneState(void);
 
 #endif //HARDWARESM_H
 

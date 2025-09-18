@@ -1,4 +1,3 @@
-//#include "ModeSm.h"
 #include "SDT.h"
 
 void ModeSSBReceiveEnter(void){

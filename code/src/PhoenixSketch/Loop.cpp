@@ -135,7 +135,7 @@ void HandleButtonPress(int32_t button){
                 ED.currentBand[ED.activeVFO] = FIRST_BAND;
             ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
             ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-            UpdateTuneState();
+            UpdateRFHardwareState();
             break;
         }
         case ZOOM:{
@@ -151,7 +151,7 @@ void HandleButtonPress(int32_t button){
                 ED.currentBand[ED.activeVFO] = LAST_BAND;
             ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
             ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-            UpdateTuneState();
+            UpdateRFHardwareState();
             break;
         }
         case SET_MODE:{
@@ -209,7 +209,7 @@ void ConsumeInterrupt(void){
         }
         case (iMODE):{
             // mode has changed, recalc filters, change frequencies, etc
-            UpdateTuneState();
+            UpdateRFHardwareState();
             break;
         }
         case (iKEY1_PRESSED):{
@@ -261,7 +261,7 @@ void ConsumeInterrupt(void){
             ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
             // Change the band if we tune out of the current band
             ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
-            UpdateTuneState();
+            UpdateRFHardwareState();
             Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
@@ -269,7 +269,7 @@ void ConsumeInterrupt(void){
             ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
             // Change the band if we tune out of the current band
             ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
-            UpdateTuneState();
+            UpdateRFHardwareState();
             Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
@@ -296,11 +296,11 @@ void ConsumeInterrupt(void){
             }else{
                 ED.activeVFO = 0;
             }
-            UpdateTuneState();
+            UpdateRFHardwareState();
             break;
         }
         case (iUPDATE_TUNE):{
-            UpdateTuneState();
+            UpdateRFHardwareState();
             break;
         }
         case (iPOWER_CHANGE):{

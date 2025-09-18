@@ -3,6 +3,7 @@
 static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
 static RFHardwareState rfHardwareState = RFReceive;
 static RFHardwareState oldrfHardwareState = RFReceive;
+static TuneState tuneState = TuneReceive;
 
 /**
  * Initialize the RF board by calling the initialization functions for each 
@@ -154,7 +155,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             RXBypassBPF(); // BPF out of RX path
             BypassXVTR();  // Bypass XVTR
             Bypass100WPA(); // always bypassed
-            
+
             break;
         }
         case RFCalIQ:{
@@ -177,6 +178,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
 }
 
 void UpdateRFHardwareState(void){
+    UpdateTuneState();
     if (modeSM.state_id == previousRadioState){
         // Already in this state, no need to change
         return;
@@ -224,4 +226,77 @@ void UpdateRFHardwareState(void){
     }
     HandleRFHardwareStateChange(rfHardwareState);
     previousRadioState = modeSM.state_id;
+}
+
+
+/** Update the center frequency as we switch between CW and SSB and between RX and TX.
+ * CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
+ * SSB Transmit:    TXfreq = centerFreq_Hz
+ * CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
+ */
+void HandleTuneState(TuneState tuneState){
+    SelectLPFBand(ED.currentBand[ED.activeVFO]);
+    SetBPFBand(ED.currentBand[ED.activeVFO]);
+    SetAntenna(ED.currentBand[ED.activeVFO]);
+    UpdateFIRFilterMask(&filters);
+    switch (tuneState){
+        case TuneReceive:{
+            // CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
+            int64_t newFreq = ED.centerFreq_Hz[ED.activeVFO]*100;
+            SetSSBVFOFrequency( newFreq );
+            break;
+        }
+        case TuneSSBTX:{
+            // SSB Transmit:    TXfreq = centerFreq_Hz
+            int64_t newFreq = GetTXRXFreq_dHz();
+            SetSSBVFOFrequency( newFreq );
+            break;
+        }
+        case TuneCWTX:{
+            // CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
+            int64_t newFreq = GetCWTXFreq_dHz();
+            SetCWVFOFrequency( newFreq );
+            break;
+        }
+    }
+}
+
+void UpdateTuneState(void){
+    switch (modeSM.state_id){
+        case (ModeSm_StateId_CW_RECEIVE):
+        case (ModeSm_StateId_SSB_RECEIVE):{
+            tuneState = TuneReceive;
+            break;
+        }
+        case (ModeSm_StateId_SSB_TRANSMIT):{
+            tuneState = TuneSSBTX;
+            break;
+        }
+        case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_SPACE):
+        case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
+        case (ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT):{
+            tuneState = TuneCWTX;
+            break;
+        }
+
+        //case (ModeSm_StateId_CALIBRATE_FREQUENCY):
+        //case (ModeSm_StateId_CALIBRATE_RX_IQ):
+        //case (ModeSm_StateId_CALIBRATE_TX_IQ):
+        //case (ModeSm_StateId_CALIBRATE_CW_PA):
+        //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
+        //    break;
+        //}
+
+        default:{
+            Debug("Unhandled modeSM.state_id state in UpdateTuneState!");
+            char strbuf[10];
+            sprintf(strbuf, "> %lu",(uint32_t)modeSM.state_id);
+            Debug(strbuf);
+            break;
+        }
+    }
+    HandleTuneState(tuneState);
 }
