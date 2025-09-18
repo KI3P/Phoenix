@@ -133,7 +133,9 @@ void HandleButtonPress(int32_t button){
             ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
             if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
                 ED.currentBand[ED.activeVFO] = FIRST_BAND;
-            ChangeBand();
+            ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+            ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+            UpdateTuneState();
             break;
         }
         case ZOOM:{
@@ -147,7 +149,9 @@ void HandleButtonPress(int32_t button){
             ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
             if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
                 ED.currentBand[ED.activeVFO] = LAST_BAND;
-            ChangeBand();
+            ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+            ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+            UpdateTuneState();
             break;
         }
         case SET_MODE:{
@@ -205,7 +209,7 @@ void ConsumeInterrupt(void){
         }
         case (iMODE):{
             // mode has changed, recalc filters, change frequencies, etc
-            ChangeTune();
+            UpdateTuneState();
             break;
         }
         case (iKEY1_PRESSED):{
@@ -285,11 +289,16 @@ void ConsumeInterrupt(void){
         case (iVFO_CHANGE):{
             // The VFO has been updated. We might have selected a different active VFO,
             // we might have changed frequency.
-            ChangeVFO();
+            if (ED.activeVFO == 0){
+                ED.activeVFO = 1;
+            }else{
+                ED.activeVFO = 0;
+            }
+            UpdateTuneState();
             break;
         }
         case (iUPDATE_TUNE):{
-            ChangeTune();
+            UpdateTuneState();
             break;
         }
         case (iPOWER_CHANGE):{

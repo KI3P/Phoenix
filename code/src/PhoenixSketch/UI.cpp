@@ -22,14 +22,14 @@ UIValueUpdateFloat uiRXGainUpdate = {
     .base = TYPE_FLOAT,
     .getValueFunction = GetRXAttenuation,
     .incrementValue = 0.5,
-    .setValueFunction = SetRXAttenuation
+    .setValueFunction = SetRXAttenuation // TODO: implement this via an interrupt instead
 };
 
 UIValueUpdateFloat uiTXGainUpdate = {
     .base = TYPE_FLOAT,
     .getValueFunction = GetTXAttenuation,
     .incrementValue = 0.5,
-    .setValueFunction = SetTXAttenuation
+    .setValueFunction = SetTXAttenuation // TODO: implement this via an interrupt instead
 };
 
 /**

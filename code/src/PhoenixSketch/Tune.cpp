@@ -70,18 +70,6 @@ void AdjustFineTune(int32_t filter_change){
 }
 
 /**
- * Switch the active VFO. This involves retuning the radio.
- */
-void ChangeVFO(void){
-    if (ED.activeVFO == 0){
-        ED.activeVFO = 1;
-    }else{
-        ED.activeVFO = 0;
-    }
-    ChangeTune();
-}
-
-/**
  * Return the effective transmit/receive frequency, which is a combination of the center
  * frequency, the fine tune frequency, and the sample rate.
  * 
@@ -108,17 +96,6 @@ int64_t GetCWTXFreq_dHz(void){
     }
 }
 
-/**
- * Tune the receiver to the active VFO selection.
- */
-void ChangeTune(void){
-    SelectLPFBand(ED.currentBand[ED.activeVFO]);
-    SetBPFBand(ED.currentBand[ED.activeVFO]);
-    UpdateTuneState();
-    SetAntenna(ED.currentBand[ED.activeVFO]);
-    UpdateFIRFilterMask(&filters);
-}
-
 int8_t GetBand(int64_t freq){
     for(uint8_t i = 0; i < NUMBER_OF_BANDS; i++){
         if(freq >= bands[i].fBandLow_Hz && freq <= bands[i].fBandHigh_Hz){
@@ -126,12 +103,6 @@ int8_t GetBand(int64_t freq){
         }
     }
     return -1; // Frequency not within one of the defined ham bands
-}
-
-void ChangeBand(void){
-    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
-    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-    ChangeTune();
 }
 
 static TuneState tuneState = TuneReceive;
@@ -145,6 +116,10 @@ and between SSB receive and SSB transmit mode? it changes from state to state.
 */
 
 void HandleTuneState(TuneState tuneState){
+    SelectLPFBand(ED.currentBand[ED.activeVFO]);
+    SetBPFBand(ED.currentBand[ED.activeVFO]);
+    SetAntenna(ED.currentBand[ED.activeVFO]);
+    UpdateFIRFilterMask(&filters);
     switch (tuneState){
         case TuneReceive:{
             // CW/SSB Receive:  RXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4
@@ -162,7 +137,6 @@ void HandleTuneState(TuneState tuneState){
             // CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
             int64_t newFreq = GetCWTXFreq_dHz();
             SetCWVFOFrequency( newFreq );
-
             break;
         }
     }
