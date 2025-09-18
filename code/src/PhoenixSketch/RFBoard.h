@@ -2,9 +2,6 @@
 #define RFBOARD_H
 #include "SDT.h"
 
-// This file lists the functions that are globally visible
-errno_t InitializeRFBoard(void);
-
 // Attenuator control functions
 errno_t TXAttenuatorCreate(float32_t txAttenuation_dB);
 errno_t RXAttenuatorCreate(float32_t rxAttenuation_dB);

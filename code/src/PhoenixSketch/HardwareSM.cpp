@@ -1,8 +1,8 @@
 #include "SDT.h"
 
 static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
-static RFBoardState rfBoardState = RFBoardReceive;
-static RFBoardState oldrfBoardState = RFBoardReceive;
+static RFHardwareState rfHardwareState = RFReceive;
+static RFHardwareState oldrfHardwareState = RFReceive;
 
 /**
  * Initialize the RF board by calling the initialization functions for each 
@@ -22,28 +22,32 @@ errno_t InitializeRFBoard(void){
     err += InitRXTX();
 
     // force the initialization to RF receive
-    oldrfBoardState = RFBoardSSBTransmit;
-    HandleRFBoardStateChange(RFBoardReceive); // updates oldrfBoardState
+    oldrfHardwareState = RFTransmit;
+    HandleRFHardwareStateChange(RFReceive); // updates oldrfHardwareState
     previousRadioState = ModeSm_StateId_SSB_RECEIVE;
     return err;
+}
+
+errno_t InitializeRFHardware(void){
+    return InitializeRFBoard();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
 // State machine code
 ////////////////////////////////////////////////////////////////////////////////////
 
-ModeSm_StateId GetRFBoardPreviousState(void){
+ModeSm_StateId GetRFHardwarePreviousState(void){
     return previousRadioState;
 }
 
-void HandleRFBoardStateChange(RFBoardState newState){
-    if (newState == oldrfBoardState){
+void HandleRFHardwareStateChange(RFHardwareState newState){
+    if (newState == oldrfHardwareState){
         return;
     }
-    // Following the state diagram in RF_board_api.drawio, implement the actions
+    // Following the state diagrams in T41_V12_board_api.drawio, implement the actions
     // required to enter the new state.
     switch (newState){
-        case RFBoardReceive:{
+        case RFReceive:{
             // Set GPA state to appropriate value
             SetRXAttenuation( ED.RAtten[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableCW to LO
@@ -61,9 +65,15 @@ void HandleRFBoardStateChange(RFBoardState newState){
             DisableCalFeedback();
             // Set rxtxState to LO (RX)
             SelectRXMode();
+
+            TXBypassBPF(); // BPF out of TX path
+            RXSelectBPF(); // BPF in to RX path
+            SelectXVTR();  // Shunt the TX path to nothing
+            Bypass100WPA(); // always bypassed
+
             break;
         }
-        case RFBoardSSBTransmit:{
+        case RFTransmit:{
             // Set GPB state to appropriate value
             SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableCW to LO
@@ -83,9 +93,15 @@ void HandleRFBoardStateChange(RFBoardState newState){
             DisableCalFeedback();
             // Set rxtxState to HI (TX)
             SelectTXMode();
+
+            TXSelectBPF(); // BPF in to TX path
+            RXBypassBPF(); // BPF out of RX path
+            BypassXVTR();  // Bypass XVTR
+            Bypass100WPA(); // always bypassed
+
             break;
         }
-        case RFBoardCWMark:{
+        case RFCWMark:{
             // Set GPB state to appropriate value
             SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableSSB to LO
@@ -105,9 +121,15 @@ void HandleRFBoardStateChange(RFBoardState newState){
             SelectTXCWModulation();
             // Set calFeedbackState to LO
             DisableCalFeedback();
+
+            TXSelectBPF(); // BPF in to TX path
+            RXBypassBPF(); // BPF out of RX path
+            BypassXVTR();  // Bypass XVTR
+            Bypass100WPA(); // always bypassed
+
             break;
         }
-        case RFBoardCWSpace:{
+        case RFCWSpace:{
             // Set GPB state to appropriate value
             SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableSSB to LO
@@ -127,9 +149,15 @@ void HandleRFBoardStateChange(RFBoardState newState){
             SelectTXCWModulation();
             // Set calFeedbackState to LO
             DisableCalFeedback();
+
+            TXSelectBPF(); // BPF in to TX path
+            RXBypassBPF(); // BPF out of RX path
+            BypassXVTR();  // Bypass XVTR
+            Bypass100WPA(); // always bypassed
+            
             break;
         }
-        case RFBoardCalIQ:{
+        case RFCalIQ:{
             // Set GPA state to appropriate value
             // Set GPB state to appropriate value
             // Set frequencySSB_Hz to appropriate value
@@ -145,10 +173,10 @@ void HandleRFBoardStateChange(RFBoardState newState){
             break;
         }
     }
-    oldrfBoardState = newState;
+    oldrfHardwareState = newState;
 }
 
-void UpdateRFBoardState(void){
+void UpdateRFHardwareState(void){
     if (modeSM.state_id == previousRadioState){
         // Already in this state, no need to change
         return;
@@ -158,23 +186,23 @@ void UpdateRFBoardState(void){
     switch (modeSM.state_id){
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
-            rfBoardState = RFBoardReceive;
+            rfHardwareState = RFReceive;
             break;
         }
         case (ModeSm_StateId_SSB_TRANSMIT):{
-            rfBoardState = RFBoardSSBTransmit;
+            rfHardwareState = RFTransmit;
             break;
         }
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_MARK):{
-            rfBoardState = RFBoardCWMark;
+            rfHardwareState = RFCWMark;
             break;
         }
         case (ModeSm_StateId_CW_TRANSMIT_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT):{
-            rfBoardState = RFBoardCWSpace;
+            rfHardwareState = RFCWSpace;
             break;
         }
 
@@ -187,13 +215,13 @@ void UpdateRFBoardState(void){
         //}
 
         default:{
-            Debug("Unhandled modeSM.state_id state in UpdateRFBoardState!");
+            Debug("Unhandled modeSM.state_id state in UpdateRFHardwareState!");
             char strbuf[10];
             sprintf(strbuf, "> %lu",(uint32_t)modeSM.state_id);
             Debug(strbuf);
             break;
         }
     }
-    HandleRFBoardStateChange(rfBoardState);
+    HandleRFHardwareStateChange(rfHardwareState);
     previousRadioState = modeSM.state_id;
 }

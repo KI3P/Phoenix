@@ -2,18 +2,20 @@
 #define HARDWARESM_H
 #include "SDT.h"
 
-// RF Board state machine functions
-enum RFBoardState {
-    RFBoardCWMark,
-    RFBoardCWSpace,
-    RFBoardReceive,
-    RFBoardSSBTransmit,
-    RFBoardCalIQ
+// RF Board state machine states
+enum RFHardwareState {
+    RFCWMark,
+    RFCWSpace,
+    RFReceive,
+    RFTransmit,
+    RFCalIQ
 };
 
-ModeSm_StateId GetRFBoardPreviousState(void);
-void UpdateRFBoardState(void);
-void HandleRFBoardStateChange(RFBoardState newState);
+ModeSm_StateId GetRFHardwarePreviousState(void);
+void UpdateRFHardwareState(void);
+void HandleRFHardwareStateChange(RFHardwareState newState);
+errno_t InitializeRFHardware(void);
+//errno_t InitializeRFBoard(void);
 
 #endif //HARDWARESM_H
 
