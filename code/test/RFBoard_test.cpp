@@ -725,3 +725,196 @@ TEST(RFBoard, TuneStateMachine_DifferentSampleRates) {
     // GetTXRXFreq_dHz() = (14074000 + 100 - 48000/4) * 100 = (14074100 - 12000) * 100 = 1406210000
     EXPECT_EQ(GetSSBVFOFrequency(), 14062100);
 }
+
+// ================== BUFFER LOGGING TESTS ==================
+
+TEST(RFBoard, BufferLogsSSBVFOStateChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test EnableSSBVFOOutput - should call SET_BIT which includes buffer_add()
+    EnableSSBVFOOutput();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+    EXPECT_EQ(buffer.head, 1);
+
+    // Verify the register value was logged
+    EXPECT_EQ(buffer.entries[0].register_value, hardwareRegister);
+
+    // Test DisableSSBVFOOutput - should call CLEAR_BIT which includes buffer_add()
+    DisableSSBVFOOutput();
+
+    // Verify buffer has two entries
+    EXPECT_EQ(buffer.count, 2);
+    EXPECT_EQ(buffer.head, 2);
+
+    // Verify the register values are different
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
+
+    // Verify timestamps are increasing
+    EXPECT_LE(buffer.entries[0].timestamp, buffer.entries[1].timestamp);
+}
+
+TEST(RFBoard, BufferLogsCWVFOStateChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test EnableCWVFOOutput
+    EnableCWVFOOutput();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+
+    // Test DisableCWVFOOutput
+    DisableCWVFOOutput();
+
+    // Verify buffer has two entries with different register values
+    EXPECT_EQ(buffer.count, 2);
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
+}
+
+TEST(RFBoard, BufferLogsCWOnOffChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test CWon
+    CWon();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+
+    uint32_t register_after_on = buffer.entries[0].register_value;
+
+    // Test CWoff
+    CWoff();
+
+    // Verify buffer has two entries
+    EXPECT_EQ(buffer.count, 2);
+
+    // Verify the register values are different
+    EXPECT_NE(register_after_on, buffer.entries[1].register_value);
+
+    // Verify timestamps are increasing
+    EXPECT_LE(buffer.entries[0].timestamp, buffer.entries[1].timestamp);
+}
+
+TEST(RFBoard, BufferLogsModulationChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test SelectTXSSBModulation
+    SelectTXSSBModulation();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+
+    // Test SelectTXCWModulation
+    SelectTXCWModulation();
+
+    // Verify buffer has two entries with different register values
+    EXPECT_EQ(buffer.count, 2);
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
+}
+
+TEST(RFBoard, BufferLogsCalFeedbackChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test EnableCalFeedback
+    EnableCalFeedback();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+
+    // Test DisableCalFeedback
+    DisableCalFeedback();
+
+    // Verify buffer has two entries with different register values
+    EXPECT_EQ(buffer.count, 2);
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
+}
+
+TEST(RFBoard, BufferLogsRXTXModeChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test SelectTXMode
+    SelectTXMode();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+
+    // Test SelectRXMode
+    SelectRXMode();
+
+    // Verify buffer has two entries with different register values
+    EXPECT_EQ(buffer.count, 2);
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
+}
+
+TEST(RFBoard, BufferLogsAttenuatorChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Create RX attenuator (this should log register changes via SET_RF_GPA_RXATT macro)
+    RXAttenuatorCreate(10.0);
+
+    // Verify buffer has entries (creation may involve multiple register operations)
+    EXPECT_GT(buffer.count, 0);
+
+    size_t initial_count = buffer.count;
+
+    // Change RX attenuation value
+    SetRXAttenuation(20.0);
+
+    // Verify buffer count increased
+    EXPECT_GT(buffer.count, initial_count);
+
+    // Create TX attenuator (this should log register changes via SET_RF_GPB_TXATT macro)
+    size_t count_before_tx = buffer.count;
+    TXAttenuatorCreate(15.0);
+
+    // Verify buffer count increased
+    EXPECT_GT(buffer.count, count_before_tx);
+
+    // Change TX attenuation value
+    size_t count_before_set_tx = buffer.count;
+    SetTXAttenuation(25.0);
+
+    // Verify buffer count increased
+    EXPECT_GT(buffer.count, count_before_set_tx);
+}
+
+TEST(RFBoard, BufferLogsSequentialOperations) {
+    // Initialize timing and buffer
+    StartMillis();
+
+    // Record the initial buffer count
+    size_t initial_count = buffer.count;
+
+    // Perform a simple sequence of operations
+    EnableSSBVFOOutput();
+    DisableSSBVFOOutput();
+
+    // Verify we have at least 2 new entries
+    EXPECT_GE(buffer.count, initial_count + 2);
+
+    // Verify that buffer functionality is working by checking the count increased
+    // This is a simple test that doesn't rely on complex buffer indexing
+    EXPECT_GT(buffer.count, initial_count);
+}

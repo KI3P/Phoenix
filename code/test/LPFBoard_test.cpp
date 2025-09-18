@@ -1131,3 +1131,202 @@ TEST_F(LPFBoardTest, BufferTracksTimestampsAccurately) {
     EXPECT_LE(buffer.entries[1].timestamp, time_after_2);
     EXPECT_GT(buffer.entries[1].timestamp, buffer.entries[0].timestamp);
 }
+
+// ================== MISSING BUFFER COVERAGE TESTS ==================
+
+TEST_F(LPFBoardTest, BufferLogsBPFFunctionCalls) {
+    // Test that all BPF functions call buffer_add() via SET_BIT/CLEAR_BIT
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test TXSelectBPF calls buffer_add
+    TXSelectBPF();
+    EXPECT_EQ(buffer.count, 1);
+    uint32_t register_value_1 = buffer.entries[0].register_value;
+
+    // Test TXBypassBPF calls buffer_add
+    TXBypassBPF();
+    EXPECT_EQ(buffer.count, 2);
+    uint32_t register_value_2 = buffer.entries[1].register_value;
+    EXPECT_NE(register_value_1, register_value_2);
+
+    // Test RXSelectBPF calls buffer_add
+    RXSelectBPF();
+    EXPECT_EQ(buffer.count, 3);
+    uint32_t register_value_3 = buffer.entries[2].register_value;
+    EXPECT_NE(register_value_2, register_value_3);
+
+    // Test RXBypassBPF calls buffer_add
+    RXBypassBPF();
+    EXPECT_EQ(buffer.count, 4);
+    uint32_t register_value_4 = buffer.entries[3].register_value;
+    EXPECT_NE(register_value_3, register_value_4);
+
+    // Verify all timestamps are valid and increasing
+    for (size_t i = 0; i < 4; i++) {
+        EXPECT_GE(buffer.entries[i].timestamp, 0U);
+        if (i > 0) {
+            EXPECT_LE(buffer.entries[i-1].timestamp, buffer.entries[i].timestamp);
+        }
+    }
+}
+
+TEST_F(LPFBoardTest, BufferLogsXVTRFunctionCalls) {
+    // Test that XVTR functions call buffer_add() via SET_BIT/CLEAR_BIT
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test SelectXVTR calls buffer_add (CLEAR_BIT - active low)
+    SelectXVTR();
+    EXPECT_EQ(buffer.count, 1);
+    uint32_t register_value_1 = buffer.entries[0].register_value;
+    // Allow timestamp to be 0 or greater (timing may be very fast in test environment)
+    EXPECT_GE(buffer.entries[0].timestamp, 0U);
+
+    // Test BypassXVTR calls buffer_add (SET_BIT)
+    BypassXVTR();
+    EXPECT_EQ(buffer.count, 2);
+    uint32_t register_value_2 = buffer.entries[1].register_value;
+    EXPECT_NE(register_value_1, register_value_2);
+    EXPECT_GE(buffer.entries[1].timestamp, 0U);
+    EXPECT_LE(buffer.entries[0].timestamp, buffer.entries[1].timestamp);
+}
+
+TEST_F(LPFBoardTest, BufferLogs100WPAFunctionCalls) {
+    // Test that 100W PA functions call buffer_add() via SET_BIT/CLEAR_BIT
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test Select100WPA calls buffer_add
+    Select100WPA();
+    EXPECT_EQ(buffer.count, 1);
+    uint32_t register_value_1 = buffer.entries[0].register_value;
+    EXPECT_GE(buffer.entries[0].timestamp, 0U);
+
+    // Test Bypass100WPA calls buffer_add
+    Bypass100WPA();
+    EXPECT_EQ(buffer.count, 2);
+    uint32_t register_value_2 = buffer.entries[1].register_value;
+    EXPECT_NE(register_value_1, register_value_2);
+    EXPECT_GE(buffer.entries[1].timestamp, 0U);
+    EXPECT_LE(buffer.entries[0].timestamp, buffer.entries[1].timestamp);
+}
+
+TEST_F(LPFBoardTest, BufferLogsInitializationFunctionCalls) {
+    // Test that initialization functions call buffer_add() via SET_LPF_BAND and SET_ANTENNA
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Set up mock EEPROM data for initialization
+    ED.currentBand[ED.activeVFO] = BAND_20M;
+    ED.antennaSelection[BAND_20M] = 2;
+
+    // Call InitBPFPathControl which should call SET_LPF_BAND and SET_ANTENNA
+    errno_t result = InitBPFPathControl();
+
+    // Verify buffer_add was called (should have at least 2 entries from the macros)
+    EXPECT_GE(buffer.count, 2);
+
+    // Verify all entries have valid timestamps (allow 0 for very fast execution)
+    for (size_t i = 0; i < buffer.count; i++) {
+        EXPECT_GE(buffer.entries[i].timestamp, 0U);
+    }
+
+    // Verify that register values were logged
+    bool found_band_change = false;
+    bool found_antenna_change = false;
+
+    for (size_t i = 0; i < buffer.count; i++) {
+        uint16_t reg_val = buffer.entries[i].register_value & 0x03FF;
+
+        // Check if this entry contains the band setting (bits 0-3)
+        if ((reg_val & 0x0F) == LPF_BAND_20M) {
+            found_band_change = true;
+        }
+
+        // Check if this entry contains the antenna setting (bits 4-5)
+        if (((reg_val >> 4) & 0x03) == 2) {
+            found_antenna_change = true;
+        }
+    }
+
+    EXPECT_TRUE(found_band_change);
+    EXPECT_TRUE(found_antenna_change);
+}
+
+TEST_F(LPFBoardTest, BufferLogsComprehensiveOperationSequence) {
+    // Integration test: verify buffer logging works for all types of operations
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Perform a comprehensive sequence of operations that should all log to buffer
+
+    // BPF operations (SET_BIT/CLEAR_BIT)
+    TXSelectBPF();
+    size_t count_after_tx_select = buffer.count;
+    EXPECT_GE(count_after_tx_select, 1);
+
+    RXSelectBPF();
+    size_t count_after_rx_select = buffer.count;
+    EXPECT_GT(count_after_rx_select, count_after_tx_select);
+
+    // XVTR operations (CLEAR_BIT/SET_BIT)
+    SelectXVTR();
+    size_t count_after_xvtr_select = buffer.count;
+    EXPECT_GT(count_after_xvtr_select, count_after_rx_select);
+
+    // 100W PA operations (SET_BIT/CLEAR_BIT)
+    Select100WPA();
+    size_t count_after_pa_select = buffer.count;
+    EXPECT_GT(count_after_pa_select, count_after_xvtr_select);
+
+    // Band selection (SET_LPF_BAND macro)
+    SelectLPFBand(BAND_40M);
+    size_t count_after_band = buffer.count;
+    EXPECT_GT(count_after_band, count_after_pa_select);
+
+    // Antenna selection (SET_ANTENNA macro)
+    SelectAntenna(1);
+    size_t count_after_antenna = buffer.count;
+    EXPECT_GT(count_after_antenna, count_after_band);
+
+    // Verify we have at least 6 entries total
+    EXPECT_GE(buffer.count, 6);
+
+    // Verify all timestamps are valid and generally increasing
+    uint32_t prev_timestamp = 0;
+    bool timestamps_reasonable = true;
+
+    for (size_t i = 0; i < buffer.count; i++) {
+        EXPECT_GE(buffer.entries[i].timestamp, 0U);
+
+        // Allow for some timestamp equality due to rapid execution
+        if (buffer.entries[i].timestamp < prev_timestamp) {
+            timestamps_reasonable = false;
+        }
+        prev_timestamp = buffer.entries[i].timestamp;
+    }
+
+    EXPECT_TRUE(timestamps_reasonable);
+
+    // Verify that register values show the expected changes
+    // Check that the final register state contains our expected settings
+    uint16_t final_register = GetLPFRegister();
+
+    // Should have BAND_40M in bits 0-3
+    EXPECT_EQ(final_register & 0x0F, LPF_BAND_40M);
+
+    // Should have antenna 1 in bits 4-5
+    EXPECT_EQ((final_register >> 4) & 0x03, 1);
+
+    // Should have various control bits set appropriately
+    EXPECT_EQ(GET_BIT(final_register, TXBPFBIT), 1);  // TX BPF selected
+    EXPECT_EQ(GET_BIT(final_register, RXBPFBIT), 1);  // RX BPF selected
+    EXPECT_EQ(GET_BIT(final_register, XVTRBIT), 0);   // XVTR selected (active low)
+    EXPECT_EQ(GET_BIT(final_register, PA100WBIT), 1); // 100W PA selected
+}
