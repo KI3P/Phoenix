@@ -97,7 +97,7 @@ int64_t GetCWTXFreq_dHz(void){
 }
 
 int8_t GetBand(int64_t freq){
-    for(uint8_t i = 0; i < NUMBER_OF_BANDS; i++){
+    for(uint8_t i = FIRST_BAND; i <= LAST_BAND; i++){
         if(freq >= bands[i].fBandLow_Hz && freq <= bands[i].fBandHigh_Hz){
             return i;
         }

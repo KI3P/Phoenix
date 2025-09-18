@@ -259,14 +259,16 @@ void ConsumeInterrupt(void){
         }
         case (iCENTERTUNE_INCREASE):{
             ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
-            //SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            // Change the band if we tune out of the current band
+            ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
             UpdateTuneState();
             Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;
         }
         case (iCENTERTUNE_DECREASE):{
             ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
-            //SetFreq(ED.centerFreq_Hz[ED.activeVFO]);
+            // Change the band if we tune out of the current band
+            ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
             UpdateTuneState();
             Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
             break;

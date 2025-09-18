@@ -183,6 +183,27 @@ errno_t Init100WPAControl(void){
 }
 
 void SelectLPFBand(int32_t band){
+    if (band == -1){
+        // We are in the case where the selected frequency is outside a ham band
+        // We want to maintain FCC compliance on harmonic strength. So select the 
+        // LPF for the nearest band that is higher than our current frequency.
+        if (ED.centerFreq_Hz[ED.activeVFO] < bands[FIRST_BAND].fBandLow_Hz){
+            band = FIRST_BAND;
+        } else {
+            for(uint8_t i = FIRST_BAND; i <= LAST_BAND-1; i++){
+                if((ED.centerFreq_Hz[ED.activeVFO] > bands[i].fBandHigh_Hz) && 
+                   (ED.centerFreq_Hz[ED.activeVFO] < bands[i+1].fBandLow_Hz)){
+                    band = i;
+                    break;
+                }
+            }
+        }
+        if (band == -1){
+            // This is the case where the frequency is higher than the highest band
+            band = LAST_BAND + 10; // force it to pick no filter. You're on your own now
+        }
+    }
+
     switch (band){
         case BAND_160M:
             SET_LPF_BAND(LPF_BAND_160M);

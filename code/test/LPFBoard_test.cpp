@@ -1330,3 +1330,240 @@ TEST_F(LPFBoardTest, BufferLogsComprehensiveOperationSequence) {
     EXPECT_EQ(GET_BIT(final_register, XVTRBIT), 0);   // XVTR selected (active low)
     EXPECT_EQ(GET_BIT(final_register, PA100WBIT), 1); // 100W PA selected
 }
+
+// ================== OUT-OF-BAND FREQUENCY HANDLING TESTS ==================
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBelowFirstBand) {
+    // Set up a frequency below the first band (160M starts at 1.8 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 1000000; // 1 MHz - below 160M band
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select FIRST_BAND (160M) which maps to LPF_BAND_160M
+    EXPECT_EQ(bandBits, LPF_BAND_160M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween160MAnd80M) {
+    // Set up a frequency between 160M (1.8-2.0 MHz) and 80M (3.5-4.0 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 2500000; // 2.5 MHz - between bands
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 160M (the lower band between 160M and 80M)
+    EXPECT_EQ(bandBits, LPF_BAND_160M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween80MAnd60M) {
+    // Set up a frequency between 80M (3.5-4.0 MHz) and 60M (5.35 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 5000000; // 5 MHz - between bands
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 80M (the lower band between 80M and 60M)
+    EXPECT_EQ(bandBits, LPF_BAND_80M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween40MAnd30M) {
+    // Set up a frequency between 40M (7.0-7.3 MHz) and 30M (10.1-10.15 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 8500000; // 8.5 MHz - between bands
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 40M (the lower band between 40M and 30M)
+    EXPECT_EQ(bandBits, LPF_BAND_40M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween20MAnd17M) {
+    // Set up a frequency between 20M (14.0-14.35 MHz) and 17M (18.068-18.168 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 16000000; // 16 MHz - between bands
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 20M (the lower band between 20M and 17M)
+    EXPECT_EQ(bandBits, LPF_BAND_20M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween15MAnd12M) {
+    // Set up a frequency between 15M (21.0-21.45 MHz) and 12M (24.89-24.99 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 23000000; // 23 MHz - between bands
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 15M (the lower band between 15M and 12M)
+    EXPECT_EQ(bandBits, LPF_BAND_15M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween10MAnd6M) {
+    // Set up a frequency between 10M (28.0-29.7 MHz) and 6M (50.0-54.0 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 35000000; // 35 MHz - between bands
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 10M (the lower band between 10M and 6M)
+    EXPECT_EQ(bandBits, LPF_BAND_10M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyAboveHighestBand) {
+    // Set up a frequency above the highest band (6M ends at 54.0 MHz)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 70000000; // 70 MHz - above 6M band
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select no filter (LPF_BAND_NF) for frequencies above highest band
+    EXPECT_EQ(bandBits, LPF_BAND_NF);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyWayAboveHighestBand) {
+    // Set up a frequency way above the highest band
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 145000000; // 145 MHz - way above 6M band
+
+    // Call SelectLPFBand with -1 (out-of-band indicator)
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select no filter (LPF_BAND_NF) for frequencies way above highest band
+    EXPECT_EQ(bandBits, LPF_BAND_NF);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandBoundaryConditions) {
+    SetLPFRegister(0x0000);
+
+    // Test frequency just below 160M band (1.8 MHz)
+    ED.centerFreq_Hz[ED.activeVFO] = 1799999; // Just below 160M
+    SelectLPFBand(-1);
+    uint16_t result = GetLPFRegister();
+    EXPECT_EQ(result & 0x0F, LPF_BAND_160M); // Should select 160M
+
+    // Test frequency just above 160M band (2.0 MHz) but below 80M (3.5 MHz)
+    ED.centerFreq_Hz[ED.activeVFO] = 2000001; // Just above 160M
+    SelectLPFBand(-1);
+    result = GetLPFRegister();
+    EXPECT_EQ(result & 0x0F, LPF_BAND_160M); // Should select 160M (lower band)
+
+    // Test frequency just above 6M band (54.0 MHz)
+    ED.centerFreq_Hz[ED.activeVFO] = 54000001; // Just above 6M
+    SelectLPFBand(-1);
+    result = GetLPFRegister();
+    EXPECT_EQ(result & 0x0F, LPF_BAND_NF); // Should select no filter
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandEdgeCaseVeryLowFrequency) {
+    // Test with very low frequency (below broadcast band)
+    SetLPFRegister(0x0000);
+    ED.centerFreq_Hz[ED.activeVFO] = 100000; // 100 kHz - very low
+
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should still select FIRST_BAND (160M)
+    EXPECT_EQ(bandBits, LPF_BAND_160M);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandValidBandStillWorks) {
+    // Test that valid band selection still works normally
+    SetLPFRegister(0xFFFF);
+
+    // Test with valid band (not -1)
+    SelectLPFBand(BAND_20M);
+
+    uint16_t result = GetLPFRegister();
+    uint16_t bandBits = result & 0x0F;
+
+    // Should select 20M filter normally
+    EXPECT_EQ(bandBits, LPF_BAND_20M);
+
+    // Verify other bits are preserved (cleared lower 4 bits, kept upper bits)
+    EXPECT_EQ(result & 0xFFF0, 0x03F0);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandCallsUpdateMCPRegisters) {
+    // Test that out-of-band selection still calls UpdateMCPRegisters
+    SetLPFRegister(0x0000);
+    SetMCPAOld(0x00);
+    SetMCPBOld(0x00);
+
+    ED.centerFreq_Hz[ED.activeVFO] = 2500000; // Between bands
+
+    SelectLPFBand(-1);
+
+    uint16_t result = GetLPFRegister();
+
+    // Verify that UpdateMCPRegisters was called by checking old values were updated
+    uint8_t expectedGPB = result & 0xFF;
+    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+}
+
+TEST_F(LPFBoardTest, SelectLPFBandOutOfBandSequentialTest) {
+    // Test multiple out-of-band frequencies in sequence
+    SetLPFRegister(0x0000);
+
+    // Test frequencies going from low to high, between different bands
+    struct {
+        uint32_t freq;
+        uint8_t expectedBand;
+    } testCases[] = {
+        {1000000, LPF_BAND_160M},   // Below 160M -> 160M
+        {2500000, LPF_BAND_160M},   // Between 160M and 80M -> 160M
+        {5000000, LPF_BAND_80M},    // Between 80M and 60M -> 80M
+        {8500000, LPF_BAND_40M},    // Between 40M and 30M -> 40M
+        {16000000, LPF_BAND_20M},   // Between 20M and 17M -> 20M
+        {35000000, LPF_BAND_10M},   // Between 10M and 6M -> 10M
+        {70000000, LPF_BAND_NF},    // Above 6M -> No filter
+    };
+
+    for (size_t i = 0; i < sizeof(testCases)/sizeof(testCases[0]); i++) {
+        ED.centerFreq_Hz[ED.activeVFO] = testCases[i].freq;
+        SelectLPFBand(-1);
+
+        uint16_t result = GetLPFRegister();
+        uint16_t bandBits = result & 0x0F;
+
+        EXPECT_EQ(bandBits, testCases[i].expectedBand)
+            << "Failed for frequency " << testCases[i].freq << " Hz";
+    }
+}
