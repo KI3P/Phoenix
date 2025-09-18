@@ -83,6 +83,9 @@ add_executable(all_LPFBoard_tests LPFBoard_test.cpp ../src/PhoenixSketch/LPFBoar
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp FrontPanel_mock.cpp si5351_mock.cpp Arduino_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp)
 target_link_libraries(all_LPFBoard_tests GTest::gtest_main)
 
+add_executable(all_Micros_tests micros_test.cpp Arduino_mock.cpp)
+target_link_libraries(all_Micros_tests GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(all_RFboard_tests)
 gtest_discover_tests(all_ModeSm_tests)
@@ -93,3 +96,4 @@ gtest_discover_tests(all_TransmitChain_tests)
 gtest_discover_tests(all_FrontPanel_tests)
 gtest_discover_tests(all_CAT_tests)
 gtest_discover_tests(all_LPFBoard_tests)
+gtest_discover_tests(all_Micros_tests)

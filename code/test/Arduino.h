@@ -31,6 +31,7 @@ void cli(void);
 void sei(void);
 void delayMicroseconds(uint32_t usec);
 int64_t millis(void);
+uint32_t micros(void);
 void MyDelay(unsigned long millisWait);
 
 #define OUTPUT 1

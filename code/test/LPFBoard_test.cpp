@@ -978,3 +978,156 @@ TEST_F(LPFBoardTest, SelectAntennaWithDifferentValues) {
     EXPECT_EQ((result >> 4) & 0x03, 1);
     EXPECT_EQ(GetMCPBOld(), result & 0xFF);
 }
+
+// ================== BUFFER LOGGING TESTS ==================
+
+TEST_F(LPFBoardTest, BufferAddCallsLogRegisterChanges) {
+    // Initialize timing and buffer state
+    StartMillis();
+
+    // Clear buffer by setting count to 0
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Call buffer_add directly to test the functionality
+    SetLPFRegister(0x0100); // Set some test value
+
+    // Get timestamp before calling buffer_add to verify timing works
+    uint32_t time_before = micros();
+    buffer_add(); // Call manually
+    uint32_t time_after = micros();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+    EXPECT_EQ(buffer.head, 1);
+
+    // Verify the logged register value matches current state
+    EXPECT_EQ(buffer.entries[0].register_value, hardwareRegister);
+
+    // Verify timestamp is within reasonable range
+    EXPECT_GE(buffer.entries[0].timestamp, time_before);
+    EXPECT_LE(buffer.entries[0].timestamp, time_after);
+}
+
+TEST_F(LPFBoardTest, BufferAddTracksMultipleChanges) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Make several register changes
+    SetLPFRegister(0x0000);
+
+    TXSelectBPF();      // Change 1 - sets TX BPF bit (bit 8)
+    TXBypassBPF();      // Change 2 - clears TX BPF bit (bit 8)
+    RXSelectBPF();      // Change 3 - sets RX BPF bit (bit 9)
+
+    // Verify buffer has three entries
+    EXPECT_EQ(buffer.count, 3);
+    EXPECT_EQ(buffer.head, 3);
+
+    // Verify timestamps are increasing
+    EXPECT_LE(buffer.entries[0].timestamp, buffer.entries[1].timestamp);
+    EXPECT_LE(buffer.entries[1].timestamp, buffer.entries[2].timestamp);
+
+    // Verify register values are different and reasonable
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
+    EXPECT_NE(buffer.entries[1].register_value, buffer.entries[2].register_value);
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[2].register_value);
+}
+
+TEST_F(LPFBoardTest, BufferAddMacroCallsFromBandSelection) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Use SET_LPF_BAND macro (which includes buffer_add)
+    SetLPFRegister(0x0000);
+    SelectLPFBand(BAND_20M); // This uses SET_LPF_BAND macro
+
+    // Verify buffer_add was called
+    EXPECT_EQ(buffer.count, 1);
+
+    // Verify the register value contains the correct band setting
+    uint16_t register_value = buffer.entries[0].register_value & 0x03FF;
+    EXPECT_EQ(register_value & 0x0F, LPF_BAND_20M);
+}
+
+TEST_F(LPFBoardTest, BufferAddMacroCallsFromAntennaSelection) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Use SET_ANTENNA macro (which includes buffer_add)
+    SetLPFRegister(0x0000);
+    SelectAntenna(2); // This uses SET_ANTENNA macro
+
+    // Verify buffer_add was called
+    EXPECT_EQ(buffer.count, 1);
+
+    // Verify the register value contains the correct antenna setting
+    uint16_t register_value = buffer.entries[0].register_value & 0x03FF;
+    EXPECT_EQ((register_value >> 4) & 0x03, 2);
+}
+
+TEST_F(LPFBoardTest, BufferWrapsAroundWhenFull) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    SetLPFRegister(0x0000);
+
+    // Fill buffer completely
+    for (int i = 0; i < REGISTER_BUFFER_SIZE; i++) {
+        TXSelectBPF();   // Set bit
+        TXBypassBPF();   // Clear bit - this creates register changes
+    }
+
+    // Verify buffer is full
+    EXPECT_EQ(buffer.count, REGISTER_BUFFER_SIZE);
+    EXPECT_EQ(buffer.head, 0); // Should wrap around to 0
+
+    // Add one more entry - should overwrite the first
+    uint32_t timestamp_before_wrap = buffer.entries[0].timestamp;
+    TXSelectBPF(); // This should overwrite entry[0]
+
+    // Buffer should still be full, head should be at 1
+    EXPECT_EQ(buffer.count, REGISTER_BUFFER_SIZE);
+    EXPECT_EQ(buffer.head, 1);
+
+    // The timestamp at entry[0] should be newer (the entry was overwritten)
+    EXPECT_GT(buffer.entries[0].timestamp, timestamp_before_wrap);
+}
+
+TEST_F(LPFBoardTest, BufferTracksTimestampsAccurately) {
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    SetLPFRegister(0x0000);
+
+    // Record time before first change
+    uint32_t time_before = micros();
+    TXSelectBPF();
+    uint32_t time_after = micros();
+
+    // Verify timestamp is within reasonable range
+    EXPECT_GE(buffer.entries[0].timestamp, time_before);
+    EXPECT_LE(buffer.entries[0].timestamp, time_after);
+
+    // Wait a bit (simulate time passage)
+    AddMillisTime(10); // Add 10ms to millis (this doesn't affect micros)
+
+    uint32_t time_before_2 = micros();
+    RXSelectBPF();
+    uint32_t time_after_2 = micros();
+
+    // Second timestamp should be in correct range and later than first
+    EXPECT_GE(buffer.entries[1].timestamp, time_before_2);
+    EXPECT_LE(buffer.entries[1].timestamp, time_after_2);
+    EXPECT_GT(buffer.entries[1].timestamp, buffer.entries[0].timestamp);
+}

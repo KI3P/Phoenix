@@ -575,9 +575,25 @@ extern uint32_t hardwareRegister;
 #define LPF_BAND_160M 0b0001
 
 #define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
-#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)))
-#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)))
-#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)))
+#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)));buffer_add()
+#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)));buffer_add()
+#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)));buffer_add()
+
+// Every time the value of hardwareRegister is updated, store this in a rolling buffer
+#define REGISTER_BUFFER_SIZE 100
+
+typedef struct {
+    uint32_t timestamp;
+    uint32_t register_value;
+} BufferEntry;
+
+typedef struct {
+    BufferEntry entries[REGISTER_BUFFER_SIZE];
+    size_t head;        // Index where next entry will be written
+    size_t count;       // Number of valid entries (up to BUFFER_SIZE)
+} RollingBuffer;
+extern RollingBuffer buffer;
+void buffer_add(void);
 
 void MyDelay(unsigned long millisWait);
 

@@ -89,6 +89,16 @@ float32_t SAM_carrier_freq_offsetOld = 0;
 ModeSm modeSM;
 UISm uiSM;
 uint32_t hardwareRegister;
+RollingBuffer buffer = {0};
+
+void buffer_add(void) {
+  buffer.entries[buffer.head].timestamp = micros();
+  buffer.entries[buffer.head].register_value = hardwareRegister;  
+  buffer.head = (buffer.head + 1) % REGISTER_BUFFER_SIZE;  // Wrap around
+  if (buffer.count < REGISTER_BUFFER_SIZE) {
+    buffer.count++;
+  }
+}
 
 void MyDelay(unsigned long millisWait) {
     unsigned long now = millis();

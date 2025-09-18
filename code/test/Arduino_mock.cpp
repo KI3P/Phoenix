@@ -124,6 +124,7 @@ void SerialClass::println() {
 }
 
 int64_t tstart;
+int64_t tstartMicros;
 
 void cli(void){}
 void sei(void){}
@@ -133,6 +134,7 @@ void StartMillis(void){
     struct timeval tv;
     gettimeofday(&tv,NULL);
     tstart = (int64_t)(1000 * tv.tv_sec) + (int64_t)((float32_t)tv.tv_usec/1000);
+    tstartMicros = (int64_t)(1000000 * tv.tv_sec) + (int64_t)tv.tv_usec;
 }
 
 void AddMillisTime(uint64_t delta_ms){
@@ -143,6 +145,13 @@ int64_t millis(void){
     struct timeval tv;
     gettimeofday(&tv,NULL);
     return (int64_t)(1000 * tv.tv_sec) + (int64_t)((float32_t)tv.tv_usec/1000) - tstart;
+}
+
+uint32_t micros(void){
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    int64_t current_micros = (int64_t)(1000000 * tv.tv_sec) + (int64_t)tv.tv_usec;
+    return (uint32_t)(current_micros - tstartMicros);
 }
 
 void SetMillisTime(uint64_t time_ms){
