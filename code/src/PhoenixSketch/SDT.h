@@ -485,6 +485,7 @@ struct AGCConfig {
 
 #include "ModeSm.h"
 #include "UISm.h"
+#include "HardwareSM.h"
 
 // Others
 #include "Loop.h"

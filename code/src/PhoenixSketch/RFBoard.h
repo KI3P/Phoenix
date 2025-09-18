@@ -47,25 +47,10 @@ void SelectTXMode(void);
 void SelectRXMode(void);
 errno_t InitRXTX(void);
 
-//void SetFreq(int64_t centerFreq_Hz);
-//int64_t GetFreq(void);
-
+// Function calls needed for unit tests
 bool getRXTXState(void);
 bool getCWState(void);
 bool getCalFeedbackState(void);
 bool getModulationState(void);
-
-// RF Board state machine functions
-enum RFBoardState {
-    RFBoardCWMark,
-    RFBoardCWSpace,
-    RFBoardReceive,
-    RFBoardSSBTransmit,
-    RFBoardCalIQ
-};
-
-ModeSm_StateId GetRFBoardPreviousState(void);
-void UpdateRFBoardState(void);
-void HandleRFBoardStateChange(RFBoardState newState);
 
 #endif // RFBOARD_H
