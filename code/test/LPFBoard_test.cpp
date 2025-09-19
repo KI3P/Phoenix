@@ -224,7 +224,7 @@ TEST_F(LPFBoardTest, SelectLPFBand160M) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F; // Lower 4 bits
-    EXPECT_EQ(bandBits, LPF_BAND_160M);
+    EXPECT_EQ(bandBits, BAND_160M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBand80M) {
@@ -234,7 +234,7 @@ TEST_F(LPFBoardTest, SelectLPFBand80M) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
-    EXPECT_EQ(bandBits, LPF_BAND_80M);
+    EXPECT_EQ(bandBits, BAND_80M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBand40M) {
@@ -244,7 +244,7 @@ TEST_F(LPFBoardTest, SelectLPFBand40M) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
-    EXPECT_EQ(bandBits, LPF_BAND_40M);
+    EXPECT_EQ(bandBits, BAND_40M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBand20M) {
@@ -254,7 +254,7 @@ TEST_F(LPFBoardTest, SelectLPFBand20M) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
-    EXPECT_EQ(bandBits, LPF_BAND_20M);
+    EXPECT_EQ(bandBits, BAND_20M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBand10M) {
@@ -264,7 +264,7 @@ TEST_F(LPFBoardTest, SelectLPFBand10M) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
-    EXPECT_EQ(bandBits, LPF_BAND_10M);
+    EXPECT_EQ(bandBits, BAND_10M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBand6M) {
@@ -274,7 +274,7 @@ TEST_F(LPFBoardTest, SelectLPFBand6M) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
-    EXPECT_EQ(bandBits, LPF_BAND_6M);
+    EXPECT_EQ(bandBits, BAND_6M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandInvalidDefaultsToNF) {
@@ -284,7 +284,7 @@ TEST_F(LPFBoardTest, SelectLPFBandInvalidDefaultsToNF) {
 
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
-    EXPECT_EQ(bandBits, LPF_BAND_NF);
+    EXPECT_EQ(bandBits, BAND_NF_BCD);
 }
 
 TEST_F(LPFBoardTest, LPFBandSelectionPreservesOtherBits) {
@@ -295,7 +295,7 @@ TEST_F(LPFBoardTest, LPFBandSelectionPreservesOtherBits) {
 
     uint16_t result = GetLPFRegister();
     EXPECT_EQ(result & 0x03F0, 0x03F0); // Upper bits preserved
-    EXPECT_EQ(result & 0x000F, LPF_BAND_20M); // Band bits set correctly
+    EXPECT_EQ(result & 0x000F, BAND_20M_BCD); // Band bits set correctly
 }
 
 // ================== ANTENNA SELECTION TESTS ==================
@@ -409,7 +409,7 @@ TEST_F(LPFBoardTest, ComplexRegisterManipulation) {
     EXPECT_EQ(GET_BIT(result, RXBPFBIT), 1);
     EXPECT_EQ(GET_BIT(result, PA100WBIT), 1);
     EXPECT_EQ(GET_BIT(result, XVTRBIT), 1);
-    EXPECT_EQ(result & 0x0F, LPF_BAND_20M);
+    EXPECT_EQ(result & 0x0F, BAND_20M_BCD);
     EXPECT_EQ((result >> 4) & 0x03, 2);
 }
 
@@ -878,7 +878,7 @@ TEST_F(LPFBoardTest, SelectLPFBandUpdatesRegisterAndHardware) {
 
     // Verify the band bits are set correctly
     uint16_t bandBits = result & 0x000F;
-    EXPECT_EQ(bandBits, LPF_BAND_20M);
+    EXPECT_EQ(bandBits, BAND_20M_BCD);
 
     // Verify other bits are preserved
     EXPECT_EQ(result & 0xFFF0, 0x03F0);
@@ -897,19 +897,19 @@ TEST_F(LPFBoardTest, SelectLPFBandWithDifferentBands) {
     // Test 160M band
     SelectLPFBand(BAND_160M);
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, LPF_BAND_160M);
+    EXPECT_EQ(result & 0x0F, BAND_160M_BCD);
     EXPECT_EQ(GetMCPBOld(), result & 0xFF);
 
     // Test 80M band
     SelectLPFBand(BAND_80M);
     result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, LPF_BAND_80M);
+    EXPECT_EQ(result & 0x0F, BAND_80M_BCD);
     EXPECT_EQ(GetMCPBOld(), result & 0xFF);
 
     // Test invalid band (should default to NF)
     SelectLPFBand(99);
     result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, LPF_BAND_NF);
+    EXPECT_EQ(result & 0x0F, BAND_NF_BCD);
     EXPECT_EQ(GetMCPBOld(), result & 0xFF);
 }
 
@@ -1051,7 +1051,7 @@ TEST_F(LPFBoardTest, BufferAddMacroCallsFromBandSelection) {
 
     // Verify the register value contains the correct band setting
     uint16_t register_value = buffer.entries[0].register_value & 0x03FF;
-    EXPECT_EQ(register_value & 0x0F, LPF_BAND_20M);
+    EXPECT_EQ(register_value & 0x0F, BAND_20M_BCD);
 }
 
 TEST_F(LPFBoardTest, BufferAddMacroCallsFromAntennaSelection) {
@@ -1244,12 +1244,12 @@ TEST_F(LPFBoardTest, BufferLogsInitializationFunctionCalls) {
         uint16_t reg_val = buffer.entries[i].register_value & 0x03FF;
 
         // Check if this entry contains the band setting (bits 0-3)
-        if ((reg_val & 0x0F) == LPF_BAND_20M) {
+        if ((reg_val & 0x000F) == BAND_20M_BCD) {
             found_band_change = true;
         }
 
         // Check if this entry contains the antenna setting (bits 4-5)
-        if (((reg_val >> 4) & 0x03) == 2) {
+        if (((reg_val >> 4) & 0x0003) == 2) {
             found_antenna_change = true;
         }
     }
@@ -1319,7 +1319,7 @@ TEST_F(LPFBoardTest, BufferLogsComprehensiveOperationSequence) {
     uint16_t final_register = GetLPFRegister();
 
     // Should have BAND_40M in bits 0-3
-    EXPECT_EQ(final_register & 0x0F, LPF_BAND_40M);
+    EXPECT_EQ(final_register & 0x0F, BAND_40M_BCD);
 
     // Should have antenna 1 in bits 4-5
     EXPECT_EQ((final_register >> 4) & 0x03, 1);
@@ -1344,8 +1344,8 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBelowFirstBand) {
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
 
-    // Should select FIRST_BAND (160M) which maps to LPF_BAND_160M
-    EXPECT_EQ(bandBits, LPF_BAND_160M);
+    // Should select FIRST_BAND (160M) which maps to BAND_160M_BCD
+    EXPECT_EQ(bandBits, BAND_160M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween160MAnd80M) {
@@ -1360,7 +1360,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween160MAnd80M) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 160M (the lower band between 160M and 80M)
-    EXPECT_EQ(bandBits, LPF_BAND_160M);
+    EXPECT_EQ(bandBits, BAND_160M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween80MAnd60M) {
@@ -1375,7 +1375,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween80MAnd60M) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 80M (the lower band between 80M and 60M)
-    EXPECT_EQ(bandBits, LPF_BAND_80M);
+    EXPECT_EQ(bandBits, BAND_80M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween40MAnd30M) {
@@ -1390,7 +1390,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween40MAnd30M) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 40M (the lower band between 40M and 30M)
-    EXPECT_EQ(bandBits, LPF_BAND_40M);
+    EXPECT_EQ(bandBits, BAND_40M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween20MAnd17M) {
@@ -1405,7 +1405,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween20MAnd17M) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 20M (the lower band between 20M and 17M)
-    EXPECT_EQ(bandBits, LPF_BAND_20M);
+    EXPECT_EQ(bandBits, BAND_20M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween15MAnd12M) {
@@ -1420,7 +1420,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween15MAnd12M) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 15M (the lower band between 15M and 12M)
-    EXPECT_EQ(bandBits, LPF_BAND_15M);
+    EXPECT_EQ(bandBits, BAND_15M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween10MAnd6M) {
@@ -1435,7 +1435,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyBetween10MAnd6M) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 10M (the lower band between 10M and 6M)
-    EXPECT_EQ(bandBits, LPF_BAND_10M);
+    EXPECT_EQ(bandBits, BAND_10M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyAboveHighestBand) {
@@ -1449,8 +1449,8 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyAboveHighestBand) {
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
 
-    // Should select no filter (LPF_BAND_NF) for frequencies above highest band
-    EXPECT_EQ(bandBits, LPF_BAND_NF);
+    // Should select no filter (BAND_NF_BCD) for frequencies above highest band
+    EXPECT_EQ(bandBits, BAND_NF_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyWayAboveHighestBand) {
@@ -1464,8 +1464,8 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandFrequencyWayAboveHighestBand) {
     uint16_t result = GetLPFRegister();
     uint16_t bandBits = result & 0x0F;
 
-    // Should select no filter (LPF_BAND_NF) for frequencies way above highest band
-    EXPECT_EQ(bandBits, LPF_BAND_NF);
+    // Should select no filter (BAND_NF_BCD) for frequencies way above highest band
+    EXPECT_EQ(bandBits, BAND_NF_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandBoundaryConditions) {
@@ -1475,19 +1475,19 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandBoundaryConditions) {
     ED.centerFreq_Hz[ED.activeVFO] = 1799999; // Just below 160M
     SelectLPFBand(-1);
     uint16_t result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, LPF_BAND_160M); // Should select 160M
+    EXPECT_EQ(result & 0x0F, BAND_160M_BCD); // Should select 160M
 
     // Test frequency just above 160M band (2.0 MHz) but below 80M (3.5 MHz)
     ED.centerFreq_Hz[ED.activeVFO] = 2000001; // Just above 160M
     SelectLPFBand(-1);
     result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, LPF_BAND_160M); // Should select 160M (lower band)
+    EXPECT_EQ(result & 0x0F, BAND_160M_BCD); // Should select 160M (lower band)
 
     // Test frequency just above 6M band (54.0 MHz)
     ED.centerFreq_Hz[ED.activeVFO] = 54000001; // Just above 6M
     SelectLPFBand(-1);
     result = GetLPFRegister();
-    EXPECT_EQ(result & 0x0F, LPF_BAND_NF); // Should select no filter
+    EXPECT_EQ(result & 0x0F, BAND_NF_BCD); // Should select no filter
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandEdgeCaseVeryLowFrequency) {
@@ -1501,7 +1501,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandEdgeCaseVeryLowFrequency) {
     uint16_t bandBits = result & 0x0F;
 
     // Should still select FIRST_BAND (160M)
-    EXPECT_EQ(bandBits, LPF_BAND_160M);
+    EXPECT_EQ(bandBits, BAND_160M_BCD);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandValidBandStillWorks) {
@@ -1515,7 +1515,7 @@ TEST_F(LPFBoardTest, SelectLPFBandValidBandStillWorks) {
     uint16_t bandBits = result & 0x0F;
 
     // Should select 20M filter normally
-    EXPECT_EQ(bandBits, LPF_BAND_20M);
+    EXPECT_EQ(bandBits, BAND_20M_BCD);
 
     // Verify other bits are preserved (cleared lower 4 bits, kept upper bits)
     EXPECT_EQ(result & 0xFFF0, 0x03F0);
@@ -1547,13 +1547,13 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandSequentialTest) {
         uint32_t freq;
         uint8_t expectedBand;
     } testCases[] = {
-        {1000000, LPF_BAND_160M},   // Below 160M -> 160M
-        {2500000, LPF_BAND_160M},   // Between 160M and 80M -> 160M
-        {5000000, LPF_BAND_80M},    // Between 80M and 60M -> 80M
-        {8500000, LPF_BAND_40M},    // Between 40M and 30M -> 40M
-        {16000000, LPF_BAND_20M},   // Between 20M and 17M -> 20M
-        {35000000, LPF_BAND_10M},   // Between 10M and 6M -> 10M
-        {70000000, LPF_BAND_NF},    // Above 6M -> No filter
+        {1000000, BAND_160M_BCD},   // Below 160M -> 160M
+        {2500000, BAND_160M_BCD},   // Between 160M and 80M -> 160M
+        {5000000, BAND_80M_BCD},    // Between 80M and 60M -> 80M
+        {8500000, BAND_40M_BCD},    // Between 40M and 30M -> 40M
+        {16000000, BAND_20M_BCD},   // Between 20M and 17M -> 20M
+        {35000000, BAND_10M_BCD},   // Between 10M and 6M -> 10M
+        {70000000, BAND_NF_BCD},    // Above 6M -> No filter
     };
 
     for (size_t i = 0; i < sizeof(testCases)/sizeof(testCases[0]); i++) {

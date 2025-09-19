@@ -31,8 +31,9 @@ errno_t InitializeRFBoard(void){
 }
 
 errno_t InitializeRFHardware(void){
-    errno_t val = InitializeRFBoard();
-    val += InitializeLPFBoard();
+    errno_t val = InitializeLPFBoard();
+    val += InitializeBPFBoard();
+    val += InitializeRFBoard();
     return val;
 }
 

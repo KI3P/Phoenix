@@ -17,6 +17,7 @@ public:
     uint8_t digitalRead(uint8_t pin) { return 0; }
     void writeGPIOA(uint16_t value) {}
     void writeGPIOB(uint16_t value) {}
+    void writeGPIOAB(uint16_t value) {}
     uint16_t readGPIOA() { return 0; }
     uint16_t readGPIOB() { return 0; }
 };

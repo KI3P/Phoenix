@@ -21,6 +21,7 @@ float32_t ReadSWR(void);
 float32_t ReadForwardPower(void);
 float32_t ReadReflectedPower(void);
 errno_t InitSWRControl(void);
+uint8_t BandToBCD(int32_t band);
 
 // For unit testing - access to internal register state
 uint16_t GetLPFRegisterState(void);

@@ -501,6 +501,7 @@ struct AGCConfig {
 #include "FrontPanel_Rotary.h"
 #include "RFBoard.h"
 #include "LPFBoard.h"
+#include "BPFBoard.h"
 #include "CAT.h"
 
 extern struct BIT bit_results;
@@ -542,44 +543,49 @@ extern bool morseCharacterUpdated;
 extern uint32_t hardwareRegister;
 
 // The bit map for hardwareRegister
-#define BAND0BIT  0
-#define BAND1BIT  1
-#define BAND2BIT  2
-#define BAND3BIT  3
-#define ANT0BIT   4
-#define ANT1BIT   5
-#define XVTRBIT   6
-#define PA100WBIT 7
-#define TXBPFBIT  8
-#define RXBPFBIT  9
-#define RXTXBIT   10
-#define CWBIT     11
-#define MODEBIT   12
-#define CALBIT    13
-#define CWVFOBIT  14
-#define SSBVFOBIT 15
-#define TXATTLSB  16
-#define TXATTMSD  21
-#define RXATTLSB  24
-#define TXATTMSB  29
+#define LPFBAND0BIT  0
+#define LPFBAND1BIT  1
+#define LPFBAND2BIT  2
+#define LPFBAND3BIT  3
+#define ANT0BIT      4
+#define ANT1BIT      5
+#define XVTRBIT      6
+#define PA100WBIT    7
+#define TXBPFBIT     8
+#define RXBPFBIT     9
+#define RXTXBIT      10
+#define CWBIT        11
+#define MODEBIT      12
+#define CALBIT       13
+#define CWVFOBIT     14
+#define SSBVFOBIT    15
+#define TXATTLSB     16
+#define TXATTMSD     21
+#define RXATTLSB     22
+#define TXATTMSB     27
+#define BPFBAND0BIT  28
+#define BPFBAND1BIT  29
+#define BPFBAND2BIT  30
+#define BPFBAND3BIT  31
 
-#define LPF_BAND_NF   0b1111
-#define LPF_BAND_6M   0b1010
-#define LPF_BAND_10M  0b1001
-#define LPF_BAND_12M  0b1000
-#define LPF_BAND_15M  0b0111
-#define LPF_BAND_17M  0b0110
-#define LPF_BAND_20M  0b0101
-#define LPF_BAND_30M  0b0100
-#define LPF_BAND_40M  0b0011
-#define LPF_BAND_60M  0b0000
-#define LPF_BAND_80M  0b0010
-#define LPF_BAND_160M 0b0001
+#define BAND_NF_BCD   0b1111
+#define BAND_6M_BCD   0b1010
+#define BAND_10M_BCD  0b1001
+#define BAND_12M_BCD  0b1000
+#define BAND_15M_BCD  0b0111
+#define BAND_17M_BCD  0b0110
+#define BAND_20M_BCD  0b0101
+#define BAND_30M_BCD  0b0100
+#define BAND_40M_BCD  0b0011
+#define BAND_60M_BCD  0b0000
+#define BAND_80M_BCD  0b0010
+#define BAND_160M_BCD 0b0001
 
 #define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
 #define SET_BIT(byte, bit) ((byte) |= (1 << (bit)));buffer_add()
 #define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)));buffer_add()
 #define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)));buffer_add()
+#define GET_LPF_BAND (uint8_t)(hardwareRegister & 0x0000000F)
 
 // Every time the value of hardwareRegister is updated, store this in a rolling buffer
 #define REGISTER_BUFFER_SIZE 100

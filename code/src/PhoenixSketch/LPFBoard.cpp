@@ -1,30 +1,6 @@
 #include "SDT.h"
 #include "AD7991.h"
 
-#define LPFBAND0BIT 0
-#define LPFBAND1BIT 1
-#define LPFBAND2BIT 2
-#define LPFBAND3BIT 3
-#define LPFANT0BIT  4
-#define LPFANT1BIT  5
-#define LPFXVTRBIT  6
-#define LPF100WBIT  7
-#define LPFTXBPFBIT 8
-#define LPFRXBPFBIT 9
-
-#define LPF_BAND_NF   0b1111
-#define LPF_BAND_6M   0b1010
-#define LPF_BAND_10M  0b1001
-#define LPF_BAND_12M  0b1000
-#define LPF_BAND_15M  0b0111
-#define LPF_BAND_17M  0b0110
-#define LPF_BAND_20M  0b0101
-#define LPF_BAND_30M  0b0100
-#define LPF_BAND_40M  0b0011
-#define LPF_BAND_60M  0b0000
-#define LPF_BAND_80M  0b0010
-#define LPF_BAND_160M 0b0001
-
 // LPF_Register bit map:
 // Bit   Pin    Description     Receive            Transmit
 // 0     GPB0   Band I2C0       b                  b
@@ -82,14 +58,43 @@ void SetMCPBOld(uint8_t value) {
 }
 // end of unit testing section
 
+uint8_t BandToBCD(int32_t band){
+    switch (band){
+        case BAND_160M:
+            return BAND_160M_BCD;
+        case BAND_80M:
+            return BAND_80M_BCD;
+        case BAND_60M:
+            return BAND_60M_BCD;
+        case BAND_40M:
+            return BAND_40M_BCD;
+        case BAND_30M:
+            return BAND_30M_BCD;
+        case BAND_20M:
+            return BAND_20M_BCD;
+        case BAND_17M:
+            return BAND_17M_BCD;
+        case BAND_15M:
+            return BAND_15M_BCD;
+        case BAND_12M:
+            return BAND_12M_BCD;
+        case BAND_10M:
+            return BAND_10M_BCD;
+        case BAND_6M:
+            return BAND_6M_BCD;
+        default:
+            return BAND_NF_BCD;
+    }
+}
+
 errno_t InitLPFBoardMCP(void){
     if (LPFinitialized) return LPFerrno;
 
     /******************************************************************
      * Set up the V12 LPF which is connected via the BANDS connector *
      ******************************************************************/
-    SET_LPF_BAND(ED.currentBand[ED.activeVFO]);
-    SET_ANTENNA(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);;
+    SET_LPF_BAND(BandToBCD(ED.currentBand[ED.activeVFO]));
+    SET_ANTENNA(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
     if (mcpLPF.begin_I2C(V12_LPF_MCP23017_ADDR,&Wire2)){
         Debug("Initializing V12 LPF board");
         mcpLPF.enableAddrPins();
@@ -97,10 +102,11 @@ errno_t InitLPFBoardMCP(void){
         for (int i=0;i<16;i++){
             mcpLPF.pinMode(i, OUTPUT);
         }
-        mcpLPF.writeGPIOA(LPF_GPA_STATE); 
-        mcpLPF.writeGPIOB(LPF_GPB_STATE);
         mcpA_old = LPF_GPA_STATE;
         mcpB_old = LPF_GPB_STATE;
+        mcpLPF.writeGPIOA(LPF_GPA_STATE); 
+        mcpLPF.writeGPIOB(LPF_GPB_STATE);
+        Debug("Startup LPF GPA state: "+String(LPF_GPA_STATE,BIN));
         Debug("Startup LPF GPB state: "+String(LPF_GPB_STATE,BIN));
         bit_results.V12_LPF_I2C_present = true;
         LPFerrno = ESUCCESS;
@@ -204,45 +210,7 @@ void SelectLPFBand(int32_t band){
             band = LAST_BAND + 10; // force it to pick no filter. You're on your own now
         }
     }
-
-    switch (band){
-        case BAND_160M:
-            SET_LPF_BAND(LPF_BAND_160M);
-            break;
-        case BAND_80M:
-            SET_LPF_BAND(LPF_BAND_80M);
-            break;
-        case BAND_60M:
-            SET_LPF_BAND(LPF_BAND_60M);
-            break;   
-        case BAND_40M:
-            SET_LPF_BAND(LPF_BAND_40M);
-            break;
-        case BAND_30M:
-            SET_LPF_BAND(LPF_BAND_30M);
-            break;
-        case BAND_20M:
-            SET_LPF_BAND(LPF_BAND_20M);
-            break;
-        case BAND_17M:
-            SET_LPF_BAND(LPF_BAND_17M);
-            break;
-        case BAND_15M:
-            SET_LPF_BAND(LPF_BAND_15M);
-            break;
-        case BAND_12M:
-            SET_LPF_BAND(LPF_BAND_12M);
-            break;
-        case BAND_10M:
-            SET_LPF_BAND(LPF_BAND_10M);
-            break;
-        case BAND_6M:
-            SET_LPF_BAND(LPF_BAND_6M);
-            break;
-        default:
-            SET_LPF_BAND(LPF_BAND_NF);
-            break;
-    }
+    SET_LPF_BAND(BandToBCD(band));
     // And now actually change the hardware...
     UpdateMCPRegisters();
 }
