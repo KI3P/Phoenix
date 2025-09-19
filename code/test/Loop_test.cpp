@@ -583,3 +583,365 @@ TEST(Loop, CompleteStraightKeySequence){
     }
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
 }
+
+// ================== HARDWARE STATE MACHINE TIMING DELAY TESTS ==================
+
+TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
+    // Test that the new timing delays in RFReceive state occur as expected
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware and set up for state transition
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial conditions - start from transmit state to trigger full receive sequence
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateRFHardwareState(); // This sets the previous state properly
+
+    // Clear buffer to track the receive state sequence
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition to receive state to trigger the timing sequence
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateRFHardwareState(); // This should trigger the receive sequence with delays
+
+    // The sequence should have multiple buffer entries with time gaps
+    // RFReceive sequence: CWoff, DisableCWVFOOutput, SetTXAttenuation(31.5), TXBypassBPF,
+    // SelectXVTR, Bypass100WPA, **50ms delay**, RXSelectBPF, UpdateTuneState, SetRXAttenuation,
+    // EnableSSBVFOOutput, DisableCalFeedback, **50ms delay**, SelectRXMode, **50ms delay**, SetTXAttenuation
+
+    // Verify we have multiple buffer entries (should be 10+ hardware operations)
+    EXPECT_GE(buffer.count, 10);
+
+    // Find the time gaps between groups of operations (where delays occur)
+    std::vector<size_t> delay_indices;
+    for (size_t i = 1; i < buffer.count; i++) {
+        uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
+        // Look for gaps > 45ms (allowing some tolerance for the 50ms delays)
+        if (time_gap > 45000) { // 45ms in microseconds
+            delay_indices.push_back(i);
+        }
+    }
+
+    // Should have 3 delay points in the RFReceive sequence
+    EXPECT_EQ(delay_indices.size(), 3);
+
+    // Verify the delays are approximately 50ms each
+    for (size_t idx : delay_indices) {
+        uint32_t time_gap = buffer.entries[idx].timestamp - buffer.entries[idx-1].timestamp;
+        EXPECT_GE(time_gap, 45000); // At least 45ms
+        EXPECT_LE(time_gap, 55000); // At most 55ms (allowing some tolerance)
+    }
+}
+
+TEST(Loop, HardwareStateMachineRFTransmitTimingDelays) {
+    // Test that the timing delays in RFTransmit state occur as expected
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware and set up for state transition
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial conditions - start from receive state
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateRFHardwareState();
+
+    // Clear buffer to track the transmit state sequence
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition to transmit state to trigger the timing sequence
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateRFHardwareState(); // This should trigger the transmit sequence with delays
+
+    // The sequence should have multiple buffer entries
+    // RFTransmit sequence: RXBypassBPF, DisableCalFeedback, **50ms delay**, SetTXAttenuation,
+    // DisableCWVFOOutput, CWoff, UpdateTuneState, EnableSSBVFOOutput, SelectTXSSBModulation,
+    // TXSelectBPF, BypassXVTR, Bypass100WPA, **50ms delay**, SelectTXMode
+
+    // Verify we have multiple buffer entries (should be 10+ hardware operations)
+    EXPECT_GE(buffer.count, 10);
+
+    // Find the time gaps between groups of operations (where delays occur)
+    std::vector<size_t> delay_indices;
+    for (size_t i = 1; i < buffer.count; i++) {
+        uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
+        // Look for gaps > 45ms (allowing some tolerance for the 50ms delays)
+        if (time_gap > 45000) { // 45ms in microseconds
+            delay_indices.push_back(i);
+        }
+    }
+
+    // Should have 2 delay points in the RFTransmit sequence
+    EXPECT_EQ(delay_indices.size(), 2);
+
+    // Verify the delays are approximately 50ms each
+    for (size_t idx : delay_indices) {
+        uint32_t time_gap = buffer.entries[idx].timestamp - buffer.entries[idx-1].timestamp;
+        EXPECT_GE(time_gap, 45000); // At least 45ms
+        EXPECT_LE(time_gap, 55000); // At most 55ms (allowing some tolerance)
+    }
+}
+
+TEST(Loop, HardwareStateMachineRFCWMarkTimingDelays) {
+    // Test that the timing delays in RFCWMark state occur as expected (from non-CWSpace state)
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware and set up for state transition
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial conditions - start from receive state to trigger full CW mark sequence
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+
+    // Clear buffer to track the CW mark state sequence
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition to CW mark state to trigger the timing sequence
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState(); // This should trigger the CW mark sequence with delays
+
+    // The sequence should have multiple buffer entries
+    // RFCWMark sequence (from non-CWSpace): RXBypassBPF, DisableCalFeedback, SetTXAttenuation,
+    // DisableSSBVFOOutput, UpdateTuneState, EnableCWVFOOutput, SelectTXCWModulation,
+    // TXSelectBPF, BypassXVTR, Bypass100WPA, SelectTXMode, **50ms delay**, CWon
+
+    // Verify we have multiple buffer entries (should be 10+ hardware operations)
+    EXPECT_GE(buffer.count, 10);
+
+    // Find the time gaps between groups of operations (where delays occur)
+    std::vector<size_t> delay_indices;
+    for (size_t i = 1; i < buffer.count; i++) {
+        uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
+        // Look for gaps > 45ms (allowing some tolerance for the 50ms delays)
+        if (time_gap > 45000) { // 45ms in microseconds
+            delay_indices.push_back(i);
+        }
+    }
+
+    // Should have 1 delay point in the RFCWMark sequence (before CWon)
+    EXPECT_EQ(delay_indices.size(), 1);
+
+    // Verify the delay is approximately 50ms
+    if (delay_indices.size() >= 1) {
+        size_t idx = delay_indices[0];
+        uint32_t time_gap = buffer.entries[idx].timestamp - buffer.entries[idx-1].timestamp;
+        EXPECT_GE(time_gap, 45000); // At least 45ms
+        EXPECT_LE(time_gap, 55000); // At most 55ms (allowing some tolerance)
+    }
+}
+
+TEST(Loop, HardwareStateMachineRFCWMarkFromCWSpaceNoDelay) {
+    // Test that RFCWMark state from RFCWSpace state has no delays (optimization)
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware and set up for state transition
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial conditions - start from CW space state
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateRFHardwareState();
+
+    // Clear buffer to track the CW mark state sequence
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition to CW mark state (should only call CWon, no other setup)
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+
+    // Should have minimal buffer entries (just CWon operation)
+    EXPECT_LE(buffer.count, 2); // Should be 1-2 entries max
+
+    // Check that there are no significant time gaps (no delays)
+    for (size_t i = 1; i < buffer.count; i++) {
+        uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
+        // Should be no delays > 10ms
+        EXPECT_LT(time_gap, 10000); // Less than 10ms
+    }
+}
+
+TEST(Loop, HardwareStateMachineRFCWSpaceFromCWMarkNoDelay) {
+    // Test that RFCWSpace state from RFCWMark state has no delays (optimization)
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware and set up for state transition
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial conditions - start from CW mark state
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+
+    // Clear buffer to track the CW space state sequence
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition to CW space state (should only call CWoff, no other setup)
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateRFHardwareState();
+
+    // Should have minimal buffer entries (just CWoff operation)
+    EXPECT_LE(buffer.count, 2); // Should be 1-2 entries max
+
+    // Check that there are no significant time gaps (no delays)
+    for (size_t i = 1; i < buffer.count; i++) {
+        uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
+        // Should be no delays > 10ms
+        EXPECT_LT(time_gap, 10000); // Less than 10ms
+    }
+}
+
+TEST(Loop, HardwareStateMachineTimingSequenceVerification) {
+    // Comprehensive test to verify the complete timing sequence during state transitions
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test a complete cycle: Receive -> Transmit -> Receive
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateRFHardwareState();
+
+    // Clear buffer and start tracking transitions
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition 1: Receive to Transmit
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    uint32_t start_time = micros();
+    UpdateRFHardwareState();
+    uint32_t end_time = micros();
+
+    // The total time should include the delays (should be ~100ms)
+    uint32_t total_time = end_time - start_time;
+    EXPECT_GE(total_time, 90000);  // At least 90ms (2 x 50ms delays - some tolerance)
+    EXPECT_LE(total_time, 150000); // At most 150ms (allowing for processing overhead)
+
+    size_t transmit_entries = buffer.count;
+    EXPECT_GE(transmit_entries, 10); // Should have multiple hardware operations
+
+    // Transition 2: Transmit back to Receive
+    buffer.head = 0;
+    buffer.count = 0;
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    start_time = micros();
+    UpdateRFHardwareState();
+    end_time = micros();
+
+    // The total time should include the delays (should be ~150ms)
+    total_time = end_time - start_time;
+    EXPECT_GE(total_time, 135000); // At least 135ms (3 x 50ms delays - some tolerance)
+    EXPECT_LE(total_time, 200000); // At most 200ms (allowing for processing overhead)
+
+    size_t receive_entries = buffer.count;
+    EXPECT_GE(receive_entries, 12); // Should have more hardware operations than transmit
+}
+
+TEST(Loop, HardwareStateMachineUpdateTuneStateAlwaysCalled) {
+    // Test that UpdateTuneState is called even when there's no hardware state change
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware
+    InitializeRFHardware();
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set to a known state
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateRFHardwareState();
+
+    // Clear buffer
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Call UpdateRFHardwareState again with same state (should only call UpdateTuneState)
+    UpdateRFHardwareState();
+
+    // Should have at least one buffer entry from UpdateTuneState -> HandleTuneState -> SelectLPFBand
+    EXPECT_GE(buffer.count, 1);
+
+    // Verify there are no significant delays (no MyDelay calls)
+    for (size_t i = 1; i < buffer.count; i++) {
+        uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
+        EXPECT_LT(time_gap, 10000); // Less than 10ms (no delays expected)
+    }
+}
+
+TEST(Loop, HardwareStateMachineDelayOrderingVerification) {
+    // Test that delays occur in the correct order within the state sequences
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Initialize RF hardware
+    ModeSm_start(&modeSM);
+    UISm_start(&uiSM);
+    InitializeRFHardware();
+
+    // Start from transmit to trigger receive sequence with all delays
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateRFHardwareState();
+
+    // Clear buffer for receive sequence
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Transition to receive to get the full delay sequence
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateRFHardwareState();
+
+    // Analyze the timing pattern to verify delay ordering
+    std::vector<uint32_t> operation_times;
+    for (size_t i = 0; i < buffer.count; i++) {
+        operation_times.push_back(buffer.entries[i].timestamp);
+    }
+
+    // Find delay boundaries (large time gaps)
+    std::vector<size_t> delay_boundaries;
+    for (size_t i = 1; i < operation_times.size(); i++) {
+        if (operation_times[i] - operation_times[i-1] > 45000) { // 45ms threshold
+            delay_boundaries.push_back(i);
+        }
+    }
+
+    // Verify we have the expected 3 delays for receive sequence
+    EXPECT_EQ(delay_boundaries.size(), 3);
+
+    if (delay_boundaries.size() >= 3) {
+        // First delay should occur after initial power-down operations
+        EXPECT_GE(delay_boundaries[0], 5); // At least 5 operations before first delay
+
+        // Second delay should occur after receive path setup
+        EXPECT_GT(delay_boundaries[1], delay_boundaries[0] + 3); // At least 3 ops between delays
+
+        // Third delay should occur before final TX attenuation setting
+        EXPECT_GE(delay_boundaries[2], delay_boundaries[1] + 1); // At least 1 op between delays
+    }
+}

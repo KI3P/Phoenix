@@ -26,11 +26,14 @@ errno_t InitializeRFBoard(void){
     oldrfHardwareState = RFTransmit;
     HandleRFHardwareStateChange(RFReceive); // updates oldrfHardwareState
     previousRadioState = ModeSm_StateId_SSB_RECEIVE;
+    tuneState = TuneReceive;
     return err;
 }
 
 errno_t InitializeRFHardware(void){
-    return InitializeRFBoard();
+    errno_t val = InitializeRFBoard();
+    val += InitializeLPFBoard();
+    return val;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -43,38 +46,55 @@ ModeSm_StateId GetRFHardwarePreviousState(void){
 
 void HandleRFHardwareStateChange(RFHardwareState newState){
     if (newState == oldrfHardwareState){
+        UpdateTuneState();
         return;
     }
     // Following the state diagrams in T41_V12_board_api.drawio, implement the actions
     // required to enter the new state.
     switch (newState){
         case RFReceive:{
-            // Set GPA state to appropriate value
-            SetRXAttenuation( ED.RAtten[ED.currentBand[ED.activeVFO]] );
-            // Set clockEnableCW to LO
-            DisableCWVFOOutput();
+            // First, do things that reduce the transmitted power
+
             // Set cwState to LO
             CWoff();
-            // Set frequencySSB_Hz to appropriate value
-            //SetSSBVFOFrequency( ED.centerFreq_Hz[ED.activeVFO]*100 );
+            // Set clockEnableCW to LO
+            DisableCWVFOOutput();
+            SetTXAttenuation(31.5);
+            TXBypassBPF(); // BPF out of TX path
+            SelectXVTR();  // Shunt the TX path to nothing
+            Bypass100WPA(); // always bypassed
+            // Wait to make sure all the above have happened
+            MyDelay(50);
+            
+            // Now, switch in the receive path hardware
+            // Set frequency
+            RXSelectBPF(); // BPF in to RX path
             UpdateTuneState();
+            // Set GPA state to appropriate value
+            SetRXAttenuation( ED.RAtten[ED.currentBand[ED.activeVFO]] );
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
             EnableSSBVFOOutput();
-            // Set calFeedbackState to LO
+            // Make sure calFeedbackState is LO
             DisableCalFeedback();
+            // Wait to make sure all these changes have happened
+            MyDelay(50);
             // Set rxtxState to LO (RX)
             SelectRXMode();
-
-            TXBypassBPF(); // BPF out of TX path
-            RXSelectBPF(); // BPF in to RX path
-            SelectXVTR();  // Shunt the TX path to nothing
-            Bypass100WPA(); // always bypassed
-
+            // Wait for the relay to switch
+            MyDelay(50);
+            SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
             break;
         }
         case RFTransmit:{
+            // Get all the receive hardware out of the path
+            RXBypassBPF(); // BPF out of RX path
+            // Set calFeedbackState to LO
+            DisableCalFeedback();
+            MyDelay(50);
+
+            // Start configuring the transmit chain
             // Set GPB state to appropriate value
             SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
             // Set clockEnableCW to LO
@@ -90,72 +110,76 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             EnableSSBVFOOutput();
             // Set modulationState to HI (SSB)
             SelectTXSSBModulation();
-            // Set calFeedbackState to LO
-            DisableCalFeedback();
-            // Set rxtxState to HI (TX)
-            SelectTXMode();
-
+            
             TXSelectBPF(); // BPF in to TX path
-            RXBypassBPF(); // BPF out of RX path
             BypassXVTR();  // Bypass XVTR
             Bypass100WPA(); // always bypassed
 
+            MyDelay(50);
+            // Set rxtxState to HI (TX)
+            SelectTXMode();
+            
             break;
         }
         case RFCWMark:{
-            // Set GPB state to appropriate value
-            SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
-            // Set clockEnableSSB to LO
-            DisableSSBVFOOutput();
-            // Set frequencyCW_Hz to appropriate value
-            //SetCWVFOFrequency( GetCWTXFreq_dHz() );
-            UpdateTuneState();
-            // Set driveCurrentCW_mA to appropriate value
-            // > This does not change after initialization, so do nothing
-            // Set clockEnableCW to HI
-            EnableCWVFOOutput();
+            // If we come from the RFCWSpace state, we only have to change one thing
+            if (oldrfHardwareState != RFCWSpace){
+                RXBypassBPF(); // BPF out of RX path
+                // Set calFeedbackState to LO
+                DisableCalFeedback();
+                // Set GPB state to appropriate value
+                SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
+                // Set clockEnableSSB to LO
+                DisableSSBVFOOutput();
+                // Set frequencyCW_Hz to appropriate value
+                //SetCWVFOFrequency( GetCWTXFreq_dHz() );
+                UpdateTuneState();
+                // Set driveCurrentCW_mA to appropriate value
+                // > This does not change after initialization, so do nothing
+                // Set clockEnableCW to HI
+                EnableCWVFOOutput();
+                // Set modulationState to LO (CW)
+                SelectTXCWModulation();
+                TXSelectBPF(); // BPF in to TX path
+                BypassXVTR();  // Bypass XVTR
+                Bypass100WPA(); // always bypassed
+                // Set rxtxState to HI (TX)
+                SelectTXMode();
+                // Potential issue here if we don't wait for the relay to switch before
+                // we turn the CW signal on.
+                MyDelay(50);
+            }
             // Set cwState to HI
             CWon();
-            // Set rxtxState to HI (TX)
-            SelectTXMode();
-            // Set modulationState to LO (CW)
-            SelectTXCWModulation();
-            // Set calFeedbackState to LO
-            DisableCalFeedback();
-
-            TXSelectBPF(); // BPF in to TX path
-            RXBypassBPF(); // BPF out of RX path
-            BypassXVTR();  // Bypass XVTR
-            Bypass100WPA(); // always bypassed
-
             break;
         }
         case RFCWSpace:{
-            // Set GPB state to appropriate value
-            SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
-            // Set clockEnableSSB to LO
-            DisableSSBVFOOutput();
-            // Set frequencyCW_Hz to appropriate value
-            //SetCWVFOFrequency( GetCWTXFreq_dHz() );
-            UpdateTuneState();
-            // Set driveCurrentCW_mA to appropriate value
-            // > This does not change after initialization, so do nothing
-            // Set clockEnableCW to HI
-            EnableCWVFOOutput();
+            // If we come from the RFCWMark state, we only have to change one thing
+            if (oldrfHardwareState != RFCWMark){
+                RXBypassBPF(); // BPF out of RX path
+                // Set calFeedbackState to LO
+                DisableCalFeedback();
+                // Set GPB state to appropriate value
+                SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
+                // Set clockEnableSSB to LO
+                DisableSSBVFOOutput();
+                // Set frequencyCW_Hz to appropriate value
+                //SetCWVFOFrequency( GetCWTXFreq_dHz() );
+                UpdateTuneState();
+                // Set driveCurrentCW_mA to appropriate value
+                // > This does not change after initialization, so do nothing
+                // Set clockEnableCW to HI
+                EnableCWVFOOutput();
+                // Set modulationState to LO (CW)
+                SelectTXCWModulation();
+                TXSelectBPF(); // BPF in to TX path
+                BypassXVTR();  // Bypass XVTR
+                Bypass100WPA(); // always bypassed
+                // Set rxtxState to HI (TX)
+                SelectTXMode();
+            }
             // Set cwState to LO
             CWoff();
-            // Set rxtxState to HI (TX)
-            SelectTXMode();
-            // Set modulationState to LO (CW)
-            SelectTXCWModulation();
-            // Set calFeedbackState to LO
-            DisableCalFeedback();
-
-            TXSelectBPF(); // BPF in to TX path
-            RXBypassBPF(); // BPF out of RX path
-            BypassXVTR();  // Bypass XVTR
-            Bypass100WPA(); // always bypassed
-
             break;
         }
         case RFCalIQ:{
@@ -178,9 +202,10 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
 }
 
 void UpdateRFHardwareState(void){
-    UpdateTuneState();
     if (modeSM.state_id == previousRadioState){
-        // Already in this state, no need to change
+        // Already in this state, no need to change RF hardware, though the
+        // tuning might have changed.
+        UpdateTuneState();
         return;
     }
     // Several transceiver states map to the same RF board state. Handle this mapping

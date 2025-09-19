@@ -64,6 +64,10 @@ void setup(void){
     pinMode(SHUTDOWN_COMPLETE, OUTPUT);     // HI sent here tells ATTiny85 to cut the power
     digitalWrite(SHUTDOWN_COMPLETE, 0);  
     
+    // Start the mode state machines
+    ModeSm_start(&modeSM);
+    UISm_start(&uiSM);
+    
     pinMode(31,OUTPUT); //testcode
     digitalWrite(31, 0);  //testcode
 

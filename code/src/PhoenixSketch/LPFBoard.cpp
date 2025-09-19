@@ -246,7 +246,7 @@ void SelectLPFBand(int32_t band){
     UpdateMCPRegisters();
 }
 
-errno_t InitLPFControl(void){
+errno_t InitializeLPFBoard(void){
     return InitLPFBoardMCP();
 }
 

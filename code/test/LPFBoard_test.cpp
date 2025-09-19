@@ -445,9 +445,9 @@ TEST_F(LPFBoardTest, Init100WPAControlCallsMainInit) {
     EXPECT_TRUE(result == ESUCCESS || result == ENOI2C || result == EFAIL);
 }
 
-TEST_F(LPFBoardTest, InitLPFControlCallsMainInit) {
-    // InitLPFControl() should return the same result as InitLPFBoardMCP()
-    errno_t result = InitLPFControl();
+TEST_F(LPFBoardTest, InitLPFBoardCallsMainInit) {
+    // InitializeLPFBoard() should return the same result as InitLPFBoardMCP()
+    errno_t result = InitializeLPFBoard();
 
     // Since we can't mock the I2C hardware in this test environment,
     // we expect this to return ENOI2C (I2C device not found)
@@ -489,8 +489,8 @@ TEST_F(LPFBoardTest, InitFunctionsMultipleCallsSafe) {
     result2 = Init100WPAControl();
     EXPECT_EQ(result1, result2);
 
-    result1 = InitLPFControl();
-    result2 = InitLPFControl();
+    result1 = InitializeLPFBoard();
+    result2 = InitializeLPFBoard();
     EXPECT_EQ(result1, result2);
 
     result1 = InitAntennaControl();

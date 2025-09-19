@@ -2,7 +2,7 @@
 #define LPFBOARD_H
 #include "SDT.h"
 
-errno_t InitLPFBoard(void);
+errno_t InitializeLPFBoard(void);
 void TXSelectBPF(void);
 void TXBypassBPF(void);
 void RXSelectBPF(void);
@@ -15,7 +15,6 @@ void Select100WPA(void);
 void Bypass100WPA(void);
 errno_t Init100WPAControl(void);
 void SelectLPFBand(int32_t band);
-errno_t InitLPFControl(void);
 void SelectAntenna(uint8_t antenna);
 errno_t InitAntennaControl(void);
 float32_t ReadSWR(void);
