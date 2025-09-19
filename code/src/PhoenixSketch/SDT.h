@@ -193,8 +193,8 @@ extern struct config_t {
     float32_t powerOutSSB[NUMBER_OF_BANDS];  
     float32_t CWPowerCalibrationFactor[NUMBER_OF_BANDS];  // UNUSED
     float32_t SSBPowerCalibrationFactor[NUMBER_OF_BANDS]; // UNUSED
-    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1};
-    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0};
+    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1};
+    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS];    // UNUSED
     float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS];  // UNUSED
     float32_t IQXRecAmpCorrectionFactor[NUMBER_OF_BANDS]; // UNUSED
@@ -220,9 +220,10 @@ extern struct config_t {
     int32_t CWToneIndex = 3;
     float32_t TransmitPowerLevelCW = 0.0;             // UNUSED
     float32_t TransmitPowerLevelSSB = 0.0;            // UNUSED
-    float32_t SWR_PowerAdj[NUMBER_OF_BANDS];              // UNUSED
-    float32_t SWRSlopeAdj[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // UNUSED
-    int32_t SWR_R_Offset[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // UNUSED
+    float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
 } ED;
 
 // Define a structure to hold the results of built-in-test routine

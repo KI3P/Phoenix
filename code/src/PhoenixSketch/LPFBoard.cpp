@@ -1,4 +1,5 @@
 #include "SDT.h"
+#include "AD7991.h"
 
 #define LPFBAND0BIT 0
 #define LPFBAND1BIT 1
@@ -45,7 +46,7 @@ static bool LPFinitialized = false;
 static errno_t LPFerrno = EFAIL;
 static uint8_t mcpA_old = 0x00;
 static uint8_t mcpB_old = 0x00;
-//static AD7991 swrADC;
+static AD7991 swrADC;
 
 #define LPF_GPA_STATE (uint8_t)((hardwareRegister >> 8) & 0x00000003)   // Bits 8 & 9
 #define LPF_GPB_STATE (uint8_t)(hardwareRegister & 0x000000FF)          // Lowest byte
@@ -247,7 +248,9 @@ void SelectLPFBand(int32_t band){
 }
 
 errno_t InitializeLPFBoard(void){
-    return InitLPFBoardMCP();
+    errno_t val = InitSWRControl();
+    val += InitLPFBoardMCP();
+    return val;
 }
 
 void SelectAntenna(uint8_t antennaNum){
@@ -264,21 +267,61 @@ errno_t InitAntennaControl(void){
     return InitLPFBoardMCP();
 }
 
+static float32_t adcF_sRawOld;
+static float32_t adcR_sRawOld;
+static float32_t adcF_sRaw;
+static float32_t adcR_sRaw;
+static float32_t Pf_dBm;
+static float32_t Pr_dBm;
+static float32_t Pf_W;
+static float32_t Pr_W;
+static float32_t swr;
+
+#define VREF_MV 4096     // the reference voltage on your board
+#define PAD_ATTENUATION_DB 26 // attenuation of the pad
+#define COUPLER_ATTENUATION_DB 20 // attenuation of the binocular toroid coupler
+
+void read_SWR() {
+  // Step 1. Measure the peak forward and Reverse voltages
+  adcF_sRaw = (float32_t)swrADC.readADCsingle(0);
+  adcR_sRaw = (float32_t)swrADC.readADCsingle(1);
+
+  adcF_sRaw = 0.1 * adcF_sRaw + 0.9 * adcF_sRawOld;  //Running average
+  adcR_sRaw = 0.1 * adcR_sRaw + 0.9 * adcR_sRawOld;
+  adcF_sRawOld = adcF_sRaw;
+  adcR_sRawOld = adcR_sRaw;
+
+  //Convert ADC reading to mV
+  adcF_sRaw = adcF_sRaw * VREF_MV / 4096.;
+  adcR_sRaw = adcR_sRaw * VREF_MV / 4096.;
+
+  Pf_dBm = adcF_sRaw/(25 + ED.SWR_F_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+  Pr_dBm = adcR_sRaw/(25 + ED.SWR_R_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+
+  // Convert to input voltage squared as read by ADC converted to before attenuation
+  Pf_W = (float32_t)pow(10,Pf_dBm/10)/1000;
+  Pr_W = (float32_t)pow(10,Pr_dBm/10)/1000;
+
+  float32_t A = pow(Pr_W / Pf_W, 0.5);
+  swr = (1.0 + A) / (1.0 - A);
+}
+
 float32_t ReadSWR(void){
-    return 0;
+    return swr;
 }
 
 float32_t ReadForwardPower(void){
-    return 0;
+    return Pf_W;
 }
 
 float32_t ReadReflectedPower(void){
-    return 0;
+    return Pr_W;
 }
+
 
 errno_t InitSWRControl(void){
 
-    /*if (!swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
+    if (!swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
         bit_results.V12_LPF_AD7991_present = false;
         Debug("AD7991 not found at 0x"+String(AD7991_I2C_ADDR1,HEX));
 
@@ -289,7 +332,7 @@ errno_t InitSWRControl(void){
             return ESUCCESS;
         }
         return ENOI2C;
-    }*/
+    }
     return ESUCCESS;
 }
 
