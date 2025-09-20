@@ -12,7 +12,7 @@
 #define DIT_DURATION_MS                         7
 #define SPLASH_DURATION_MS                      17
 
-#define KEYER_TYPE                              KeyTypeId_Keyer // or KeyTypeId_Straight
+#define KEYER_TYPE                              KeyTypeId_Straight // or KeyTypeId_Keyer
 #define KEYER_FLIP                              false // or true
 
 #define BUFFER_SIZE                             128
@@ -54,7 +54,7 @@
 #define ZOOM 3
 #define NOISE_FLOOR 4
 #define BAND_DN 5
-#define SET_MODE 6
+#define TOGGLE_MODE 6
 #define DEMODULATION 7
 #define MAIN_TUNE_INCREMENT 8
 #define NOISE_REDUCTION 9

@@ -21,8 +21,6 @@ FREQ_ENC_DEC    Decrease the tune frequency by increment
 */
 
 static InterruptType interrupt = iNONE; /** The internal InterruptType variable */
-static KeyTypeId keyType = KEYER_TYPE;
-static bool keyerFlip = KEYER_FLIP;
 static uint8_t switchFilterSideband = 0;
 char strbuf[100];
 
@@ -32,21 +30,21 @@ char strbuf[100];
  * @param key The KeyTypeId to set the key to. Valid choices are KeyTypeId_Straight or KeyTypeId_Keyer
  */
 void SetKeyType(KeyTypeId key){
-    keyType = key;
+    ED.keyType = key;
 }
 
 /**
  * Sets the keyer logic so that KEY1 = dah and KEY2 = dit
  */
 void SetKey1Dah(void){
-    keyerFlip = true;
+    ED.keyerFlip = true;
 }
 
 /**
  * Sets the keyer logic so that KEY1 = dit and KEY2 = dah
  */
 void SetKey1Dit(void){
-    keyerFlip = false;
+    ED.keyerFlip = false;
 }
 
 /**
@@ -154,7 +152,22 @@ void HandleButtonPress(int32_t button){
             UpdateRFHardwareState();
             break;
         }
-        case SET_MODE:{
+        case TOGGLE_MODE:{
+            switch(modeSM.state_id){
+                case ModeSm_StateId_SSB_RECEIVE:{
+    				ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+                    UpdateRFHardwareState();
+                    break;
+                }
+                case ModeSm_StateId_CW_RECEIVE:{
+    				ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+	    			UpdateRFHardwareState();
+                    break;
+                }
+                default:{
+                    break;
+                }
+            }
             break;
         }
         case DEMODULATION:{
@@ -213,10 +226,10 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iKEY1_PRESSED):{
-            if (keyType == KeyTypeId_Straight){
+            if (ED.keyType == KeyTypeId_Straight){
                 ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
             } else {
-                if (keyerFlip){
+                if (ED.keyerFlip){
                     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
                 }else{
                     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
@@ -224,8 +237,14 @@ void ConsumeInterrupt(void){
             }
             break;
         }
+        case (iKEY1_RELEASED):{
+            if (ED.keyType == KeyTypeId_Straight){
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+            }
+            break;
+        }
         case (iKEY2_PRESSED):{
-            if (keyerFlip){
+            if (ED.keyerFlip){
                 ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
             }else{
                 ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);

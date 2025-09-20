@@ -24,7 +24,8 @@ static int32_t multiple, oldMultiple;
 #define CAL_ON  1
 #define RX  0
 #define TX  1
-int64_t SSBVFOFreq_dHz;
+static int64_t SSBVFOFreq_dHz;
+static int64_t CWVFOFreq_dHz;
 
 static uint8_t mcpA_old = 0x00;
 static uint8_t mcpB_old = 0x00;
@@ -460,8 +461,16 @@ void DisableSSBVFOOutput(void){
 
 // CW VFO Control Functions
 void SetCWVFOFrequency(int64_t frequency_dHz){
-    si5351.set_freq(GetCWTXFreq_dHz(), SI5351_CLK2);
+    // No need to change if it's already at this setting
+    if (frequency_dHz == CWVFOFreq_dHz) return;
+    CWVFOFreq_dHz = frequency_dHz;
+    si5351.set_freq(CWVFOFreq_dHz, SI5351_CLK2);
 } // frequency in Hz * 100
+
+
+int64_t GetCWVFOFrequency(void){
+    return CWVFOFreq_dHz/100;
+}
 
 /**
  * Enable the CW VFO output (CLK2)

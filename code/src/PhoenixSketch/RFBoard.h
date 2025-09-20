@@ -20,6 +20,7 @@ void DisableSSBVFOOutput(void);
 errno_t InitSSBVFO(void);
 
 // CW VFO Control Functions
+int64_t GetCWVFOFrequency(void);
 void SetCWVFOFrequency(int64_t frequency_dHz); // frequency in Hz * 100
 void SetCWVFOPower(int32_t power);
 void EnableCWVFOOutput(void);

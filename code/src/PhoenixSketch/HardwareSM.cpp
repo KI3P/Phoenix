@@ -77,6 +77,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
             EnableSSBVFOOutput();
+            SelectTXSSBModulation();
             // Make sure calFeedbackState is LO
             DisableCalFeedback();
             // Wait to make sure all these changes have happened

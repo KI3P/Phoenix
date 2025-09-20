@@ -209,7 +209,7 @@ extern struct config_t {
     char myCall[10];                                  // UNUSED
     char myTimeZone[10];                              // UNUSED
     int32_t separationCharacter = (int32_t)'.';               // UNUSED
-    bool paddleFlip = PADDLE_FLIP;                     // UNUSED // false = right paddle = DAH, true = DIT
+    bool keyerFlip = KEYER_FLIP;                     // false = right paddle = DAH, true = DIT
     int32_t sdCardPresent = 0;                            // UNUSED
     float32_t myLong = MY_LON;                            // UNUSED
     float32_t myLat = MY_LAT;                             // UNUSED

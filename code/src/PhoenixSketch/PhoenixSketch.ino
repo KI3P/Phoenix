@@ -62,6 +62,8 @@ void setup(void){
     
     // Start the mode state machines
     ModeSm_start(&modeSM);
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
     UISm_start(&uiSM);
     
     pinMode(31,OUTPUT); //testcode
