@@ -8,7 +8,7 @@
             "name": "Debug Unit Tests",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/test/build/all_LPFBoard_tests",
+        "program": "${workspaceFolder}/test/build/all_Radio_tests",
         "args": [],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}/test/build/",
@@ -22,7 +22,7 @@
                 "ignoreFailures": true
             }
         ],
-        "preLaunchTask": "Run Unit Tests",
+        "preLaunchTask": "Make Unit Tests",
         "miDebuggerPath": "/usr/bin/gdb"  // or lldb on macOS
         }
     ]

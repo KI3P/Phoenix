@@ -51,10 +51,6 @@ void Splash()
     
 }
 
-void SetBPFBand(int val){}
-void SetAntenna(int val){}
-
-
 void setup(void){
     Serial.begin(115200);
     delay(1000); //testcode

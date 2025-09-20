@@ -3,6 +3,13 @@
 #include <cstdint>
 #include "Wire.h"
 
+// Constants for interrupt and pin modes
+#define CHANGE 1
+#define INPUT_PULLUP 2
+#define LOW 0
+#define HIGH 1
+#define MCP23XXX_INT_ERR 255
+
 class Adafruit_MCP23X17 {
 public:
     Adafruit_MCP23X17() {}
@@ -20,4 +27,9 @@ public:
     void writeGPIOAB(uint16_t value) {}
     uint16_t readGPIOA() { return 0; }
     uint16_t readGPIOB() { return 0; }
+    uint16_t readGPIOAB() { return 0; }
+    void setupInterruptPin(uint8_t pin, uint8_t mode) {}
+    uint8_t getLastInterruptPin() { return MCP23XXX_INT_ERR; }
+    void clearInterrupts() {}
+    void setupInterrupts(bool mirror, bool openDrain, uint8_t polarity) {}
 };

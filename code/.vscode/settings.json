@@ -36,7 +36,8 @@
     "unordered_map": "cpp",
     "vector": "cpp",
     "any": "cpp",
-    "numeric": "cpp"
+    "numeric": "cpp",
+    "chrono": "cpp"
   },
   "arduino.useArduinoCli": true,
   "arduino.logLevel": "info",

@@ -9,6 +9,13 @@
             "problemMatcher": []
         },
         {
+            "label": "Make Unit Tests",
+            "type": "shell",
+            "command": "cd test/build && cmake .. && make",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
             "type": "cppbuild",
             "label": "C/C++: g++ build active file",
             "command": "/usr/bin/g++",

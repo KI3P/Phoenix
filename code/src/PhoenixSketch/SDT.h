@@ -110,8 +110,8 @@ enum FilterType {
 };
 
 enum TXRXType {
-    TX = 0,
-    RX = 1
+    TX = 1,
+    RX = 0
 };
 
 enum AGCMode {
@@ -605,8 +605,8 @@ void buffer_add(void);
 
 void MyDelay(unsigned long millisWait);
 
-void SetBPFBand(int val);
-void SetAntenna(int val);
+//void SetBPFBand(int val);
+//void SetAntenna(int val);
 
 
 #endif // SDT_H

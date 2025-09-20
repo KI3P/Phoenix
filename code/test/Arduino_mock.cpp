@@ -6,6 +6,7 @@
 SerialClass Serial;
 SerialClass SerialUSB1;
 TwoWire Wire;
+TwoWire Wire1;
 TwoWire Wire2;
 
 #define NUMPINS 41
@@ -175,6 +176,14 @@ void pinMode(uint16_t pin, uint8_t val){
 uint8_t getPinMode(uint16_t pin){
     if (pin < NUMPINS) return pin_mode[pin];
     return 0;
+}
+
+void __disable_irq(void) {
+    // Mock implementation - does nothing in test environment
+}
+
+void __enable_irq(void) {
+    // Mock implementation - does nothing in test environment
 }
 
 

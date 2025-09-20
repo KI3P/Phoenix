@@ -28,6 +28,8 @@ void AddMillisTime(uint64_t delta_ms);
 void SetMillisTime(uint64_t time_ms);
 
 void cli(void);
+void __disable_irq(void);
+void __enable_irq(void);
 void sei(void);
 void delayMicroseconds(uint32_t usec);
 int64_t millis(void);
