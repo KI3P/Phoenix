@@ -239,6 +239,41 @@ String::String(int val, int base) {
     strcpy(_data, buf);
 }
 
+String::String(unsigned int val) {
+    char buf[12];
+    sprintf(buf, "%u", val);
+    _data = new char[strlen(buf) + 1];
+    strcpy(_data, buf);
+}
+
+String::String(unsigned int val, int base) {
+    char buf[34]; // Large enough for binary representation
+    if (base == 16) {
+        sprintf(buf, "%X", val);
+    } else if (base == 2) {
+        // Convert to binary
+        if (val == 0) {
+            strcpy(buf, "0");
+        } else {
+            int index = 0;
+            char temp[34];
+            while (val > 0) {
+                temp[index++] = (val % 2) + '0';
+                val /= 2;
+            }
+            // Reverse the string
+            for (int i = 0; i < index; i++) {
+                buf[i] = temp[index - 1 - i];
+            }
+            buf[index] = '\0';
+        }
+    } else {
+        sprintf(buf, "%u", val); // Default to decimal
+    }
+    _data = new char[strlen(buf) + 1];
+    strcpy(_data, buf);
+}
+
 String::String(long val) {
     char buf[22];
     sprintf(buf, "%ld", val);
@@ -342,8 +377,38 @@ String operator+(const char* left, const String& right) {
     return result;
 }
 
-void SetLPFBand(int32_t band){}
-void SetBPFBand(int32_t band){}
-void SetAntenna(int32_t a){}
+// Overloaded += operators
+String& String::operator+=(const String& other) {
+    char* new_data = new char[length() + other.length() + 1];
+    strcpy(new_data, _data);
+    strcat(new_data, other._data);
+    delete[] _data;
+    _data = new_data;
+    return *this;
+}
+
+String& String::operator+=(const char* other) {
+    char* new_data = new char[length() + strlen(other) + 1];
+    strcpy(new_data, _data);
+    strcat(new_data, other);
+    delete[] _data;
+    _data = new_data;
+    return *this;
+}
+
+// Substring function
+String String::substring(unsigned int from, unsigned int to) const {
+    size_t len = length();
+    if (from >= len) return String("");
+    if (to > len) to = len;
+    if (from >= to) return String("");
+
+    char* sub_data = new char[to - from + 1];
+    strncpy(sub_data, _data + from, to - from);
+    sub_data[to - from] = '\0';
+    String result(sub_data);
+    delete[] sub_data;
+    return result;
+}
 
 void flush(void){}

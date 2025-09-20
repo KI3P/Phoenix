@@ -105,3 +105,161 @@ void MyDelay(unsigned long millisWait) {
     while (millis() - now < millisWait)
         ;  // Twiddle thumbs until delay ends...
 }
+
+void buffer_pretty_print(void) {
+    Debug("=== Hardware Register Buffer Contents ===");
+    Debug("Buffer size: " + String((unsigned int)buffer.count) + "/" + String((unsigned int)REGISTER_BUFFER_SIZE));
+    Debug("Head index: " + String((unsigned int)buffer.head));
+
+    if (buffer.count == 0) {
+        Debug("Buffer is empty");
+        return;
+    }
+
+    Debug("Entries (oldest to newest):");
+    Debug("| Index | Timestamp(μs) | Register Value | Binary                                  | Hex        |");
+    Debug("|-------|---------------|----------------|-----------------------------------------|------------|");
+
+    // Calculate starting index for oldest entry
+    size_t start_idx;
+    if (buffer.count < REGISTER_BUFFER_SIZE) {
+        start_idx = 0;
+    } else {
+        start_idx = buffer.head;
+    }
+
+    // Print entries from oldest to newest
+    for (size_t i = 0; i < buffer.count; i++) {
+        size_t idx = (start_idx + i) % REGISTER_BUFFER_SIZE;
+        BufferEntry entry = buffer.entries[idx];
+
+        // Convert register value to binary string
+        String binary = "";
+        for (int bit = 31; bit >= 0; bit--) {
+            binary += ((entry.register_value >> bit) & 1) ? "1" : "0";
+            if (bit % 4 == 0 && bit > 0) binary += " ";  // Add space every 4 bits
+        }
+
+        String line = "| ";
+        line += String((unsigned int)idx, DEC).substring(0, 5);
+        while (line.length() < 7) line += " ";
+        line += " | ";
+        line += String((unsigned int)entry.timestamp, DEC);
+
+        // Pad timestamp 
+        while (line.length() < 23) line += " ";
+        line += " | ";
+
+        line += String((unsigned int)entry.register_value, DEC);
+        // Pad register value
+        while (line.length() < 40) line += " ";
+        line += " | ";
+
+        line += binary;
+        // Pad binary 
+        while (line.length() < 82) line += " ";
+        line += " | ";
+
+        line += "0x" + String((unsigned int)entry.register_value, HEX);
+        while (line.length() < 96) line += " ";
+        line += "|";
+
+        Debug(line);
+    }
+    Debug("==========================================");
+}
+
+String regtostring(uint32_t register_value,uint8_t MSB, uint8_t LSB){
+  // Convert register value to binary string
+  String binary = "";
+  for (int bit = MSB; bit >= LSB; bit--) {
+    binary += ((register_value >> bit) & 1) ? "1" : "0";
+    //if (bit % 4 == 0 && bit > 0) binary += " ";  // Add space every 4 bits
+  }
+  return binary;
+}
+
+void pretty_print_line(BufferEntry entry){
+  String line = "| ";
+  line += String((unsigned int)entry.timestamp, DEC);
+  // Pad timestamp 
+  while (line.length() < 15) line += " ";
+  line += " | ";
+  line += regtostring(entry.register_value,LPFBAND3BIT,LPFBAND0BIT);
+  line += " ";
+  line += regtostring(entry.register_value,BPFBAND3BIT,BPFBAND0BIT);
+  line += " ";
+  line += regtostring(entry.register_value,ANT1BIT,ANT0BIT);
+  line += " ";
+  line += regtostring(entry.register_value,XVTRBIT,XVTRBIT);
+  line += " ";
+  line += regtostring(entry.register_value,PA100WBIT,PA100WBIT);
+  line += " ";
+  line += regtostring(entry.register_value,TXBPFBIT,TXBPFBIT);
+  line += " ";
+  line += regtostring(entry.register_value,RXBPFBIT,RXBPFBIT);
+  line += " ";
+  line += regtostring(entry.register_value,RXTXBIT,RXTXBIT);
+  line += " ";
+  line += regtostring(entry.register_value,CWBIT,CWBIT);
+  line += " ";
+  line += regtostring(entry.register_value,MODEBIT,MODEBIT);
+  line += " ";
+  line += regtostring(entry.register_value,CALBIT,CALBIT);
+  line += " ";
+  line += regtostring(entry.register_value,CWVFOBIT,CWVFOBIT);
+  line += " ";
+  line += regtostring(entry.register_value,SSBVFOBIT,SSBVFOBIT);
+  line += " ";
+  line += regtostring(entry.register_value,TXATTMSB,TXATTLSB);
+  line += " ";
+  line += regtostring(entry.register_value,RXATTMSB,RXATTLSB);
+  line += " |";
+  Debug(line);
+}
+
+void buffer_pretty_print_last_entry(void) {
+  Debug("|               |              X 1     R   M   C S               |");
+  Debug("|               |           A  V 0 T R X   O C V V               |");
+  Debug("|               |           n  T 0 X X T C D A F F               |");
+  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
+  Debug("|---------------|------------------------------------------------|");
+  BufferEntry entry;
+  if (buffer.head > 0) entry = buffer.entries[buffer.head-1];
+  else entry = buffer.entries[REGISTER_BUFFER_SIZE-1];
+  pretty_print_line(entry);
+}
+
+void buffer_pretty_buffer_array(void) {
+    Debug("=== Hardware Register Buffer Contents ===");
+    Debug("Buffer size: " + String((unsigned int)buffer.count) + "/" + String((unsigned int)REGISTER_BUFFER_SIZE));
+    Debug("Head index: " + String((unsigned int)buffer.head));
+
+    if (buffer.count == 0) {
+        Debug("Buffer is empty");
+        return;
+    }
+
+    Debug("Entries (oldest to newest):");
+    Debug("|               |              X 1     R   M   C S               |");
+    Debug("|               |           A  V 0 T R X   O C V V               |");
+    Debug("|               |           n  T 0 X X T C D A F F               |");
+    Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
+    Debug("|---------------|------------------------------------------------|");
+
+    // Calculate starting index for oldest entry
+    size_t start_idx;
+    if (buffer.count < REGISTER_BUFFER_SIZE) {
+        start_idx = 0;
+    } else {
+        start_idx = buffer.head;
+    }
+
+    // Print entries from oldest to newest
+    for (size_t i = 0; i < buffer.count; i++) {
+        size_t idx = (start_idx + i) % REGISTER_BUFFER_SIZE;
+        BufferEntry entry = buffer.entries[idx];
+        pretty_print_line(entry);
+    }
+    Debug("==========================================");
+}

@@ -284,8 +284,9 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iBUTTON_PRESSED):{
-            Debug(String("Pressed button:") + String(GetButton()));
-            HandleButtonPress(GetButton());
+            int32_t button = GetButton();
+            Debug(String("Pressed button:") + String(button));
+            HandleButtonPress(button);
             break;
         }
         case (iVFO_CHANGE):{

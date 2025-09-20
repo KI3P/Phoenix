@@ -91,12 +91,19 @@ errno_t InitLPFBoardMCP(void){
     if (LPFinitialized) return LPFerrno;
 
     /******************************************************************
-     * Set up the V12 LPF which is connected via the BANDS connector *
+     * Set up the LPF which is connected via the BANDS connector *
      ******************************************************************/
+    // Prepare the register values for receive mode
     SET_LPF_BAND(BandToBCD(ED.currentBand[ED.activeVFO]));
     SET_ANTENNA(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
+    CLEAR_BIT(hardwareRegister,PA100WBIT);
+    CLEAR_BIT(hardwareRegister,RXTXBIT);
+    CLEAR_BIT(hardwareRegister,XVTRBIT);
+    CLEAR_BIT(hardwareRegister,TXBPFBIT);
+    SET_BIT(hardwareRegister,RXBPFBIT);
+
     if (mcpLPF.begin_I2C(V12_LPF_MCP23017_ADDR,&Wire2)){
-        Debug("Initializing V12 LPF board");
+        Debug("Initializing LPF board");
         mcpLPF.enableAddrPins();
         // Set all pins to be outputs
         for (int i=0;i<16;i++){

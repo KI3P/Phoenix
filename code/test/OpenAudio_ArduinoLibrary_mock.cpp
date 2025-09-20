@@ -12,7 +12,7 @@ int AudioRecordQueue::available(void) {
 }
 
 void AudioRecordQueue::clear(void) {
-    head = 0;
+    //head = 0;
 }
 
 void AudioRecordQueue::setChannel(uint8_t chan) {

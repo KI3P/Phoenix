@@ -2,7 +2,7 @@
 
 static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
 static RFHardwareState rfHardwareState = RFReceive;
-static RFHardwareState oldrfHardwareState = RFReceive;
+static RFHardwareState oldrfHardwareState = RFinvalid;
 static TuneState tuneState = TuneReceive;
 
 /**
@@ -262,8 +262,8 @@ void UpdateRFHardwareState(void){
  */
 void HandleTuneState(TuneState tuneState){
     SelectLPFBand(ED.currentBand[ED.activeVFO]);
-    SetBPFBand(ED.currentBand[ED.activeVFO]);
-    SetAntenna(ED.currentBand[ED.activeVFO]);
+    SelectBPFBand(ED.currentBand[ED.activeVFO]);
+    SelectAntenna(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
     UpdateFIRFilterMask(&filters);
     switch (tuneState){
         case TuneReceive:{

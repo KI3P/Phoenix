@@ -13,10 +13,8 @@ typedef float float32_t;
 #define AudioInterrupts()
 #define DMAMEM
 #define FASTRUN
-
-void SetLPFBand(int32_t band);
-void SetBPFBand(int32_t band);
-void SetAntenna(int32_t a);
+#define DEC 10
+#define HEX 16
 
 void digitalWrite(uint16_t pin, uint8_t val);
 uint8_t digitalRead(uint16_t pin);
@@ -80,6 +78,8 @@ public:
     String(const String& other);
     String(int val);
     String(int val, int base);
+    String(unsigned int val);
+    String(unsigned int val, int base);
     String(long val);
     String(long val, int base);
     String(float val);
@@ -93,6 +93,9 @@ public:
     String& operator=(const String& other);
     String operator+(const String& other) const;
     String operator+(const char* other) const;
+    String& operator+=(const String& other);
+    String& operator+=(const char* other);
+    String substring(unsigned int from, unsigned int to) const;
 
 private:
     char* _data;

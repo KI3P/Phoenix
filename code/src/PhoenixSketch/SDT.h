@@ -204,7 +204,7 @@ extern struct config_t {
     float32_t RAtten[NUMBER_OF_BANDS];
     int64_t favoriteFreqs[MAX_FAVORITES];                // UNUSED
     int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // center tune and fine tune
-    int32_t antennaSelection[NUMBER_OF_BANDS];            // UNUSED
+    int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     char mapFileName[50];                             // UNUSED
     char myCall[10];                                  // UNUSED
     char myTimeZone[10];                              // UNUSED
@@ -560,9 +560,9 @@ extern uint32_t hardwareRegister;
 #define CWVFOBIT     14
 #define SSBVFOBIT    15
 #define TXATTLSB     16
-#define TXATTMSD     21
+#define TXATTMSB     21
 #define RXATTLSB     22
-#define TXATTMSB     27
+#define RXATTMSB     27
 #define BPFBAND0BIT  28
 #define BPFBAND1BIT  29
 #define BPFBAND2BIT  30
@@ -602,11 +602,11 @@ typedef struct {
 } RollingBuffer;
 extern RollingBuffer buffer;
 void buffer_add(void);
+void buffer_pretty_print(void);
+void buffer_pretty_buffer_array(void);
+void pretty_print_line(BufferEntry entry);
+void buffer_pretty_print_last_entry(void);
 
 void MyDelay(unsigned long millisWait);
-
-//void SetBPFBand(int val);
-//void SetAntenna(int val);
-
 
 #endif // SDT_H
