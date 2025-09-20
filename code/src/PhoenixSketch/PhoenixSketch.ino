@@ -1,6 +1,9 @@
 #include "SDT.h"
 #include <RA8875.h>
 
+// Create an IntervalTimer object for driving the state machines
+IntervalTimer timer1ms;
+
 // pins for the display CS and reset
 #define TFT_CS 10
 #define TFT_RESET 9 // any pin or nothing!
@@ -15,14 +18,14 @@ RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
 #include "phoenix.cpp"
 
 void drawArray(const uint32_t * image, uint32_t isize, uint16_t iwidth, uint16_t x, uint16_t y){
-  uint16_t pixels[iwidth]; // container
-  uint32_t i, idx;
-  for (idx = 0; idx < isize/iwidth; idx++){
-    for (i = (iwidth*idx); i < iwidth*(idx+1); i++){
-      pixels[i - (iwidth*idx)] = tft.Color24To565(image[i]);
+    uint16_t pixels[iwidth]; // container
+    uint32_t i, idx;
+    for (idx = 0; idx < isize/iwidth; idx++){
+        for (i = (iwidth*idx); i < iwidth*(idx+1); i++){
+            pixels[i - (iwidth*idx)] = tft.Color24To565(image[i]);
+        }
+        tft.drawPixels(pixels, iwidth, x, idx+y);
     }
-    tft.drawPixels(pixels, iwidth, x, idx+y);
-  }
 }
 
 void Splash() 
@@ -49,6 +52,14 @@ void Splash()
     tft.setCursor((XPIXELS / 2) - (38 * tft.getFontWidth() / 2) + 0, YPIXELS / 4 + 70);  // 38 = letters in string
     tft.print("           Oliver King, KI3P");
     
+}
+
+/**
+ * This is run every 1ms. It dispatches do events to the state machines
+ */
+void tick1ms(void){
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    UISm_dispatch_event(&uiSM, UISm_EventId_DO);
 }
 
 void setup(void){
@@ -93,5 +104,5 @@ void setup(void){
 
     // Display the image at bottom middle
     drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
-
+    timer1ms.begin(tick1ms, 1000);  // run tick1ms every 1ms
 }

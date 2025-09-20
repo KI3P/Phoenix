@@ -1,8 +1,51 @@
 #include "gtest/gtest.h"
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 #include "../src/PhoenixSketch/SDT.h"
 
 #define GETHWRBITS(LSB,len) ((hardwareRegister >> LSB) & ((1 << len) - 1))
+
+// Timer variables for interrupt simulation
+static std::atomic<bool> timer_running{false};
+static std::thread timer_thread;
+
+/**
+ * Timer interrupt function that runs every 1ms
+ * Dispatches DO events to the state machines
+ */
+void timer1ms(void) {
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    UISm_dispatch_event(&uiSM, UISm_EventId_DO);
+}
+
+/**
+ * Start the 1ms timer interrupt
+ */
+void start_timer1ms() {
+    if (timer_running.load()) return; // Already running
+
+    timer_running.store(true);
+    timer_thread = std::thread([]() {
+        while (timer_running.load()) {
+            timer1ms();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    });
+}
+
+/**
+ * Stop the 1ms timer interrupt
+ */
+void stop_timer1ms() {
+    if (!timer_running.load()) return; // Already stopped
+
+    timer_running.store(false);
+    if (timer_thread.joinable()) {
+        timer_thread.join();
+    }
+}
 
 void CheckThatStateIsReceive(){
     int32_t band = ED.currentBand[ED.activeVFO];
@@ -126,43 +169,53 @@ TEST(Radio, RadioStateRunThrough) {
     UpdateAudioIOState();
     InitializeRFHardware(); // RF board, LPF board, and BPF board
     InitializeSignalProcessing();
+
+    // Now, start the 1ms timer interrupt to simulate hardware timer
+    start_timer1ms();
+
     //-------------------------------------------------------------
     
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 
     // Check the state before loop is invoked and then again after
     CheckThatStateIsReceive();
-    for (size_t i = 0; i < 500; i++) loop();
+    for (size_t i = 0; i < 50; i++){
+        loop();
+        MyDelay(10);
+    }
     CheckThatStateIsReceive();
 
     // Now, press the BAND UP button and check that things changed as expected
     int32_t oldband = ED.currentBand[ED.activeVFO];
     SetButton(BAND_UP);
     SetInterrupt(iBUTTON_PRESSED);
-    loop();    
+    loop(); MyDelay(10);
     EXPECT_EQ(ED.currentBand[ED.activeVFO],oldband+1);
     CheckThatStateIsReceive();
     // go back down
     oldband = ED.currentBand[ED.activeVFO];
     SetButton(BAND_DN);
     SetInterrupt(iBUTTON_PRESSED);
-    loop();    
+    loop(); MyDelay(10);
     EXPECT_EQ(ED.currentBand[ED.activeVFO],oldband-1);
     CheckThatStateIsReceive();
 
     // Change the fine tune frequency
     Debug("Before fine tune change:");print_frequency_state();
     SetInterrupt(iFINETUNE_INCREASE);
-    loop();
+    loop(); MyDelay(10);
     int64_t oldrxtx = GetTXRXFreq_dHz();
     Debug("After fine tune change:");print_frequency_state();
     
     // Go to SSB transmit mode
     SetInterrupt(iPTT_PRESSED);
-    loop();
+    loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
     CheckThatStateIsSSBTransmit();
-    for (size_t i = 0; i < 500; i++) loop();
+    for (size_t i = 0; i < 50; i++){
+        loop();
+        MyDelay(10);
+    }
     CheckThatStateIsSSBTransmit();
     EXPECT_EQ(oldrxtx, GetTXRXFreq_dHz());
     EXPECT_EQ(oldrxtx, GetSSBVFOFrequency()*100);
@@ -171,7 +224,7 @@ TEST(Radio, RadioStateRunThrough) {
     // Change frequency while transmitting
     int64_t oldfreq = ED.centerFreq_Hz[ED.activeVFO];
     SetInterrupt(iCENTERTUNE_INCREASE);
-    loop();    
+    loop(); MyDelay(10);
     CheckThatStateIsSSBTransmit();
     EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], oldfreq+ED.freqIncrement);
     EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_dHz());
@@ -180,7 +233,7 @@ TEST(Radio, RadioStateRunThrough) {
 
     // Go back to SSB receive mode
     SetInterrupt(iPTT_RELEASED);
-    loop();
+    loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     CheckThatStateIsReceive();
     EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_dHz()); // rxtx should stay the same
@@ -189,7 +242,7 @@ TEST(Radio, RadioStateRunThrough) {
     // Switch to CW receive mode
     SetButton(TOGGLE_MODE);
     SetInterrupt(iBUTTON_PRESSED);
-    loop();
+    loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
     CheckThatStateIsReceive();
     EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_dHz()); // rxtx should stay the same
@@ -197,12 +250,15 @@ TEST(Radio, RadioStateRunThrough) {
     
     // Press the key to start transmitting
     SetInterrupt(iKEY1_PRESSED);
-    loop();
+    loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
     CheckThatStateIsCWTransmitMark();
     Debug("Change to CW transmit mark mode:");print_frequency_state();
     EXPECT_EQ(GetCWVFOFrequency()*100, GetCWTXFreq_dHz());
-    for (size_t i = 0; i < 500; i++) loop();
+    for (size_t i = 0; i < 50; i++){
+        loop();
+        MyDelay(10);
+    }
     CheckThatStateIsCWTransmitMark();
 
     // Release the PTT key, we should go to a new state
@@ -210,20 +266,24 @@ TEST(Radio, RadioStateRunThrough) {
     loop();
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
     CheckThatStateIsCWTransmitSpace();
-    // Our test code doesn't call the do event automatically. We need to do this.
-    // First, confirm that the state didn't change even though we're well past 
-    // waitDuration_ms
-    for (size_t i = 0; i < 500; i++) loop();
-    CheckThatStateIsCWTransmitSpace();
-    
-    // Now, call the do event until the state changes back to receive
-    for (size_t i = 0; i < modeSM.vars.waitDuration_ms-1; i++) ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
-    CheckThatStateIsCWTransmitSpace();
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
+    // Then, after at least waitDuration_ms, we should go back to receive
+    StartMillis();
+    for (size_t i = 0; i < 50; i++){
+        loop();
+        MyDelay(10);
+        if (millis() < CW_TRANSMIT_SPACE_TIMEOUT_MS){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
+        }
+    }
+    //CheckThatStateIsCWTransmitSpace();
     CheckThatStateIsReceive();
+
 
     //buffer_pretty_print();
     //buffer_pretty_buffer_array();
     //buffer_pretty_print_last_entry();
     //CheckThatStateIsSSBTransmit();
+
+    // Stop the 1ms timer interrupt
+    stop_timer1ms();
 }
