@@ -34,6 +34,7 @@ typedef enum {
 void ConsumeInterrupt(void);
 InterruptType GetInterrupt(void);
 void SetInterrupt(InterruptType i);
+void PrependInterrupt(InterruptType i);
 void loop(void);
 void SetKeyType(KeyTypeId key);
 void SetKey1Dit(void);

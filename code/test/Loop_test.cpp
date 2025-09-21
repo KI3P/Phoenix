@@ -945,3 +945,200 @@ TEST(Loop, HardwareStateMachineDelayOrderingVerification) {
         EXPECT_GE(delay_boundaries[2], delay_boundaries[1] + 1); // At least 1 op between delays
     }
 }
+
+// ===== FIFO Buffer Unit Tests =====
+
+TEST(Loop, GetInterruptReturnsNoneWhenEmpty) {
+    // Test should return iNONE when buffer is empty
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    InterruptType result = GetInterrupt();
+    EXPECT_EQ(result, iNONE);
+}
+
+TEST(Loop, SetInterruptAddsToBuffer) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    SetInterrupt(iPTT_PRESSED);
+    InterruptType result = GetInterrupt();
+    EXPECT_EQ(result, iPTT_PRESSED);
+}
+
+TEST(Loop, GetInterruptConsumesFromBuffer) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    SetInterrupt(iPTT_PRESSED);
+    GetInterrupt(); // Consume the interrupt
+
+    // Buffer should now be empty
+    InterruptType result = GetInterrupt();
+    EXPECT_EQ(result, iNONE);
+}
+
+TEST(Loop, SetInterruptMultipleValues) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Add multiple interrupts
+    SetInterrupt(iPTT_PRESSED);
+    SetInterrupt(iKEY1_PRESSED);
+    SetInterrupt(iVOLUME_INCREASE);
+
+    // Should get them back in FIFO order
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iKEY1_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iVOLUME_INCREASE);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, PrependInterruptAddsToFront) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Add normal interrupt first
+    SetInterrupt(iPTT_PRESSED);
+
+    // Prepend interrupt - should come out first
+    PrependInterrupt(iKEY1_PRESSED);
+
+    // Should get prepended interrupt first
+    EXPECT_EQ(GetInterrupt(), iKEY1_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, PrependInterruptOnEmptyBuffer) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Prepend to empty buffer
+    PrependInterrupt(iKEY1_PRESSED);
+
+    EXPECT_EQ(GetInterrupt(), iKEY1_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, PrependInterruptMultiple) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    SetInterrupt(iPTT_PRESSED);
+
+    // Prepend multiple - they should come out in reverse order of prepending
+    PrependInterrupt(iKEY1_PRESSED);
+    PrependInterrupt(iKEY2_PRESSED);
+
+    EXPECT_EQ(GetInterrupt(), iKEY2_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iKEY1_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, FifoBufferOrdering) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test complex ordering scenario
+    SetInterrupt(iVOLUME_INCREASE);      // Position 1
+    SetInterrupt(iVOLUME_DECREASE);      // Position 2
+    PrependInterrupt(iPTT_PRESSED);      // Should be first
+    SetInterrupt(iCENTERTUNE_INCREASE);  // Position 3
+    PrependInterrupt(iPTT_RELEASED);     // Should be first now
+
+    // Expected order: iPTT_RELEASED, iPTT_PRESSED, iVOLUME_INCREASE, iVOLUME_DECREASE, iCENTERTUNE_INCREASE
+    EXPECT_EQ(GetInterrupt(), iPTT_RELEASED);
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iVOLUME_INCREASE);
+    EXPECT_EQ(GetInterrupt(), iVOLUME_DECREASE);
+    EXPECT_EQ(GetInterrupt(), iCENTERTUNE_INCREASE);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, FifoBufferOverflow) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Fill buffer to capacity (INTERRUPT_BUFFER_SIZE = 16)
+    for (int i = 0; i < 16; i++) {
+        SetInterrupt(iVOLUME_INCREASE);
+    }
+
+    // Add one more to trigger overflow - should drop oldest
+    SetInterrupt(iPTT_PRESSED);
+
+    // Should get 15 VOLUME_INCREASE + 1 PTT_PRESSED
+    for (int i = 0; i < 15; i++) {
+        EXPECT_EQ(GetInterrupt(), iVOLUME_INCREASE);
+    }
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, PrependBufferOverflow) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Fill buffer to capacity
+    for (int i = 0; i < 16; i++) {
+        SetInterrupt(iVOLUME_INCREASE);
+    }
+
+    // Prepend to full buffer - should drop oldest from end
+    PrependInterrupt(iPTT_PRESSED);
+
+    // Should get PTT_PRESSED first, then 15 VOLUME_INCREASE
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    for (int i = 0; i < 15; i++) {
+        EXPECT_EQ(GetInterrupt(), iVOLUME_INCREASE);
+    }
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, FifoBufferStateConsistency) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test that buffer maintains consistent state through mixed operations
+    SetInterrupt(iVOLUME_INCREASE);
+    SetInterrupt(iVOLUME_DECREASE);
+
+    EXPECT_EQ(GetInterrupt(), iVOLUME_INCREASE);
+
+    PrependInterrupt(iPTT_PRESSED);
+    SetInterrupt(iKEY1_PRESSED);
+
+    EXPECT_EQ(GetInterrupt(), iPTT_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iVOLUME_DECREASE);
+    EXPECT_EQ(GetInterrupt(), iKEY1_PRESSED);
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+TEST(Loop, FifoBufferAllInterruptTypes) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test with various interrupt types to ensure enum values work correctly
+    InterruptType test_interrupts[] = {
+        iNONE, iPTT_PRESSED, iPTT_RELEASED, iMODE, iKEY1_PRESSED,
+        iKEY1_RELEASED, iKEY2_PRESSED, iVOLUME_INCREASE, iVOLUME_DECREASE,
+        iFILTER_INCREASE, iFILTER_DECREASE, iCENTERTUNE_INCREASE,
+        iCENTERTUNE_DECREASE, iFINETUNE_INCREASE, iFINETUNE_DECREASE
+    };
+
+    size_t num_tests = sizeof(test_interrupts) / sizeof(test_interrupts[0]);
+
+    // Add all test interrupts
+    for (size_t i = 0; i < num_tests && i < 16; i++) {
+        SetInterrupt(test_interrupts[i]);
+    }
+
+    // Verify they come back in order
+    for (size_t i = 0; i < num_tests && i < 16; i++) {
+        EXPECT_EQ(GetInterrupt(), test_interrupts[i]);
+    }
+
+    EXPECT_EQ(GetInterrupt(), iNONE);
+}

@@ -73,7 +73,7 @@ InterruptType GetInterrupt(void){
 }
 
 /**
- * Adds an interrupt to the FIFO buffer.
+ * Adds an interrupt to the end of the FIFO buffer.
  *
  * @param i The InterruptType value to add to the buffer.
  */
@@ -86,6 +86,24 @@ void SetInterrupt(InterruptType i){
 
     interruptFifo.buffer[interruptFifo.head] = i;
     interruptFifo.head = (interruptFifo.head + 1) % INTERRUPT_BUFFER_SIZE;
+    interruptFifo.count++;
+}
+
+/**
+ * Adds an interrupt to the beginning of the FIFO buffer.
+ *
+ * @param i The InterruptType value to add to the buffer.
+ */
+void PrependInterrupt(InterruptType i){
+    if (interruptFifo.count >= INTERRUPT_BUFFER_SIZE) {
+        // Buffer is full, drop the oldest interrupt (at head-1)
+        interruptFifo.head = (interruptFifo.head - 1 + INTERRUPT_BUFFER_SIZE) % INTERRUPT_BUFFER_SIZE;
+        interruptFifo.count--;
+    }
+
+    // Move tail backward to insert at the beginning
+    interruptFifo.tail = (interruptFifo.tail - 1 + INTERRUPT_BUFFER_SIZE) % INTERRUPT_BUFFER_SIZE;
+    interruptFifo.buffer[interruptFifo.tail] = i;
     interruptFifo.count++;
 }
 
@@ -227,13 +245,59 @@ void HandleButtonPress(int32_t button){
 }
 
 /**
+ * The keyer requires special handling logic because of its timers
+ */
+void HandleKeyer(InterruptType interrupt){
+    if ((interrupt != iKEY1_PRESSED) && (interrupt != iKEY2_PRESSED))
+        return; // this should never happen
+
+    // act on this interrupt if we're in the CW_RECEIVE or CW_TRANSMIT_KEYER_WAIT states
+    // If we're in the TRANSMIT_DIT_MARK, TRANSMIT_DAH_MARK, or TRANSMIT_KEYER_SPACE states,
+    // add it back to the head of the interrupt queue. If we're in any other state, discard
+    // it without acting on it
+    switch (modeSM.state_id){
+        case ModeSm_StateId_CW_RECEIVE:
+        case ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT:{
+            switch (interrupt){
+                case (iKEY1_PRESSED):{
+                    if (ED.keyerFlip){
+                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+                    }else{
+                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+                    }
+                    break;
+                }
+                case (iKEY2_PRESSED):{
+                    if (ED.keyerFlip){
+                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+                    }else{
+                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+                    }
+                    break;
+                }
+            
+            }
+            break;
+        }
+        case ModeSm_StateId_CW_TRANSMIT_DAH_MARK:
+        case ModeSm_StateId_CW_TRANSMIT_DIT_MARK:
+        case ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE:{
+            PrependInterrupt(interrupt);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+/**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
  * issuing an event to the state machines or by updating a system parameter. Interrupt 
  * is consumed and removed from the buffer.
  */
 void ConsumeInterrupt(void){
     InterruptType interrupt = GetInterrupt();
-    while ( interrupt != iNONE ){
+    if ( interrupt != iNONE ){
         switch (interrupt){
             case (iNONE):{
                 break;
@@ -255,11 +319,7 @@ void ConsumeInterrupt(void){
                 if (ED.keyType == KeyTypeId_Straight){
                     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
                 } else {
-                    if (ED.keyerFlip){
-                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
-                    }else{
-                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
-                    }
+                    HandleKeyer(interrupt);
                 }
                 break;
             }
@@ -270,11 +330,7 @@ void ConsumeInterrupt(void){
                 break;
             }
             case (iKEY2_PRESSED):{
-                if (ED.keyerFlip){
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
-                }else{
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
-                }
+                HandleKeyer(interrupt);
                 break;
             }
             case (iVOLUME_INCREASE):{
@@ -356,7 +412,6 @@ void ConsumeInterrupt(void){
             default:
                 break;
         }
-        interrupt = GetInterrupt();
     }
 }
 

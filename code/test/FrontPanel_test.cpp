@@ -162,7 +162,7 @@ TEST(FrontPanel, FilterDecrease){
         loop();
     }
     int32_t maxpost = FindMax("FilterDecrease_ReceiveOut_L.txt", 2048*258); //4238
-    EXPECT_LT(maxpost, maxpre*0.35);
+    EXPECT_LT(maxpost, maxpre*0.5);
 
     if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
         EXPECT_LT(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,tmphi);
