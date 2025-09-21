@@ -41,19 +41,19 @@ void SetLPFRegisterState(uint16_t value) {
     hardwareRegister = (hardwareRegister & 0xFFFFFC00) | (value & 0x03FF);
 }
 
-uint8_t GetMCPAOld(void) {
+uint8_t GetLPFMCPAOld(void) {
     return mcpA_old;
 }
 
-uint8_t GetMCPBOld(void) {
+uint8_t GetLPFMCPBOld(void) {
     return mcpB_old;
 }
 
-void SetMCPAOld(uint8_t value) {
+void SetLPFMCPAOld(uint8_t value) {
     mcpA_old = value;
 }
 
-void SetMCPBOld(uint8_t value) {
+void SetLPFMCPBOld(uint8_t value) {
     mcpB_old = value;
 }
 // end of unit testing section
@@ -124,6 +124,10 @@ errno_t InitLPFBoardMCP(void){
     }
     LPFinitialized = true;
     return LPFerrno;
+}
+
+uint16_t GetLPFMCPRegisters(void){
+    return mcpLPF.readGPIOAB();
 }
 
 void UpdateMCPRegisters(void){

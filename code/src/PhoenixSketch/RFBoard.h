@@ -10,6 +10,7 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB);
 float32_t GetRXAttenuation(void);
 float32_t GetTXAttenuation(void);
 errno_t InitAttenuation(void);
+uint16_t GetRFMCPRegisters(void); // used for unit testing
 
 // SSB VFO Control Functions
 int64_t GetSSBVFOFrequency(void);

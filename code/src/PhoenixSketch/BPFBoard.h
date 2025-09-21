@@ -33,5 +33,6 @@ handle special case of bypass
 
 errno_t InitializeBPFBoard(void);
 void SelectBPFBand(int32_t band);
+uint16_t GetBPFMCPRegisters(void);
 
 #endif // BPF_CONTROL_h

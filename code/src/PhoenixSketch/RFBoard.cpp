@@ -652,3 +652,7 @@ void SelectRXMode(void){
 bool getRXTXState(void){
     return GET_BIT(hardwareRegister,RXTXBIT);
 }
+
+uint16_t GetRFMCPRegisters(void){
+    return mcpAtten.readGPIOAB();
+}

@@ -47,7 +47,27 @@ void stop_timer1ms() {
     }
 }
 
+void CheckThatHardwareRegisterMatchesActualHardware(){
+    // LPF
+    uint16_t gpioab = GetLPFMCPRegisters(); // a is upper half, b is lower half
+    EXPECT_EQ((uint8_t)(gpioab & 0x00FF), (uint8_t)(hardwareRegister & 0x000000FF)); // gpiob
+    EXPECT_EQ((uint8_t)((gpioab >> 8) & 0x0003), (uint8_t)((hardwareRegister >> 8) & 0x00000003));
+    // RF
+    gpioab = GetRFMCPRegisters();
+    EXPECT_EQ((uint8_t)(gpioab & 0x003F), (uint8_t)((hardwareRegister >> TXATTLSB) & 0x0000003F)); // tx atten
+    EXPECT_EQ((uint8_t)((gpioab >> 8) & 0x003F), (uint8_t)((hardwareRegister >> RXATTLSB) & 0x0000003F));
+    // BPF
+    gpioab = GetBPFMCPRegisters();
+    EXPECT_EQ(gpioab, BPF_WORD);
+    // Teensy
+    EXPECT_EQ(digitalRead(RXTX),GET_BIT(hardwareRegister,RXTXBIT));
+    EXPECT_EQ(digitalRead(CW_ON_OFF),GET_BIT(hardwareRegister,CWBIT));
+    EXPECT_EQ(digitalRead(XMIT_MODE),GET_BIT(hardwareRegister,MODEBIT));
+    EXPECT_EQ(digitalRead(CAL),GET_BIT(hardwareRegister,CALBIT));
+}
+
 void CheckThatStateIsReceive(){
+    // Check that the hardware register contains the expected bits
     int32_t band = ED.currentBand[ED.activeVFO];
     EXPECT_EQ(GETHWRBITS(LPFBAND0BIT,4), BandToBCD(band)); // LPF filter
     EXPECT_EQ(GETHWRBITS(ANT0BIT,2), ED.antennaSelection[band]); // antenna
@@ -64,6 +84,8 @@ void CheckThatStateIsReceive(){
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[band])); // TX attenuation
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    // Now check that the GPIO registers match the hardware register
+    CheckThatHardwareRegisterMatchesActualHardware();
 }
 
 void CheckThatStateIsSSBTransmit(){
@@ -83,6 +105,7 @@ void CheckThatStateIsSSBTransmit(){
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[band])); // TX attenuation
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    CheckThatHardwareRegisterMatchesActualHardware();
 }
 
 void CheckThatStateIsCWTransmitMark(){
@@ -102,6 +125,7 @@ void CheckThatStateIsCWTransmitMark(){
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[band])); // TX attenuation
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    CheckThatHardwareRegisterMatchesActualHardware();
 }
 
 void CheckThatStateIsCWTransmitSpace(){
@@ -121,6 +145,7 @@ void CheckThatStateIsCWTransmitSpace(){
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[band])); // TX attenuation
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    CheckThatHardwareRegisterMatchesActualHardware();
 }
 
 

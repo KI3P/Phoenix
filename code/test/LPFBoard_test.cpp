@@ -595,59 +595,59 @@ TEST_F(LPFBoardTest, SetAntennaMacro) {
 TEST_F(LPFBoardTest, UpdateMCPRegistersNoChangeNoUpdate) {
     // Set up a scenario where the register state matches the old values
     SetLPFRegister(0x0234);
-    SetMCPAOld(0x02); // Upper 8 bits of register (GPA)
-    SetMCPBOld(0x34); // Lower 8 bits of register (GPB)
+    SetLPFMCPAOld(0x02); // Upper 8 bits of register (GPA)
+    SetLPFMCPBOld(0x34); // Lower 8 bits of register (GPB)
 
     // Call UpdateMCPRegisters - should not call writeGPIO since values match
     UpdateMCPRegisters();
 
     // Old values should remain unchanged since no update was needed
-    EXPECT_EQ(GetMCPAOld(), 0x02);
-    EXPECT_EQ(GetMCPBOld(), 0x34);
+    EXPECT_EQ(GetLPFMCPAOld(), 0x02);
+    EXPECT_EQ(GetLPFMCPBOld(), 0x34);
 }
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersGPAChanged) {
     // Set up a scenario where GPA register changed
     SetLPFRegister(0x02AB);
-    SetMCPAOld(0x03); // Different from current GPA state (0x02)
-    SetMCPBOld(0xAB); // Same as current GPB state
+    SetLPFMCPAOld(0x03); // Different from current GPA state (0x02)
+    SetLPFMCPBOld(0xAB); // Same as current GPB state
 
     // Call UpdateMCPRegisters - should update GPA but not GPB
     UpdateMCPRegisters();
 
     // Old GPA value should be updated to match current state
-    EXPECT_EQ(GetMCPAOld(), 0x02);
+    EXPECT_EQ(GetLPFMCPAOld(), 0x02);
     // Old GPB value should remain unchanged
-    EXPECT_EQ(GetMCPBOld(), 0xAB);
+    EXPECT_EQ(GetLPFMCPBOld(), 0xAB);
 }
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersGPBChanged) {
     // Set up a scenario where GPB register changed
     SetLPFRegister(0x0256);
-    SetMCPAOld(0x02); // Same as current GPA state
-    SetMCPBOld(0x78); // Different from current GPB state (0x56)
+    SetLPFMCPAOld(0x02); // Same as current GPA state
+    SetLPFMCPBOld(0x78); // Different from current GPB state (0x56)
 
     // Call UpdateMCPRegisters - should update GPB but not GPA
     UpdateMCPRegisters();
 
     // Old GPA value should remain unchanged
-    EXPECT_EQ(GetMCPAOld(), 0x02);
+    EXPECT_EQ(GetLPFMCPAOld(), 0x02);
     // Old GPB value should be updated to match current state
-    EXPECT_EQ(GetMCPBOld(), 0x56);
+    EXPECT_EQ(GetLPFMCPBOld(), 0x56);
 }
 
 TEST_F(LPFBoardTest, UpdateMCPRegistersBothChanged) {
     // Set up a scenario where both GPA and GPB registers changed
     SetLPFRegister(0x02CD);
-    SetMCPAOld(0x03); // Different from current GPA state (0x02)
-    SetMCPBOld(0x34); // Different from current GPB state (0xCD)
+    SetLPFMCPAOld(0x03); // Different from current GPA state (0x02)
+    SetLPFMCPBOld(0x34); // Different from current GPB state (0xCD)
 
     // Call UpdateMCPRegisters - should update both GPA and GPB
     UpdateMCPRegisters();
 
     // Both old values should be updated to match current state
-    EXPECT_EQ(GetMCPAOld(), 0x02);
-    EXPECT_EQ(GetMCPBOld(), 0xCD);
+    EXPECT_EQ(GetLPFMCPAOld(), 0x02);
+    EXPECT_EQ(GetLPFMCPBOld(), 0xCD);
 }
 
 // ================== UPDATED TXSELECTBPF FUNCTION TESTS ==================
@@ -655,8 +655,8 @@ TEST_F(LPFBoardTest, UpdateMCPRegistersBothChanged) {
 TEST_F(LPFBoardTest, TXSelectBPFUpdatesRegisterAndHardware) {
     // Start with cleared register and known old values
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Call TXSelectBPF - should set the bit and update hardware
     TXSelectBPF();
@@ -670,14 +670,14 @@ TEST_F(LPFBoardTest, TXSelectBPFUpdatesRegisterAndHardware) {
     // Verify that UpdateMCPRegisters was called and updated the old values
     // Since TXBPFBIT is bit 8, it affects the GPA register (upper 8 bits)
     uint8_t expectedGPA = (result >> 8) & 0xFF;
-    EXPECT_EQ(GetMCPAOld(), expectedGPA);
+    EXPECT_EQ(GetLPFMCPAOld(), expectedGPA);
 }
 
 TEST_F(LPFBoardTest, TXSelectBPFWithExistingRegisterState) {
     // Start with a register that has some bits already set
     SetLPFRegister(0x0234);
-    SetMCPAOld(0x02); // Same as current GPA state initially
-    SetMCPBOld(0x34); // Same as current GPB state initially
+    SetLPFMCPAOld(0x02); // Same as current GPA state initially
+    SetLPFMCPBOld(0x34); // Same as current GPB state initially
 
     // Call TXSelectBPF - should set the TX BPF bit and update hardware
     TXSelectBPF();
@@ -693,28 +693,28 @@ TEST_F(LPFBoardTest, TXSelectBPFWithExistingRegisterState) {
 
     // Verify that hardware state was updated appropriately
     uint8_t expectedGPA = (result >> 8) & 0xFF;
-    EXPECT_EQ(GetMCPAOld(), expectedGPA);
+    EXPECT_EQ(GetLPFMCPAOld(), expectedGPA);
 }
 
 // ================== MCP OLD VALUE ACCESSOR TESTS ==================
 
 TEST_F(LPFBoardTest, MCPOldValueAccessors) {
     // Test setting and getting MCP A old value
-    SetMCPAOld(0xAB);
-    EXPECT_EQ(GetMCPAOld(), 0xAB);
+    SetLPFMCPAOld(0xAB);
+    EXPECT_EQ(GetLPFMCPAOld(), 0xAB);
 
     // Test setting and getting MCP B old value
-    SetMCPBOld(0xCD);
-    EXPECT_EQ(GetMCPBOld(), 0xCD);
+    SetLPFMCPBOld(0xCD);
+    EXPECT_EQ(GetLPFMCPBOld(), 0xCD);
 
     // Test that they're independent
-    SetMCPAOld(0x12);
-    EXPECT_EQ(GetMCPAOld(), 0x12);
-    EXPECT_EQ(GetMCPBOld(), 0xCD); // Should not have changed
+    SetLPFMCPAOld(0x12);
+    EXPECT_EQ(GetLPFMCPAOld(), 0x12);
+    EXPECT_EQ(GetLPFMCPBOld(), 0xCD); // Should not have changed
 
-    SetMCPBOld(0x34);
-    EXPECT_EQ(GetMCPAOld(), 0x12); // Should not have changed
-    EXPECT_EQ(GetMCPBOld(), 0x34);
+    SetLPFMCPBOld(0x34);
+    EXPECT_EQ(GetLPFMCPAOld(), 0x12); // Should not have changed
+    EXPECT_EQ(GetLPFMCPBOld(), 0x34);
 }
 
 // ================== UPDATED BPF FUNCTION TESTS ==================
@@ -722,8 +722,8 @@ TEST_F(LPFBoardTest, MCPOldValueAccessors) {
 TEST_F(LPFBoardTest, TXBypassBPFUpdatesRegisterAndHardware) {
     // Start with TX BPF bit set and known old values
     SetLPFRegister(1 << TXBPFBIT);
-    SetMCPAOld((1 << TXBPFBIT) >> 8); // GPA (upper 8 bits) - TXBPFBIT is bit 8
-    SetMCPBOld(0x00); // GPB (lower 8 bits)
+    SetLPFMCPAOld((1 << TXBPFBIT) >> 8); // GPA (upper 8 bits) - TXBPFBIT is bit 8
+    SetLPFMCPBOld(0x00); // GPB (lower 8 bits)
 
     // Call TXBypassBPF - should clear the bit and update hardware
     TXBypassBPF();
@@ -736,14 +736,14 @@ TEST_F(LPFBoardTest, TXBypassBPFUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPA = (result >> 8) & 0xFF;
-    EXPECT_EQ(GetMCPAOld(), expectedGPA);
+    EXPECT_EQ(GetLPFMCPAOld(), expectedGPA);
 }
 
 TEST_F(LPFBoardTest, RXSelectBPFUpdatesRegisterAndHardware) {
     // Start with cleared register and known old values
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Call RXSelectBPF - should set the bit and update hardware
     RXSelectBPF();
@@ -756,14 +756,14 @@ TEST_F(LPFBoardTest, RXSelectBPFUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPA = (result >> 8) & 0xFF;
-    EXPECT_EQ(GetMCPAOld(), expectedGPA);
+    EXPECT_EQ(GetLPFMCPAOld(), expectedGPA);
 }
 
 TEST_F(LPFBoardTest, RXBypassBPFUpdatesRegisterAndHardware) {
     // Start with RX BPF bit set and known old values
     SetLPFRegister(1 << RXBPFBIT);
-    SetMCPAOld((1 << RXBPFBIT) >> 8); // GPA (upper 8 bits) - RXBPFBIT is bit 9
-    SetMCPBOld(0x00); // GPB (lower 8 bits)
+    SetLPFMCPAOld((1 << RXBPFBIT) >> 8); // GPA (upper 8 bits) - RXBPFBIT is bit 9
+    SetLPFMCPBOld(0x00); // GPB (lower 8 bits)
 
     // Call RXBypassBPF - should clear the bit and update hardware
     RXBypassBPF();
@@ -776,7 +776,7 @@ TEST_F(LPFBoardTest, RXBypassBPFUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPA = (result >> 8) & 0xFF;
-    EXPECT_EQ(GetMCPAOld(), expectedGPA);
+    EXPECT_EQ(GetLPFMCPAOld(), expectedGPA);
 }
 
 // ================== UPDATED XVTR FUNCTION TESTS ==================
@@ -784,8 +784,8 @@ TEST_F(LPFBoardTest, RXBypassBPFUpdatesRegisterAndHardware) {
 TEST_F(LPFBoardTest, SelectXVTRUpdatesRegisterAndHardware) {
     // Start with XVTR bypassed (bit set) and known old values
     SetLPFRegister(1 << XVTRBIT);
-    SetMCPAOld(0x00); // GPA (upper 8 bits)
-    SetMCPBOld(1 << XVTRBIT); // GPB (lower 8 bits)
+    SetLPFMCPAOld(0x00); // GPA (upper 8 bits)
+    SetLPFMCPBOld(1 << XVTRBIT); // GPB (lower 8 bits)
 
     // Call SelectXVTR - should clear the bit (active low) and update hardware
     SelectXVTR();
@@ -798,14 +798,14 @@ TEST_F(LPFBoardTest, SelectXVTRUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 TEST_F(LPFBoardTest, BypassXVTRUpdatesRegisterAndHardware) {
     // Start with XVTR selected (bit cleared) and known old values
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Call BypassXVTR - should set the bit and update hardware
     BypassXVTR();
@@ -818,7 +818,7 @@ TEST_F(LPFBoardTest, BypassXVTRUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 // ================== UPDATED 100W PA FUNCTION TESTS ==================
@@ -826,8 +826,8 @@ TEST_F(LPFBoardTest, BypassXVTRUpdatesRegisterAndHardware) {
 TEST_F(LPFBoardTest, Select100WPAUpdatesRegisterAndHardware) {
     // Start with cleared register and known old values
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Call Select100WPA - should set the bit and update hardware
     Select100WPA();
@@ -840,14 +840,14 @@ TEST_F(LPFBoardTest, Select100WPAUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 TEST_F(LPFBoardTest, Bypass100WPAUpdatesRegisterAndHardware) {
     // Start with 100W PA bit set and known old values
     SetLPFRegister(1 << PA100WBIT);
-    SetMCPAOld(0x00); // GPA (upper 8 bits)
-    SetMCPBOld(1 << PA100WBIT); // GPB (lower 8 bits)
+    SetLPFMCPAOld(0x00); // GPA (upper 8 bits)
+    SetLPFMCPBOld(1 << PA100WBIT); // GPB (lower 8 bits)
 
     // Call Bypass100WPA - should clear the bit and update hardware
     Bypass100WPA();
@@ -860,7 +860,7 @@ TEST_F(LPFBoardTest, Bypass100WPAUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 // ================== UPDATED SELECTLPFBAND FUNCTION TESTS ==================
@@ -868,8 +868,8 @@ TEST_F(LPFBoardTest, Bypass100WPAUpdatesRegisterAndHardware) {
 TEST_F(LPFBoardTest, SelectLPFBandUpdatesRegisterAndHardware) {
     // Start with all band bits set and known old values
     SetLPFRegister(0x03FF);
-    SetMCPAOld(0x03);
-    SetMCPBOld(0xFF);
+    SetLPFMCPAOld(0x03);
+    SetLPFMCPBOld(0xFF);
 
     // Call SelectLPFBand with a specific band
     SelectLPFBand(BAND_20M);
@@ -885,32 +885,32 @@ TEST_F(LPFBoardTest, SelectLPFBandUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandWithDifferentBands) {
     // Test multiple band selections to ensure hardware update is called each time
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Test 160M band
     SelectLPFBand(BAND_160M);
     uint16_t result = GetLPFRegister();
     EXPECT_EQ(result & 0x0F, BAND_160M_BCD);
-    EXPECT_EQ(GetMCPBOld(), result & 0xFF);
+    EXPECT_EQ(GetLPFMCPBOld(), result & 0xFF);
 
     // Test 80M band
     SelectLPFBand(BAND_80M);
     result = GetLPFRegister();
     EXPECT_EQ(result & 0x0F, BAND_80M_BCD);
-    EXPECT_EQ(GetMCPBOld(), result & 0xFF);
+    EXPECT_EQ(GetLPFMCPBOld(), result & 0xFF);
 
     // Test invalid band (should default to NF)
     SelectLPFBand(99);
     result = GetLPFRegister();
     EXPECT_EQ(result & 0x0F, BAND_NF_BCD);
-    EXPECT_EQ(GetMCPBOld(), result & 0xFF);
+    EXPECT_EQ(GetLPFMCPBOld(), result & 0xFF);
 }
 
 // ================== UPDATED SELECTANTENNA FUNCTION TESTS ==================
@@ -918,8 +918,8 @@ TEST_F(LPFBoardTest, SelectLPFBandWithDifferentBands) {
 TEST_F(LPFBoardTest, SelectAntennaUpdatesRegisterAndHardware) {
     // Start with cleared register and known old values
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Call SelectAntenna with antenna 2
     SelectAntenna(2);
@@ -932,14 +932,14 @@ TEST_F(LPFBoardTest, SelectAntennaUpdatesRegisterAndHardware) {
 
     // Verify that UpdateMCPRegisters was called and updated the old values
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 TEST_F(LPFBoardTest, SelectAntennaInvalidDoesNotUpdateHardware) {
     // Start with antenna 1 selected and known old values
     SetLPFRegister(0x0010); // Antenna 1 selected (bits 4-5 = 01)
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x10);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x10);
 
     // Call SelectAntenna with invalid antenna (should not change register)
     SelectAntenna(4);
@@ -951,32 +951,32 @@ TEST_F(LPFBoardTest, SelectAntennaInvalidDoesNotUpdateHardware) {
 
     // Since register didn't change, UpdateMCPRegisters should still be called
     // but old values should remain the same (no hardware write needed)
-    EXPECT_EQ(GetMCPBOld(), 0x10);
+    EXPECT_EQ(GetLPFMCPBOld(), 0x10);
 }
 
 TEST_F(LPFBoardTest, SelectAntennaWithDifferentValues) {
     // Test multiple antenna selections to ensure hardware update is called each time
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     // Test antenna 0
     SelectAntenna(0);
     uint16_t result = GetLPFRegister();
     EXPECT_EQ((result >> 4) & 0x03, 0);
-    EXPECT_EQ(GetMCPBOld(), result & 0xFF);
+    EXPECT_EQ(GetLPFMCPBOld(), result & 0xFF);
 
     // Test antenna 3
     SelectAntenna(3);
     result = GetLPFRegister();
     EXPECT_EQ((result >> 4) & 0x03, 3);
-    EXPECT_EQ(GetMCPBOld(), result & 0xFF);
+    EXPECT_EQ(GetLPFMCPBOld(), result & 0xFF);
 
     // Test antenna 1
     SelectAntenna(1);
     result = GetLPFRegister();
     EXPECT_EQ((result >> 4) & 0x03, 1);
-    EXPECT_EQ(GetMCPBOld(), result & 0xFF);
+    EXPECT_EQ(GetLPFMCPBOld(), result & 0xFF);
 }
 
 // ================== BUFFER LOGGING TESTS ==================
@@ -1524,8 +1524,8 @@ TEST_F(LPFBoardTest, SelectLPFBandValidBandStillWorks) {
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandCallsUpdateMCPRegisters) {
     // Test that out-of-band selection still calls UpdateMCPRegisters
     SetLPFRegister(0x0000);
-    SetMCPAOld(0x00);
-    SetMCPBOld(0x00);
+    SetLPFMCPAOld(0x00);
+    SetLPFMCPBOld(0x00);
 
     ED.centerFreq_Hz[ED.activeVFO] = 2500000; // Between bands
 
@@ -1535,7 +1535,7 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandCallsUpdateMCPRegisters) {
 
     // Verify that UpdateMCPRegisters was called by checking old values were updated
     uint8_t expectedGPB = result & 0xFF;
-    EXPECT_EQ(GetMCPBOld(), expectedGPB);
+    EXPECT_EQ(GetLPFMCPBOld(), expectedGPB);
 }
 
 TEST_F(LPFBoardTest, SelectLPFBandOutOfBandSequentialTest) {

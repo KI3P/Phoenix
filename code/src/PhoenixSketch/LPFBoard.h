@@ -22,14 +22,15 @@ float32_t ReadForwardPower(void);
 float32_t ReadReflectedPower(void);
 errno_t InitSWRControl(void);
 uint8_t BandToBCD(int32_t band);
+void UpdateMCPRegisters(void);
 
 // For unit testing - access to internal register state
 uint16_t GetLPFRegisterState(void);
 void SetLPFRegisterState(uint16_t value);
-void UpdateMCPRegisters(void);
-uint8_t GetMCPAOld(void);
-uint8_t GetMCPBOld(void);
-void SetMCPAOld(uint8_t value);
-void SetMCPBOld(uint8_t value);
+uint16_t GetLPFMCPRegisters(void);
+uint8_t GetLPFMCPAOld(void);
+uint8_t GetLPFMCPBOld(void);
+void SetLPFMCPAOld(uint8_t value);
+void SetLPFMCPBOld(uint8_t value);
 
 #endif // LPFBOARD_H
