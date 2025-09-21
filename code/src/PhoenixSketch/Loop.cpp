@@ -20,7 +20,15 @@ FREQ_ENC_INC    Increase the tune frequency by increment
 FREQ_ENC_DEC    Decrease the tune frequency by increment
 */
 
-static InterruptType interrupt = iNONE; /** The internal InterruptType variable */
+// FIFO buffer for interrupt events
+#define INTERRUPT_BUFFER_SIZE 16
+static struct {
+    InterruptType buffer[INTERRUPT_BUFFER_SIZE];
+    volatile size_t head;  // Points to next position to write
+    volatile size_t tail;  // Points to next position to read
+    volatile size_t count; // Number of items in buffer
+} interruptFifo = {{iNONE}, 0, 0, 0};
+
 static uint8_t switchFilterSideband = 0;
 char strbuf[100];
 
@@ -48,21 +56,37 @@ void SetKey1Dit(void){
 }
 
 /**
- * Get the value of the internal interrupt variable.
- * 
- * @return The value of the internal InterruptType variable.
+ * Get the next interrupt from the FIFO buffer.
+ *
+ * @return The next InterruptType from the buffer, or iNONE if buffer is empty.
  */
 InterruptType GetInterrupt(void){
-    return interrupt;
+    if (interruptFifo.count == 0) {
+        return iNONE;
+    }
+
+    InterruptType result = interruptFifo.buffer[interruptFifo.tail];
+    interruptFifo.tail = (interruptFifo.tail + 1) % INTERRUPT_BUFFER_SIZE;
+    interruptFifo.count--;
+
+    return result;
 }
 
 /**
- * Sets the internal interrupt variable.
- * 
- * @param i The InterruptType value to set it to.
+ * Adds an interrupt to the FIFO buffer.
+ *
+ * @param i The InterruptType value to add to the buffer.
  */
 void SetInterrupt(InterruptType i){
-    interrupt = i;
+    if (interruptFifo.count >= INTERRUPT_BUFFER_SIZE) {
+        // Buffer is full, drop the oldest interrupt
+        interruptFifo.tail = (interruptFifo.tail + 1) % INTERRUPT_BUFFER_SIZE;
+        interruptFifo.count--;
+    }
+
+    interruptFifo.buffer[interruptFifo.head] = i;
+    interruptFifo.head = (interruptFifo.head + 1) % INTERRUPT_BUFFER_SIZE;
+    interruptFifo.count++;
 }
 
 /**
@@ -203,136 +227,137 @@ void HandleButtonPress(int32_t button){
 }
 
 /**
- * Considers the value of the interrupt and acts accordingly by either issueing an
- * event to the state machines or by updating a system parameter. Interrupt is 
- * consumed and interrupt variable set to NONE.
+ * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
+ * issuing an event to the state machines or by updating a system parameter. Interrupt 
+ * is consumed and removed from the buffer.
  */
 void ConsumeInterrupt(void){
-    switch (interrupt){
-        case (iNONE):{
-            break;
-        }
-        case (iPTT_PRESSED):{
-            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
-            break;
-        }
-        case (iPTT_RELEASED):{
-            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
-            break;
-        }
-        case (iMODE):{
-            // mode has changed, recalc filters, change frequencies, etc
-            UpdateRFHardwareState();
-            break;
-        }
-        case (iKEY1_PRESSED):{
-            if (ED.keyType == KeyTypeId_Straight){
-                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
-            } else {
-                if (ED.keyerFlip){
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
-                }else{
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+    InterruptType interrupt = GetInterrupt();
+    while ( interrupt != iNONE ){
+        switch (interrupt){
+            case (iNONE):{
+                break;
+            }
+            case (iPTT_PRESSED):{
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+                break;
+            }
+            case (iPTT_RELEASED):{
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+                break;
+            }
+            case (iMODE):{
+                // mode has changed, recalc filters, change frequencies, etc
+                UpdateRFHardwareState();
+                break;
+            }
+            case (iKEY1_PRESSED):{
+                if (ED.keyType == KeyTypeId_Straight){
+                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
+                } else {
+                    if (ED.keyerFlip){
+                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+                    }else{
+                        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+                    }
                 }
+                break;
             }
-            break;
-        }
-        case (iKEY1_RELEASED):{
-            if (ED.keyType == KeyTypeId_Straight){
-                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+            case (iKEY1_RELEASED):{
+                if (ED.keyType == KeyTypeId_Straight){
+                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+                }
+                break;
             }
-            break;
-        }
-        case (iKEY2_PRESSED):{
-            if (ED.keyerFlip){
-                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
-            }else{
-                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+            case (iKEY2_PRESSED):{
+                if (ED.keyerFlip){
+                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+                }else{
+                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+                }
+                break;
             }
-            break;
-        }
-        case (iVOLUME_INCREASE):{
-            ED.audioVolume++;
-            if (ED.audioVolume > 100) ED.audioVolume = 100;
-            sprintf(strbuf,"Volume: %ld",ED.audioVolume);
-            Debug(strbuf);
-            break;
-        }
-        case (iVOLUME_DECREASE):{
-            ED.audioVolume--;
-            if (ED.audioVolume < 0) ED.audioVolume = 0;
-            sprintf(strbuf,"Volume: %ld",ED.audioVolume);
-            Debug(strbuf);
-            break;
-        }
-        case (iFILTER_INCREASE):{
-            FilterSetSSB(1);
-            Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                     + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );            break;
-        }
-        case (iFILTER_DECREASE):{
-            FilterSetSSB(-1);
-            Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                     + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
-            break;
-        }
-        case (iCENTERTUNE_INCREASE):{
-            ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
-            // Change the band if we tune out of the current band
-            ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
-            UpdateRFHardwareState();
-            Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
-            break;
-        }
-        case (iCENTERTUNE_DECREASE):{
-            ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
-            // Change the band if we tune out of the current band
-            ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
-            UpdateRFHardwareState();
-            Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
-            break;
-        }
-        case (iFINETUNE_INCREASE):{
-            AdjustFineTune(+1);
-            Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
-            break;
-        }
-        case (iFINETUNE_DECREASE):{
-            AdjustFineTune(-1);
-            Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
-            break;
-        }
-        case (iBUTTON_PRESSED):{
-            int32_t button = GetButton();
-            Debug(String("Pressed button:") + String(button));
-            HandleButtonPress(button);
-            break;
-        }
-        case (iVFO_CHANGE):{
-            // The VFO has been updated. We might have selected a different active VFO,
-            // we might have changed frequency.
-            if (ED.activeVFO == 0){
-                ED.activeVFO = 1;
-            }else{
-                ED.activeVFO = 0;
+            case (iVOLUME_INCREASE):{
+                ED.audioVolume++;
+                if (ED.audioVolume > 100) ED.audioVolume = 100;
+                sprintf(strbuf,"Volume: %ld",ED.audioVolume);
+                Debug(strbuf);
+                break;
             }
-            UpdateRFHardwareState();
-            break;
+            case (iVOLUME_DECREASE):{
+                ED.audioVolume--;
+                if (ED.audioVolume < 0) ED.audioVolume = 0;
+                sprintf(strbuf,"Volume: %ld",ED.audioVolume);
+                Debug(strbuf);
+                break;
+            }
+            case (iFILTER_INCREASE):{
+                FilterSetSSB(1);
+                Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                        + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );            break;
+            }
+            case (iFILTER_DECREASE):{
+                FilterSetSSB(-1);
+                Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                        + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
+                break;
+            }
+            case (iCENTERTUNE_INCREASE):{
+                ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
+                // Change the band if we tune out of the current band
+                ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
+                UpdateRFHardwareState();
+                Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
+                break;
+            }
+            case (iCENTERTUNE_DECREASE):{
+                ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
+                // Change the band if we tune out of the current band
+                ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
+                UpdateRFHardwareState();
+                Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
+                break;
+            }
+            case (iFINETUNE_INCREASE):{
+                AdjustFineTune(+1);
+                Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
+                break;
+            }
+            case (iFINETUNE_DECREASE):{
+                AdjustFineTune(-1);
+                Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
+                break;
+            }
+            case (iBUTTON_PRESSED):{
+                int32_t button = GetButton();
+                Debug(String("Pressed button:") + String(button));
+                HandleButtonPress(button);
+                break;
+            }
+            case (iVFO_CHANGE):{
+                // The VFO has been updated. We might have selected a different active VFO,
+                // we might have changed frequency.
+                if (ED.activeVFO == 0){
+                    ED.activeVFO = 1;
+                }else{
+                    ED.activeVFO = 0;
+                }
+                UpdateRFHardwareState();
+                break;
+            }
+            case (iUPDATE_TUNE):{
+                UpdateRFHardwareState();
+                break;
+            }
+            case (iPOWER_CHANGE):{
+                // Nothing here yet
+                break;
+            }
+            default:
+                break;
         }
-        case (iUPDATE_TUNE):{
-            UpdateRFHardwareState();
-            break;
-        }
-        case (iPOWER_CHANGE):{
-            // Nothing here yet
-            break;
-        }
-        default:
-            break;
+        interrupt = GetInterrupt();
     }
-    // Clear the interrupt. If there was no interrupt this has no effect. If there was,
-    // this resets the state so we don't try to handle it again.
-    interrupt = iNONE;
 }
 
 /**

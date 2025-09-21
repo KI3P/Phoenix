@@ -8,9 +8,9 @@
 #define ITU_REGION                              2  // for USA
 //#define ITU_REGION                            3   // Asia/Oceania
 
-#define CW_TRANSMIT_SPACE_TIMEOUT_MS            20
-#define DIT_DURATION_MS                         7
-#define SPLASH_DURATION_MS                      17
+#define CW_TRANSMIT_SPACE_TIMEOUT_MS            200
+#define DIT_DURATION_MS                         60 // 20 WPM
+#define SPLASH_DURATION_MS                      1000
 
 #define KEYER_TYPE                              KeyTypeId_Straight // or KeyTypeId_Keyer
 #define KEYER_FLIP                              false // or true

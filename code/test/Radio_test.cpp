@@ -2,8 +2,12 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <mutex>
 
 #include "../src/PhoenixSketch/SDT.h"
+
+// Mutex to protect buffer_add() from race conditions
+static std::mutex buffer_mutex;
 
 #define GETHWRBITS(LSB,len) ((hardwareRegister >> LSB) & ((1 << len) - 1))
 
@@ -46,6 +50,10 @@ void stop_timer1ms() {
         timer_thread.join();
     }
 }
+
+// We can't override buffer_add due to linking conflicts.
+// The issue is that the timer thread and main thread are calling buffer_add simultaneously.
+// Let's analyze the actual timing output to understand the root cause better.
 
 void CheckThatHardwareRegisterMatchesActualHardware(){
     // LPF
@@ -186,7 +194,8 @@ TEST(Radio, RadioStateRunThrough) {
     //-------------------------------------------------------------
     // Start the mode state machines
     ModeSm_start(&modeSM);
-    modeSM.vars.waitDuration_ms = 200;
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
     UISm_start(&uiSM);
     // Initialize the hardware
     FrontPanelInit();
@@ -286,9 +295,33 @@ TEST(Radio, RadioStateRunThrough) {
     }
     CheckThatStateIsCWTransmitMark();
 
-    // Release the PTT key, we should go to a new state
+
+    // Do a sequence of key pressed and releases
+    SetInterrupt(iKEY1_RELEASED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
+    CheckThatStateIsCWTransmitSpace();
+
+    SetInterrupt(iKEY1_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
+    CheckThatStateIsCWTransmitMark();
+
+    SetInterrupt(iKEY1_RELEASED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
+    CheckThatStateIsCWTransmitSpace();
+
+    SetInterrupt(iKEY1_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
+    CheckThatStateIsCWTransmitMark();
+
+
+    // Release the PTT key, we should go to receive state after a delay
     SetInterrupt(iKEY1_RELEASED);
     loop();
+    // Immediately after key is released we are still in transmit space state
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
     CheckThatStateIsCWTransmitSpace();
     // Then, after at least waitDuration_ms, we should go back to receive
@@ -300,9 +333,82 @@ TEST(Radio, RadioStateRunThrough) {
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
         }
     }
-    //CheckThatStateIsCWTransmitSpace();
     CheckThatStateIsReceive();
 
+
+    // Change the key type
+    ED.keyType = KeyTypeId_Keyer;
+    ED.keyerFlip = false;
+
+    // when flip is false, key 1 is a dit
+    // flush the hardware register
+    StartMillis();
+    buffer_flush();
+    SetInterrupt(iKEY1_PRESSED);
+    loop();
+    int64_t m0 = millis();
+    for (size_t i = 0; i < 600; i++){
+        loop(); MyDelay(1);
+        int64_t m = millis();
+        
+        // Check that the mode state machine is changing as expected
+        if (m-m0 < DIT_DURATION_MS-2){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+            CheckThatStateIsCWTransmitMark();
+        }
+        if ((m-m0 > DIT_DURATION_MS+5) & (m-m0 < 2*DIT_DURATION_MS)){ // 5ms grace period
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+            CheckThatStateIsCWTransmitSpace();
+        }
+        if ((m-m0 > 2*DIT_DURATION_MS+10) & (m-m0 < (2*DIT_DURATION_MS+CW_TRANSMIT_SPACE_TIMEOUT_MS+1))){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
+            CheckThatStateIsCWTransmitSpace();
+        }        
+        if (m-m0 > (2*DIT_DURATION_MS+CW_TRANSMIT_SPACE_TIMEOUT_MS+25+150)){ // 25 ms grace + 150 ms hardware change
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+            CheckThatStateIsReceive();
+        }
+    }
+    CheckThatStateIsReceive();
+
+
+    // Change the key direction
+    ED.keyerFlip = true;
+
+    // when flip is true, key 1 is a dah
+    // flush the hardware register
+    StartMillis();
+    buffer_flush();
+    SetInterrupt(iKEY1_PRESSED);
+    loop();
+    m0 = millis();
+    for (size_t i = 0; i < 800; i++){
+        loop(); MyDelay(1);
+        int64_t m = millis();
+        
+        // Check that the mode state machine is changing as expected
+        if (m-m0 < DIT_DURATION_MS*3-2){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DAH_MARK);
+            CheckThatStateIsCWTransmitMark();
+        }
+        if ((m-m0 > DIT_DURATION_MS*3+15) & (m-m0 < DIT_DURATION_MS*4)){ // 5ms grace period
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+            CheckThatStateIsCWTransmitSpace();
+        }
+        if ((m-m0 > DIT_DURATION_MS*4+30) & (m-m0 < (DIT_DURATION_MS*4+CW_TRANSMIT_SPACE_TIMEOUT_MS+1))){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
+            CheckThatStateIsCWTransmitSpace();
+        }        
+        if (m-m0 > (DIT_DURATION_MS*4+CW_TRANSMIT_SPACE_TIMEOUT_MS+35+150)){ // 35 ms grace + 150 ms hardware change
+            //Debug(String(m-m0));
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+            CheckThatStateIsReceive();
+        }
+    }
+    CheckThatStateIsReceive();
+    
+    
+    buffer_pretty_buffer_array();
 
     //buffer_pretty_print();
     //buffer_pretty_buffer_array();

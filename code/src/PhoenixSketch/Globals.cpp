@@ -92,12 +92,21 @@ uint32_t hardwareRegister;
 RollingBuffer buffer = {0};
 
 void buffer_add(void) {
-  buffer.entries[buffer.head].timestamp = micros();
-  buffer.entries[buffer.head].register_value = hardwareRegister;  
-  buffer.head = (buffer.head + 1) % REGISTER_BUFFER_SIZE;  // Wrap around
-  if (buffer.count < REGISTER_BUFFER_SIZE) {
-    buffer.count++;
-  }
+    buffer.entries[buffer.head].timestamp = micros();
+    buffer.entries[buffer.head].register_value = hardwareRegister;  
+    buffer.head = (buffer.head + 1) % REGISTER_BUFFER_SIZE;  // Wrap around
+    if (buffer.count < REGISTER_BUFFER_SIZE) {
+        buffer.count++;
+    }
+}
+
+void buffer_flush(void) {
+    for (size_t i = 0; i < REGISTER_BUFFER_SIZE; i++){
+        buffer.entries[i].timestamp = 0;
+        buffer.entries[i].register_value = 0;
+    }
+    buffer.count = 0;
+    buffer.head = 0;
 }
 
 void MyDelay(unsigned long millisWait) {

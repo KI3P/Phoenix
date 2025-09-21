@@ -602,6 +602,7 @@ typedef struct {
 } RollingBuffer;
 extern RollingBuffer buffer;
 void buffer_add(void);
+void buffer_flush(void);
 void buffer_pretty_print(void);
 void buffer_pretty_buffer_array(void);
 void pretty_print_line(BufferEntry entry);

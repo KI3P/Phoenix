@@ -45,6 +45,10 @@ ModeSm_StateId GetRFHardwarePreviousState(void){
     return previousRadioState;
 }
 
+RFHardwareState GetRFHardwareState(void){
+    return rfHardwareState;
+}
+
 void HandleRFHardwareStateChange(RFHardwareState newState){
     if (newState == oldrfHardwareState){
         UpdateTuneState();

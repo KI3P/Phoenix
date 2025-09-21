@@ -23,6 +23,7 @@ void UpdateRFHardwareState(void);
 void HandleRFHardwareStateChange(RFHardwareState newState);
 errno_t InitializeRFHardware(void);
 void UpdateTuneState(void);
+RFHardwareState GetRFHardwareState(void);
 
 #endif //HARDWARESM_H
 
