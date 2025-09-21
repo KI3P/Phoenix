@@ -371,7 +371,6 @@ TEST(Radio, RadioStateRunThrough) {
     }
     CheckThatStateIsReceive();
 
-
     // Change the key direction
     ED.keyerFlip = true;
 
@@ -407,6 +406,75 @@ TEST(Radio, RadioStateRunThrough) {
     }
     CheckThatStateIsReceive();
     
+
+    // Now buffer up three commands: dit dit dah
+    // flush the hardware register
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+    StartMillis();
+    buffer_flush();
+    EXPECT_EQ(GetInterruptFifoSize(),0);
+    SetInterrupt(iKEY2_PRESSED);
+    EXPECT_EQ(GetInterruptFifoSize(),1);
+    loop();
+    m0 = millis();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+    EXPECT_EQ(GetInterruptFifoSize(),0);
+    SetInterrupt(iKEY2_PRESSED);
+    EXPECT_EQ(GetInterruptFifoSize(),1);
+    loop();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+    EXPECT_EQ(GetInterruptFifoSize(),1);
+    SetInterrupt(iKEY1_PRESSED);
+    EXPECT_EQ(GetInterruptFifoSize(),2);
+    loop();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+    EXPECT_EQ(GetInterruptFifoSize(),2);
+    for (size_t i = 0; i < 1000; i++){
+        loop(); MyDelay(1);
+        int64_t m = millis();
+        // m0 is 50 ms
+        // Check that the mode state machine is changing as expected
+        if (m < m0+DIT_DURATION_MS-2){ // 108
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+            CheckThatStateIsCWTransmitMark();
+        }
+        // 115 to 170 (50+120)
+        if ((m > m0+DIT_DURATION_MS+5) & (m < m0+DIT_DURATION_MS*2)){ // 5ms grace period
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+            CheckThatStateIsCWTransmitSpace();
+        }
+        // 180 to 240
+        if ((m > m0+DIT_DURATION_MS*2+10) & (m < m0+DIT_DURATION_MS*3)){ // 5ms grace period
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
+            CheckThatStateIsCWTransmitMark();
+        }
+        // 255 to 290
+        if ((m > m0+DIT_DURATION_MS*3+15) & (m < m0+DIT_DURATION_MS*4)){ // 5ms grace period
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+            CheckThatStateIsCWTransmitSpace();
+        }
+        // 310 to 470
+        if ((m > m0+DIT_DURATION_MS*4+20) & (m < m0+DIT_DURATION_MS*7)){ // 20ms grace period
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DAH_MARK);
+            CheckThatStateIsCWTransmitMark();
+        }
+        // 505 to 530
+        if ((m > m0+DIT_DURATION_MS*7+35) & (m < m0+DIT_DURATION_MS*8)){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
+            CheckThatStateIsCWTransmitSpace();
+        }
+        // 570 to 730
+        if ((m > m0+DIT_DURATION_MS*8+40) & (m < m0+DIT_DURATION_MS*8+CW_TRANSMIT_SPACE_TIMEOUT_MS)){
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
+            CheckThatStateIsCWTransmitSpace();
+        }
+        // 995 to end
+        if (m > m0+(DIT_DURATION_MS*8+CW_TRANSMIT_SPACE_TIMEOUT_MS+50+150)){ // 35 ms grace + 150 ms hardware change
+            EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+            CheckThatStateIsReceive();
+        }
+    }
+    CheckThatStateIsReceive();
     
     buffer_pretty_buffer_array();
 

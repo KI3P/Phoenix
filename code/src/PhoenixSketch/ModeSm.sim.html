@@ -280,6 +280,8 @@ state NORMAL_STATES {
 
         CW_RECEIVE : exit / #123; ModeCWReceiveExit()#59; #125;
 
+        CW_RECEIVE : 1. do / #123; markCount_ms = 0#59; #125;
+
         SSB_TRANSMIT
 
         SSB_TRANSMIT : SSB_TRANSMIT
@@ -318,7 +320,7 @@ state NORMAL_STATES {
 
         CW_TRANSMIT_DIT_MARK : exit / #123; ModeCWTransmitMarkExit()#59; #125;
 
-        CW_TRANSMIT_DIT_MARK : 1. do / #123; markCount_ms++#59; #125;
+        CW_TRANSMIT_DIT_MARK : 1. do / #123; markCount_ms++#59;\nspaceCount_ms = 0#59; #125;
 
         CW_TRANSMIT_KEYER_SPACE
 
@@ -328,7 +330,7 @@ state NORMAL_STATES {
 
         CW_TRANSMIT_KEYER_SPACE : enter / #123; spaceCount_ms = 0#59; #125;
 
-        CW_TRANSMIT_KEYER_SPACE : 1. do / #123; spaceCount_ms++#59; #125;
+        CW_TRANSMIT_KEYER_SPACE : 1. do / #123; spaceCount_ms++#59;\nmarkCount_ms = 0#59; #125;
 
         CW_TRANSMIT_KEYER_WAIT
 
@@ -338,7 +340,7 @@ state NORMAL_STATES {
 
         CW_TRANSMIT_KEYER_WAIT : exit / #123; ModeCWTransmitSpaceExit()#59; #125;
 
-        CW_TRANSMIT_KEYER_WAIT : 1. do / #123; spaceCount_ms++#59; #125;
+        CW_TRANSMIT_KEYER_WAIT : 1. do / #123; spaceCount_ms++#59;\nmarkCount_ms = 0#59; #125;
 
         CW_TRANSMIT_DAH_MARK
 
@@ -350,7 +352,7 @@ state NORMAL_STATES {
 
         CW_TRANSMIT_DAH_MARK : exit / #123; ModeCWTransmitMarkExit()#59; #125;
 
-        CW_TRANSMIT_DAH_MARK : 1. do / #123; markCount_ms++#59; #125;
+        CW_TRANSMIT_DAH_MARK : 1. do / #123; markCount_ms++#59;\nspaceCount_ms = 0#59; #125;
 
         %% Initial state name as "." so that it fits in black circle shape.
         %% See https://github.com/StateSmith/StateSmith/issues/404
@@ -616,6 +618,7 @@ evaluateGuard = null;
             case ModeSm.StateId.CW_RECEIVE:
                 switch (eventId)
                 {
+                    case ModeSm.EventId.DO: this.#CW_RECEIVE_do(); break;
                     case ModeSm.EventId.TO_SSB_MODE: this.#CW_RECEIVE_to_ssb_mode(); break;
                     case ModeSm.EventId.KEY_PRESSED: this.#CW_RECEIVE_key_pressed(); break;
                     case ModeSm.EventId.DAH_PRESSED: this.#CW_RECEIVE_dah_pressed(); break;
@@ -1410,6 +1413,18 @@ evaluateGuard = null;
         // No ancestor handles this event.
     }
     
+    #CW_RECEIVE_do()
+    {
+        // CW_RECEIVE behavior
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms = 0;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms = 0;");
+        } // end of behavior for CW_RECEIVE
+        
+        // No ancestor handles this event.
+    }
+    
     #CW_RECEIVE_key_pressed()
     {
         // CW_RECEIVE behavior
@@ -1505,10 +1520,10 @@ evaluateGuard = null;
     #CW_TRANSMIT_DAH_MARK_do()
     {
         // CW_TRANSMIT_DAH_MARK behavior
-        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;"); }
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;\nspaceCount_ms = 0;"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;");`
-            this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;\nspaceCount_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;\nspaceCount_ms = 0;");
         } // end of behavior for CW_TRANSMIT_DAH_MARK
         
         // CW_TRANSMIT_DAH_MARK behavior
@@ -1584,10 +1599,10 @@ evaluateGuard = null;
     #CW_TRANSMIT_DIT_MARK_do()
     {
         // CW_TRANSMIT_DIT_MARK behavior
-        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;"); }
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;\nspaceCount_ms = 0;"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;");`
-            this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;\nspaceCount_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "markCount_ms++;\nspaceCount_ms = 0;");
         } // end of behavior for CW_TRANSMIT_DIT_MARK
         
         // CW_TRANSMIT_DIT_MARK behavior
@@ -1656,10 +1671,10 @@ evaluateGuard = null;
     #CW_TRANSMIT_KEYER_SPACE_do()
     {
         // CW_TRANSMIT_KEYER_SPACE behavior
-        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;"); }
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;\nmarkCount_ms = 0;"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;");`
-            this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;\nmarkCount_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;\nmarkCount_ms = 0;");
         } // end of behavior for CW_TRANSMIT_KEYER_SPACE
         
         // CW_TRANSMIT_KEYER_SPACE behavior
@@ -1770,10 +1785,10 @@ evaluateGuard = null;
     #CW_TRANSMIT_KEYER_WAIT_do()
     {
         // CW_TRANSMIT_KEYER_WAIT behavior
-        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;"); }
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;\nmarkCount_ms = 0;"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;");`
-            this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;\nmarkCount_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "spaceCount_ms++;\nmarkCount_ms = 0;");
         } // end of behavior for CW_TRANSMIT_KEYER_WAIT
         
         // CW_TRANSMIT_KEYER_WAIT behavior

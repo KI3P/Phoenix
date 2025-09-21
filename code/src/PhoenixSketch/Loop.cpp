@@ -72,6 +72,10 @@ InterruptType GetInterrupt(void){
     return result;
 }
 
+size_t GetInterruptFifoSize(void){
+    return interruptFifo.count;
+}
+
 /**
  * Adds an interrupt to the end of the FIFO buffer.
  *

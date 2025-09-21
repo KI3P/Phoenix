@@ -75,6 +75,8 @@ static void CW_RECEIVE_dah_pressed(ModeSm* sm);
 
 static void CW_RECEIVE_dit_pressed(ModeSm* sm);
 
+static void CW_RECEIVE_do(ModeSm* sm);
+
 static void CW_RECEIVE_key_pressed(ModeSm* sm);
 
 static void CW_RECEIVE_to_ssb_mode(ModeSm* sm);
@@ -257,6 +259,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
         case ModeSm_StateId_CW_RECEIVE:
             switch (event_id)
             {
+                case ModeSm_EventId_DO: CW_RECEIVE_do(sm); break;
                 case ModeSm_EventId_TO_SSB_MODE: CW_RECEIVE_to_ssb_mode(sm); break;
                 case ModeSm_EventId_KEY_PRESSED: CW_RECEIVE_key_pressed(sm); break;
                 case ModeSm_EventId_DAH_PRESSED: CW_RECEIVE_dah_pressed(sm); break;
@@ -943,6 +946,18 @@ static void CW_RECEIVE_dit_pressed(ModeSm* sm)
     // No ancestor handles this event.
 }
 
+static void CW_RECEIVE_do(ModeSm* sm)
+{
+    // CW_RECEIVE behavior
+    // uml: 1. do / { markCount_ms = 0; }
+    {
+        // Step 1: execute action `markCount_ms = 0;`
+        sm->vars.markCount_ms = 0;
+    } // end of behavior for CW_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
 static void CW_RECEIVE_key_pressed(ModeSm* sm)
 {
     // CW_RECEIVE behavior
@@ -1022,10 +1037,11 @@ static void CW_TRANSMIT_DAH_MARK_exit(ModeSm* sm)
 static void CW_TRANSMIT_DAH_MARK_do(ModeSm* sm)
 {
     // CW_TRANSMIT_DAH_MARK behavior
-    // uml: 1. do / { markCount_ms++; }
+    // uml: 1. do / { markCount_ms++;\nspaceCount_ms = 0; }
     {
-        // Step 1: execute action `markCount_ms++;`
+        // Step 1: execute action `markCount_ms++;\nspaceCount_ms = 0;`
         sm->vars.markCount_ms++;
+        sm->vars.spaceCount_ms = 0;
     } // end of behavior for CW_TRANSMIT_DAH_MARK
     
     // CW_TRANSMIT_DAH_MARK behavior
@@ -1086,10 +1102,11 @@ static void CW_TRANSMIT_DIT_MARK_exit(ModeSm* sm)
 static void CW_TRANSMIT_DIT_MARK_do(ModeSm* sm)
 {
     // CW_TRANSMIT_DIT_MARK behavior
-    // uml: 1. do / { markCount_ms++; }
+    // uml: 1. do / { markCount_ms++;\nspaceCount_ms = 0; }
     {
-        // Step 1: execute action `markCount_ms++;`
+        // Step 1: execute action `markCount_ms++;\nspaceCount_ms = 0;`
         sm->vars.markCount_ms++;
+        sm->vars.spaceCount_ms = 0;
     } // end of behavior for CW_TRANSMIT_DIT_MARK
     
     // CW_TRANSMIT_DIT_MARK behavior
@@ -1143,10 +1160,11 @@ static void CW_TRANSMIT_KEYER_SPACE_exit(ModeSm* sm)
 static void CW_TRANSMIT_KEYER_SPACE_do(ModeSm* sm)
 {
     // CW_TRANSMIT_KEYER_SPACE behavior
-    // uml: 1. do / { spaceCount_ms++; }
+    // uml: 1. do / { spaceCount_ms++;\nmarkCount_ms = 0; }
     {
-        // Step 1: execute action `spaceCount_ms++;`
+        // Step 1: execute action `spaceCount_ms++;\nmarkCount_ms = 0;`
         sm->vars.spaceCount_ms++;
+        sm->vars.markCount_ms = 0;
     } // end of behavior for CW_TRANSMIT_KEYER_SPACE
     
     // CW_TRANSMIT_KEYER_SPACE behavior
@@ -1240,10 +1258,11 @@ static void CW_TRANSMIT_KEYER_WAIT_dit_pressed(ModeSm* sm)
 static void CW_TRANSMIT_KEYER_WAIT_do(ModeSm* sm)
 {
     // CW_TRANSMIT_KEYER_WAIT behavior
-    // uml: 1. do / { spaceCount_ms++; }
+    // uml: 1. do / { spaceCount_ms++;\nmarkCount_ms = 0; }
     {
-        // Step 1: execute action `spaceCount_ms++;`
+        // Step 1: execute action `spaceCount_ms++;\nmarkCount_ms = 0;`
         sm->vars.spaceCount_ms++;
+        sm->vars.markCount_ms = 0;
     } // end of behavior for CW_TRANSMIT_KEYER_WAIT
     
     // CW_TRANSMIT_KEYER_WAIT behavior
