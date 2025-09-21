@@ -62,6 +62,41 @@ void tick1ms(void){
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
 }
 
+const unsigned long DEBOUNCE_DELAY = 50; // 50ms debounce time
+volatile bool lastKey1State = LOW;
+volatile uint32_t lastKey1time;
+void Key1Change(void){
+    uint32_t currentTime = millis();
+    // Check if enough time has passed since last interrupt
+    if (currentTime - lastKey1time < DEBOUNCE_DELAY) {
+        return; // Ignore this interrupt (likely bounce)
+    }
+
+    bool currentState = digitalRead(KEY1);
+    if (currentState != lastKey1State) {
+        if (currentState == HIGH) {
+            // Rising edge detected
+            SetInterrupt(iKEY1_RELEASED);
+        } else {
+            // Falling edge detected  
+            SetInterrupt(iKEY1_PRESSED);
+        }
+        lastKey1State = currentState;
+    }
+    lastKey1time = currentTime;
+}
+
+volatile uint32_t lastKey2time;
+void Key2On(void){
+    uint32_t currentTime = millis();
+    // Check if enough time has passed since last interrupt
+    if (currentTime - lastKey2time < DEBOUNCE_DELAY) {
+        return; // Ignore this interrupt (likely bounce)
+    }
+    SetInterrupt(iKEY2_PRESSED);
+    lastKey2time = currentTime;
+}
+
 void setup(void){
     Serial.begin(115200);
     delay(1000); //testcode
@@ -80,11 +115,10 @@ void setup(void){
     pinMode(31,OUTPUT); //testcode
     digitalWrite(31, 0);  //testcode
 
-    FrontPanelInit();
-
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
+    FrontPanelInit();
     SetupAudio();
     UpdateAudioIOState();
 
@@ -94,15 +128,24 @@ void setup(void){
     // So make our VFO frequency the negative of this to shift it back to 1 kHz
     ED.fineTuneFreq_Hz[ED.activeVFO] = -48000L; //testcode
 
+
     // Display code
     pinMode(TFT_CS, OUTPUT);
     digitalWrite(TFT_CS, HIGH);
-
     tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);  // parameter list from library code
     tft.setRotation(0);
     Splash();
-
     // Display the image at bottom middle
     drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
+
+    pinMode(KEY1, INPUT_PULLUP);
+    pinMode(KEY2, INPUT_PULLUP);
+    lastKey1State = digitalRead(KEY1); // Initialize
+    lastKey1time = millis(); // for debounce
+    attachInterrupt(digitalPinToInterrupt(KEY1), Key1Change, CHANGE);
+    lastKey2time = millis(); // for debounce
+    attachInterrupt(digitalPinToInterrupt(KEY2), Key2On, FALLING);
+
     timer1ms.begin(tick1ms, 1000);  // run tick1ms every 1ms
+
 }
