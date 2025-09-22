@@ -163,7 +163,7 @@ static void interrupt2() {
     mcp2.clearInterrupts();
 }
 
-void FrontPanelInit(void) {
+void InitializeFrontPanel(void) {
     bool failed=false;
     Debug("Initializing front panel");
 

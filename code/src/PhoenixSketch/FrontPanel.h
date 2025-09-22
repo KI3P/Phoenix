@@ -9,7 +9,7 @@
 #define INT_PIN_1 14
 #define INT_PIN_2 15
 
-void FrontPanelInit(void);
+void InitializeFrontPanel(void);
 void CheckForFrontPanelInterrupts(void);
 int32_t GetButton(void);
 void SetButton(int32_t);

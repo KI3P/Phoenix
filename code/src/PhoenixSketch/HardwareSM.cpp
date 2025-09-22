@@ -203,6 +203,10 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set calFeedbackState to LO
             break;
         }
+        case RFinvalid:{
+            Debug("Asked to handle RFinvalid state, doing nothing.");
+            break;
+        }
     }
     oldrfHardwareState = newState;
 }

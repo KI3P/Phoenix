@@ -217,7 +217,7 @@ void UpdateAudioIOState(void){
 /**
  * Perform setup of the audio input and output
  */
-void SetupAudio(void){
+void InitializeAudio(void){
     SetI2SFreq(SR[SampleRate].rate);
     // The sgtl5000_teensy is the controller for the Teensy Audio board. We use it to get 
     // the microphone input for SSB, and the I/Q output for the exciter board. In other

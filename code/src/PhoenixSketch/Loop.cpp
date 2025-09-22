@@ -279,7 +279,8 @@ void HandleKeyer(InterruptType interrupt){
                     }
                     break;
                 }
-            
+                default:
+                    break;
             }
             break;
         }

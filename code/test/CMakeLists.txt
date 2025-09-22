@@ -27,6 +27,7 @@ add_compile_options(-Wno-write-strings)
 
 include_directories(../src/PhoenixSketch)
 include_directories(../test)
+include_directories(/home/oliver/.arduino15/packages/teensy/hardware/avr/1.59.0/libraries/RA8875/src/)
 
 add_executable(all_RFboard_tests RFBoard_test.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp ../src/PhoenixSketch/CAT.cpp ../src/PhoenixSketch/HardwareSM.cpp ../src/PhoenixSketch/BPFBoard.cpp
   ../src/PhoenixSketch/DSP_FFT.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/Tune.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp

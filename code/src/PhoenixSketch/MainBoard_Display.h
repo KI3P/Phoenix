@@ -11,5 +11,6 @@ struct dispSc {
 //extern struct dispSc displayScale[];
 
 void DrawDisplay(void);
+void InitializeDisplay(void);
 
 #endif

@@ -192,17 +192,19 @@ TEST(Radio, RadioStateRunThrough) {
     //-------------------------------------------------------------
     // Radio startup code
     //-------------------------------------------------------------
+
+    // Initialize the hardware
+    InitializeFrontPanel();
+    InitializeAudio();
+    InitializeRFHardware(); // RF board, LPF board, and BPF board
+    InitializeSignalProcessing();
+
     // Start the mode state machines
     ModeSm_start(&modeSM);
     modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
     modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
     UISm_start(&uiSM);
-    // Initialize the hardware
-    FrontPanelInit();
-    SetupAudio();
     UpdateAudioIOState();
-    InitializeRFHardware(); // RF board, LPF board, and BPF board
-    InitializeSignalProcessing();
 
     // Now, start the 1ms timer interrupt to simulate hardware timer
     start_timer1ms();
