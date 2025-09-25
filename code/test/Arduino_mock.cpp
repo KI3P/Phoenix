@@ -58,6 +58,38 @@ void SerialClass::println(int n) {
     }
 }
 
+void SerialClass::print(int64_t n) {
+    if (file) {
+        fprintf(file, "%lld", (long long)n);
+    } else {
+        std::cout << (long long)n;
+    }
+}
+
+void SerialClass::println(int64_t n) {
+    if (file) {
+        fprintf(file, "%lld\n", (long long)n);
+    } else {
+        std::cout << (long long)n << std::endl;
+    }
+}
+
+void SerialClass::print(uint32_t n) {
+    if (file) {
+        fprintf(file, "%u", n);
+    } else {
+        std::cout << n;
+    }
+}
+
+void SerialClass::println(uint32_t n) {
+    if (file) {
+        fprintf(file, "%u\n", n);
+    } else {
+        std::cout << n << std::endl;
+    }
+}
+
 void SerialClass::print(float f) {
     if (file) {
         fprintf(file, "%f", f);

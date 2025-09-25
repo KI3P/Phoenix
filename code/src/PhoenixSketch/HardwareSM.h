@@ -9,13 +9,14 @@ enum RFHardwareState {
     RFReceive,
     RFTransmit,
     RFCalIQ,
-    RFinvalid
+    RFInvalid
 };
 
 enum TuneState {
     TuneReceive,
     TuneSSBTX,
-    TuneCWTX
+    TuneCWTX,
+    TuneInvalid
 };
 
 ModeSm_StateId GetRFHardwarePreviousState(void);

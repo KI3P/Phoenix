@@ -48,6 +48,7 @@ void Key2On(void){
 
 void setup(void){
     Serial.begin(115200);
+    SerialUSB1.begin(38400); // For CAT control
     delay(1000); //testcode
     Serial.println("T41 SDT Setup");
     //Configure the pins for the auto shutdown
@@ -60,10 +61,10 @@ void setup(void){
 
     Serial.println("...Initializing hardware");
     InitializeFrontPanel();
+    InitializeSignalProcessing();  // Initialize DSP before starting audio
     InitializeAudio();
     InitializeDisplay();
     InitializeRFHardware(); // RF board, LPF board, and BPF board
-    InitializeSignalProcessing();
 
     // Start the mode state machines
     Serial.println("...Starting state machines");

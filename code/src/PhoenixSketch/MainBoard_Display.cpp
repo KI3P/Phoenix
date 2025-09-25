@@ -61,9 +61,9 @@ void Splash(){
 static void DrawSplash(){
     Splash();
     // Display the image at bottom middle
-    drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
-
+    //drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
 }
+
 
 static void DrawHome(){}
 
@@ -112,10 +112,12 @@ void DrawDisplay(void){
     if (uiSM.state_id == oldstate) return;
     switch (uiSM.state_id){
         case (UISm_StateId_SPLASH):{
+            Debug("Drawing splash screen");
             DrawSplash();
             break;
         }
         case (UISm_StateId_HOME):{
+            Debug("Drawing home screen");
             DrawHome();
             break;
         }

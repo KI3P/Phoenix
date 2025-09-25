@@ -132,10 +132,10 @@ enum ModulationType {
 };
 
 enum NoiseReductionType {
-  NROff = 0,
-  NRKim = 1,
-  NRSpectral = 2,
-  NRLMS = 3
+    NROff = 0,
+    NRKim = 1,
+    NRSpectral = 2,
+    NRLMS = 3
 };
 
 // This enum is used by an experimental Morse decoder.
@@ -148,27 +148,20 @@ enum MorseStates { state0,
               state6 };
 
 extern struct config_t {
-    char versionSettings[10];                             // UNUSED
     AGCMode agc = AGCOff; // was AGCLong
     int32_t audioVolume = 30;
     float32_t rfGainAllBands_dB = 0;
-    int32_t tuneIndex = DEFAULTFREQINCREMENT;             // UNUSED
     int64_t stepFineTune = FAST_TUNE_INCREMENT;
-    int32_t powerLevel = DEFAULT_POWER_LEVEL;             // UNUSED
-    int32_t xmtMode = 0;                                  // UNUSED
     NoiseReductionType nrOptionSelect = NROff;
     uint8_t ANR_notchOn = 0;
     int32_t spectrumScale = 1; // was currentScale
     uint32_t spectrum_zoom = 1;
-    float32_t spectrum_display_scale = 20.0;              // UNUSED
     int32_t CWFilterIndex = 5;
-    int32_t paddleDit = 36;                               // UNUSED
-    int32_t paddleDah = 35;                               // UNUSED
+    int32_t CWToneIndex = 3;
     int32_t decoderFlag = DECODER_STATE; // CW decoder, 0=off, 1=on
-    KeyTypeId keyType = KEYER_TYPE;                         // UNUSED
+    KeyTypeId keyType = KEYER_TYPE;
     int32_t currentWPM = DEFAULT_KEYER_WPM;
     float32_t sidetoneVolume = 20.0;
-    int64_t cwTransmitDelay = 750;                       // UNUSED
     int32_t freqIncrement = 5;
     float32_t freqCorrectionFactor = 0;
     uint8_t activeVFO = 0;                                // 0(A) or 1(B)
@@ -177,49 +170,17 @@ extern struct config_t {
     int64_t fineTuneFreq_Hz[2] = {0, 0};
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
-    int32_t currentMicThreshold = -10;                    // UNUSED
-    float32_t currentMicCompRatio = 5.0;                  // UNUSED
-    float32_t currentMicAttack = 0.1;                     // UNUSED
-    float32_t currentMicRelease = 2.0;                    // UNUSED
     int32_t currentMicGain = -10;
-    int32_t switchValues[18];                             // UNUSED
-    float32_t LPFcoeff = 0.0;                             // UNUSED
-    //float32_t NR_PSI = 0.0;                               // UNUSED
-    //float32_t NR_alpha = 0.0;                             // UNUSED
-    //float32_t NR_beta = 0.0;                              // UNUSED
-    float32_t omegaN = 0.0;                               // UNUSED
-    float32_t pll_fmax = 4000.0;                          // UNUSED
-    float32_t powerOutCW[NUMBER_OF_BANDS];       
-    float32_t powerOutSSB[NUMBER_OF_BANDS];  
-    float32_t CWPowerCalibrationFactor[NUMBER_OF_BANDS];  // UNUSED
-    float32_t SSBPowerCalibrationFactor[NUMBER_OF_BANDS]; // UNUSED
+    float32_t powerOutCW[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5};
+    float32_t powerOutSSB[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5};
     float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1};
     float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS];    // UNUSED
-    float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS];  // UNUSED
-    float32_t IQXRecAmpCorrectionFactor[NUMBER_OF_BANDS]; // UNUSED
-    float32_t IQXRecPhaseCorrectionFactor[NUMBER_OF_BANDS]; // UNUSED
-    float32_t XAttenCW[NUMBER_OF_BANDS];
-    float32_t XAttenSSB[NUMBER_OF_BANDS];
-    float32_t RAtten[NUMBER_OF_BANDS];
-    int64_t favoriteFreqs[MAX_FAVORITES];                // UNUSED
-    int64_t lastFrequencies[NUMBER_OF_BANDS][2];         // center tune and fine tune
+    float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    int64_t lastFrequencies[NUMBER_OF_BANDS][2] = {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};         // center tune and fine tune
     int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    char mapFileName[50];                             // UNUSED
-    char myCall[10];                                  // UNUSED
-    char myTimeZone[10];                              // UNUSED
-    int32_t separationCharacter = (int32_t)'.';               // UNUSED
     bool keyerFlip = KEYER_FLIP;                     // false = right paddle = DAH, true = DIT
-    int32_t sdCardPresent = 0;                            // UNUSED
-    float32_t myLong = MY_LON;                            // UNUSED
-    float32_t myLat = MY_LAT;                             // UNUSED
-    int32_t currentNoiseFloor[NUMBER_OF_BANDS];           // UNUSED
-    int32_t compressorFlag;                               // UNUSED
-    int32_t receiveEQFlag = 0;                            // UNUSED
-    int32_t xmitEQFlag = 0;                               // UNUSED
-    int32_t CWToneIndex = 3;
-    float32_t TransmitPowerLevelCW = 0.0;             // UNUSED
-    float32_t TransmitPowerLevelSSB = 0.0;            // UNUSED
     float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
@@ -228,30 +189,30 @@ extern struct config_t {
 
 // Define a structure to hold the results of built-in-test routine
 struct BIT {
-  bool RF_I2C_present;
-  bool RF_Si5351_present;
-  bool BPF_I2C_present;
-  bool V12_LPF_I2C_present;
-  bool V12_LPF_AD7991_present;
-  bool FRONT_PANEL_I2C_present;
-  uint8_t AD7991_I2C_ADDR;
+    bool RF_I2C_present;
+    bool RF_Si5351_present;
+    bool BPF_I2C_present;
+    bool V12_LPF_I2C_present;
+    bool V12_LPF_AD7991_present;
+    bool FRONT_PANEL_I2C_present;
+    uint8_t AD7991_I2C_ADDR;
 };
 
 /** Contains the parameters that define a band */
 struct band {
-  int64_t freqVFO1_Hz; // Frequency of VFO1 in Hz (hardware mixer)
-  float32_t freqVFO2_Hz;  // UNUSED Frequency of VFO2 in Hz (DSP mixer) 
-  int64_t fBandLow_Hz;     // Lower band edge
-  int64_t fBandHigh_Hz;    // Upper band edge
-  const char *name;  // name of band
-  ModulationType mode;
-  int32_t FHiCut_Hz;
-  int32_t FLoCut_Hz;
-  float32_t RFgain_dB;       // dB
-  uint8_t band_type;
-  float32_t gainCorrection;  // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
-  int32_t AGC_thresh;
-  int16_t pixel_offset;
+    int64_t freqVFO1_Hz; // Frequency of VFO1 in Hz (hardware mixer)
+    float32_t freqVFO2_Hz;  // UNUSED Frequency of VFO2 in Hz (DSP mixer) 
+    int64_t fBandLow_Hz;     // Lower band edge
+    int64_t fBandHigh_Hz;    // Upper band edge
+    const char *name;  // name of band
+    ModulationType mode;
+    int32_t FHiCut_Hz;
+    int32_t FLoCut_Hz;
+    float32_t RFgain_dB;       // dB
+    uint8_t band_type;
+    float32_t gainCorrection;  // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
+    int32_t AGC_thresh;
+    int16_t pixel_offset;
 };
 
 /** Contains the block of audio time samples being processed */
@@ -263,9 +224,9 @@ struct DataBlock {
 }; 
 
 typedef struct SR_Descriptor {
-  const uint8_t SR_n;
-  const uint32_t rate;
-  const char *const text;
+    const uint8_t SR_n;
+    const uint32_t rate;
+    const char *const text;
 } SR_Desc;
 
 /** Contains the structs and parameters for a decimation filter*/
@@ -354,25 +315,25 @@ struct FilterConfig {
         // Zoom FFT filters
         biquadZoomI.numStages = IIR_biquad_Zoom_FFT_N_stages;
         biquadZoomQ.numStages = IIR_biquad_Zoom_FFT_N_stages;
-        biquadZoomI.pState = (float32_t *)malloc(sizeof(float32_t) * (IIR_biquad_Zoom_FFT_N_stages * 4));
-        biquadZoomQ.pState = (float32_t *)malloc(sizeof(float32_t) * (IIR_biquad_Zoom_FFT_N_stages * 4));
+        biquadZoomI.pState = (float32_t *)calloc(IIR_biquad_Zoom_FFT_N_stages * 4, sizeof(float32_t));
+        biquadZoomQ.pState = (float32_t *)calloc(IIR_biquad_Zoom_FFT_N_stages * 4, sizeof(float32_t));
         
         // Audio lowpass filters
         biquadAudioLowPass.numStages = N_stages_biquad_lowpass1;
-        biquadAudioLowPass.pState = (float32_t *)malloc(sizeof(float32_t) * (N_stages_biquad_lowpass1 * 4));
+        biquadAudioLowPass.pState = (float32_t *)calloc(N_stages_biquad_lowpass1 * 4, sizeof(float32_t));
         biquadAudioLowPass.pCoeffs = biquad_lowpass1_coeffs;
 
         // Audio equalization filters
-        eqFiltBuffer = (float32_t *)malloc(sizeof(float32_t) * (READ_BUFFER_SIZE/DF));
-        eqSumBuffer = (float32_t *)malloc(sizeof(float32_t) * (READ_BUFFER_SIZE/DF));
+        eqFiltBuffer = (float32_t *)calloc(READ_BUFFER_SIZE/DF, sizeof(float32_t));
+        eqSumBuffer = (float32_t *)calloc(READ_BUFFER_SIZE/DF, sizeof(float32_t));
         for (size_t i = 0; i<14; i++){
             S_Rec[i].numStages = eqNumStages;
-            S_Rec[i].pState = (float32_t *)malloc(sizeof(float32_t) * eqNumStages * 2);
-            S_Rec[i].pCoeffs = *EQ_Coeffs[i];
+            S_Rec[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
+            S_Rec[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
 
             S_Xmt[i].numStages = eqNumStages;
-            S_Xmt[i].pState = (float32_t *)malloc(sizeof(float32_t) * eqNumStages * 2);
-            S_Xmt[i].pCoeffs = *EQ_Coeffs[i];
+            S_Xmt[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
+            S_Xmt[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
         }
 
         // CW decode filter
@@ -383,8 +344,8 @@ struct FilterConfig {
         // Block size is READ_BUFFER_SIZE / (DF1*DF2) = 2048 / 8 = 256
         // Number of taps is 48
         // So state array size is: Num Taps + Block Size - 1
-        uint16_t INT1_STATE_SIZE = 48 +  READ_BUFFER_SIZE / (DF1*DF2)  - 1;        
-        FIR_int1_state = (float32_t *)malloc(sizeof(float32_t) * INT1_STATE_SIZE);
+        uint16_t INT1_STATE_SIZE = 48 +  READ_BUFFER_SIZE / (DF1*DF2)  - 1;
+        FIR_int1_state = (float32_t *)calloc(INT1_STATE_SIZE, sizeof(float32_t));
         arm_fir_interpolate_init_f32(&FIR_int1, DF2, 48, FIR_int1_coeffs, FIR_int1_state, READ_BUFFER_SIZE/DF);
 
         // Second stage undoes DF1 (4)
@@ -392,7 +353,7 @@ struct FilterConfig {
         // Number of taps is 32
         // So state array size is:
         uint16_t INT2_STATE_SIZE = 32 + READ_BUFFER_SIZE / DF1 - 1;
-        FIR_int2_state = (float32_t *)malloc(sizeof(float32_t) * INT2_STATE_SIZE);
+        FIR_int2_state = (float32_t *)calloc(INT2_STATE_SIZE, sizeof(float32_t));
         arm_fir_interpolate_init_f32(&FIR_int2, DF1, 32, FIR_int2_coeffs, FIR_int2_state, READ_BUFFER_SIZE/DF1);
     }
     ~FilterConfig() {
@@ -413,7 +374,7 @@ struct FilterConfig {
 struct AGCConfig {
     // Start variables taken from wdsp
     const float32_t tau_attack            = 0.001; // tau_attack
-    float32_t tau_decay             = 0.250;
+    float32_t tau_decay                   = 0.250;
     const float32_t n_tau                 = 4; 
     const float32_t fixed_gain            = 20.0;
     const float32_t max_input             = 1.0;
@@ -426,8 +387,8 @@ struct AGCConfig {
     const float32_t pop_ratio             = 5.0;        // pop_ratio
     const float32_t hang_enable           = 1; 
     const float32_t tau_hang_backmult     = 0.500;      // tau_hang_backmult
-    float32_t hangtime              = 0.250;      // hangtime
-    float32_t hang_thresh           = 0.250;      // hang_thresh
+    float32_t hangtime                    = 0.250;      // hangtime
+    float32_t hang_thresh                 = 0.250;      // hang_thresh
     const float32_t tau_hang_decay        = 0.100;      // tau_hang_decay
     float32_t max_gain                    = 10000.0;
     float32_t ring_max = 0.0;

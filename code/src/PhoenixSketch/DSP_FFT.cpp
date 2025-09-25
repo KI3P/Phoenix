@@ -297,6 +297,9 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
             filters->S_Rec[i].pState[j] = 0;
             filters->S_Xmt[i].pState[j] = 0;
         }
+        // Set coefficient pointers now that EQ_Coeffs is guaranteed to be initialized
+        filters->S_Rec[i].pCoeffs = *EQ_Coeffs[i];
+        filters->S_Xmt[i].pCoeffs = *EQ_Coeffs[i];
     }
 
     // Interpolation filters
@@ -522,12 +525,22 @@ void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXT
     float32_t scale;
     if (TXRX == RX) scale = (float)ED.equalizerRec[bf] / 100.0;
     else scale = (float)ED.equalizerXmt[bf] / 100.0;
+
+    // Fix the weird bug where the pState array gets a nan in it upon entering loop
+    // after a power cycle
+    for (size_t i = 0; i < 2*filters->eqNumStages; i++){
+        if (isnan(filters->S_Rec[bf].pState[i])){
+            memset(filters->S_Rec[bf].pState,0,sizeof(float32_t)*2*filters->eqNumStages);
+            break;
+        }
+    }
+
     // Filter I with this band's biquad
-    if (TXRX == RX)
+    if (TXRX == RX){
         arm_biquad_cascade_df2T_f32(&filters->S_Rec[bf], data->I, filters->eqFiltBuffer, data->N);
-    else
-        arm_biquad_cascade_df2T_f32(&filters->S_Xmt
-            [bf], data->I, filters->eqFiltBuffer, data->N);
+    }else{
+        arm_biquad_cascade_df2T_f32(&filters->S_Xmt[bf], data->I, filters->eqFiltBuffer, data->N);
+    }
     // Scale the amplitude by the overall level scaler
     arm_scale_f32(filters->eqFiltBuffer, (float32_t)sign*scale, filters->eqFiltBuffer, data->N);
     // Add to the accumulator buffer
@@ -536,7 +549,7 @@ void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXT
 
 void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX){
     // Apply 14 successive filters, accumulating in filters->eqSumBuffer as we go
-    memset(filters->eqSumBuffer, 0, sizeof(float32_t)*data->N);
+    memset(filters->eqSumBuffer, 0, sizeof(float32_t) * (READ_BUFFER_SIZE/filters->DF));
     for (int i = 0; i < 14; i++) {
         ApplyEQBandFilter(data, filters, i, TXRX);
     }

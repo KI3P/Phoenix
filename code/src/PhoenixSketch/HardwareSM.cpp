@@ -2,7 +2,7 @@
 
 static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
 static RFHardwareState rfHardwareState = RFReceive;
-static RFHardwareState oldrfHardwareState = RFinvalid;
+static RFHardwareState oldrfHardwareState = RFInvalid;
 static TuneState tuneState = TuneReceive;
 
 /**
@@ -23,10 +23,9 @@ errno_t InitializeRFBoard(void){
     err += InitRXTX();
 
     // force the initialization to RF receive
-    oldrfHardwareState = RFTransmit;
-    HandleRFHardwareStateChange(RFReceive); // updates oldrfHardwareState
-    previousRadioState = ModeSm_StateId_SSB_RECEIVE;
-    tuneState = TuneReceive;
+    oldrfHardwareState = RFInvalid;
+    previousRadioState = ModeSm_StateId_ROOT;
+    tuneState = TuneInvalid;
     return err;
 }
 
@@ -203,8 +202,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set calFeedbackState to LO
             break;
         }
-        case RFinvalid:{
-            Debug("Asked to handle RFinvalid state, doing nothing.");
+        case RFInvalid:{
+            Debug("Asked to handle RFInvalid state, doing nothing.");
             break;
         }
     }
@@ -270,6 +269,8 @@ void UpdateRFHardwareState(void){
  * CW Transmit:     TXfreq = centerFreq_Hz + fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
  */
 void HandleTuneState(TuneState tuneState){
+    if (tuneState == TuneInvalid) return;
+    
     SelectLPFBand(ED.currentBand[ED.activeVFO]);
     SelectBPFBand(ED.currentBand[ED.activeVFO]);
     SelectAntenna(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
@@ -293,6 +294,8 @@ void HandleTuneState(TuneState tuneState){
             SetCWVFOFrequency( newFreq );
             break;
         }
+        default:
+            break;
     }
 }
 

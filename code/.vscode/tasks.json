@@ -4,14 +4,14 @@
         {
             "label": "Run Unit Tests",
             "type": "shell",
-            "command": "cd test/build && cmake .. && make && ctest --output-on-failure",
+            "command": "cd test/build && cmake .. && make -j4 && ctest --output-on-failure",
             "group": "build",
             "problemMatcher": []
         },
         {
             "label": "Make Unit Tests",
             "type": "shell",
-            "command": "cd test/build && cmake .. && make",
+            "command": "cd test/build && cmake .. && make -j4",
             "group": "build",
             "problemMatcher": []
         },

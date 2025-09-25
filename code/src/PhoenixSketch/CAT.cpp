@@ -50,6 +50,7 @@ char *RX_write( char* cmd );
 char *SA_write( char* cmd );
 char *SA_read(  char* cmd );
 char *TX_write( char* cmd );
+char *ED_read(  char* cmd );
 
 typedef struct	{
 	char name[3];   //two chars plus zero terminator
@@ -62,7 +63,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 17
+#define NUM_SUPPORTED_COMMANDS 18
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -81,7 +82,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
 		{ "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
 		{ "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
-		{ "TX", 4, 0, TX_write, unsupported_cmd } // set transceiver to transmit.
+		{ "TX", 4,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
+		{ "ED", 0,  3, unsupported_cmd, ED_read } // print out the state of the EEPROM data
 	};
 
 char *unsupported_cmd( char *cmd ){
@@ -421,6 +423,94 @@ char *TX_write( char* cmd ){
 			break;
 	}
   	sprintf( obuf, "TX0;");
+  	return obuf;
+}
+
+char *ED_read(  char* cmd  ){
+	// Print out the state of the EEPROM data
+	/*The situation is this: the radio works correctly, demodulating as expected, on the first run.
+	However, on power cycle the output appears to be muted. Why? Look at the state of the EEPROM
+	data after first run and then again after reboot to see if there is a plausible explanation.*/
+
+	Serial.println("=== ED Struct Contents ===");
+	Serial.print("agc:               "); Serial.println(ED.agc);
+	Serial.print("audioVolume:       "); Serial.println(ED.audioVolume);
+	Serial.print("rfGainAllBands_dB: "); Serial.println(ED.rfGainAllBands_dB);
+	Serial.print("stepFineTune:      "); Serial.println(ED.stepFineTune);
+	Serial.print("nrOptionSelect:    "); Serial.println(ED.nrOptionSelect);
+	Serial.print("ANR_notchOn:       "); Serial.println(ED.ANR_notchOn);
+	Serial.print("spectrumScale:     "); Serial.println(ED.spectrumScale);
+	Serial.print("spectrum_zoom:     "); Serial.println(ED.spectrum_zoom);
+	Serial.print("CWFilterIndex:     "); Serial.println(ED.CWFilterIndex);
+	Serial.print("CWToneIndex:       "); Serial.println(ED.CWToneIndex);
+	Serial.print("decoderFlag:       "); Serial.println(ED.decoderFlag);
+	Serial.print("keyType:           "); Serial.println(ED.keyType);
+	Serial.print("currentWPM:        "); Serial.println(ED.currentWPM);
+	Serial.print("sidetoneVolume:    "); Serial.println(ED.sidetoneVolume);
+	Serial.print("freqIncrement:     "); Serial.println(ED.freqIncrement);
+	Serial.print("freqCorrectionFactor: "); Serial.println(ED.freqCorrectionFactor);
+	Serial.print("activeVFO:         "); Serial.println(ED.activeVFO);
+	Serial.print("currentBand[0]:    "); Serial.println(ED.currentBand[0]);
+	Serial.print("currentBand[1]:    "); Serial.println(ED.currentBand[1]);
+	Serial.print("centerFreq_Hz[0]:  "); Serial.println(ED.centerFreq_Hz[0]);
+	Serial.print("centerFreq_Hz[1]:  "); Serial.println(ED.centerFreq_Hz[1]);
+	Serial.print("fineTuneFreq_Hz[0]: "); Serial.println(ED.fineTuneFreq_Hz[0]);
+	Serial.print("fineTuneFreq_Hz[1]: "); Serial.println(ED.fineTuneFreq_Hz[1]);
+	Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
+	Serial.print("keyerFlip:         "); Serial.println(ED.keyerFlip);
+
+	Serial.print("equalizerRec: ");
+	for(int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+		Serial.print(ED.equalizerRec[i]);
+		if(i < EQUALIZER_CELL_COUNT-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.print("equalizerXmt: ");
+	for(int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+		Serial.print(ED.equalizerXmt[i]);
+		if(i < EQUALIZER_CELL_COUNT-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.print("powerOutCW: ");
+	for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+		Serial.print(ED.powerOutCW[i]);
+		if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.print("powerOutSSB: ");
+	for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+		Serial.print(ED.powerOutSSB[i]);
+		if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.print("IQAmpCorrectionFactor: ");
+	for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+		Serial.print(ED.IQAmpCorrectionFactor[i]);
+		if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.print("IQPhaseCorrectionFactor: ");
+	for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+		Serial.print(ED.IQPhaseCorrectionFactor[i]);
+		if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.print("antennaSelection: ");
+	for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+		Serial.print(ED.antennaSelection[i]);
+		if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+	}
+	Serial.println();
+
+	Serial.println("=== End ED Struct ===");
+
+  	sprintf( obuf, "ED;");
   	return obuf;
 }
 
