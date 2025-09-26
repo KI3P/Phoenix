@@ -1772,3 +1772,253 @@ TEST(Loop, NoiseReductionButtonEnumValueVerification) {
     ConsumeInterrupt();
     EXPECT_EQ((int)ED.nrOptionSelect, 0); // Back to NROff
 }
+
+// ================== FINE_TUNE_INCREMENT BUTTON TESTS ==================
+
+TEST(Loop, FineTuneIncrementButtonCyclesThroughValues) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test cycling through all fine tune increment values: 10, 50, 250, 500
+    // Start with default value (10)
+    ED.stepFineTune = 10;
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 50);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 250);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 500);
+
+    // Test wrap-around from maximum back to minimum
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10);
+}
+
+TEST(Loop, FineTuneIncrementButtonFullSequence) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test complete sequence starting from 10 Hz
+    ED.stepFineTune = 10;
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 50);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 250);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 500);
+
+    // Test wrap-around from maximum back to minimum
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10);
+
+    // Test another cycle to ensure it continues working
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 50);
+}
+
+TEST(Loop, FineTuneIncrementButtonWrapsFromMaximum) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start at maximum fine tune increment value
+    ED.stepFineTune = 500;
+
+    // Press button - should wrap to minimum
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10);
+}
+
+TEST(Loop, FineTuneIncrementButtonWith50Start) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start with 50 Hz and test progression
+    ED.stepFineTune = 50;
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 250);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 500);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10);
+}
+
+TEST(Loop, FineTuneIncrementButtonWith250Start) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start with 250 Hz and test progression
+    ED.stepFineTune = 250;
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 500);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 50);
+}
+
+TEST(Loop, FineTuneIncrementButtonWithInvalidStartValue) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test behavior when starting with a value not in the array
+    // This should wrap to the beginning of the array
+    ED.stepFineTune = 100; // Not in the standard array
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10); // Should reset to first value
+}
+
+TEST(Loop, FineTuneIncrementButtonViaInterruptHandling) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set initial fine tune increment value
+    ED.stepFineTune = 250;
+
+    // Set up mock button and trigger interrupt
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify fine tune increment value advanced to next value in sequence
+    EXPECT_EQ(ED.stepFineTune, 500);
+}
+
+TEST(Loop, FineTuneIncrementButtonDoesNotAffectOtherValues) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial state with various ED values
+    int64_t initialCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
+    int64_t initialFineTuneFreq = ED.fineTuneFreq_Hz[ED.activeVFO];
+    ModulationType initialModulation = ED.modulation[ED.activeVFO];
+    int32_t initialBand = ED.currentBand[ED.activeVFO];
+    uint8_t initialActiveVFO = ED.activeVFO;
+    int32_t initialFreqIncrement = ED.freqIncrement;
+    NoiseReductionType initialNrOptionSelect = ED.nrOptionSelect;
+
+    ED.stepFineTune = 50;
+
+    // Press FINE_TUNE_INCREMENT button
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify only stepFineTune changed
+    EXPECT_EQ(ED.stepFineTune, 250);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], initialCenterFreq);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], initialFineTuneFreq);
+    EXPECT_EQ(ED.modulation[ED.activeVFO], initialModulation);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], initialBand);
+    EXPECT_EQ(ED.activeVFO, initialActiveVFO);
+    EXPECT_EQ(ED.freqIncrement, initialFreqIncrement);
+    EXPECT_EQ(ED.nrOptionSelect, initialNrOptionSelect);
+}
+
+TEST(Loop, FineTuneIncrementButtonMultipleRapidPresses) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test multiple rapid button presses
+    ED.stepFineTune = 10;
+
+    // Simulate rapid pressing through FIFO
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+
+    // Process all interrupts
+    ConsumeInterrupt(); // 10 -> 50
+    EXPECT_EQ(ED.stepFineTune, 50);
+
+    ConsumeInterrupt(); // 50 -> 250
+    EXPECT_EQ(ED.stepFineTune, 250);
+
+    ConsumeInterrupt(); // 250 -> 500
+    EXPECT_EQ(ED.stepFineTune, 500);
+
+    ConsumeInterrupt(); // 500 -> 10 (wraparound)
+    EXPECT_EQ(ED.stepFineTune, 10);
+}
+
+TEST(Loop, FineTuneIncrementButtonArrayValueVerification) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test cycling through all expected values to verify the array is correct
+    ED.stepFineTune = 10;
+
+    // Verify starting value
+    EXPECT_EQ(ED.stepFineTune, 10);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 50);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 250);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 500);
+
+    SetButton(FINE_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.stepFineTune, 10); // Back to beginning
+}

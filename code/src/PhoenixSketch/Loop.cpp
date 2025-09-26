@@ -245,6 +245,17 @@ void HandleButtonPress(int32_t button){
             ED.freqIncrement = incrementValues[i];
             break;
         }
+        case FINE_TUNE_INCREMENT:{
+            int32_t selectFT[] = { 10, 50, 250, 500 };
+            size_t i = 0;
+            for (i = 0; i < sizeof(selectFT)/sizeof(int32_t); i++)
+                if (ED.stepFineTune == selectFT[i]) break;
+            i++;
+            if (i >= sizeof(selectFT)/sizeof(int32_t))
+                i = 0;
+            ED.stepFineTune = selectFT[i];
+            break;
+        }
         case NOISE_REDUCTION:{
             int8_t newnr = (int8_t)ED.nrOptionSelect + 1;
             if (newnr > (int8_t)NRLMS)
@@ -257,9 +268,6 @@ void HandleButtonPress(int32_t button){
                 ED.ANR_notchOn = 1;
             else
                 ED.ANR_notchOn = 0;
-            break;
-        }
-        case FINE_TUNE_INCREMENT:{
             break;
         }
         case FILTER:{
