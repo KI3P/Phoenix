@@ -235,19 +235,28 @@ void HandleButtonPress(int32_t button){
         }
         case MAIN_TUNE_INCREMENT:{
             int32_t incrementValues[] = { 10, 50, 100, 250, 1000, 10000, 100000, 1000000 };
+            // find the index of the current increment
             size_t i = 0;
             for (i = 0; i < sizeof(incrementValues)/sizeof(int32_t); i++)
                 if (incrementValues[i] == ED.freqIncrement) break;
-            i++; // increment it
+            i++; // increase it
             if (i >= sizeof(incrementValues)/sizeof(int32_t)) // check for end of array
                 i = 0;
             ED.freqIncrement = incrementValues[i];
             break;
         }
         case NOISE_REDUCTION:{
+            int8_t newnr = (int8_t)ED.nrOptionSelect + 1;
+            if (newnr > (int8_t)NRLMS)
+                newnr = (int8_t)NROff;
+            ED.nrOptionSelect = (NoiseReductionType)newnr;
             break;
         }
         case NOTCH_FILTER:{
+            if (ED.ANR_notchOn == 0)
+                ED.ANR_notchOn = 1;
+            else
+                ED.ANR_notchOn = 0;
             break;
         }
         case FINE_TUNE_INCREMENT:{

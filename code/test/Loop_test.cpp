@@ -1534,3 +1534,241 @@ TEST(Loop, MainTuneIncrementButtonMultipleRapidPresses) {
     ConsumeInterrupt(); // 100 -> 250
     EXPECT_EQ(ED.freqIncrement, 250);
 }
+
+// ================== NOISE_REDUCTION BUTTON TESTS ==================
+
+TEST(Loop, NoiseReductionButtonCyclesThroughTypes) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test cycling through all noise reduction types: NROff(0), NRKim(1), NRSpectral(2), NRLMS(3)
+    // Start with default value (NROff)
+    ED.nrOptionSelect = NROff;
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRKim);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRSpectral);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRLMS);
+
+    // Test wrap-around from maximum back to minimum
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+}
+
+TEST(Loop, NoiseReductionButtonFullSequence) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test complete sequence starting from NROff
+    ED.nrOptionSelect = NROff;
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRKim);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRSpectral);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRLMS);
+
+    // Test wrap-around from maximum back to minimum
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+
+    // Test another cycle to ensure it continues working
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRKim);
+}
+
+TEST(Loop, NoiseReductionButtonWrapsFromMaximum) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start at maximum noise reduction type
+    ED.nrOptionSelect = NRLMS;
+
+    // Press button - should wrap to minimum
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+}
+
+TEST(Loop, NoiseReductionButtonWithKimStart) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start with NRKim and test progression
+    ED.nrOptionSelect = NRKim;
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRSpectral);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRLMS);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+}
+
+TEST(Loop, NoiseReductionButtonWithSpectralStart) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start with NRSpectral and test progression
+    ED.nrOptionSelect = NRSpectral;
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRLMS);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.nrOptionSelect, NRKim);
+}
+
+TEST(Loop, NoiseReductionButtonViaInterruptHandling) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set initial noise reduction type
+    ED.nrOptionSelect = NRSpectral;
+
+    // Set up mock button and trigger interrupt
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify noise reduction type advanced to next value in sequence
+    EXPECT_EQ(ED.nrOptionSelect, NRLMS);
+}
+
+TEST(Loop, NoiseReductionButtonDoesNotAffectOtherValues) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial state with various ED values
+    int64_t initialCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
+    int64_t initialFineTuneFreq = ED.fineTuneFreq_Hz[ED.activeVFO];
+    ModulationType initialModulation = ED.modulation[ED.activeVFO];
+    int32_t initialBand = ED.currentBand[ED.activeVFO];
+    uint8_t initialActiveVFO = ED.activeVFO;
+    int32_t initialFreqIncrement = ED.freqIncrement;
+
+    ED.nrOptionSelect = NRKim;
+
+    // Press NOISE_REDUCTION button
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify only nrOptionSelect changed
+    EXPECT_EQ(ED.nrOptionSelect, NRSpectral);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], initialCenterFreq);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], initialFineTuneFreq);
+    EXPECT_EQ(ED.modulation[ED.activeVFO], initialModulation);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], initialBand);
+    EXPECT_EQ(ED.activeVFO, initialActiveVFO);
+    EXPECT_EQ(ED.freqIncrement, initialFreqIncrement);
+}
+
+TEST(Loop, NoiseReductionButtonMultipleRapidPresses) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test multiple rapid button presses
+    ED.nrOptionSelect = NROff;
+
+    // Simulate rapid pressing through FIFO
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+
+    // Process all interrupts
+    ConsumeInterrupt(); // NROff -> NRKim
+    EXPECT_EQ(ED.nrOptionSelect, NRKim);
+
+    ConsumeInterrupt(); // NRKim -> NRSpectral
+    EXPECT_EQ(ED.nrOptionSelect, NRSpectral);
+
+    ConsumeInterrupt(); // NRSpectral -> NRLMS
+    EXPECT_EQ(ED.nrOptionSelect, NRLMS);
+
+    ConsumeInterrupt(); // NRLMS -> NROff (wraparound)
+    EXPECT_EQ(ED.nrOptionSelect, NROff);
+}
+
+TEST(Loop, NoiseReductionButtonEnumValueVerification) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Verify the enum values are as expected
+    EXPECT_EQ((int)NROff, 0);
+    EXPECT_EQ((int)NRKim, 1);
+    EXPECT_EQ((int)NRSpectral, 2);
+    EXPECT_EQ((int)NRLMS, 3);
+
+    // Test cycling through all enum values
+    ED.nrOptionSelect = NROff;
+    EXPECT_EQ((int)ED.nrOptionSelect, 0);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ((int)ED.nrOptionSelect, 1);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ((int)ED.nrOptionSelect, 2);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ((int)ED.nrOptionSelect, 3);
+
+    SetButton(NOISE_REDUCTION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ((int)ED.nrOptionSelect, 0); // Back to NROff
+}
