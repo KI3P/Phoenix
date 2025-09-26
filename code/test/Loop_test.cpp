@@ -126,6 +126,22 @@ TEST(Loop, ChangeVFO){
 }
 
 TEST(Loop, CATFrequencyChangeViaRepeatedLoop){
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+     // Initialize the hardware
+    InitializeFrontPanel();
+    InitializeAudio();
+    InitializeRFHardware(); // RF board, LPF board, and BPF board
+    InitializeSignalProcessing();
+    // Start the mode state machines
+    ModeSm_start(&modeSM);
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
     // Save initial state
     ED.activeVFO = VFO_A;
     int64_t initialCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
@@ -1141,4 +1157,188 @@ TEST(Loop, FifoBufferAllInterruptTypes) {
     }
 
     EXPECT_EQ(GetInterrupt(), iNONE);
+}
+
+// ================== NEW BUTTON PRESS TESTS ==================
+
+TEST(Loop, ZoomButtonCyclesThroughLevels) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set initial zoom level
+    ED.spectrum_zoom = SPECTRUM_ZOOM_1;
+
+    // Test cycling through zoom levels
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_2);
+
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_4);
+
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_8);
+
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_16);
+
+    // Test wrap-around from max back to min
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_MIN);
+}
+
+TEST(Loop, ZoomButtonWrapsAroundAtMaximum) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start at maximum zoom level
+    ED.spectrum_zoom = SPECTRUM_ZOOM_MAX;
+
+    // Press zoom button - should wrap to minimum
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_MIN);
+}
+
+TEST(Loop, ZoomButtonViaInterruptHandling) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set initial zoom level
+    ED.spectrum_zoom = SPECTRUM_ZOOM_2;
+
+    // Set up mock button return value and trigger interrupt
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify zoom level increased
+    EXPECT_EQ(ED.spectrum_zoom, SPECTRUM_ZOOM_4);
+}
+
+TEST(Loop, ResetTuningButtonCallsResetFunction) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial state with non-zero fine tune
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 1500L;
+    ED.centerFreq_Hz[ED.activeVFO] = 14200000L;
+    int64_t oldRXTX = GetTXRXFreq_dHz();
+
+    // Call reset tuning button handler
+    SetButton(RESET_TUNING);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify that fine tune frequency was reset to 0
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 0L);
+
+    // Center frequency should be adjusted by the fine tune amount that was reset
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14201500L); // 14200000 + 1500
+
+    // RXTX frequency should remain the same
+    EXPECT_EQ(GetTXRXFreq_dHz(), oldRXTX);
+}
+
+TEST(Loop, ResetTuningButtonViaInterruptHandling) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial state with non-zero fine tune
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 2000L;
+
+    // Set up mock button and trigger interrupt
+    SetButton(RESET_TUNING);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify fine tune was reset
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 0L);
+}
+
+TEST(Loop, DemodulationButtonCyclesThroughModes) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test cycling through modulation modes: USB->LSB->AM->SAM->USB
+    // Start with USB (0)
+    ED.modulation[ED.activeVFO] = USB;
+
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.modulation[ED.activeVFO], LSB);
+
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.modulation[ED.activeVFO], AM);
+
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.modulation[ED.activeVFO], SAM);
+
+    // Test wrap-around from SAM back to USB
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.modulation[ED.activeVFO], USB);
+}
+
+TEST(Loop, DemodulationButtonWrapsAroundFromSAM) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start at maximum modulation type (SAM = 3)
+    ED.modulation[ED.activeVFO] = SAM;
+
+    // Press demodulation button - should wrap to USB
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.modulation[ED.activeVFO], USB);
+}
+
+TEST(Loop, DemodulationButtonWorksWithDifferentVFO) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test with VFO B (activeVFO = 1)
+    ED.activeVFO = 1;
+    ED.modulation[ED.activeVFO] = LSB;
+
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.modulation[ED.activeVFO], AM);
+
+    // VFO A should remain unchanged
+    EXPECT_EQ(ED.modulation[0], LSB); // Assuming VFO A was initialized to LSB
+}
+
+TEST(Loop, DemodulationButtonViaInterruptHandling) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set initial modulation mode
+    ED.modulation[ED.activeVFO] = AM;
+
+    // Set up mock button and trigger interrupt
+    SetButton(DEMODULATION);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify modulation mode advanced
+    EXPECT_EQ(ED.modulation[ED.activeVFO], SAM);
 }

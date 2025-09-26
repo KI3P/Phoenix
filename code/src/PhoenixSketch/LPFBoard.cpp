@@ -102,7 +102,7 @@ errno_t InitLPFBoardMCP(void){
     CLEAR_BIT(hardwareRegister,TXBPFBIT);
     SET_BIT(hardwareRegister,RXBPFBIT);
 
-    if (mcpLPF.begin_I2C(V12_LPF_MCP23017_ADDR,&Wire2)){
+    if (mcpLPF.begin_I2C(LPF_MCP23017_ADDR,&Wire2)){
         Debug("Initializing LPF board");
         mcpLPF.enableAddrPins();
         // Set all pins to be outputs
@@ -118,7 +118,7 @@ errno_t InitLPFBoardMCP(void){
         bit_results.V12_LPF_I2C_present = true;
         LPFerrno = ESUCCESS;
     } else {
-        Debug("LPF MCP23017 not found at 0x"+String(V12_LPF_MCP23017_ADDR,HEX));
+        Debug("LPF MCP23017 not found at 0x"+String(LPF_MCP23017_ADDR,HEX));
         bit_results.V12_LPF_I2C_present = false;
         LPFerrno = ENOI2C;
     }

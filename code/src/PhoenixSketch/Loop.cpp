@@ -175,26 +175,35 @@ void HandleButtonPress(int32_t button){
         case BAND_UP:{
             ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
             ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
+            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2] = ED.modulation[ED.activeVFO];
             if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
                 ED.currentBand[ED.activeVFO] = FIRST_BAND;
             ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
             ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+            ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
             UpdateRFHardwareState();
             break;
         }
         case ZOOM:{
+            ED.spectrum_zoom++;
+            if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
+                ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
             break;
         }
-        case NOISE_FLOOR:{
+        case RESET_TUNING:{
+            ResetTuning();
+            UpdateRFHardwareState();
             break;
         }
         case BAND_DN:{
             ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
             ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
+            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2] = ED.modulation[ED.activeVFO];
             if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
                 ED.currentBand[ED.activeVFO] = LAST_BAND;
             ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
             ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+            ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
             UpdateRFHardwareState();
             break;
         }
@@ -217,6 +226,11 @@ void HandleButtonPress(int32_t button){
             break;
         }
         case DEMODULATION:{
+            // Rotate through the modulation types USB(0), LSB(1), AM(2), and SAM(3)
+            int8_t newmod = (int8_t)ED.modulation[ED.activeVFO] + 1;
+            if (newmod > (int8_t)SAM)
+                newmod = (int8_t)USB;
+            ED.modulation[ED.activeVFO] = (ModulationType)newmod;
             break;
         }
         case MAIN_TUNE_INCREMENT:{

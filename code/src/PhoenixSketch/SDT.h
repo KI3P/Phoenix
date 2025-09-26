@@ -165,6 +165,7 @@ extern struct config_t {
     int32_t freqIncrement = 5;
     float32_t freqCorrectionFactor = 0;
     uint8_t activeVFO = 0;                                // 0(A) or 1(B)
+    ModulationType modulation[2] = {LSB, LSB};
     int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND};
     int64_t centerFreq_Hz[2] = {7030000L,7030000L};
     int64_t fineTuneFreq_Hz[2] = {0, 0};
@@ -178,7 +179,8 @@ extern struct config_t {
     float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    int64_t lastFrequencies[NUMBER_OF_BANDS][2] = {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};         // center tune and fine tune
+    int64_t lastFrequencies[NUMBER_OF_BANDS][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                                {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0}}; // center tune, fine tune, modulation
     int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     bool keyerFlip = KEYER_FLIP;                     // false = right paddle = DAH, true = DIT
     float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};

@@ -96,6 +96,16 @@ int64_t GetCWTXFreq_dHz(void){
     }
 }
 
+/**
+ * Set the fine tune frequency to 0 Hz and change the center frequency such that 
+ * the RXTX frequency remains the same.
+ */
+void ResetTuning(void){
+    ED.centerFreq_Hz[ED.activeVFO] = ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO];
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0.0;
+    return;
+}
+
 int8_t GetBand(int64_t freq){
     for(uint8_t i = FIRST_BAND; i <= LAST_BAND; i++){
         if(freq >= bands[i].fBandLow_Hz && freq <= bands[i].fBandHigh_Hz){

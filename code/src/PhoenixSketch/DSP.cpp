@@ -572,7 +572,7 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
     // The demod mode is accomplished by selecting/combining the real and imaginary parts 
     // of the output of the IFFT process.
     float32_t audiotmp, w;
-    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+    switch (ED.modulation[ED.activeVFO]) {
       case LSB:
         // for SSB copy real part in both outputs
         arm_copy_f32(data->I, data->Q, data->N);
