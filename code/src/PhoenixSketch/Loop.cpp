@@ -234,6 +234,14 @@ void HandleButtonPress(int32_t button){
             break;
         }
         case MAIN_TUNE_INCREMENT:{
+            int32_t incrementValues[] = { 10, 50, 100, 250, 1000, 10000, 100000, 1000000 };
+            size_t i = 0;
+            for (i = 0; i < sizeof(incrementValues)/sizeof(int32_t); i++)
+                if (incrementValues[i] == ED.freqIncrement) break;
+            i++; // increment it
+            if (i >= sizeof(incrementValues)/sizeof(int32_t)) // check for end of array
+                i = 0;
+            ED.freqIncrement = incrementValues[i];
             break;
         }
         case NOISE_REDUCTION:{

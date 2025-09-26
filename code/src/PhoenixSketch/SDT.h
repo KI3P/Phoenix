@@ -162,7 +162,7 @@ extern struct config_t {
     KeyTypeId keyType = KEYER_TYPE;
     int32_t currentWPM = DEFAULT_KEYER_WPM;
     float32_t sidetoneVolume = 20.0;
-    int32_t freqIncrement = 5;
+    int32_t freqIncrement = 1000;
     float32_t freqCorrectionFactor = 0;
     uint8_t activeVFO = 0;                                // 0(A) or 1(B)
     ModulationType modulation[2] = {LSB, LSB};

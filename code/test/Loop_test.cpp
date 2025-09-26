@@ -1342,3 +1342,195 @@ TEST(Loop, DemodulationButtonViaInterruptHandling) {
     // Verify modulation mode advanced
     EXPECT_EQ(ED.modulation[ED.activeVFO], SAM);
 }
+
+// ================== MAIN_TUNE_INCREMENT BUTTON TESTS ==================
+
+TEST(Loop, MainTuneIncrementButtonCyclesThroughValues) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test cycling through all frequency increment values: 10, 50, 100, 250, 1000, 10000, 100000, 1000000
+    // Start with default value (1000)
+    ED.freqIncrement = 1000;
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 10000);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 100000);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 1000000);
+
+    // Test wrap-around from maximum back to minimum
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 10);
+}
+
+TEST(Loop, MainTuneIncrementButtonFullSequence) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test complete sequence starting from 10 Hz
+    ED.freqIncrement = 10;
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 50);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 100);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 250);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 1000);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 10000);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 100000);
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 1000000);
+
+    // Test wrap-around from maximum back to minimum
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 10);
+}
+
+TEST(Loop, MainTuneIncrementButtonWrapsFromMaximum) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Start at maximum increment value
+    ED.freqIncrement = 1000000;
+
+    // Press button - should wrap to minimum
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 10);
+}
+
+TEST(Loop, MainTuneIncrementButtonWithNonStandardStartValue) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test behavior when starting with a value not in the standard array
+    // This should find the value and increment normally
+    ED.freqIncrement = 250;
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 1000);
+}
+
+TEST(Loop, MainTuneIncrementButtonWithInvalidStartValue) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test behavior when starting with a value not in the array
+    // This should wrap to the beginning of the array
+    ED.freqIncrement = 999; // Not in the standard array
+
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.freqIncrement, 10); // Should reset to first value
+}
+
+TEST(Loop, MainTuneIncrementButtonViaInterruptHandling) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set initial increment value
+    ED.freqIncrement = 100;
+
+    // Set up mock button and trigger interrupt
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify increment value advanced to next value in sequence
+    EXPECT_EQ(ED.freqIncrement, 250);
+}
+
+TEST(Loop, MainTuneIncrementButtonDoesNotAffectOtherValues) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Set up initial state with various ED values
+    int64_t initialCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
+    int64_t initialFineTuneFreq = ED.fineTuneFreq_Hz[ED.activeVFO];
+    ModulationType initialModulation = ED.modulation[ED.activeVFO];
+    int32_t initialBand = ED.currentBand[ED.activeVFO];
+    uint8_t initialActiveVFO = ED.activeVFO;
+
+    ED.freqIncrement = 50;
+
+    // Press MAIN_TUNE_INCREMENT button
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+
+    // Verify only freqIncrement changed
+    EXPECT_EQ(ED.freqIncrement, 100);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], initialCenterFreq);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], initialFineTuneFreq);
+    EXPECT_EQ(ED.modulation[ED.activeVFO], initialModulation);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], initialBand);
+    EXPECT_EQ(ED.activeVFO, initialActiveVFO);
+}
+
+TEST(Loop, MainTuneIncrementButtonMultipleRapidPresses) {
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Test multiple rapid button presses
+    ED.freqIncrement = 10;
+
+    // Simulate rapid pressing through FIFO
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+    SetButton(MAIN_TUNE_INCREMENT);
+    SetInterrupt(iBUTTON_PRESSED);
+
+    // Process all interrupts
+    ConsumeInterrupt(); // 10 -> 50
+    EXPECT_EQ(ED.freqIncrement, 50);
+
+    ConsumeInterrupt(); // 50 -> 100
+    EXPECT_EQ(ED.freqIncrement, 100);
+
+    ConsumeInterrupt(); // 100 -> 250
+    EXPECT_EQ(ED.freqIncrement, 250);
+}
