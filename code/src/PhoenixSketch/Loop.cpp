@@ -182,17 +182,7 @@ void HandleButtonPress(int32_t button){
             ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
             ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
             UpdateRFHardwareState();
-            break;
-        }
-        case ZOOM:{
-            ED.spectrum_zoom++;
-            if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
-                ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
-            break;
-        }
-        case RESET_TUNING:{
-            ResetTuning();
-            UpdateRFHardwareState();
+            Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
             break;
         }
         case BAND_DN:{
@@ -205,6 +195,21 @@ void HandleButtonPress(int32_t button){
             ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
             ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
             UpdateRFHardwareState();
+            Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
+            break;
+        }
+        case ZOOM:{
+            ED.spectrum_zoom++;
+            if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
+                ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
+            Debug("Zoom is x" + String(1<<ED.spectrum_zoom));
+            break;
+        }
+        case RESET_TUNING:{
+            ResetTuning();
+            UpdateRFHardwareState();
+            Debug("Center freq = " + String(ED.centerFreq_Hz[ED.activeVFO]));
+            Debug("Fine tune freq = " + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
             break;
         }
         case TOGGLE_MODE:{
@@ -223,6 +228,7 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
             }
+            Debug("Mode is " + String(modeSM.state_id));
             break;
         }
         case DEMODULATION:{
@@ -231,6 +237,7 @@ void HandleButtonPress(int32_t button){
             if (newmod > (int8_t)SAM)
                 newmod = (int8_t)USB;
             ED.modulation[ED.activeVFO] = (ModulationType)newmod;
+            Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
             break;
         }
         case MAIN_TUNE_INCREMENT:{
@@ -243,6 +250,7 @@ void HandleButtonPress(int32_t button){
             if (i >= sizeof(incrementValues)/sizeof(int32_t)) // check for end of array
                 i = 0;
             ED.freqIncrement = incrementValues[i];
+            Debug("Main tune increment is " + String(ED.freqIncrement));
             break;
         }
         case FINE_TUNE_INCREMENT:{
@@ -254,13 +262,16 @@ void HandleButtonPress(int32_t button){
             if (i >= sizeof(selectFT)/sizeof(int32_t))
                 i = 0;
             ED.stepFineTune = selectFT[i];
+            Debug("Fine tune increment is " + String(ED.stepFineTune));
             break;
         }
         case NOISE_REDUCTION:{
+            // Rotate through the noise reduction types
             int8_t newnr = (int8_t)ED.nrOptionSelect + 1;
             if (newnr > (int8_t)NRLMS)
                 newnr = (int8_t)NROff;
             ED.nrOptionSelect = (NoiseReductionType)newnr;
+            Debug("Noise reduction is " + String(ED.nrOptionSelect));
             break;
         }
         case NOTCH_FILTER:{
@@ -268,18 +279,27 @@ void HandleButtonPress(int32_t button){
                 ED.ANR_notchOn = 1;
             else
                 ED.ANR_notchOn = 0;
+            Debug("Notch filter is " + String(ED.ANR_notchOn));
             break;
         }
         case FILTER:{
+            // I am not sure what the point of this button is, so ignore for now
             break;
         }
         case DECODER_TOGGLE:{
+            if (ED.decoderFlag == 0)
+                ED.decoderFlag = 1;
+            else
+                ED.decoderFlag = 0;
+            Debug("Decoder is " + String(ED.decoderFlag));
             break;
         }
         case DDE:{
+            // Add this later
             break;
         }
         case BEARING:{
+            // Add this later
             break;
         }
         default:
