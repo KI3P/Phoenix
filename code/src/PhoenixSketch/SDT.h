@@ -179,8 +179,9 @@ extern struct config_t {
     float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    int64_t lastFrequencies[NUMBER_OF_BANDS][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
-                                {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0}}; // center tune, fine tune, modulation
+    int64_t lastFrequencies[NUMBER_OF_BANDS][3] = {{1850000,0,1},{3700000,0,1},{5351500,0,0},
+                    {7150000,0,1},{10125000,0,0},{14200000,0,0},{18100000,0,0},
+                    {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0}}; // center tune, fine tune, modulation
     int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
     bool keyerFlip = KEYER_FLIP;                     // false = right paddle = DAH, true = DIT
     float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
@@ -466,6 +467,7 @@ struct AGCConfig {
 #include "LPFBoard.h"
 #include "BPFBoard.h"
 #include "CAT.h"
+#include "Storage.h"
 
 extern struct BIT bit_results;
 extern struct band bands[];

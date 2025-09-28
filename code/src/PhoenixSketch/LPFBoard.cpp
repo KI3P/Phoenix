@@ -299,19 +299,21 @@ float32_t ReadReflectedPower(void){
 
 
 errno_t InitSWRControl(void){
-
-    if (!swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
-        bit_results.V12_LPF_AD7991_present = false;
-        Debug("AD7991 not found at 0x"+String(AD7991_I2C_ADDR1,HEX));
-
-        if (!swrADC.begin(AD7991_I2C_ADDR2,&Wire2)){
-            bit_results.V12_LPF_AD7991_present = true;
-            bit_results.AD7991_I2C_ADDR = AD7991_I2C_ADDR2;
-            Debug("AD7991 found at alternative 0x"+String(AD7991_I2C_ADDR2,HEX));
-            return ESUCCESS;
-        }
-        return ENOI2C;
+    bit_results.V12_LPF_AD7991_present = false;
+    if (swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
+        bit_results.V12_LPF_AD7991_present = true;
+        bit_results.AD7991_I2C_ADDR = AD7991_I2C_ADDR1;
+        return ESUCCESS;
     }
-    return ESUCCESS;
+    Debug("AD7991 not found at 0x"+String(AD7991_I2C_ADDR1,HEX));
+
+    if (swrADC.begin(AD7991_I2C_ADDR2,&Wire2)){
+        bit_results.V12_LPF_AD7991_present = true;
+        bit_results.AD7991_I2C_ADDR = AD7991_I2C_ADDR2;
+        Debug("AD7991 found at alternative 0x"+String(AD7991_I2C_ADDR2,HEX));
+        return ESUCCESS;
+    }
+    Debug("AD7991 not found at 0x"+String(AD7991_I2C_ADDR2,HEX));
+    return ENOI2C;
 }
 

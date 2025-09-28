@@ -59,6 +59,7 @@ public:
     void print(float);
     void println(float);
     void println(const String& s);
+    void printf(const char* format, ...);
     uint32_t available(void);
     uint8_t read(void);
     uint32_t availableForWrite(void);
@@ -107,5 +108,8 @@ private:
 
 // Free function to allow const char* + String
 String operator+(const char* left, const String& right);
+
+// F() macro for storing strings in flash memory (mock just returns the string)
+#define F(str) str
 
 #endif

@@ -532,7 +532,7 @@ void CheckForCATSerialEvents(void){
 
      		// Check to see if the command is a good one BEFORE sending it
       		// to the command executor
-      		Serial.println( String("catCommand is ")+String(catCommand)+String(" catCommandIndex is ")+String(catCommandIndex));
+      		//Serial.println( String("catCommand is ")+String(catCommand)+String(" catCommandIndex is ")+String(catCommandIndex));
 			char *parser_output = command_parser( catCommand );
 			catCommandIndex = 0;
       		// We executed it, now erase it
@@ -573,10 +573,10 @@ void CheckForCATSerialEvents(void){
 
 char *command_parser( char* command ){
 	// loop through the entire list of supported commands
-	Serial.println( String("command_parser(): cmd is ") + String(command) );
+	//Serial.println( String("command_parser(): cmd is ") + String(command) );
 	for( int i = 0; i < NUM_SUPPORTED_COMMANDS; i++ ){
 		if( ! strncmp( command, valid_commands[ i ].name, 2 ) ){
-			Serial.println( String("command_parser(): found ") + String(valid_commands[i].name) );
+			//Serial.println( String("command_parser(): found ") + String(valid_commands[i].name) );
 			// The two letters match.  What about the params?
 			int write_params_len = valid_commands[ i ].set_len;
 			int read_params_len  = valid_commands[ i ].read_len;

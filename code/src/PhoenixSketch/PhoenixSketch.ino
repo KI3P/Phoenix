@@ -49,7 +49,7 @@ void Key2On(void){
 void setup(void){
     Serial.begin(115200);
     SerialUSB1.begin(38400); // For CAT control
-    delay(1000); //testcode
+    //delay(1000); //testcode
     Serial.println("T41 SDT Setup");
     //Configure the pins for the auto shutdown
     pinMode(BEGIN_TEENSY_SHUTDOWN, INPUT);  // HI received here tells Teensy to start shutdown routine
@@ -58,6 +58,8 @@ void setup(void){
     
     pinMode(31,OUTPUT); //testcode
     digitalWrite(31, 0);  //testcode
+    Serial.println("...Initializing storage");
+    InitializeStorage();
 
     Serial.println("...Initializing hardware");
     InitializeFrontPanel();
@@ -96,3 +98,12 @@ void setup(void){
     
     Serial.println("...Setup done!");
 }
+
+/*
+
+Bug:
+Start radio as above. 500 Hz input tone appears at 500 Hz on the audio output.
+Change band up.
+Now, fineTuneFreq needs to be set to -47000 Hz for a 500 Hz tone to be seen on 
+the audio output. This should be -48000 Hz.
+*/

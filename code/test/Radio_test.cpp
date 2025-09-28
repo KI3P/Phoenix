@@ -195,14 +195,15 @@ TEST(Radio, RadioStateRunThrough) {
 
     // Initialize the hardware
     InitializeFrontPanel();
-    InitializeAudio();
-    InitializeRFHardware(); // RF board, LPF board, and BPF board
     InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware(); // RF board, LPF board, and BPF board
 
     // Start the mode state machines
-    ModeSm_start(&modeSM);
     modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
     modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
     UISm_start(&uiSM);
     UpdateAudioIOState();
 
@@ -487,4 +488,61 @@ TEST(Radio, RadioStateRunThrough) {
 
     // Stop the 1ms timer interrupt
     stop_timer1ms();
+}
+
+TEST(Radio, RadioFrequencyTuningWorks) {
+    // Set up the queues so we get some simulated data through and start the "clock"
+    Q_in_L.setChannel(2); // 1 kHz tone
+    Q_in_R.setChannel(3);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    //-------------------------------------------------------------
+    // Radio startup code
+    //-------------------------------------------------------------
+
+    // Initialize the hardware
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware(); // RF board, LPF board, and BPF board
+
+    // Start the mode state machines
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    ED.fineTuneFreq_Hz[ED.activeVFO] = -48000L;
+
+    // Now, start the 1ms timer interrupt to simulate hardware timer
+    start_timer1ms();
+
+    //-------------------------------------------------------------
+    
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Check the state before loop is invoked and then again after
+    CheckThatStateIsReceive();
+    for (size_t i = 0; i < 50; i++){
+        loop();
+        MyDelay(10);
+    }
+    CheckThatStateIsReceive();
+
+    // Now, press the BAND UP button and check that things changed as expected
+    //int32_t oldband = ED.currentBand[ED.activeVFO];
+    //SetButton(BAND_UP);
+    //SetInterrupt(iBUTTON_PRESSED);
+    //loop(); MyDelay(10);
+    //EXPECT_EQ(ED.currentBand[ED.activeVFO],oldband+1);
+    //CheckThatStateIsReceive();
+
+    //for (size_t k=0; k<512; k++){
+    //    printf("%d,%7.6f\n", k, psdnew[k]);
+    //}
+    Debug("End");
 }

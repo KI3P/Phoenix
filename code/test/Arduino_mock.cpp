@@ -2,6 +2,7 @@
 #include "Wire.h"
 #include <iostream>
 #include <string>
+#include <cstdarg>
 
 SerialClass Serial;
 SerialClass SerialUSB1;
@@ -112,6 +113,17 @@ void SerialClass::println(const String& s) {
     } else {
         std::cout << s.c_str() << std::endl;
     }
+}
+
+void SerialClass::printf(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    if (file) {
+        vfprintf(file, format, args);
+    } else {
+        vprintf(format, args);
+    }
+    va_end(args);
 }
 
 uint32_t SerialClass::available(void) {

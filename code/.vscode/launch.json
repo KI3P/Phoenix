@@ -8,7 +8,7 @@
             "name": "Debug Unit Tests",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/test/build/all_Loop_tests",
+        "program": "${workspaceFolder}/test/build/all_Radio_tests",
         "args": [],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}/test/build/",

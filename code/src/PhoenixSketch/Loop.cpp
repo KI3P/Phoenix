@@ -432,6 +432,8 @@ void ConsumeInterrupt(void){
             }
             case (iCENTERTUNE_DECREASE):{
                 ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
+                if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
+                    ED.centerFreq_Hz[ED.activeVFO] = 250000;
                 // Change the band if we tune out of the current band
                 ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
                 UpdateRFHardwareState();
@@ -483,13 +485,13 @@ void ConsumeInterrupt(void){
  * Shut down the radio gracefully when informed by the Shutdown circuitry 
  * that the power button has been pressed.
  */
-void ShutdownTeensy(void)
-{
+void ShutdownTeensy(void){
     // Do whatever is needed before cutting power here
-    // ... nothing yet
-
+    SaveDataToStorage();
+    
     // Tell the ATTiny that we have finished shutdown and it's safe to power off
     digitalWrite(SHUTDOWN_COMPLETE, 1);
+    MyDelay(10000); // wait for the turn off command
 }
 
 FASTRUN void loop(void){
