@@ -115,6 +115,22 @@ void SerialClass::println(const String& s) {
     }
 }
 
+void SerialClass::print(size_t n) {
+    if (file) {
+        fprintf(file, "%zu", n);
+    } else {
+        std::cout << n;
+    }
+}
+
+void SerialClass::println(size_t n) {
+    if (file) {
+        fprintf(file, "%zu\n", n);
+    } else {
+        std::cout << n << std::endl;
+    }
+}
+
 void SerialClass::printf(const char* format, ...) {
     va_list args;
     va_start(args, format);

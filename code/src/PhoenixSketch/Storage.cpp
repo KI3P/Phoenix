@@ -2,7 +2,6 @@
 #include <LittleFS.h> // comes bundled with Teensyduino
 #include <SD.h>
 #include <ArduinoJson.h>
-#include <StreamUtils.h>
 
 const char *filename = "config.txt";
 LittleFS_Program myfs;
@@ -92,7 +91,6 @@ void SaveDataToStorage(void){
     // Write this JSON object to filename on the LittleFS
     File file = myfs.open(filename, FILE_WRITE);
     if (file) {
-        //ReadLoggingStream loggingStream(file, Serial);
         if (serializeJson(doc, file) == 0){
             Serial.println(F("Failed to write to LittleFS"));
         }else{
@@ -168,7 +166,6 @@ void RestoreDataFromStorage(void){
     // Try to load from LittleFS first
     File file = myfs.open(filename, FILE_READ);
     if (file) {
-        //ReadLoggingStream loggingStream(file, Serial);
         DeserializationError error = deserializeJson(doc, file);
         file.close();
         if (error) {

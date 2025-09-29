@@ -98,12 +98,3 @@ void setup(void){
     
     Serial.println("...Setup done!");
 }
-
-/*
-
-Bug:
-Start radio as above. 500 Hz input tone appears at 500 Hz on the audio output.
-Change band up.
-Now, fineTuneFreq needs to be set to -47000 Hz for a 500 Hz tone to be seen on 
-the audio output. This should be -48000 Hz.
-*/

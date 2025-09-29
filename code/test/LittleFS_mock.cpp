@@ -6,10 +6,10 @@
 SDClass SD;
 
 // File class implementation
-File::File() : _position(0), _isOpen(false) {}
+File::File() : _position(0), _isOpen(false), _isDirectory(false), _dirIteratorValid(false) {}
 
-File::File(const std::string& path, const std::string& mode, std::shared_ptr<std::map<std::string, std::string>> storage)
-    : _path(path), _mode(mode), _position(0), _isOpen(true), _storage(storage) {
+File::File(const std::string& path, const std::string& mode, std::shared_ptr<std::map<std::string, std::string>> storage, bool isDirectory)
+    : _path(path), _mode(mode), _position(0), _isOpen(true), _storage(storage), _isDirectory(isDirectory), _dirIteratorValid(false) {
 
     if (_storage && _storage->find(_path) != _storage->end()) {
         _content = (*_storage)[_path];
@@ -20,6 +20,12 @@ File::File(const std::string& path, const std::string& mode, std::shared_ptr<std
     // If writing mode, start with empty content
     if (_mode == "w" || _mode == "write") {
         _content = "";
+    }
+
+    // Initialize directory iterator if this is a directory
+    if (_isDirectory && _storage) {
+        _dirIterator = _storage->begin();
+        _dirIteratorValid = true;
     }
 }
 
@@ -108,6 +114,62 @@ size_t File::println(const char* str) {
     return written;
 }
 
+// Directory iteration methods
+bool File::isDirectory() const {
+    return _isDirectory;
+}
+
+File File::openNextFile() {
+    if (!_isDirectory || !_storage || !_dirIteratorValid) {
+        return File(); // Return invalid file
+    }
+
+    // Find next file that matches our directory path prefix
+    std::string dirPrefix = _path;
+    if (!dirPrefix.empty() && dirPrefix.back() != '/') {
+        dirPrefix += "/";
+    }
+
+    while (_dirIterator != _storage->end()) {
+        std::string currentPath = _dirIterator->first;
+        ++_dirIterator;
+
+        // Check if this file is in our directory
+        if (currentPath.find(dirPrefix) == 0 && currentPath != _path) {
+            // Extract the relative path within this directory
+            std::string relativePath = currentPath.substr(dirPrefix.length());
+
+            // Check if this is a direct child (no more slashes)
+            if (relativePath.find('/') == std::string::npos) {
+                // It's a file in this directory
+                return File(currentPath, "r", _storage, false);
+            }
+        }
+    }
+
+    // No more files
+    return File();
+}
+
+const char* File::name() const {
+    if (_path.empty()) {
+        static const char* empty = "";
+        return empty;
+    }
+
+    // Find the last slash and return everything after it
+    size_t lastSlash = _path.find_last_of('/');
+    if (lastSlash != std::string::npos) {
+        // Create a static string to return (this is a simplification for the mock)
+        static std::string filename = _path.substr(lastSlash + 1);
+        return filename.c_str();
+    }
+
+    // No slash found, return the whole path
+    static std::string filename = _path;
+    return filename.c_str();
+}
+
 // LittleFS_Program class implementation
 LittleFS_Program::LittleFS_Program() : _initialized(false) {
     _storage = std::make_shared<std::map<std::string, std::string>>();
@@ -135,7 +197,24 @@ File LittleFS_Program::open(const char* path, const char* mode) {
     }
 
     std::string mode_str = mode ? mode : "r";
-    return File(std::string(path), mode_str, _storage);
+    std::string path_str = std::string(path);
+
+    // Check if this should be treated as a directory
+    // In our mock, we'll assume it's a directory if the path ends with "/" or if it's a known directory pattern
+    bool isDirectory = false;
+    if (!path_str.empty() && (path_str.back() == '/' || path_str == "/")) {
+        isDirectory = true;
+    } else {
+        // Check if there are files with this path as prefix (making it a directory)
+        for (const auto& entry : *_storage) {
+            if (entry.first.find(path_str) == 0 && entry.first != path_str) {
+                isDirectory = true;
+                break;
+            }
+        }
+    }
+
+    return File(path_str, mode_str, _storage, isDirectory);
 }
 
 File LittleFS_Program::open(const char* path, int mode) {
@@ -144,7 +223,23 @@ File LittleFS_Program::open(const char* path, int mode) {
     }
 
     std::string mode_str = (mode == FILE_WRITE) ? "w" : "r";
-    return File(std::string(path), mode_str, _storage);
+    std::string path_str = std::string(path);
+
+    // Check if this should be treated as a directory
+    bool isDirectory = false;
+    if (!path_str.empty() && (path_str.back() == '/' || path_str == "/")) {
+        isDirectory = true;
+    } else {
+        // Check if there are files with this path as prefix (making it a directory)
+        for (const auto& entry : *_storage) {
+            if (entry.first.find(path_str) == 0 && entry.first != path_str) {
+                isDirectory = true;
+                break;
+            }
+        }
+    }
+
+    return File(path_str, mode_str, _storage, isDirectory);
 }
 
 bool LittleFS_Program::exists(const char* path) {

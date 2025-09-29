@@ -714,7 +714,6 @@ DataBlock * ReceiveProcessing(const char *fname){
         return NULL;
     }
     digitalWrite(31, 1);    //testcode
-
     // Clear overfull buffers
     ClearAudioBuffers();
 

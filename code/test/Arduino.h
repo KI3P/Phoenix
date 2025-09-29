@@ -56,6 +56,8 @@ public:
     void println(int64_t);
     void print(uint32_t);
     void println(uint32_t);
+    void print(size_t);
+    void println(size_t);
     void print(float);
     void println(float);
     void println(const String& s);

@@ -9,7 +9,7 @@
 class File {
 public:
     File();
-    File(const std::string& path, const std::string& mode, std::shared_ptr<std::map<std::string, std::string>> storage);
+    File(const std::string& path, const std::string& mode, std::shared_ptr<std::map<std::string, std::string>> storage, bool isDirectory = false);
     ~File();
 
     // File operations
@@ -30,6 +30,11 @@ public:
     size_t print(const std::string& str);
     size_t println(const char* str);
 
+    // Directory iteration methods
+    bool isDirectory() const;
+    File openNextFile();
+    const char* name() const;
+
 private:
     std::string _path;
     std::string _mode;
@@ -37,6 +42,11 @@ private:
     size_t _position;
     bool _isOpen;
     std::shared_ptr<std::map<std::string, std::string>> _storage;
+
+    // Directory iteration state
+    bool _isDirectory;
+    mutable std::map<std::string, std::string>::iterator _dirIterator;
+    mutable bool _dirIteratorValid;
 };
 
 // Mock LittleFS_Program class
