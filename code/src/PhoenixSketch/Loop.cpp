@@ -302,6 +302,14 @@ void HandleButtonPress(int32_t button){
             // Add this later
             break;
         }
+        case VFOTOGGLE:{
+            if (ED.activeVFO == 0)
+                ED.activeVFO = 1;
+            else
+                ED.activeVFO = 0;
+            UpdateRFHardwareState();
+            break;
+        }
         default:
             break;
     }
@@ -427,7 +435,7 @@ void ConsumeInterrupt(void){
                 // Change the band if we tune out of the current band
                 ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
                 UpdateRFHardwareState();
-                Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
+                //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iCENTERTUNE_DECREASE):{
@@ -437,17 +445,17 @@ void ConsumeInterrupt(void){
                 // Change the band if we tune out of the current band
                 ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
                 UpdateRFHardwareState();
-                Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
+                //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_INCREASE):{
                 AdjustFineTune(+1);
-                Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
+                //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_DECREASE):{
                 AdjustFineTune(-1);
-                Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
+                //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iBUTTON_PRESSED):{

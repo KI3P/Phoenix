@@ -1262,6 +1262,13 @@ static void CALIBRATE_TX_IQ_select(UISm* sm)
 static void HOME_enter(UISm* sm)
 {
     sm->state_id = UISm_StateId_HOME;
+    
+    // HOME behavior
+    // uml: enter / { clearScreen = true; }
+    {
+        // Step 1: execute action `clearScreen = true;`
+        sm->vars.clearScreen = true;
+    } // end of behavior for HOME
 }
 
 static void HOME_exit(UISm* sm)

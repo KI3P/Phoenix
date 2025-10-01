@@ -89,6 +89,8 @@ void SaveDataToStorage(void){
     doc["keyerFlip"] = ED.keyerFlip;
 
     // Write this JSON object to filename on the LittleFS
+    // Delete existing file, otherwise data is appended to the file
+    myfs.remove(filename);
     File file = myfs.open(filename, FILE_WRITE);
     if (file) {
         if (serializeJson(doc, file) == 0){
@@ -232,6 +234,7 @@ void RestoreDataFromStorage(void){
         ED.currentBand[1] = doc["currentBand"][1] | ED.currentBand[1];
     }
     if (doc["centerFreq_Hz"].is<JsonArray>()) {
+        Debug("restoring center freq from storage");
         ED.centerFreq_Hz[0] = doc["centerFreq_Hz"][0] | ED.centerFreq_Hz[0];
         ED.centerFreq_Hz[1] = doc["centerFreq_Hz"][1] | ED.centerFreq_Hz[1];
     }

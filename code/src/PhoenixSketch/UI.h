@@ -53,20 +53,6 @@ extern UIValueUpdateInt uiRFScaleUpdate;
 void UIIncValue(void);
 void UIDecValue(void);
 
-void DrawActiveVFOPane(void);
-void DrawInactiveVFOPane(void);
-void DrawFreqBandModPane(void);
-void DrawSpectrumPane(void);
-void DrawWaterfallPane(void);
-void DrawStateOfHealthPane(void);
-void DrawTimePane(void);
-void DrawSWRPane(void);
-void DrawTXRXStatusPane(void);
-void DrawSMeterPane(void);
-void DrawAudioSpectrumPane(void);
-void DrawSettingsPane(void);
-void DrawNameBadgePane(void);
-
 
 //#ifdef TEST_MODE
 // TEST FUNCTIONS, USED IN GOOGLE TEST HARNESS. MAY BE UNNECESSARY

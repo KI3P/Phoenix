@@ -266,6 +266,8 @@ HOME
 
 HOME : HOME
 
+HOME : enter / #123; clearScreen = true#59; #125;
+
 state MAIN_MENU_DISPLAY {
 
         MAIN_MENU_RF
@@ -1745,6 +1747,13 @@ evaluateGuard = null;
         {
             // Step 1: execute action `this.tracer?.enterState('HOME');`
             this.tracer?.enterState('HOME');
+        } // end of behavior for HOME
+        
+        // HOME behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");
         } // end of behavior for HOME
     }
     

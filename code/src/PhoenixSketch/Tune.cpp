@@ -81,6 +81,17 @@ int64_t GetTXRXFreq_dHz(void){
 }
 
 /**
+ * Return the effective transmit/receive frequency, which is a combination of the center
+ * frequency, the fine tune frequency, and the sample rate, for a particular VFO.
+ * 
+ * @return The effective transmit/receive frequency in units of Hz
+ */
+int64_t GetTXRXFreq(uint8_t vfo){
+    int64_t val = (ED.centerFreq_Hz[vfo] + ED.fineTuneFreq_Hz[vfo] - SR[SampleRate].rate/4);
+    return val;
+}
+
+/**
  * Return the CW transmit frequency, which is a combination of the RX/TX frequency and the
  * CW tone offset.
  * 

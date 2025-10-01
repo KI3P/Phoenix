@@ -64,3 +64,4 @@
 #define DECODER_TOGGLE      13
 #define DDE                 14
 #define BEARING             15
+#define VFOTOGGLE           21

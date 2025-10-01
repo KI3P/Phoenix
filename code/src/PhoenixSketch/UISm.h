@@ -73,6 +73,7 @@ typedef struct UISm UISm;
 // State machine variables. Can be used for inputs, outputs, user variables...
 typedef struct UISm_Vars
 {
+    bool clearScreen;
     uint16_t splashDuration_ms;
     uint16_t splashCount_ms;
     uint8_t mainMenuSelection;

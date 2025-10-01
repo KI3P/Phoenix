@@ -17,6 +17,14 @@
 // Display size constants
 #define RA8875_800x480     0x01
 
+// Font size enum
+enum RA8875tsize {
+    RA8875_FONT_SIZE_X1 = 0,
+    RA8875_FONT_SIZE_X2 = 1,
+    RA8875_FONT_SIZE_X3 = 2,
+    RA8875_FONT_SIZE_X4 = 3
+};
+
 class RA8875 {
 public:
     // Constructor
@@ -28,11 +36,17 @@ public:
 
     // Screen operations
     void clearScreen(uint16_t color = RA8875_BLACK);
+    void fillWindow(uint16_t color = RA8875_BLACK);
+
+    // Drawing operations
+    void fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
+    void drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
 
     // Text operations
     void setTextColor(uint16_t color);
     void setCursor(uint16_t x, uint16_t y);
     void setFontScale(uint8_t scale);
+    void setFontScale(enum RA8875tsize scale);
     void print(const char* text);
     void print(int value);
     void print(float value);

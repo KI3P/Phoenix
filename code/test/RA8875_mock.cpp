@@ -18,6 +18,10 @@ void RA8875::clearScreen(uint16_t color) {
     // Mock implementation - could log the action if needed
 }
 
+void RA8875::fillWindow(uint16_t color) {
+    // Mock implementation - fills entire window
+}
+
 void RA8875::setTextColor(uint16_t color) {
     _text_color = color;
 }
@@ -29,6 +33,18 @@ void RA8875::setCursor(uint16_t x, uint16_t y) {
 
 void RA8875::setFontScale(uint8_t scale) {
     _font_scale = scale;
+}
+
+void RA8875::setFontScale(enum RA8875tsize scale) {
+    _font_scale = static_cast<uint8_t>(scale);
+}
+
+void RA8875::fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
+    // Mock implementation - could log the action if needed for testing
+}
+
+void RA8875::drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
+    // Mock implementation - could log the action if needed for testing
 }
 
 void RA8875::print(const char* text) {
