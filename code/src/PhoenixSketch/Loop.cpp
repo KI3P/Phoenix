@@ -319,6 +319,9 @@ void HandleButtonPress(int32_t button){
             Debug("Volume knob function is " + String(volumeFunction));
             break;
         }
+        case FINETUNEBUTTON:{
+            break;
+        }
         default:
             break;
     }

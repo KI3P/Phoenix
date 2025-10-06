@@ -314,13 +314,13 @@ void DrawAudioSpectrumPane(void) {
 
 /////////////////////////////////////////////////////////////////
 // These functions all have to do with updating the settings pane
-void UpdateSetting(uint16_t charWidth, uint16_t charHeight, 
+void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
                    char *txt, uint8_t Nchars, 
                    char *value, uint8_t valWidth,
                    uint16_t yposition, bool redrawFunction, bool redrawValue){
     // Text
     // |<-6 chars->: val 
-    int16_t x = PaneSettings.x0 + (6-Nchars)*charWidth;
+    int16_t x = PaneSettings.x0 + xoffset - Nchars*charWidth;
     int16_t y = PaneSettings.y0 + yposition*PaneSettings.height/5 + 1; // 1 pixel offset for border box
     Rectangle box;
     if (redrawFunction){
@@ -332,8 +332,8 @@ void UpdateSetting(uint16_t charWidth, uint16_t charHeight,
     }
     
     if (redrawValue){
-        x = PaneSettings.x0 + (6+1)*charWidth;
-        CalculateTextCorners(x,y,&box,Nchars,charWidth,charHeight);
+        x = PaneSettings.x0 + xoffset +1*charWidth;
+        CalculateTextCorners(x,y,&box,valWidth,charWidth,charHeight);
         BlankBox(&box);
         tft.setCursor(x, y);
         tft.setTextColor(RA8875_GREEN);
@@ -403,12 +403,46 @@ void UpdateVolumeSetting(void) {
     }
     char valueText[5];
     sprintf(valueText,"%ld",value);
-    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), 
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), 6*tft.getFontWidth(),
                   settingText, 4, 
                   valueText, 3,
                   0,redrawFunction,redrawValue);
 
 }
+
+// Main tune and fine tune increment
+int32_t oldFreqIncrement = 0;
+int64_t oldStepFineTune = 0;
+void UpdateIncrementSetting(void) {
+    if (oldFreqIncrement != ED.freqIncrement){
+        tft.setFontScale((enum RA8875tsize)1);
+        uint16_t offset = 6*tft.getFontWidth();
+        tft.setFontScale((enum RA8875tsize)0);
+        char valueText[8];
+        sprintf(valueText,"%ld",ED.freqIncrement);
+        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), offset,
+                    "Increment:", 10, 
+                    valueText, 7, // longest length for this field
+                    1,true,true);
+        oldFreqIncrement = ED.freqIncrement;
+    }
+
+    if (oldStepFineTune != ED.stepFineTune){
+
+        tft.setFontScale((enum RA8875tsize)1);
+        uint16_t offset = 14*tft.getFontWidth();
+        tft.setFontScale((enum RA8875tsize)0);
+        char valueText[8];
+        sprintf(valueText,"%ld",ED.stepFineTune);
+        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), offset,
+                    "FT Inc:", 7, 
+                    valueText, 3,
+                    1,true,true);
+
+        oldStepFineTune = ED.stepFineTune;
+    }
+}
+
 
 void DrawSettingsPane(void) {
     // Only update if information is stale
@@ -418,6 +452,7 @@ void DrawSettingsPane(void) {
     }
 
     UpdateVolumeSetting();
+    UpdateIncrementSetting();
 
     if (PaneSettings.stale){
         // Draw a box around the borders

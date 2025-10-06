@@ -65,4 +65,5 @@
 #define DDE                 14
 #define BEARING             15
 #define VOLUMEBUTTON        18
+#define FINETUNEBUTTON      20
 #define VFOTOGGLE           21
