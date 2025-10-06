@@ -314,30 +314,33 @@ void DrawAudioSpectrumPane(void) {
 
 /////////////////////////////////////////////////////////////////
 // These functions all have to do with updating the settings pane
+uint16_t column1x = 0;
+uint16_t column2x = 0;
+
 void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
-                   char *txt, uint8_t Nchars, 
-                   char *value, uint8_t valWidth,
-                   uint16_t yposition, bool redrawFunction, bool redrawValue){
+                   char *labelText, uint8_t NLabelChars, 
+                   char *valueText, uint8_t NValueChars,
+                   uint16_t yoffset, bool redrawFunction, bool redrawValue){
     // Text
     // |<-6 chars->: val 
-    int16_t x = PaneSettings.x0 + xoffset - Nchars*charWidth;
-    int16_t y = PaneSettings.y0 + yposition*PaneSettings.height/5 + 1; // 1 pixel offset for border box
+    int16_t x = PaneSettings.x0 + xoffset - NLabelChars*charWidth;
+    int16_t y = PaneSettings.y0 + yoffset;
     Rectangle box;
     if (redrawFunction){
-        CalculateTextCorners(x,y,&box,Nchars,charWidth,charHeight);
+        CalculateTextCorners(x,y,&box,NLabelChars,charWidth,charHeight);
         BlankBox(&box);
         tft.setCursor(x, y);
         tft.setTextColor(RA8875_WHITE);
-        tft.print(txt);
+        tft.print(labelText);
     }
     
     if (redrawValue){
         x = PaneSettings.x0 + xoffset +1*charWidth;
-        CalculateTextCorners(x,y,&box,valWidth,charWidth,charHeight);
+        CalculateTextCorners(x,y,&box,NValueChars,charWidth,charHeight);
         BlankBox(&box);
         tft.setCursor(x, y);
         tft.setTextColor(RA8875_GREEN);
-        tft.print(value);
+        tft.print(valueText);
     }
 }
 
@@ -403,10 +406,10 @@ void UpdateVolumeSetting(void) {
     }
     char valueText[5];
     sprintf(valueText,"%ld",value);
-    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), 6*tft.getFontWidth(),
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
                   settingText, 4, 
                   valueText, 3,
-                  0,redrawFunction,redrawValue);
+                  1,redrawFunction,redrawValue); // yoffset = 1 to avoid smudging border box
 
 }
 
@@ -415,44 +418,74 @@ int32_t oldFreqIncrement = 0;
 int64_t oldStepFineTune = 0;
 void UpdateIncrementSetting(void) {
     if (oldFreqIncrement != ED.freqIncrement){
-        tft.setFontScale((enum RA8875tsize)1);
-        uint16_t offset = 6*tft.getFontWidth();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
         sprintf(valueText,"%ld",ED.freqIncrement);
-        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), offset,
-                    "Increment:", 10, 
+        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+                    (char *)"Increment:", 10, 
                     valueText, 7, // longest length for this field
-                    1,true,true);
+                    PaneSettings.height/5,true,true);
         oldFreqIncrement = ED.freqIncrement;
     }
 
     if (oldStepFineTune != ED.stepFineTune){
-
-        tft.setFontScale((enum RA8875tsize)1);
-        uint16_t offset = 14*tft.getFontWidth();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
-        sprintf(valueText,"%ld",ED.stepFineTune);
-        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), offset,
-                    "FT Inc:", 7, 
+        sprintf(valueText,"%lld",ED.stepFineTune);
+        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+                    (char *)"FT Inc:", 7, 
                     valueText, 3,
-                    1,true,true);
+                    PaneSettings.height/5,true,true);
 
         oldStepFineTune = ED.stepFineTune;
     }
 }
 
+uint8_t oldANR_notchOn = 8;
+void UpdateAutonotchSetting(void){
+    if (ED.ANR_notchOn == oldANR_notchOn) return;
+    oldANR_notchOn = ED.ANR_notchOn;
+
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[4];
+    if (ED.ANR_notchOn){
+        sprintf(valueText,"On");
+    } else {
+        sprintf(valueText,"Off");
+    }
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+        (char *)"AutoNotch:", 10, 
+        valueText, 3, // longest length for this field
+        PaneSettings.height/5 + tft.getFontHeight() + 1,true,true);
+}
+
+float32_t oldRAtten = -70;
+void UpdateRFGainSetting(void){
+    if (oldRAtten == ED.RAtten[ED.currentBand[ED.activeVFO]]) return;
+    oldRAtten = ED.RAtten[ED.currentBand[ED.activeVFO]];
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[5];
+    sprintf(valueText,"%2.1f",ED.RAtten[ED.currentBand[ED.activeVFO]]);
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+        (char *)"RX Atten:", 9, 
+        valueText, 4, // longest length for this field
+        PaneSettings.height/5 + tft.getFontHeight() + 1,true,true);
+}
 
 void DrawSettingsPane(void) {
     // Only update if information is stale
     if (PaneSettings.stale){
         // Black out the prior data
         tft.fillRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_BLACK);
+        tft.setFontScale((enum RA8875tsize)1);
+        column1x = 5.5*tft.getFontWidth();
+        column2x = 13.5*tft.getFontWidth();
     }
 
     UpdateVolumeSetting();
     UpdateIncrementSetting();
+    UpdateAutonotchSetting();
+    UpdateRFGainSetting();
 
     if (PaneSettings.stale){
         // Draw a box around the borders
