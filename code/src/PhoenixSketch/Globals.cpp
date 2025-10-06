@@ -10,6 +10,8 @@ float32_t psdold[SPECTRUM_RES];
 char morseCharacter;
 bool morseCharacterUpdated = false;
 
+VolumeFunction volumeFunction = AudioVolume;
+
 //#define BROADCAST_BAND 0
 #define HAM_BAND 1
 //#define MISC_BAND 2

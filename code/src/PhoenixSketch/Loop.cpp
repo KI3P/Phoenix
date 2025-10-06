@@ -310,6 +310,15 @@ void HandleButtonPress(int32_t button){
             UpdateRFHardwareState();
             break;
         }
+        case VOLUMEBUTTON:{
+            // Rotate through the parameters controlled by the volume knob
+            int8_t newvol = (int8_t)volumeFunction + 1;
+            if (newvol > (int8_t)SidetoneVolume)
+                newvol = (int8_t)AudioVolume;
+            volumeFunction = (VolumeFunction)newvol;
+            Debug("Volume knob function is " + String(volumeFunction));
+            break;
+        }
         default:
             break;
     }
@@ -406,17 +415,58 @@ void ConsumeInterrupt(void){
                 break;
             }
             case (iVOLUME_INCREASE):{
-                ED.audioVolume++;
-                if (ED.audioVolume > 100) ED.audioVolume = 100;
-                sprintf(strbuf,"Volume: %ld",ED.audioVolume);
-                Debug(strbuf);
+                // Triggered by the encoder turning. Update depending on what
+                // the state of the volumeFunction variable is. This variable is
+                // changed by pressing the button on the volume encoder
+                switch (volumeFunction) {
+                    case AudioVolume:{
+                        ED.audioVolume++;
+                        if (ED.audioVolume > 100) ED.audioVolume = 100;
+                        break;
+                    }
+                    case AGCGain:{
+                        bands[ED.currentBand[ED.activeVFO]].AGC_thresh++;
+                        break;
+                    }
+                    case MicGain:{
+                        ED.currentMicGain++;
+                        break;
+                    }
+                    case SidetoneVolume:{
+                        ED.sidetoneVolume += 1.0;
+                        if (ED.sidetoneVolume > 500) ED.sidetoneVolume = 500; // 0 to 500 range
+                        break;
+                    }
+                    default:
+                        break;
+                }
                 break;
             }
             case (iVOLUME_DECREASE):{
-                ED.audioVolume--;
-                if (ED.audioVolume < 0) ED.audioVolume = 0;
-                sprintf(strbuf,"Volume: %ld",ED.audioVolume);
-                Debug(strbuf);
+                switch (volumeFunction) {
+                    case AudioVolume:{
+                        ED.audioVolume--;
+                        if (ED.audioVolume < 0) ED.audioVolume = 0;
+                        break;
+                    }
+                    case AGCGain:{
+                        bands[ED.currentBand[ED.activeVFO]].AGC_thresh--;
+                        break;
+                    }
+                    case MicGain:{
+                        ED.currentMicGain--;
+                        // peg to zero if it goes too low, unsigned int expected
+                        if (ED.currentMicGain < 0) ED.currentMicGain = 0;
+                        break;
+                    }
+                    case SidetoneVolume:{
+                        ED.sidetoneVolume -= 1.0;
+                        if (ED.sidetoneVolume < 0) ED.sidetoneVolume = 0; // 0 to 500 range
+                        break;
+                    }
+                    default:
+                        break;
+                }
                 break;
             }
             case (iFILTER_INCREASE):{

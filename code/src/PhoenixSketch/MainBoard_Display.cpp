@@ -31,6 +31,25 @@ struct Pane {
     bool stale;      /**< true if the pane information needs to be updated */
 };
 
+struct Rectangle {
+    uint16_t x0;     /**< top left corner, horizontal coordinate */
+    uint16_t y0;     /**< top left corner, vertical coordinate */
+    uint16_t width;  /**< horizontal left to right size */
+    uint16_t height; /**< vertical top to bottom size */  
+};
+
+void CalculateTextCorners(int16_t x0,int16_t y0,Rectangle *rect,int16_t Nchars,
+                        uint16_t charWidth,uint16_t charHeight){
+    rect->x0 = x0;
+    rect->y0 = y0;
+    rect->width = Nchars*charWidth;
+    rect->height = charHeight;
+}
+
+void BlankBox(Rectangle *rect){
+    tft.fillRect(rect->x0, rect->y0, rect->width, rect->height, RA8875_BLACK);
+}
+
 Pane PaneVFOA =        {5,5,280,50,DrawVFOPanes,1};
 Pane PaneVFOB =        {300,5,220,40,DrawVFOPanes,1};
 Pane PaneFreqBandMod = {5,60,310,30,DrawFreqBandModPane,1};
@@ -293,21 +312,121 @@ void DrawAudioSpectrumPane(void) {
     PaneAudioSpectrum.stale = false;
 }
 
+/////////////////////////////////////////////////////////////////
+// These functions all have to do with updating the settings pane
+void UpdateSetting(uint16_t charWidth, uint16_t charHeight, 
+                   char *txt, uint8_t Nchars, 
+                   char *value, uint8_t valWidth,
+                   uint16_t yposition, bool redrawFunction, bool redrawValue){
+    // Text
+    // |<-6 chars->: val 
+    int16_t x = PaneSettings.x0 + (6-Nchars)*charWidth;
+    int16_t y = PaneSettings.y0 + yposition*PaneSettings.height/5 + 1; // 1 pixel offset for border box
+    Rectangle box;
+    if (redrawFunction){
+        CalculateTextCorners(x,y,&box,Nchars,charWidth,charHeight);
+        BlankBox(&box);
+        tft.setCursor(x, y);
+        tft.setTextColor(RA8875_WHITE);
+        tft.print(txt);
+    }
+    
+    if (redrawValue){
+        x = PaneSettings.x0 + (6+1)*charWidth;
+        CalculateTextCorners(x,y,&box,Nchars,charWidth,charHeight);
+        BlankBox(&box);
+        tft.setCursor(x, y);
+        tft.setTextColor(RA8875_GREEN);
+        tft.print(value);
+    }
+}
+
+VolumeFunction oldVolumeFunction = InvalidVolumeFunction;
+int32_t oldVolumeSetting = 0;
+void UpdateVolumeSetting(void) {
+
+    int32_t value;
+    switch (volumeFunction) {
+        case AudioVolume:
+            value = ED.audioVolume;
+            break;
+        case AGCGain:
+            value = bands[ED.currentBand[ED.activeVFO]].AGC_thresh;
+            break;
+        case MicGain:
+            value = ED.currentMicGain;
+            break;
+        case SidetoneVolume:
+            value = (int32_t)ED.sidetoneVolume;
+            break;
+        default:
+            value = -1;
+            Debug("Invalid volume function!");
+            break;
+    }
+    bool redrawFunction = true;
+    bool redrawValue = true;
+    if (volumeFunction == oldVolumeFunction){
+        redrawFunction = false;
+        // has the value changed?
+        if (value == oldVolumeSetting){
+            redrawValue = false;
+        }
+    }
+    if (!redrawFunction && !redrawValue) return;
+
+    oldVolumeSetting = value;
+    oldVolumeFunction = volumeFunction;
+
+    // There has been a change, redraw
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    // Update the volume setting
+    char settingText[5];
+    switch (volumeFunction) {
+        case AudioVolume:
+            sprintf(settingText,"Vol:");
+            break;
+        case AGCGain:
+            sprintf(settingText,"AGC:");
+            break;
+        case MicGain:
+            sprintf(settingText,"Mic:");
+            break;
+        case SidetoneVolume:
+            sprintf(settingText,"STn:");
+            break;
+        default:
+            sprintf(settingText,"Err:");
+            Debug("Invalid volume function!");
+            break;
+    }
+    char valueText[5];
+    sprintf(valueText,"%ld",value);
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), 
+                  settingText, 4, 
+                  valueText, 3,
+                  0,redrawFunction,redrawValue);
+
+}
+
 void DrawSettingsPane(void) {
     // Only update if information is stale
-    if (!PaneSettings.stale) return;
-    // Black out the prior data
-    tft.fillRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_BLACK);
-    // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_YELLOW);
-    // Put some text in it
-    tft.setFontScale((enum RA8875tsize)1);
-    tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneSettings.x0, PaneSettings.y0);
-    tft.print("Settings");
-    // Mark the pane as no longer stale
-    PaneSettings.stale = false;
+    if (PaneSettings.stale){
+        // Black out the prior data
+        tft.fillRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_BLACK);
+    }
+
+    UpdateVolumeSetting();
+
+    if (PaneSettings.stale){
+        // Draw a box around the borders
+        tft.drawRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_YELLOW);
+        // Mark the pane as no longer stale
+        PaneSettings.stale = false;
+    }
 }
+/////////////////////////////////////////////////////////////////
 
 void DrawNameBadgePane(void) {
     // Only update if information is stale

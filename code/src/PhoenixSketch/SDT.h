@@ -138,6 +138,15 @@ enum NoiseReductionType {
     NRLMS = 3
 };
 
+enum VolumeFunction {
+    AudioVolume = 0,
+    AGCGain = 1,
+    MicGain = 2,
+    SidetoneVolume = 3,
+    InvalidVolumeFunction = 100
+    //NoiseFloorLevel = 4
+};
+
 // This enum is used by an experimental Morse decoder.
 enum MorseStates { state0,
               state1,
@@ -492,6 +501,8 @@ extern float32_t SAM_carrier_freq_offsetOld;
 
 extern char morseCharacter;
 extern bool morseCharacterUpdated;
+
+extern VolumeFunction volumeFunction;
 
 // Hardware definitions
 #define RXTX        22 // Transmit/Receive (H=TX,L=RX)
