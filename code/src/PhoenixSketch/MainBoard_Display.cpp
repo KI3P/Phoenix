@@ -395,19 +395,62 @@ void DrawSWRPane(void) {
     PaneSWR.stale = false;
 }
 
+ModeSm_StateId oldMState = ModeSm_StateId_ROOT;
 void DrawTXRXStatusPane(void) {
     // Only update if information is stale
+    TXRXType state;
+    if (oldMState != modeSM.state_id){
+        switch (modeSM.state_id){
+            case ModeSm_StateId_CW_RECEIVE:
+            case ModeSm_StateId_SSB_RECEIVE:
+                PaneTXRXStatus.stale = true;
+                state = RX;
+                break;
+            case ModeSm_StateId_SSB_TRANSMIT:
+            case ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT:
+            case ModeSm_StateId_CW_TRANSMIT_DAH_MARK:
+            case ModeSm_StateId_CW_TRANSMIT_DIT_MARK:
+            case ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE:
+            case ModeSm_StateId_CW_TRANSMIT_MARK:
+            case ModeSm_StateId_CW_TRANSMIT_SPACE:
+                PaneTXRXStatus.stale = true;
+                state = TX;
+                break;
+            default:
+                PaneTXRXStatus.stale = false;
+                oldMState = modeSM.state_id;
+                break;
+        }
+    }
     if (!PaneTXRXStatus.stale) return;
-    tft.setFontDefault();
+
+    oldMState = modeSM.state_id;
     // Black out the prior data
     tft.fillRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
     tft.drawRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_YELLOW);
-    // Put some text in it
+    
+    tft.setFontDefault();   
     tft.setFontScale((enum RA8875tsize)1);
-    tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneTXRXStatus.x0, PaneTXRXStatus.y0);
-    tft.print("TXRX");
+    tft.setTextColor(RA8875_BLACK);
+    switch (state) {
+        case RX:{
+            tft.fillRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_GREEN);
+            tft.setCursor(PaneTXRXStatus.x0 + 4, PaneTXRXStatus.y0 - 5);
+            tft.print("REC");
+            FrontPanelSetLed(0, 1);
+            FrontPanelSetLed(1, 0);
+            break;
+        }
+        case TX:{
+            tft.fillRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_RED);
+            tft.setCursor(PaneTXRXStatus.x0 + 4, PaneTXRXStatus.y0 - 5);
+            tft.print("XMT");
+            FrontPanelSetLed(0, 0);
+            FrontPanelSetLed(1, 1);
+            break;
+        }
+    }
     // Mark the pane as no longer stale
     PaneTXRXStatus.stale = false;
 }

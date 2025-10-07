@@ -408,6 +408,18 @@ char *PS_read(  char* cmd ){
 
 //Choose main or subreceiver
 char *RX_write( char* cmd ){
+	switch (modeSM.state_id){
+		case (ModeSm_StateId_SSB_TRANSMIT):{
+			ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+			break;
+		} 
+		case (ModeSm_StateId_CW_TRANSMIT_MARK):{
+			ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+			break;
+		}
+		default:
+			break;
+	}
 	sprintf( obuf, "RX0;");
   	return obuf;   // We'll support that later.
 }
