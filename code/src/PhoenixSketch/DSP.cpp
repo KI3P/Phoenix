@@ -66,6 +66,7 @@ void ApplyRFGain(DataBlock *data, float32_t rfGainAllBands_dB, float32_t bandGai
  */
 errno_t ReadIQInputBuffer(DataBlock *data){
     if ((uint32_t)Q_in_L.available() > N_BLOCKS+0 && (uint32_t)Q_in_R.available() > N_BLOCKS+0 ) {
+        usec = 0;
         // get audio samples from the audio  buffers and convert them to float
         // read in N_BLOCKS blocks á 128 samples in I and Q
         for (unsigned i = 0; i < N_BLOCKS; i++) {
@@ -829,6 +830,9 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Play sound on the speaker
     PlayBuffer(&data);
     digitalWrite(31, 0);  //testcode
+
+    elapsed_micros_sum = elapsed_micros_sum + usec;
+    elapsed_micros_idx_t++;
 
     return &data;
 }

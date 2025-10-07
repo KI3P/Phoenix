@@ -507,6 +507,11 @@ extern bool morseCharacterUpdated;
 
 extern VolumeFunction volumeFunction;
 
+extern int64_t elapsed_micros_idx_t;
+extern int64_t elapsed_micros_sum;
+extern float32_t elapsed_micros_mean;
+extern elapsedMicros usec;
+
 // Hardware definitions
 #define RXTX        22 // Transmit/Receive (H=TX,L=RX)
 #define CW_ON_OFF   33 // CW on / off (H=ON,L=OFF) (V12 hardware)
@@ -586,6 +591,8 @@ void buffer_pretty_print(void);
 void buffer_pretty_buffer_array(void);
 void pretty_print_line(BufferEntry entry);
 void buffer_pretty_print_last_entry(void);
+void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp);
+float32_t TGetTemp(void);
 
 void MyDelay(unsigned long millisWait);
 

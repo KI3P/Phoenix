@@ -223,11 +223,49 @@ void DrawStateOfHealthPane(void) {
     tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
     tft.drawRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_YELLOW);
-    // Put some text in it
-    tft.setFontScale((enum RA8875tsize)1);
+        
+    char buff[10];
+    int valueColor = RA8875_GREEN;
+    double block_time;
+    double processor_load;
+    elapsed_micros_mean = elapsed_micros_sum / elapsed_micros_idx_t;
+
+    block_time = 128.0 / (double)SR[SampleRate].rate;  // one audio block is 128 samples and uses this in seconds
+    block_time = block_time * N_BLOCKS;
+
+    block_time *= 1000000.0;                                  // now in µseconds
+    processor_load = elapsed_micros_mean / block_time * 100;  // take audio processing time divide by block_time, convert to %
+
+    if (processor_load >= 100.0) {
+        processor_load = 100.0;
+        valueColor = RA8875_RED;
+    }
+
+    tft.setFontScale((enum RA8875tsize)0);
+
+    float32_t CPU_temperature = TGetTemp();
+
+    tft.setCursor(PaneStateOfHealth.x0+15, PaneStateOfHealth.y0+5);
     tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
-    tft.print("State Of Health");
+    tft.print("Temp:");
+    tft.setTextColor(valueColor);
+    sprintf(buff,"%2.1f",CPU_temperature);
+    //tft.setCursor(PaneStateOfHealth.x0 + 5 + tft.getFontWidth() * 3, 
+    //                PaneStateOfHealth.y0);
+    tft.print(buff);
+    tft.drawCircle(PaneStateOfHealth.x0+18+tft.getFontWidth()*9, 
+                    PaneStateOfHealth.y0+7, 2, valueColor);
+
+    tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0+5);
+    tft.setTextColor(RA8875_WHITE);
+    tft.print("Load:");
+    tft.setTextColor(valueColor);
+    sprintf(buff,"%2.1f%%",processor_load);
+    tft.print(buff);
+    elapsed_micros_idx_t = 0;
+    elapsed_micros_sum = 0;
+    elapsed_micros_mean = 0;
+
     // Mark the pane as no longer stale
     PaneStateOfHealth.stale = false;
 }
@@ -734,6 +772,7 @@ static void DrawSplash(){
     //drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
 }
 
+uint32_t timer_ms = 0;
 static void DrawHome(){
     // Only draw if we're on the HOME screen
     if (!(uiSM.state_id == UISm_StateId_HOME)) return;
@@ -744,6 +783,12 @@ static void DrawHome(){
         tft.fillWindow();
         uiSM.vars.clearScreen = false;
     }
+    // Trigger a redraw of some of the panes
+    if (millis()-timer_ms > 1000) {
+        timer_ms = millis();
+        PaneStateOfHealth.stale = true;
+    }
+
     // Draw each of the panes
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
         WindowPanes[i].DrawFunction();

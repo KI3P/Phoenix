@@ -67,6 +67,16 @@ void setup(void){
     InitializeAudio();
     InitializeDisplay();
     InitializeRFHardware(); // RF board, LPF board, and BPF board
+    
+    // Initialize temperature monitoring
+    uint16_t temp_check_frequency = 0x03U;  //updates the temp value at a RTC/3 clock rate
+    //0xFFFF determines a 2 second sample rate period
+    uint32_t highAlarmTemp = 85U;  //42 degrees C
+    uint32_t lowAlarmTemp = 25U;
+    uint32_t panicAlarmTemp = 90U;
+    initTempMon(temp_check_frequency, lowAlarmTemp, highAlarmTemp, panicAlarmTemp);
+    // this starts the measurements
+    TEMPMON_TEMPSENSE0 |= 0x2U;
 
     // Start the mode state machines
     Serial.println("...Starting state machines");

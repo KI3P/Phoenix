@@ -274,3 +274,58 @@ void buffer_pretty_buffer_array(void) {
     }
     Debug("==========================================");
 }
+
+//////////////////////////////////////////////////
+// Related to temperate and load monitoring
+
+int64_t elapsed_micros_idx_t = 0;
+int64_t elapsed_micros_sum = 0;
+float32_t elapsed_micros_mean = 0.0;
+elapsedMicros usec = 0;
+
+float32_t s_hotT_ROOM; /*!< The value of s_hotTemp minus room temperature(25¡æ).*/
+uint32_t panicAlarmTemp; /*!< The panic alarm temperature.*/
+uint32_t roomCount;      /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
+uint32_t s_roomC_hotC;   /*!< The value of s_roomCount minus s_hotCount.*/
+uint32_t s_hotTemp;      /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at room temperature .*/
+uint32_t s_hotCount;     /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
+#define TEMPMON_ROOMTEMP 25.0f
+#define TMS0_POWER_DOWN_MASK (0x1U)
+#define TMS1_MEASURE_FREQ(x) (((uint32_t)(((uint32_t)(x)) << 0U)) & 0xFFFFU)
+
+void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp) {
+    uint32_t calibrationData;
+    uint32_t roomCount;
+    //first power on the temperature sensor - no register change
+    TEMPMON_TEMPSENSE0 &= ~TMS0_POWER_DOWN_MASK;
+    TEMPMON_TEMPSENSE1 = TMS1_MEASURE_FREQ(freq);
+
+    calibrationData = HW_OCOTP_ANA1;
+    s_hotTemp = (uint32_t)(calibrationData & 0xFFU) >> 0x00U;
+    s_hotCount = (uint32_t)(calibrationData & 0xFFF00U) >> 0X08U;
+    roomCount = (uint32_t)(calibrationData & 0xFFF00000U) >> 0x14U;
+    s_hotT_ROOM = s_hotTemp - TEMPMON_ROOMTEMP;
+    s_roomC_hotC = roomCount - s_hotCount;
+}
+
+/*****
+  Purpose: Read the Teensy's temperature. Get worried over 50C
+
+  Parameter list:
+    void
+  Return value:
+    float           temperature Centigrade
+*****/
+float32_t TGetTemp() {
+    uint32_t nmeas;
+    float tmeas;
+    while (!(TEMPMON_TEMPSENSE0 & 0x4U)) {
+    ;
+    }
+    /* ready to read temperature code value */
+    nmeas = (TEMPMON_TEMPSENSE0 & 0xFFF00U) >> 8U;
+    tmeas = s_hotTemp - (float)((nmeas - s_hotCount) * s_hotT_ROOM / s_roomC_hotC);  // Calculate temperature
+    return tmeas;
+}
+
+//////////////////////////////////////////////////
