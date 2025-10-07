@@ -98,7 +98,8 @@ typedef int errno_t;
 
 enum KeyTypeId {
     KeyTypeId_Straight = 0,
-    KeyTypeId_Keyer = 1
+    KeyTypeId_Keyer = 1,
+    KeyTypeId_Invalid = 8
 };
 
 enum FilterType {
@@ -119,7 +120,8 @@ enum AGCMode {
     AGCLong = 1,
     AGCSlow = 2,
     AGCMed = 3,
-    AGCFast = 5
+    AGCFast = 5,
+    AGCInvalid = 8
 };
 
 enum ModulationType {
@@ -135,7 +137,8 @@ enum NoiseReductionType {
     NROff = 0,
     NRKim = 1,
     NRSpectral = 2,
-    NRLMS = 3
+    NRLMS = 3,
+    NRInvalid = 8
 };
 
 enum VolumeFunction {

@@ -321,8 +321,6 @@ void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
                    char *labelText, uint8_t NLabelChars, 
                    char *valueText, uint8_t NValueChars,
                    uint16_t yoffset, bool redrawFunction, bool redrawValue){
-    // Text
-    // |<-6 chars->: val 
     int16_t x = PaneSettings.x0 + xoffset - NLabelChars*charWidth;
     int16_t y = PaneSettings.y0 + yoffset;
     Rectangle box;
@@ -335,7 +333,7 @@ void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
     }
     
     if (redrawValue){
-        x = PaneSettings.x0 + xoffset +1*charWidth;
+        x = PaneSettings.x0 + xoffset + 1*charWidth;
         CalculateTextCorners(x,y,&box,NValueChars,charWidth,charHeight);
         BlankBox(&box);
         tft.setCursor(x, y);
@@ -347,7 +345,6 @@ void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
 VolumeFunction oldVolumeFunction = InvalidVolumeFunction;
 int32_t oldVolumeSetting = 0;
 void UpdateVolumeSetting(void) {
-
     int32_t value;
     switch (volumeFunction) {
         case AudioVolume:
@@ -413,6 +410,42 @@ void UpdateVolumeSetting(void) {
 
 }
 
+AGCMode oldAGC = AGCInvalid;
+void UpdateAGCSetting(void){
+    if (oldAGC == ED.agc) return;
+    oldAGC = ED.agc;
+
+    tft.setFontScale((enum RA8875tsize)1);
+    // Update the AGC setting
+    char valueText[5];
+    switch (ED.agc) {
+        case AGCOff:
+            sprintf(valueText,"0");
+            break;
+        case AGCLong:
+            sprintf(valueText,"L");
+            break;
+        case AGCSlow:
+            sprintf(valueText,"S");
+            break;
+        case AGCMed:
+            sprintf(valueText,"M");
+            break;
+        case AGCFast:
+            sprintf(valueText,"F");
+            break;
+        default:
+            sprintf(valueText,"E");
+            Debug("Invalid AGC choice");
+            break;
+    }
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+                  (char *)"AGC:", 4, 
+                  valueText, 4,
+                  1,true,true); // yoffset = 1 to avoid smudging border box
+
+}
+
 // Main tune and fine tune increment
 int32_t oldFreqIncrement = 0;
 int64_t oldStepFineTune = 0;
@@ -422,7 +455,7 @@ void UpdateIncrementSetting(void) {
         char valueText[8];
         sprintf(valueText,"%ld",ED.freqIncrement);
         UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
-                    (char *)"Increment:", 10, 
+                    (char *)"Tune Inc:", 9, 
                     valueText, 7, // longest length for this field
                     PaneSettings.height/5,true,true);
         oldFreqIncrement = ED.freqIncrement;
@@ -453,23 +486,161 @@ void UpdateAutonotchSetting(void){
     } else {
         sprintf(valueText,"Off");
     }
-    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
         (char *)"AutoNotch:", 10, 
         valueText, 3, // longest length for this field
         PaneSettings.height/5 + tft.getFontHeight() + 1,true,true);
 }
 
 float32_t oldRAtten = -70;
+float32_t oldTAtten = -70;
 void UpdateRFGainSetting(void){
-    if (oldRAtten == ED.RAtten[ED.currentBand[ED.activeVFO]]) return;
-    oldRAtten = ED.RAtten[ED.currentBand[ED.activeVFO]];
+    if (oldRAtten != ED.RAtten[ED.currentBand[ED.activeVFO]]){
+        oldRAtten = ED.RAtten[ED.currentBand[ED.activeVFO]];
+        tft.setFontScale((enum RA8875tsize)0);
+        char valueText[5];
+        sprintf(valueText,"%2.1f",ED.RAtten[ED.currentBand[ED.activeVFO]]);
+        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+            (char *)"RX Atten:", 9, 
+            valueText, 4, // longest length for this field
+            PaneSettings.height/5 + tft.getFontHeight() + 1,true,true);
+    }
+
+    float32_t comp;
+    switch (modeSM.state_id){
+        case ModeSm_StateId_CW_RECEIVE:
+            comp = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+            break;
+        case ModeSm_StateId_SSB_RECEIVE:
+            comp = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
+            break;
+        default:
+            comp = oldTAtten;
+            break;
+    }
+    if (oldTAtten != comp){
+        oldTAtten = comp;
+        tft.setFontScale((enum RA8875tsize)0);
+        char valueText[5];
+        sprintf(valueText,"%2.1f",comp);
+        UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+            (char *)"TX Atten:", 9, 
+            valueText, 4, // longest length for this field
+            PaneSettings.height/5 + 2*tft.getFontHeight() + 1,true,true);
+    }
+}
+
+NoiseReductionType oldNR = NRInvalid;
+void UpdateNoiseSetting(void){
+    if (oldNR == ED.nrOptionSelect) return;
+    oldNR = ED.nrOptionSelect;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[9];
+    switch (ED.nrOptionSelect){
+        case NROff:
+            sprintf(valueText,"Off");
+            break;
+        case NRKim:
+            sprintf(valueText,"Kim");
+            break;
+        case NRSpectral:
+            sprintf(valueText,"Spectral");
+            break;
+        case NRLMS:
+            sprintf(valueText,"LMS");
+            break;
+        default:
+            sprintf(valueText,"err");
+            Debug("Invalid noise reduction type selection!");
+            break;
+    }
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+        (char *)"Noise:", 6, 
+        valueText, 8, // longest length for this field
+        PaneSettings.height/5 + 2*tft.getFontHeight() + 1,true,true);
+}
+
+uint32_t oldZoom = 10000;
+void UpdateZoomSetting(void){
+    if (oldZoom == ED.spectrum_zoom) return;
+    oldZoom = ED.spectrum_zoom;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[4];
+    sprintf(valueText,"%dx",(uint8_t)(1<<ED.spectrum_zoom));
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+        (char *)"Zoom:", 5, 
+        valueText, 3, // longest length for this field
+        PaneSettings.height/5 + 4*tft.getFontHeight() + 1,true,true);
+}
+
+KeyTypeId oldKeyType = KeyTypeId_Invalid;
+int32_t oldWPM = -1;
+void UpdateKeyTypeSetting(void){
+    if ((oldKeyType == ED.keyType) && (oldWPM == ED.currentWPM)) return;
+    oldKeyType = ED.keyType;
+    oldWPM = ED.currentWPM;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[16];
+    switch (ED.keyType){
+        case KeyTypeId_Straight:
+            sprintf(valueText,"Straight key");
+            break;
+        case KeyTypeId_Keyer:
+            sprintf(valueText,"Keyer (%ld WPM)",ED.currentWPM);
+            break;
+        default:
+            sprintf(valueText,"err");
+            Debug("Invalid key type selection");
+            break;
+    }
+    
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+        (char *)"Key Type:", 9, 
+        valueText, 15, // longest length for this field
+        PaneSettings.height/5 + 5*tft.getFontHeight() + 1,true,true);
+}
+
+int32_t oldDecoderFlag = -1;
+void UpdateDecoderSetting(void){
+    if (oldDecoderFlag == ED.decoderFlag) return;
+    oldDecoderFlag = ED.decoderFlag;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[4];
+    if (ED.decoderFlag){
+        sprintf(valueText,"On");
+    } else {
+        sprintf(valueText,"Off");
+    }
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+        (char *)"Decoder:", 8, 
+        valueText, 3, // longest length for this field
+        PaneSettings.height/5 + 3*tft.getFontHeight() + 1,true,true);
+}
+
+float32_t oldrfGainAllBands_dB = -1000;
+void UpdateDSPGainSetting(void){
+    if (oldrfGainAllBands_dB == ED.rfGainAllBands_dB) return;
+    oldrfGainAllBands_dB = ED.rfGainAllBands_dB;
     tft.setFontScale((enum RA8875tsize)0);
     char valueText[5];
-    sprintf(valueText,"%2.1f",ED.RAtten[ED.currentBand[ED.activeVFO]]);
-    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
-        (char *)"RX Atten:", 9, 
+    sprintf(valueText,"%2.1f",ED.rfGainAllBands_dB);
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+        (char *)"DSP Gain:", 9, 
         valueText, 4, // longest length for this field
-        PaneSettings.height/5 + tft.getFontHeight() + 1,true,true);
+        PaneSettings.height/5 + 3*tft.getFontHeight() + 1,true,true);
+}
+
+int32_t oldAntennaSelection = -1;
+void UpdateAntennaSetting(void){
+    if (oldAntennaSelection == ED.antennaSelection[ED.currentBand[ED.activeVFO]]) return;
+    oldAntennaSelection = ED.antennaSelection[ED.currentBand[ED.activeVFO]];
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[2];
+    sprintf(valueText,"%ld",ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+        (char *)"Antenna:", 8, 
+        valueText, 2, // longest length for this field
+        PaneSettings.height/5 + 4*tft.getFontHeight() + 1,true,true);
 }
 
 void DrawSettingsPane(void) {
@@ -483,9 +654,16 @@ void DrawSettingsPane(void) {
     }
 
     UpdateVolumeSetting();
+    UpdateAGCSetting();
     UpdateIncrementSetting();
     UpdateAutonotchSetting();
     UpdateRFGainSetting();
+    UpdateNoiseSetting();
+    UpdateZoomSetting();
+    UpdateKeyTypeSetting();
+    UpdateDecoderSetting();
+    UpdateDSPGainSetting();
+    UpdateAntennaSetting();
 
     if (PaneSettings.stale){
         // Draw a box around the borders

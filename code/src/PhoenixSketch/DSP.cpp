@@ -611,21 +611,23 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
  */
 void NoiseReduction(DataBlock *data){
     switch (ED.nrOptionSelect) {
-      case NROff:  // NR Off
-        break;
-      case NRKim:  // Kim NR
-        Kim1_NR(data);
-        arm_scale_f32(data->I, 30, data->I, data->N);
-        arm_scale_f32(data->Q, 30, data->Q, data->N);
-        break;
-      case NRSpectral:  // Spectral NR
-        SpectralNoiseReduction(data);
-        break;
-      case NRLMS:  // LMS NR
-        Xanr(data, 0);
-        //arm_scale_f32(data->I, 1.5, data->I, data->N);
-        arm_scale_f32(data->Q, 2, data->I, data->N);
-        break;
+        case NROff:  // NR Off
+            break;
+        case NRKim:  // Kim NR
+            Kim1_NR(data);
+            arm_scale_f32(data->I, 30, data->I, data->N);
+            arm_scale_f32(data->Q, 30, data->Q, data->N);
+            break;
+        case NRSpectral:  // Spectral NR
+            SpectralNoiseReduction(data);
+            break;
+        case NRLMS:  // LMS NR
+            Xanr(data, 0);
+            //arm_scale_f32(data->I, 1.5, data->I, data->N);
+            arm_scale_f32(data->Q, 2, data->I, data->N);
+            break;
+        default:
+            break;
     }
 }
 
