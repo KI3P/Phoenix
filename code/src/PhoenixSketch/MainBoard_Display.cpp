@@ -167,20 +167,77 @@ void DrawVFOPanes(void) {
     }
 }
 
+int64_t oldCenterFreq = 0;
+int32_t oldBand = -1;
+ModeSm_StateId oldState = ModeSm_StateId_ROOT;
+ModulationType oldModulation = DCF77;
 void DrawFreqBandModPane(void) {
-            tft.setFontDefault();
-
     // Only update if information is stale
+    if ((oldCenterFreq != ED.centerFreq_Hz[ED.activeVFO]) ||
+        (oldBand != ED.currentBand[ED.activeVFO]) ||
+        (oldState != modeSM.state_id) ||
+        (oldModulation != ED.modulation[ED.activeVFO])){
+        PaneFreqBandMod.stale = true;
+    }
     if (!PaneFreqBandMod.stale) return;
+
+    oldCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
+    oldBand = ED.currentBand[ED.activeVFO];
+    oldState = modeSM.state_id;
+    oldModulation = ED.modulation[ED.activeVFO];
+
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
     tft.drawRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_YELLOW);
-    // Put some text in it
-    tft.setFontScale((enum RA8875tsize)1);
-    tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneFreqBandMod.x0, PaneFreqBandMod.y0);
-    tft.print("Freq Band Mod");
+    
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(RA8875_CYAN);
+    tft.setCursor(PaneFreqBandMod.x0,PaneFreqBandMod.y0);
+    tft.print("Ctr Freq:");
+    tft.setTextColor(RA8875_LIGHT_ORANGE);
+    if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
+        tft.print(ED.centerFreq_Hz[ED.activeVFO] + 48000);
+    } else {
+        tft.print(ED.centerFreq_Hz[ED.activeVFO]);
+    }
+
+    tft.setTextColor(RA8875_CYAN);
+    tft.setCursor(PaneFreqBandMod.x0+PaneFreqBandMod.width/2, PaneFreqBandMod.y0);
+    tft.print(bands[ED.currentBand[ED.activeVFO]].name);
+    
+    tft.setTextColor(RA8875_GREEN);
+    tft.setCursor(PaneFreqBandMod.x0+3*PaneFreqBandMod.width/4, PaneFreqBandMod.y0);
+
+    if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE) {
+        tft.print("CW ");
+    } else {
+        tft.print("SSB ");
+    }
+
+    tft.setTextColor(RA8875_CYAN);
+    switch (ED.modulation[ED.activeVFO]) {
+        case LSB:
+            tft.print("(LSB)");
+            break;
+        case USB:
+            tft.print("(USB)");
+            break;
+        case AM:
+            tft.print("(AM)");
+            break;
+        case SAM:
+            tft.print("(SAM)"); 
+            break;
+        case IQ:
+            tft.print("(IQ)"); 
+            break;
+        case DCF77:
+            tft.print("(DCF77)"); 
+            break;
+    }
+
     // Mark the pane as no longer stale
     PaneFreqBandMod.stale = false;
 }
@@ -188,6 +245,7 @@ void DrawFreqBandModPane(void) {
 void DrawSpectrumPane(void) {
     // Only update if information is stale
     if (!PaneSpectrum.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneSpectrum.x0, PaneSpectrum.y0, PaneSpectrum.width, PaneSpectrum.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -204,6 +262,7 @@ void DrawSpectrumPane(void) {
 void DrawWaterfallPane(void) {
     // Only update if information is stale
     if (!PaneWaterfall.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneWaterfall.x0, PaneWaterfall.y0, PaneWaterfall.width, PaneWaterfall.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -220,6 +279,7 @@ void DrawWaterfallPane(void) {
 void DrawStateOfHealthPane(void) {
     // Only update if information is stale
     if (!PaneStateOfHealth.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -274,6 +334,7 @@ void DrawStateOfHealthPane(void) {
 void DrawTimePane(void) {
     // Only update if information is stale
     if (!PaneTime.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneTime.x0, PaneTime.y0, PaneTime.width, PaneTime.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -320,6 +381,7 @@ void DrawTimePane(void) {
 void DrawSWRPane(void) {
     // Only update if information is stale
     if (!PaneSWR.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneSWR.x0, PaneSWR.y0, PaneSWR.width, PaneSWR.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -336,6 +398,7 @@ void DrawSWRPane(void) {
 void DrawTXRXStatusPane(void) {
     // Only update if information is stale
     if (!PaneTXRXStatus.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -352,6 +415,7 @@ void DrawTXRXStatusPane(void) {
 void DrawSMeterPane(void) {
     // Only update if information is stale
     if (!PaneSMeter.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneSMeter.x0, PaneSMeter.y0, PaneSMeter.width, PaneSMeter.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -368,6 +432,7 @@ void DrawSMeterPane(void) {
 void DrawAudioSpectrumPane(void) {
     // Only update if information is stale
     if (!PaneAudioSpectrum.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneAudioSpectrum.x0, PaneAudioSpectrum.y0, PaneAudioSpectrum.width, PaneAudioSpectrum.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
@@ -520,6 +585,7 @@ int32_t oldFreqIncrement = 0;
 int64_t oldStepFineTune = 0;
 void UpdateIncrementSetting(void) {
     if (oldFreqIncrement != ED.freqIncrement){
+        tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
         sprintf(valueText,"%ld",ED.freqIncrement);
@@ -531,6 +597,7 @@ void UpdateIncrementSetting(void) {
     }
 
     if (oldStepFineTune != ED.stepFineTune){
+        tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
         sprintf(valueText,"%lld",ED.stepFineTune);
@@ -717,6 +784,7 @@ void DrawSettingsPane(void) {
     if (PaneSettings.stale){
         // Black out the prior data
         tft.fillRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_BLACK);
+        tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)1);
         column1x = 5.5*tft.getFontWidth();
         column2x = 13.5*tft.getFontWidth();
@@ -746,6 +814,7 @@ void DrawSettingsPane(void) {
 void DrawNameBadgePane(void) {
     // Only update if information is stale
     if (!PaneNameBadge.stale) return;
+    tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle

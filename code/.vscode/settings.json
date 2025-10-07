@@ -41,7 +41,8 @@
     "forward_list": "cpp",
     "list": "cpp",
     "unordered_set": "cpp",
-    "initializer_list": "cpp"
+    "initializer_list": "cpp",
+    "typeinfo": "cpp"
   },
   "arduino.useArduinoCli": true,
   "arduino.logLevel": "info",
