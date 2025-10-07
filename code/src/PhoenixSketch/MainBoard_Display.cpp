@@ -1,5 +1,6 @@
 #include "SDT.h"
 #include <RA8875.h>
+#include <TimeLib.h>                   // Part of Teensy Time library
 #include "FreeSansBold24pt7b.h"
 #include "FreeSansBold18pt7b.h"
 
@@ -277,11 +278,41 @@ void DrawTimePane(void) {
     tft.fillRect(PaneTime.x0, PaneTime.y0, PaneTime.width, PaneTime.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
     tft.drawRect(PaneTime.x0, PaneTime.y0, PaneTime.width, PaneTime.height, RA8875_YELLOW);
-    // Put some text in it
-    tft.setFontScale((enum RA8875tsize)1);
+    
+    char timeBuffer[15];
+    char temp[5];
+    temp[0] = '\0';
+    timeBuffer[0] = '\0';
+    strcpy(timeBuffer, MY_TIMEZONE);  // e.g., EST
+    #ifdef TIME_24H
+    itoa(hour(), temp, DEC);
+    #else
+    itoa(hourFormat12(), temp, DEC);
+    #endif
+    if (strlen(temp) < 2) {
+        strcat(timeBuffer, "0");
+    }
+    strcat(timeBuffer, temp);
+    strcat(timeBuffer, ":");
+
+    itoa(minute(), temp, DEC);
+    if (strlen(temp) < 2) {
+        strcat(timeBuffer, "0");
+    }
+    strcat(timeBuffer, temp);
+    strcat(timeBuffer, ":");
+
+    itoa(second(), temp, DEC);
+    if (strlen(temp) < 2) {
+        strcat(timeBuffer, "0");
+    }
+    strcat(timeBuffer, temp);
+
+    tft.setFontScale( (enum RA8875tsize) 1);
     tft.setTextColor(RA8875_WHITE);
     tft.setCursor(PaneTime.x0, PaneTime.y0);
-    tft.print("Time");
+    tft.print(timeBuffer);
+        
     // Mark the pane as no longer stale
     PaneTime.stale = false;
 }
@@ -582,7 +613,7 @@ void UpdateNoiseSetting(void){
             sprintf(valueText,"Kim");
             break;
         case NRSpectral:
-            sprintf(valueText,"Spectral");
+            sprintf(valueText,"Spec");
             break;
         case NRLMS:
             sprintf(valueText,"LMS");
@@ -594,7 +625,7 @@ void UpdateNoiseSetting(void){
     }
     UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
         (char *)"Noise:", 6, 
-        valueText, 8, // longest length for this field
+        valueText, 4, // longest length for this field
         PaneSettings.height/5 + 2*tft.getFontHeight() + 1,true,true);
 }
 
@@ -719,11 +750,18 @@ void DrawNameBadgePane(void) {
     tft.fillRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
     tft.drawRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_YELLOW);
-    // Put some text in it
+    
     tft.setFontScale((enum RA8875tsize)1);
-    tft.setTextColor(RA8875_WHITE);
+    tft.setTextColor(RA8875_YELLOW);
     tft.setCursor(PaneNameBadge.x0, PaneNameBadge.y0);
-    tft.print("Name Badge");
+    tft.print(RIGNAME);
+
+    tft.setFontScale(0);
+    tft.print(" ");
+    tft.setTextColor(RA8875_RED);
+    tft.setCursor(PaneNameBadge.x0+2*PaneNameBadge.width/3, PaneNameBadge.y0+tft.getFontHeight()/2);
+    tft.print(VERSION);
+
     // Mark the pane as no longer stale
     PaneNameBadge.stale = false;
 }
@@ -787,6 +825,7 @@ static void DrawHome(){
     if (millis()-timer_ms > 1000) {
         timer_ms = millis();
         PaneStateOfHealth.stale = true;
+        PaneTime.stale = true;
     }
 
     // Draw each of the panes

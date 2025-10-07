@@ -353,6 +353,10 @@ char *NR_read(  char* cmd ){
 
 //Auto-notch
 char *NT_write( char* cmd ){
+	uint8_t v = atoi( &cmd[2] );
+	if (v < 2){
+		ED.ANR_notchOn = v;
+	}
   	return empty_string_p;
 }
 

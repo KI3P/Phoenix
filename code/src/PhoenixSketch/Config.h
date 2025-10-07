@@ -7,7 +7,7 @@
 //#define ITU_REGION                            1 //for Europe
 #define ITU_REGION                              2  // for USA
 //#define ITU_REGION                            3   // Asia/Oceania
-
+#define TIME_24H // comment this out to get 12 hour time
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200
 #define DIT_DURATION_MS                         60 // 20 WPM
 #define SPLASH_DURATION_MS                      1000

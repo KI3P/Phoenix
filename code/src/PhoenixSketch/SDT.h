@@ -1,6 +1,9 @@
 #ifndef SDT_H
 #define SDT_H
 
+#define RIGNAME "T41-EP SDT"
+#define VERSION "Phx 1.0"
+
 #define Debug(x) Serial.println(x)
 
 #include <Arduino.h>
