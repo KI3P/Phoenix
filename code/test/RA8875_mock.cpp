@@ -47,6 +47,14 @@ void RA8875::drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c
     // Mock implementation - could log the action if needed for testing
 }
 
+void RA8875::drawCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
+    // Mock implementation - could log the action if needed for testing
+}
+
+void RA8875::setFont(const void* font) {
+    // Mock implementation - store font pointer if needed
+}
+
 void RA8875::print(const char* text) {
     // Mock implementation - could log the text if needed for testing
 }
@@ -55,13 +63,27 @@ void RA8875::print(int value) {
     // Mock implementation - could log the value if needed for testing
 }
 
+void RA8875::print(int64_t value) {
+    // Mock implementation - could log the value if needed for testing
+}
+
 void RA8875::print(float value) {
     // Mock implementation - could log the value if needed for testing
+}
+
+void RA8875::setFontDefault() {
+    // Mock implementation - reset to default font
+    _font_scale = 1;
 }
 
 uint8_t RA8875::getFontWidth() {
     // Return a reasonable mock font width based on scale
     return 8 * _font_scale;
+}
+
+uint8_t RA8875::getFontHeight() {
+    // Return a reasonable mock font height based on scale
+    return 16 * _font_scale;
 }
 
 uint16_t RA8875::Color24To565(uint32_t color24) {

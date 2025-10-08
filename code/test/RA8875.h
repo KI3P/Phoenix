@@ -13,6 +13,8 @@
 #define RA8875_MAGENTA     0xF81F
 #define RA8875_YELLOW      0xFFE0
 #define RA8875_WHITE       0xFFFF
+#define RA8875_LIGHT_GREY  0xC618
+#define RA8875_LIGHT_ORANGE 0xFD20
 
 // Display size constants
 #define RA8875_800x480     0x01
@@ -41,16 +43,21 @@ public:
     // Drawing operations
     void fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
     void drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
+    void drawCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color);
 
     // Text operations
     void setTextColor(uint16_t color);
     void setCursor(uint16_t x, uint16_t y);
     void setFontScale(uint8_t scale);
     void setFontScale(enum RA8875tsize scale);
+    void setFontDefault();
+    void setFont(const void* font);
     void print(const char* text);
     void print(int value);
+    void print(int64_t value);
     void print(float value);
     uint8_t getFontWidth();
+    uint8_t getFontHeight();
 
     // Graphics operations
     uint16_t Color24To565(uint32_t color24);

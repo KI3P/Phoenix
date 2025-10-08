@@ -10,6 +10,12 @@ TwoWire Wire;
 TwoWire Wire1;
 TwoWire Wire2;
 
+// Mock Teensy temperature monitor registers
+// Set bit 2 (0x4) to indicate temperature sensor is ready
+uint32_t mock_TEMPMON_TEMPSENSE0 = 0x4 | (0x300 << 8);  // Ready bit + dummy temperature value
+uint32_t mock_TEMPMON_TEMPSENSE1 = 0;
+uint32_t mock_HW_OCOTP_ANA1 = 0x19C01900;  // Dummy calibration data
+
 #define NUMPINS 41
 static bool pin_mode[NUMPINS];
 static bool pin_value[NUMPINS];
