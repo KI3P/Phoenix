@@ -13,17 +13,4 @@ struct dispSc {
 void DrawDisplay(void);
 void InitializeDisplay(void);
 
-void DrawVFOPanes(void);
-void DrawFreqBandModPane(void);
-void DrawSpectrumPane(void);
-void DrawWaterfallPane(void);
-void DrawStateOfHealthPane(void);
-void DrawTimePane(void);
-void DrawSWRPane(void);
-void DrawTXRXStatusPane(void);
-void DrawSMeterPane(void);
-void DrawAudioSpectrumPane(void);
-void DrawSettingsPane(void);
-void DrawNameBadgePane(void);
-
 #endif

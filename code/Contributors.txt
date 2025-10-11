@@ -12,3 +12,4 @@ Known contributors to the code:
 * DD4WH: Frank Dziock, DD4WH
 * Michael Wild
 * VK3KQT: David Martin, VK3KQT
+* DB2OO: Joerg Uthoff, DB2OO
