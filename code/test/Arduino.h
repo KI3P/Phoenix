@@ -122,6 +122,34 @@ inline char* itoa(int value, char* str, int base) {
     return str;
 }
 
+// ultoa function - converts unsigned long to string
+inline char* ultoa(unsigned long value, char* str, int base) {
+    if (base == 10) {
+        sprintf(str, "%lu", value);
+    } else if (base == 16) {
+        sprintf(str, "%lx", value);
+    } else if (base == 2) {
+        int i = 0;
+        unsigned long temp = value;
+        if (temp == 0) {
+            str[i++] = '0';
+        } else {
+            while (temp > 0) {
+                str[i++] = (temp % 2) ? '1' : '0';
+                temp /= 2;
+            }
+            // Reverse the string
+            for (int j = 0; j < i/2; j++) {
+                char c = str[j];
+                str[j] = str[i-j-1];
+                str[i-j-1] = c;
+            }
+        }
+        str[i] = '\0';
+    }
+    return str;
+}
+
 class String;
 
 class SerialClass {

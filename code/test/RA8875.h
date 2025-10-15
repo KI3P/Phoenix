@@ -19,6 +19,15 @@
 // Display size constants
 #define RA8875_800x480     0x01
 
+// Layer constants
+#define L1 0
+#define L2 1
+
+// Layer effect constants
+#define OR 0
+#define AND 1
+#define TRANSPARENT 2
+
 // Font size enum
 enum RA8875tsize {
     RA8875_FONT_SIZE_X1 = 0,
@@ -44,6 +53,9 @@ public:
     void fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
     void drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
     void drawCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color);
+    void drawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color);
+    void drawFastVLine(uint16_t x, uint16_t y, uint16_t h, uint16_t color);
+    void drawFastHLine(uint16_t x, uint16_t y, uint16_t w, uint16_t color);
 
     // Text operations
     void setTextColor(uint16_t color);
@@ -62,6 +74,18 @@ public:
     // Graphics operations
     uint16_t Color24To565(uint32_t color24);
     void drawPixels(uint16_t* pixels, uint16_t count, uint16_t x, uint16_t y);
+
+    // Layer operations
+    void useLayers(bool enable);
+    void layerEffect(uint8_t effect);
+    void writeTo(uint8_t layer);
+    void clearMemory();
+
+    // Block Transfer Engine (BTE) operations
+    void BTE_move(uint16_t src_x, uint16_t src_y, uint16_t width, uint16_t height,
+                  uint16_t dst_x, uint16_t dst_y, uint8_t rop = 1, uint8_t bte_operation = 2);
+    bool readStatus();
+    void writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data);
 
 private:
     uint8_t _cs;

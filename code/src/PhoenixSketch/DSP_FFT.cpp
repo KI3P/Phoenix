@@ -111,6 +111,7 @@ void CalcPSD512(float32_t *I, float32_t *Q)
         psdold[i] = psdnew[i];
         psdnew[i] = log10f_fast(FFT_spec[i]);
     }
+    psdupdated = true;
 }
 
 void CalcPSD256(float32_t *I, float32_t *Q)

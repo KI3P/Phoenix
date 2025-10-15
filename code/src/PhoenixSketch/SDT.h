@@ -170,6 +170,7 @@ extern struct config_t {
     NoiseReductionType nrOptionSelect = NROff;
     uint8_t ANR_notchOn = 0;
     int32_t spectrumScale = 1; // was currentScale
+    int16_t spectrumNoiseFloor = 0;
     uint32_t spectrum_zoom = 1;
     int32_t CWFilterIndex = 5;
     int32_t CWToneIndex = 3;
@@ -493,6 +494,7 @@ extern UISm uiSM;
 extern ModeSm modeSM;
 extern bool displayFFTUpdated; /** Set true when psdnew is updated */
 extern bool CWLocked;
+extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t psdold[]; /** Holds the prior PSD data for the power spectrum display */
 extern AudioRecordQueue Q_in_L;

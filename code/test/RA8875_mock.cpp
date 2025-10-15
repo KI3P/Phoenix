@@ -103,3 +103,46 @@ uint16_t RA8875::Color24To565(uint32_t color24) {
 void RA8875::drawPixels(uint16_t* pixels, uint16_t count, uint16_t x, uint16_t y) {
     // Mock implementation - could log the pixel drawing if needed for testing
 }
+
+void RA8875::drawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color) {
+    // Mock implementation - could log the line drawing if needed for testing
+}
+
+void RA8875::drawFastVLine(uint16_t x, uint16_t y, uint16_t h, uint16_t color) {
+    // Mock implementation - draws a vertical line
+}
+
+void RA8875::drawFastHLine(uint16_t x, uint16_t y, uint16_t w, uint16_t color) {
+    // Mock implementation - draws a horizontal line
+}
+
+void RA8875::useLayers(bool enable) {
+    // Mock implementation - enable/disable layer support
+}
+
+void RA8875::layerEffect(uint8_t effect) {
+    // Mock implementation - set layer blending effect
+}
+
+void RA8875::writeTo(uint8_t layer) {
+    // Mock implementation - select which layer to write to
+}
+
+void RA8875::clearMemory() {
+    // Mock implementation - clear display memory
+}
+
+void RA8875::BTE_move(uint16_t src_x, uint16_t src_y, uint16_t width, uint16_t height,
+                      uint16_t dst_x, uint16_t dst_y, uint8_t rop, uint8_t bte_operation) {
+    // Mock implementation - Block Transfer Engine memory move operation
+    // Used for scrolling waterfall display
+}
+
+bool RA8875::readStatus() {
+    // Mock implementation - return false to indicate operation complete
+    return false;
+}
+
+void RA8875::writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data) {
+    // Mock implementation - write a rectangular array of pixels
+}

@@ -104,6 +104,12 @@ add_executable(all_Radio_tests Radio_test.cpp ../src/PhoenixSketch/Loop.cpp ../s
   ../src/PhoenixSketch/MainBoard_AudioIO.cpp ../src/PhoenixSketch/LPFBoard.cpp ../src/PhoenixSketch/AD7991.cpp ../src/PhoenixSketch/FrontPanel.cpp ../src/PhoenixSketch/FrontPanel_Rotary.cpp si5351_mock.cpp Arduino_mock.cpp Adafruit_I2CDevice_mock.cpp  OpenAudio_ArduinoLibrary_mock.cpp RA8875_mock.cpp LittleFS_mock.cpp)
 target_link_libraries(all_Radio_tests GTest::gtest_main)
 
+add_executable(all_Display_tests Display_test.cpp ../src/PhoenixSketch/MainBoard_Display.cpp ../src/PhoenixSketch/Loop.cpp ../src/PhoenixSketch/Tune.cpp ../src/PhoenixSketch/Mode.cpp ../src/PhoenixSketch/ModeSm.cpp ../src/PhoenixSketch/HardwareSM.cpp
+  ../src/PhoenixSketch/UISm.cpp ../src/PhoenixSketch/UI.cpp ../src/PhoenixSketch/RFBoard.cpp ../src/PhoenixSketch/DSP.cpp ../src/PhoenixSketch/CAT.cpp ../src/PhoenixSketch/BPFBoard.cpp ../src/PhoenixSketch/Storage.cpp
+  ../src/PhoenixSketch/DSP_FFT.cpp DSP_FFT_stub_test.cpp ../src/PhoenixSketch/Globals.cpp arm_functions.c ../src/PhoenixSketch/DSP_FIR.cpp ../src/PhoenixSketch/DSP_Noise.cpp ../src/PhoenixSketch/DSP_CWProcessing.cpp
+  ../src/PhoenixSketch/MainBoard_AudioIO.cpp ../src/PhoenixSketch/LPFBoard.cpp ../src/PhoenixSketch/AD7991.cpp ../src/PhoenixSketch/FrontPanel.cpp ../src/PhoenixSketch/FrontPanel_Rotary.cpp si5351_mock.cpp Arduino_mock.cpp Adafruit_I2CDevice_mock.cpp OpenAudio_ArduinoLibrary_mock.cpp RA8875_mock.cpp LittleFS_mock.cpp)
+target_link_libraries(all_Display_tests GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(all_RFboard_tests)
 gtest_discover_tests(all_ModeSm_tests)
@@ -118,3 +124,4 @@ gtest_discover_tests(all_BPFBoard_tests)
 gtest_discover_tests(all_Micros_tests)
 gtest_discover_tests(all_RFhardwareSM_tests)
 gtest_discover_tests(all_Radio_tests)
+gtest_discover_tests(all_Display_tests)
