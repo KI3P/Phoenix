@@ -531,6 +531,7 @@ FASTRUN  // Place in tightly-coupled memory
     void
 *****/
 void ShowSpectrum(void){
+    digitalWrite(30, 1);  //testcode
     int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
     int middleSlice = centerLine / 2;  // Approximate center element
     int x1 = 0;
@@ -543,8 +544,8 @@ void ShowSpectrum(void){
     y_current = pixelnew(0);
     if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
     if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
-    tft.drawLine(SPECTRUM_LEFT_X+0, 0, SPECTRUM_LEFT_X+0, pixelold[0], RA8875_BLACK);   // Erase the old spectrum
-    tft.drawLine(SPECTRUM_LEFT_X+0, 0, SPECTRUM_LEFT_X+0, y_current, RA8875_YELLOW);
+    tft.drawLine(SPECTRUM_LEFT_X+0, pixelold[0], SPECTRUM_LEFT_X+0, pixelold[0], RA8875_BLACK);   // Erase the old spectrum
+    tft.drawLine(SPECTRUM_LEFT_X+0, y_current, SPECTRUM_LEFT_X+0, y_current, RA8875_YELLOW);
     y_prev = pixelold[0];
     pixelold[0] = y_current;
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
@@ -614,7 +615,6 @@ void ShowSpectrum(void){
             test1 = 117;
         waterfall[x1] = gradient[test1];  // Try to put pixel values in middle of gradient array.  KF5N
     }
-    if ((counter == 10) || (counter == 11)) printf("\n");
     // Draw the waterfall
     // End for(...) Draw MAX_WATERFALL_WIDTH spectral points
     // Use the Block Transfer Engine (BTE) to move waterfall down a line   
@@ -627,6 +627,7 @@ void ShowSpectrum(void){
     ;
     // Then write new row data into the missing top row to get a scroll effect using display hardware, not the CPU.
     tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
+    digitalWrite(30, 0);  //testcode
 }
 
 uint32_t oz = 8;
@@ -1084,7 +1085,7 @@ void UpdateIncrementSetting(void) {
         sprintf(valueText,"%lld",ED.stepFineTune);
         UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
                     (char *)"FT Inc:", 7, 
-                    valueText, 3,
+                    valueText, 4,
                     PaneSettings.height/5,true,true);
 
         oldStepFineTune = ED.stepFineTune;

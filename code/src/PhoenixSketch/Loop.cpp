@@ -486,7 +486,7 @@ void ConsumeInterrupt(void){
             case (iCENTERTUNE_INCREASE):{
                 ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
                 // Change the band if we tune out of the current band
-                ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
+                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
                 UpdateRFHardwareState();
                 //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
@@ -496,18 +496,20 @@ void ConsumeInterrupt(void){
                 if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
                     ED.centerFreq_Hz[ED.activeVFO] = 250000;
                 // Change the band if we tune out of the current band
-                ED.currentBand[ED.activeVFO] = GetBand(ED.centerFreq_Hz[ED.activeVFO]);
+                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
                 UpdateRFHardwareState();
                 //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_INCREASE):{
                 AdjustFineTune(+1);
+                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
                 //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_DECREASE):{
                 AdjustFineTune(-1);
+                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
                 //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }

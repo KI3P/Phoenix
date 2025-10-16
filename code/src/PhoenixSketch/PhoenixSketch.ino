@@ -58,6 +58,8 @@ void setup(void){
     
     pinMode(31,OUTPUT); //testcode
     digitalWrite(31, 0);  //testcode
+    pinMode(30,OUTPUT); //testcode
+    digitalWrite(30, 0);  //testcode
     Serial.println("...Initializing storage");
     InitializeStorage();
 
