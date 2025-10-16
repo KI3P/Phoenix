@@ -716,7 +716,7 @@ DataBlock * ReceiveProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    digitalWrite(31, 1);    //testcode
+    Flag(1);
     // Clear overfull buffers
     ClearAudioBuffers();
 
@@ -775,7 +775,7 @@ DataBlock * ReceiveProcessing(const char *fname){
     float32_t shift = ED.fineTuneFreq_Hz[ED.activeVFO] + sideToneShift_Hz;
     FreqShiftF(&data,shift);
     SaveData(&data, 2); // used by the unit tests
-    
+
     // Decimate by 8. Reduce the sampled band to -12,000 Hz to +12,000 Hz.
     // The 3dB bandwidth is approximately -6,000 to +6,000 Hz
     DecimateBy8(&data, &filters);
@@ -829,10 +829,10 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Play sound on the speaker
     PlayBuffer(&data);
-    digitalWrite(31, 0);  //testcode
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
+    Flag(0);
 
     return &data;
 }

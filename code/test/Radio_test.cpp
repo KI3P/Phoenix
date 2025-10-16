@@ -243,6 +243,15 @@ TEST(Radio, RadioStateRunThrough) {
     loop(); MyDelay(10);
     int64_t oldrxtx = GetTXRXFreq_dHz();
     Debug("After fine tune change:");print_frequency_state();
+
+    // Change the zoom level
+    Debug("Before zoom change:");
+    Debug(ED.spectrum_zoom);
+    SetButton(ZOOM);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    Debug("After zoom change:");
+    Debug(ED.spectrum_zoom);
     
     // Go to SSB transmit mode
     SetInterrupt(iPTT_PRESSED);

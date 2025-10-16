@@ -203,6 +203,7 @@ void HandleButtonPress(int32_t button){
             if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
                 ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
             Debug("Zoom is x" + String(1<<ED.spectrum_zoom));
+            ZoomFFTPrep(ED.spectrum_zoom, &filters);
             break;
         }
         case RESET_TUNING:{
@@ -554,7 +555,7 @@ void ShutdownTeensy(void){
     
     // Tell the ATTiny that we have finished shutdown and it's safe to power off
     digitalWrite(SHUTDOWN_COMPLETE, 1);
-    MyDelay(10000); // wait for the turn off command
+    MyDelay(1000); // wait for the turn off command
 }
 
 FASTRUN void loop(void){

@@ -255,17 +255,12 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
     // ****************************************************************************************
 	// *  Zoom FFT: Initiate decimation and interpolation FIR filters AND IIR filters
 	// ****************************************************************************************
-    filters->zoom_M = (1 << spectrum_zoom);
-
+    
+    ZoomFFTPrep(spectrum_zoom, filters);
     for (unsigned i = 0; i < 4 * filters->IIR_biquad_Zoom_FFT_N_stages; i++) {
         filters->biquadZoomI.pState[i] = 0.0;  // set state variables to zero
         filters->biquadZoomQ.pState[i] = 0.0;  // set state variables to zero
     }
-    // this sets the coefficients for the ZoomFFT decimation filter
-    // according to the desired magnification mode
-    // for 0 the mag_coeffs will a NULL  ptr, since the filter is not going to be used in this mode!
-    filters->biquadZoomI.pCoeffs = mag_coeffs[spectrum_zoom];
-    filters->biquadZoomQ.pCoeffs = mag_coeffs[spectrum_zoom];
 
     // *********************************************
     // * Audio lowpass filter
@@ -322,9 +317,11 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
 void ZoomFFTPrep(uint32_t spectrum_zoom, FilterConfig *filters){ 
     // take value of spectrum_zoom and initialize IIR lowpass filter for the right values
     filters->zoom_M = (1 << spectrum_zoom);
+    // this sets the coefficients for the ZoomFFT decimation filter
+    // according to the desired magnification mode
+    // for 0 the mag_coeffs will a NULL  ptr, since the filter is not going to be used in this mode!
     filters->biquadZoomI.pCoeffs = mag_coeffs[spectrum_zoom];
-    filters->biquadZoomI.pCoeffs = mag_coeffs[spectrum_zoom];
-    
+    filters->biquadZoomQ.pCoeffs = mag_coeffs[spectrum_zoom];
     zoom_sample_ptr = 0;
 }
 

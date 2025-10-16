@@ -598,6 +598,7 @@ void pretty_print_line(BufferEntry entry);
 void buffer_pretty_print_last_entry(void);
 void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp);
 float32_t TGetTemp(void);
+void Flag(uint8_t val);
 
 void MyDelay(unsigned long millisWait);
 

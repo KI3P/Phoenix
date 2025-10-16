@@ -531,7 +531,7 @@ FASTRUN  // Place in tightly-coupled memory
     void
 *****/
 void ShowSpectrum(void){
-    digitalWrite(30, 1);  //testcode
+    Flag(2);
     int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
     int middleSlice = centerLine / 2;  // Approximate center element
     int x1 = 0;
@@ -627,7 +627,7 @@ void ShowSpectrum(void){
     ;
     // Then write new row data into the missing top row to get a scroll effect using display hardware, not the CPU.
     tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
-    digitalWrite(30, 0);  //testcode
+    Flag(0);
 }
 
 uint32_t oz = 8;

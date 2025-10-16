@@ -46,6 +46,13 @@ void Key2On(void){
     lastKey2time = currentTime;
 }
 
+void Flag(uint8_t val){
+    digitalWrite(31, (val >> 0) & 0b1);  //testcode
+    digitalWrite(30, (val >> 1) & 0b1);  //testcode
+    digitalWrite(29, (val >> 2) & 0b1);  //testcode
+    digitalWrite(28, (val >> 3) & 0b1);  //testcode
+}
+
 void setup(void){
     Serial.begin(115200);
     SerialUSB1.begin(38400); // For CAT control
@@ -57,9 +64,10 @@ void setup(void){
     digitalWrite(SHUTDOWN_COMPLETE, 0);  
     
     pinMode(31,OUTPUT); //testcode
-    digitalWrite(31, 0);  //testcode
     pinMode(30,OUTPUT); //testcode
-    digitalWrite(30, 0);  //testcode
+    pinMode(29,OUTPUT); //testcode
+    pinMode(28,OUTPUT); //testcode
+    Flag(0);
     Serial.println("...Initializing storage");
     InitializeStorage();
 
