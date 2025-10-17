@@ -532,35 +532,25 @@ FASTRUN  // Place in tightly-coupled memory
 *****/
 void ShowSpectrum(void){
     Flag(2);
-    int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
-    int middleSlice = centerLine / 2;  // Approximate center element
+    //int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+    //int middleSlice = centerLine / 2;  // Approximate center element
     int x1 = 0;
-    int filterLoPositionMarker;
-    int filterHiPositionMarker;
+    //int filterLoPositionMarker;
+    //int filterHiPositionMarker;
     int16_t y_left, y_current, y_prev;
-    int16_t offset;
+    int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
 
-    // Draw the first column
-    y_current = pixelnew(0);
-    if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
-    if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
-    tft.drawLine(SPECTRUM_LEFT_X+0, pixelold[0], SPECTRUM_LEFT_X+0, pixelold[0], RA8875_BLACK);   // Erase the old spectrum
-    tft.drawLine(SPECTRUM_LEFT_X+0, y_current, SPECTRUM_LEFT_X+0, y_current, RA8875_YELLOW);
     y_prev = pixelold[0];
-    pixelold[0] = y_current;
-    offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
+    y_current = offset;
     
     // Draws the main Spectrum, Waterfall and Audio displays
-    for (x1 = 1; x1 < MAX_WATERFALL_WIDTH; x1++) {
+    for (x1 = 0; x1 < MAX_WATERFALL_WIDTH; x1++) {
         y_left = y_current; // use the value we calculated the last time through this loop
         y_current = offset - pixelnew(x1);
-
         // Prevent spectrum from going below the bottom of the spectrum area
         if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
-
         // Prevent spectrum from going above the top of the spectrum area
         if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
-
         /*if (x1 > 188 && x1 < 330) {
             if (y_new_plot < 120) y_new_plot = 120;
             if (y1_new_plot < 120) y1_new_plot = 120;
