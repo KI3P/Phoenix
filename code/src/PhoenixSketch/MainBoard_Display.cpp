@@ -544,11 +544,6 @@ void ShowSpectrum(void){
     //int filterLoPositionMarker;
     //int filterHiPositionMarker;
     for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
-        //if (x1 == 0){
-        //    y_prev = pixelold[0];
-        //    y_current = offset;
-        //}
-      
         y_left = y_current; // use the value we calculated the last time through this loop
         y_current = offset - pixelnew(x1);
         // Prevent spectrum from going below the bottom of the spectrum area
@@ -617,18 +612,16 @@ void ShowSpectrum(void){
         psdupdated = false; // draw spectrum once then wait until it is updated
         redrawSpectrum = false;
     
-        /*
         // Draw the waterfall
-        // End for(...) Draw MAX_WATERFALL_WIDTH spectral points
-        // Use the Block Transfer Engine (BTE) to move waterfall down a line   
+        // Use the Block Transfer Engine (BTE) to move waterfall down a line. Take it from layer 1,
+        // our active layer, and place it on layer 2
         tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
-        //while (tft.readStatus()) ;  // Make sure it is done.  Memory moves can take time.
-        // Now bring waterfall back to the beginning of the 2nd row.
-        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 2);
-        //while (tft.readStatus()) ; // Make sure it's done.
-        // Then write new row data into the missing top row to get a scroll effect using display hardware, not the CPU.
+        while (tft.readStatus()) ;  // Make sure it is done.  Memory moves can take time.
+        // Now bring waterfall back to the beginning of the 2nd row on layer 1.
+        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 2, 1);
+        while (tft.readStatus()) ; // Make sure it's done.
+        // Then write new row data into the missing top row on layer 1 to get a scroll effect using display hardware, not the CPU.
         tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
-        */
     }
     Flag(0);
 }
@@ -645,9 +638,7 @@ void DrawSpectrumPane(void) {
     }
 
     if (psdupdated && redrawSpectrum){
-        //psdupdated = false; // draw spectrum once then wait until it is updated
-        //redrawSpectrum = false;
-        tft.writeTo(L2);
+        tft.writeTo(L1);
         ShowSpectrum();
     }
 
@@ -665,7 +656,7 @@ void DrawSpectrumPane(void) {
     DrawBandWidthIndicatorBar();
     ShowBandwidth();
     tft.drawRect(PaneSpectrum.x0-2,PaneSpectrum.y0,MAX_WATERFALL_WIDTH+5,SPECTRUM_HEIGHT,RA8875_YELLOW);
-    tft.writeTo(L1);  // Always leave on layer 1
+    //tft.writeTo(L1);  // Always leave on layer 1
 
     // Mark the pane as no longer stale
     PaneSpectrum.stale = false;
