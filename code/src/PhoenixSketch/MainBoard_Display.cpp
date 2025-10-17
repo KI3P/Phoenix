@@ -22,7 +22,7 @@ RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
 #define WINDOW_WIDTH    800
 #define WINDOW_HEIGHT   480
 #define NUMBER_OF_PANES 12
-#define SPECTRUM_REFRESH_MS 250
+#define SPECTRUM_REFRESH_MS 200
 
 struct dispSc displayScale[] = // *dbText,dBScale, pixelsPerDB, baseOffset, offsetIncrement
     {
@@ -515,6 +515,13 @@ FASTRUN int16_t pixelnew(uint32_t i){
 
 uint16_t pixelold[MAX_WATERFALL_WIDTH];
 uint16_t waterfall[MAX_WATERFALL_WIDTH];
+static int16_t x1 = 0;
+static int16_t y_left;
+static int16_t y_prev = pixelold[0];
+static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
+static int16_t y_current = offset;
+#define NCHUNKS 4
+
 FASTRUN  // Place in tightly-coupled memory
          /*****
   Purpose: Show Spectrum display
@@ -534,17 +541,14 @@ void ShowSpectrum(void){
     Flag(2);
     //int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
     //int middleSlice = centerLine / 2;  // Approximate center element
-    int x1 = 0;
     //int filterLoPositionMarker;
     //int filterHiPositionMarker;
-    int16_t y_left, y_current, y_prev;
-    int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
-
-    y_prev = pixelold[0];
-    y_current = offset;
-    
-    // Draws the main Spectrum, Waterfall and Audio displays
-    for (x1 = 0; x1 < MAX_WATERFALL_WIDTH; x1++) {
+    for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
+        //if (x1 == 0){
+        //    y_prev = pixelold[0];
+        //    y_current = offset;
+        //}
+      
         y_left = y_current; // use the value we calculated the last time through this loop
         y_current = offset - pixelnew(x1);
         // Prevent spectrum from going below the bottom of the spectrum area
@@ -561,6 +565,7 @@ void ShowSpectrum(void){
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
         y_prev = pixelold[x1]; 
         pixelold[x1] = y_current;
+        x1++;
 
         //  What is the actual spectrum at this time?  It's a combination of the old and new spectrums.
         //  In the case of a CW interrupt, the array pixelnew should be saved as the actual spectrum.
@@ -605,18 +610,26 @@ void ShowSpectrum(void){
             test1 = 117;
         waterfall[x1] = gradient[test1];  // Try to put pixel values in middle of gradient array.  KF5N
     }
-    // Draw the waterfall
-    // End for(...) Draw MAX_WATERFALL_WIDTH spectral points
-    // Use the Block Transfer Engine (BTE) to move waterfall down a line   
-    tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
-    while (tft.readStatus())  // Make sure it is done.  Memory moves can take time.
-    ;
-    // Now bring waterfall back to the beginning of the 2nd row.
-    tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 2);
-    while (tft.readStatus())  // Make sure it's done.
-    ;
-    // Then write new row data into the missing top row to get a scroll effect using display hardware, not the CPU.
-    tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
+    if (x1 >= MAX_WATERFALL_WIDTH){
+        x1 = 0;
+        y_prev = pixelold[0];
+        y_current = offset;
+        psdupdated = false; // draw spectrum once then wait until it is updated
+        redrawSpectrum = false;
+    
+        /*
+        // Draw the waterfall
+        // End for(...) Draw MAX_WATERFALL_WIDTH spectral points
+        // Use the Block Transfer Engine (BTE) to move waterfall down a line   
+        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
+        //while (tft.readStatus()) ;  // Make sure it is done.  Memory moves can take time.
+        // Now bring waterfall back to the beginning of the 2nd row.
+        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 2);
+        //while (tft.readStatus()) ; // Make sure it's done.
+        // Then write new row data into the missing top row to get a scroll effect using display hardware, not the CPU.
+        tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
+        */
+    }
     Flag(0);
 }
 
@@ -632,8 +645,8 @@ void DrawSpectrumPane(void) {
     }
 
     if (psdupdated && redrawSpectrum){
-        psdupdated = false; // draw spectrum once then wait until it is updated
-        redrawSpectrum = false;
+        //psdupdated = false; // draw spectrum once then wait until it is updated
+        //redrawSpectrum = false;
         tft.writeTo(L2);
         ShowSpectrum();
     }
@@ -1373,7 +1386,8 @@ static void DrawHome(){
 
     if (millis()-timerDisplay_ms > SPECTRUM_REFRESH_MS) {
         timerDisplay_ms = millis();
-        redrawSpectrum = true;
+        if (redrawSpectrum == false)
+            redrawSpectrum = true;
     }
     // Draw each of the panes
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
