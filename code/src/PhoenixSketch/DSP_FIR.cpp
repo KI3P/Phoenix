@@ -1248,35 +1248,59 @@ void decimate_f32(float32_t *in_buffer, float32_t *out_buffer, uint16_t M, uint3
  * Calculate the FFT of the FIR filter coefficients once to produce the FIR filter mask.
  */
 void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
-  // the FIR has exactly m_NumTaps = (FFT_length / 2) + 1 coefficients, 
-  // so we have to add (FFT_length / 2) -1 zeros before the FFT in order to produce a FFT_length 
-  // point input buffer for the FFT
-  // copy coefficients into real values of first part of buffer, rest is zero
+    // the FIR has exactly m_NumTaps = (FFT_length / 2) + 1 coefficients, 
+    // so we have to add (FFT_length / 2) -1 zeros before the FFT in order to produce a FFT_length 
+    // point input buffer for the FFT
+    // copy coefficients into real values of first part of buffer, rest is zero
 
-  float32_t FIR_Coef_I[filters->m_NumTaps];
-  float32_t FIR_Coef_Q[filters->m_NumTaps];
-  CalcCplxFIRCoeffs(FIR_Coef_I, FIR_Coef_Q, filters->m_NumTaps, 
-    (float32_t)bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, 
-    (float32_t)bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz, 
-    (float)SR[SampleRate].rate / filters->DF);
+    float32_t FIR_Coef_I[filters->m_NumTaps];
+    float32_t FIR_Coef_Q[filters->m_NumTaps];
+    int32_t high_Hz, low_Hz;
+    if (ED.modulation[ED.activeVFO] == bands[ED.currentBand[ED.activeVFO]].mode){
+        high_Hz = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+        low_Hz = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+    } else {
+        // we have changed from the default modulation
+        switch (ED.modulation[ED.activeVFO]){
+            case LSB:
+            case USB:
+                low_Hz  = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+                high_Hz = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+                break;
+            case SAM:
+            case AM:
+            case IQ:
+            case DCF77:
+                #define MAXABS(a, b) ((abs(a)) > (abs(b)) ? (abs(a)) : (abs(b)))
+                int32_t edge_Hz = MAXABS(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,
+                                         bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz); 
+                low_Hz = -edge_Hz;
+                high_Hz = edge_Hz;
+                break;
+        }
+    }
+    CalcCplxFIRCoeffs(FIR_Coef_I, FIR_Coef_Q, filters->m_NumTaps, 
+        (float32_t)low_Hz, 
+        (float32_t)high_Hz, 
+        (float)SR[SampleRate].rate / filters->DF);
 
-  for (size_t i = 0; i < filters->m_NumTaps; i++) {
-    FIR_filter_mask[i * 2] = FIR_Coef_I[i];
-    FIR_filter_mask[i * 2 + 1] = FIR_Coef_Q[i];
-  }
+    for (size_t i = 0; i < filters->m_NumTaps; i++) {
+        FIR_filter_mask[i * 2] = FIR_Coef_I[i];
+        FIR_filter_mask[i * 2 + 1] = FIR_Coef_Q[i];
+    }
 
-  for (size_t i = FFT_LENGTH + 1; i < FFT_LENGTH * 2; i++) {
-    FIR_filter_mask[i] = 0.0;
-  }
+    for (size_t i = FFT_LENGTH + 1; i < FFT_LENGTH * 2; i++) {
+        FIR_filter_mask[i] = 0.0;
+    }
 
-  // Used by unit tests
-  if (dspfirfilename != nullptr){
-    WriteFloatFile(FIR_filter_mask, 2*FFT_LENGTH, dspfirfilename);
-  }
+    // Used by unit tests
+    if (dspfirfilename != nullptr){
+        WriteFloatFile(FIR_filter_mask, 2*FFT_LENGTH, dspfirfilename);
+    }
 
-  // FFT of FIR_filter_mask
-  // perform FFT (in-place), needs only to be done once (or every time the filter coeffs change)
-  FFT512Forward(FIR_filter_mask);
+    // FFT of FIR_filter_mask
+    // perform FFT (in-place), needs only to be done once (or every time the filter coeffs change)
+    FFT512Forward(FIR_filter_mask);
 }
 
 void setdspfirfilename(char *fnm){

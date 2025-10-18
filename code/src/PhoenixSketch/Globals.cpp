@@ -18,7 +18,7 @@ VolumeFunction volumeFunction = AudioVolume;
 //#define MISC_BAND 2
 struct band bands[NUMBER_OF_BANDS] = 
   {
-  //freqVFO1 freqVFO2 band low   band hi   name    mode      Low    Hi  Gain_dB  type    gain  AGC   pixel
+  //freqVFO1 freqVFO2 band low   band hi   name    mode      Hi    Low  Gain_dB  type    gain  AGC   pixel
   //                                                       filter filter                correct     offset
     1850000, 0, 1800000, 2000000, "160M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,    // 160M
 #if defined(ITU_REGION) && ITU_REGION == 1

@@ -100,10 +100,6 @@ void setup(void){
 
     UpdateAudioIOState();
 
-    // If our input tone was at 1 kHz, then it will appear at 49 kHz after Fs/4
-    // So make our VFO frequency the negative of this to shift it back to 1 kHz
-    ED.fineTuneFreq_Hz[ED.activeVFO] = -48000L; //testcode
-
     Serial.println("...Setting up key interrupts");
     // Set up interrupts for key
     pinMode(KEY1, INPUT_PULLUP);

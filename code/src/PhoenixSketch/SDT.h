@@ -185,6 +185,8 @@ extern struct config_t {
     int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND};
     int64_t centerFreq_Hz[2] = {7030000L,7030000L};
     int64_t fineTuneFreq_Hz[2] = {0, 0};
+    //int64_t filterLo_Hz[2] = {bands[STARTUP_BAND].FLoCut_Hz,bands[STARTUP_BAND].FLoCut_Hz};
+    //int64_t filterHi_Hz[2] = {bands[STARTUP_BAND].FHiCut_Hz,bands[STARTUP_BAND].FHiCut_Hz};
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t currentMicGain = -10;

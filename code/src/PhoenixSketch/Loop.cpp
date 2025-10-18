@@ -238,6 +238,12 @@ void HandleButtonPress(int32_t button){
             if (newmod > (int8_t)SAM)
                 newmod = (int8_t)USB;
             ED.modulation[ED.activeVFO] = (ModulationType)newmod;
+            //bands[ED.currentBand[ED.activeVFO]].mode = ED.modulation[ED.activeVFO];
+            //int32_t low  = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            //int32_t high = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+            //bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = low;
+            //bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = high;
+            UpdateFIRFilterMask(&filters);
             Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
             break;
         }

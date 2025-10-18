@@ -628,11 +628,13 @@ void ShowSpectrum(void){
 uint32_t oz = 8;
 int64_t ocf = 0;
 int64_t oft = 0;
+ModulationType omd = IQ;
 void DrawSpectrumPane(void) {
     // Only update if information is stale
     if ((oz != ED.spectrum_zoom) || 
         (ocf != ED.centerFreq_Hz[ED.activeVFO]) ||
-        (oft != ED.fineTuneFreq_Hz[ED.activeVFO])){
+        (oft != ED.fineTuneFreq_Hz[ED.activeVFO]) ||
+        (omd != ED.modulation[ED.activeVFO])){
         PaneSpectrum.stale = true;
     }
 
@@ -648,6 +650,7 @@ void DrawSpectrumPane(void) {
     oz = ED.spectrum_zoom;
     ocf = ED.centerFreq_Hz[ED.activeVFO];
     oft = ED.fineTuneFreq_Hz[ED.activeVFO];
+    omd = ED.modulation[ED.activeVFO];
     // Black out the prior data
     tft.writeTo(L2);
     DrawFrequencyBarValue();
