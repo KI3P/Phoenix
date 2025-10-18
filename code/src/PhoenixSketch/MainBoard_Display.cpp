@@ -51,15 +51,18 @@ const uint16_t gradient[] = {  // Color array for waterfall background
 static bool redrawSpectrum = false;
 
 int64_t GetCenterFreq_Hz(){
-    return ED.centerFreq_Hz[ED.activeVFO];
+    if (ED.spectrum_zoom == 0)
+        return ED.centerFreq_Hz[ED.activeVFO];
+    else
+        return ED.centerFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4;
 }
 
 int64_t GetLowerFreq_Hz(){
-    return GetCenterFreq_Hz()-SR[SampleRate].rate/4-SR[SampleRate].rate/(2*(1<<ED.spectrum_zoom));
+    return GetCenterFreq_Hz()-SR[SampleRate].rate/(2*(1<<ED.spectrum_zoom));
 }
 
 int64_t GetUpperFreq_Hz(){
-    return GetCenterFreq_Hz()-SR[SampleRate].rate/4+SR[SampleRate].rate/(2*(1<<ED.spectrum_zoom));
+    return GetCenterFreq_Hz()+SR[SampleRate].rate/(2*(1<<ED.spectrum_zoom));
 }
 
 struct Pane {
@@ -446,11 +449,7 @@ void DrawFrequencyBarValue(void) {
     tft.fillRect(0, WATERFALL_TOP_Y, MAX_WATERFALL_WIDTH + PaneSpectrum.x0 + 10, tft.getFontHeight(), RA8875_BLACK);
 
     // get current frequency in Hz
-    freq_calc = (float)ED.centerFreq_Hz[ED.activeVFO];  
-
-    if (ED.spectrum_zoom == 0) {
-        freq_calc += (float32_t)SR[SampleRate].rate / 4.0;
-    }
+    freq_calc = (float)GetCenterFreq_Hz();  
 
     if (ED.spectrum_zoom < 5) {
         freq_calc = roundf(freq_calc / 1000);  // round graticule frequency to the nearest kHz
@@ -650,13 +649,12 @@ void DrawSpectrumPane(void) {
     ocf = ED.centerFreq_Hz[ED.activeVFO];
     oft = ED.fineTuneFreq_Hz[ED.activeVFO];
     // Black out the prior data
-    //tft.fillRect(PaneSpectrum.x0, PaneSpectrum.y0, PaneSpectrum.width, PaneSpectrum.height, RA8875_BLACK);
     tft.writeTo(L2);
     DrawFrequencyBarValue();
     DrawBandWidthIndicatorBar();
     ShowBandwidth();
     tft.drawRect(PaneSpectrum.x0-2,PaneSpectrum.y0,MAX_WATERFALL_WIDTH+5,SPECTRUM_HEIGHT,RA8875_YELLOW);
-    //tft.writeTo(L1);  // Always leave on layer 1
+    tft.writeTo(L1);  // Always leave on layer 1
 
     // Mark the pane as no longer stale
     PaneSpectrum.stale = false;

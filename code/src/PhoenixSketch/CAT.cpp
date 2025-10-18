@@ -44,6 +44,7 @@ char *NT_write( char* cmd );
 char *NT_read(  char* cmd );
 char *PC_write( char* cmd );
 char *PC_read(  char* cmd );
+char *PD_read(  char* cmd );
 char *PS_write( char* cmd );
 char *PS_read(  char* cmd );
 char *RX_write( char* cmd );
@@ -63,7 +64,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 18
+#define NUM_SUPPORTED_COMMANDS 19
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -80,6 +81,7 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
+		{ "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD
 		{ "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
 		{ "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
 		{ "TX", 4,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
@@ -389,6 +391,16 @@ char *PC_read(  char* cmd ){
 		o_param = round( ED.powerOutCW[ED.activeVFO] );
 	}
   	sprintf( obuf, "PC%03d;", o_param );
+  	return obuf;
+}
+
+//PSD
+char *PD_read(  char* cmd ){
+	for (int j = 0; j < SPECTRUM_RES; j++){
+		sprintf( obuf, "%d,%4.3f", j, psdnew[j] );
+		Serial.println(obuf);
+	}
+	sprintf( obuf, "PD;");
   	return obuf;
 }
 
