@@ -41,7 +41,7 @@ void AdjustFineTune(int32_t filter_change){
     #endif  // FAST_TUNE
 
     ED.fineTuneFreq_Hz[ED.activeVFO] += ED.stepFineTune * filter_change;
-    //Debug("Fine tune pre: " + String(EEPROMData.fineTuneFreq_Hz));
+    //Debug("Fine tune pre: " + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
     // If the zoom level is 0, then the valid range of fine tune window is between
     // -samplerate/2 and +samplerate/2. 
     int32_t lower_limit = -(int32_t)(SR[SampleRate].rate)/2;
@@ -77,11 +77,11 @@ void AdjustFineTune(int32_t filter_change){
     }
     //Debug("Upper limit: " + String(upper_limit));
     //Debug("Lower limit: " + String(lower_limit));
-    if (ED.fineTuneFreq_Hz[ED.activeVFO] > upper_limit) 
-        ED.fineTuneFreq_Hz[ED.activeVFO] = upper_limit;
-    if (ED.fineTuneFreq_Hz[ED.activeVFO] < lower_limit) 
-        ED.fineTuneFreq_Hz[ED.activeVFO] = lower_limit;
-    //Debug("Fine tune post: " + String(EEPROMData.fineTuneFreq_Hz));
+    if (-ED.fineTuneFreq_Hz[ED.activeVFO] > upper_limit) 
+        ED.fineTuneFreq_Hz[ED.activeVFO] = -upper_limit;
+    if (-ED.fineTuneFreq_Hz[ED.activeVFO] < lower_limit) 
+        ED.fineTuneFreq_Hz[ED.activeVFO] = -lower_limit;
+    //Debug("Fine tune post: " + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
 
     // The fine tune is applied after the spectrum is shifted by samplerate/4. So the 
     // actual frequency in the RF domain is: TXRXFreq = centerFreq+fineTuneFreq-48kHz
@@ -95,7 +95,7 @@ void AdjustFineTune(int32_t filter_change){
  * @return The effective transmit/receive frequency in units of Hz * 100
  */
 int64_t GetTXRXFreq_dHz(void){
-    int64_t val = 100*(ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
+    int64_t val = 100*(ED.centerFreq_Hz[ED.activeVFO] - ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
     return val;
 }
 
@@ -106,7 +106,7 @@ int64_t GetTXRXFreq_dHz(void){
  * @return The effective transmit/receive frequency in units of Hz
  */
 int64_t GetTXRXFreq(uint8_t vfo){
-    int64_t val = (ED.centerFreq_Hz[vfo] + ED.fineTuneFreq_Hz[vfo] - SR[SampleRate].rate/4);
+    int64_t val = (ED.centerFreq_Hz[vfo] - ED.fineTuneFreq_Hz[vfo] - SR[SampleRate].rate/4);
     return val;
 }
 

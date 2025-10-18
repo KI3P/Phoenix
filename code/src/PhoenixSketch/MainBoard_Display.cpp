@@ -250,13 +250,13 @@ void DrawFreqBandModPane(void) {
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_CYAN);
     tft.setCursor(PaneFreqBandMod.x0,PaneFreqBandMod.y0);
-    tft.print("Ctr Freq:");
+    tft.print("LO Freq:");
     tft.setTextColor(RA8875_LIGHT_ORANGE);
-    if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
-        tft.print(ED.centerFreq_Hz[ED.activeVFO] + 48000);
-    } else {
+    //if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
+    //    tft.print(ED.centerFreq_Hz[ED.activeVFO] + 48000);
+    //} else {
         tft.print(ED.centerFreq_Hz[ED.activeVFO]);
-    }
+    //}
 
     tft.setTextColor(RA8875_CYAN);
     tft.setCursor(PaneFreqBandMod.x0+PaneFreqBandMod.width/2+20, PaneFreqBandMod.y0);
@@ -354,7 +354,7 @@ FASTRUN void DrawBandWidthIndicatorBar(void)
             Zoom1Offset = 0;
             break;
     }
-    newCursorPosition = (int32_t)(ED.fineTuneFreq_Hz[ED.activeVFO] * 0.0053333) * zoomMultFactor - Zoom1Offset;
+    newCursorPosition = (int32_t)(-ED.fineTuneFreq_Hz[ED.activeVFO] * 0.0053333) * zoomMultFactor - Zoom1Offset;
 
     tft.writeTo(L2);
 
