@@ -56,6 +56,25 @@ void AdjustFineTune(int32_t filter_change){
         upper_limit = +(int32_t)visible_bandwidth/2;
         //Debug("Visible bandwidth: " + String(visible_bandwidth));
     }
+    // Don't approach within the filter bandwidth of the band edge
+    switch (ED.modulation[ED.activeVFO]){
+        case LSB:
+            lower_limit -= bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz; // FLoCut_Hz is negative
+            break;
+        case USB:
+            upper_limit -= bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            break;
+        case AM:
+        case SAM:
+        case IQ:
+        case DCF77:
+            #define MAXABS(a, b) ((abs(a)) > (abs(b)) ? (abs(a)) : (abs(b)))
+            int32_t edge_Hz = MAXABS(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,
+                                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz); 
+            lower_limit += edge_Hz;
+            upper_limit -= edge_Hz;
+            break;
+    }
     //Debug("Upper limit: " + String(upper_limit));
     //Debug("Lower limit: " + String(lower_limit));
     if (ED.fineTuneFreq_Hz[ED.activeVFO] > upper_limit) 

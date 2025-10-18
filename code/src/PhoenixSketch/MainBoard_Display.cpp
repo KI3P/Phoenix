@@ -170,7 +170,7 @@ void DrawVFOPanes(void) {
         // Black out the prior data
         tft.fillRect(PaneVFOA.x0, PaneVFOA.y0, PaneVFOA.width, PaneVFOA.height, RA8875_BLACK);
         // Draw a box around the borders
-        tft.drawRect(PaneVFOA.x0, PaneVFOA.y0, PaneVFOA.width, PaneVFOA.height, RA8875_YELLOW);
+        //tft.drawRect(PaneVFOA.x0, PaneVFOA.y0, PaneVFOA.width, PaneVFOA.height, RA8875_YELLOW);
 
         TxRxFreq = GetTXRXFreq(0);
         if (TxRxFreq < bands[ED.currentBand[0]].fBandLow_Hz || 
@@ -198,7 +198,7 @@ void DrawVFOPanes(void) {
         // Black out the prior data
         tft.fillRect(PaneVFOB.x0, PaneVFOB.y0, PaneVFOB.width, PaneVFOB.height, RA8875_BLACK);
         // Draw a box around the borders
-        tft.drawRect(PaneVFOB.x0, PaneVFOB.y0, PaneVFOB.width, PaneVFOB.height, RA8875_YELLOW);
+        //tft.drawRect(PaneVFOB.x0, PaneVFOB.y0, PaneVFOB.width, PaneVFOB.height, RA8875_YELLOW);
         
         TxRxFreq = GetTXRXFreq(1);
         if (TxRxFreq < bands[ED.currentBand[1]].fBandLow_Hz || 
@@ -245,7 +245,7 @@ void DrawFreqBandModPane(void) {
     // Black out the prior data
     tft.fillRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_YELLOW);
+    //tft.drawRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_YELLOW);
     
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_CYAN);
@@ -372,11 +372,11 @@ FASTRUN void DrawBandWidthIndicatorBar(void)
             break;
 
         case AM:
-            tft.fillRect(centerLine - (filterWidth / 2) * 0.93 + newCursorPosition, SPECTRUM_TOP_Y + 20, filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+            tft.fillRect(centerLine - (filterWidth ) * 0.93 + newCursorPosition, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
 
         case SAM:
-            tft.fillRect(centerLine - (filterWidth / 2) * 0.93 + newCursorPosition, SPECTRUM_TOP_Y + 20, filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+            tft.fillRect(centerLine - (filterWidth ) * 0.93 + newCursorPosition, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
         default:
             break;
@@ -542,6 +542,7 @@ void ShowSpectrum(void){
     //int middleSlice = centerLine / 2;  // Approximate center element
     //int filterLoPositionMarker;
     //int filterHiPositionMarker;
+    offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);
     for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
         y_left = y_current; // use the value we calculated the last time through this loop
         y_current = offset - pixelnew(x1);
@@ -670,7 +671,7 @@ void DrawStateOfHealthPane(void) {
     // Black out the prior data
     tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_YELLOW);
+    //tft.drawRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_YELLOW);
         
     char buff[10];
     int valueColor = RA8875_GREEN;
@@ -725,7 +726,7 @@ void DrawTimePane(void) {
     // Black out the prior data
     tft.fillRect(PaneTime.x0, PaneTime.y0, PaneTime.width, PaneTime.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneTime.x0, PaneTime.y0, PaneTime.width, PaneTime.height, RA8875_YELLOW);
+    //tft.drawRect(PaneTime.x0, PaneTime.y0, PaneTime.width, PaneTime.height, RA8875_YELLOW);
     
     char timeBuffer[15];
     char temp[5];
@@ -815,7 +816,7 @@ void DrawTXRXStatusPane(void) {
     // Black out the prior data
     tft.fillRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_YELLOW);
+    //tft.drawRect(PaneTXRXStatus.x0, PaneTXRXStatus.y0, PaneTXRXStatus.width, PaneTXRXStatus.height, RA8875_YELLOW);
     
     tft.setFontDefault();   
     tft.setFontScale((enum RA8875tsize)1);
@@ -1295,7 +1296,7 @@ void DrawNameBadgePane(void) {
     // Black out the prior data
     tft.fillRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_BLACK);
     // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_YELLOW);
+    //tft.drawRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_YELLOW);
     
     tft.setFontScale((enum RA8875tsize)1);
     tft.setTextColor(RA8875_YELLOW);

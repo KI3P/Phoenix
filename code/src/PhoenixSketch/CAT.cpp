@@ -38,6 +38,8 @@ char *MD_write( char* cmd );
 char *MD_read(  char* cmd );
 char *MG_write( char* cmd );
 char *MG_read(  char* cmd );
+char *NF_write( char* cmd );
+char *NF_read(  char* cmd );
 char *NR_write( char* cmd );
 char *NR_read(  char* cmd );
 char *NT_write( char* cmd );
@@ -64,7 +66,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 19
+#define NUM_SUPPORTED_COMMANDS 20
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -78,7 +80,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
 		{ "MD", 4,  3, MD_write, MD_read }, //operating mode, CW, USB etc
 		{ "MG", 6,  3, MG_write, MG_read }, // mike gain
-		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
+		{ "NF", 3+3,  3, NF_write, NF_read }, // spectrum noise floor. 3 digit number
+		{ "NR", 3,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
 		{ "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD
@@ -336,6 +339,18 @@ char *MG_read(  char* cmd ){
   	return obuf;
 }
 
+// spectrumNoiseFloor
+char *NF_write( char* cmd ){
+	int nf = atoi( &cmd[2] );
+	Debug(nf);
+	ED.spectrumNoiseFloor = nf;
+  	return empty_string_p;
+}
+
+char *NF_read(  char* cmd ){
+  	sprintf( obuf, "NF%03d;", ED.spectrumNoiseFloor );
+  	return obuf;
+}
 
 char *NR_write( char* cmd ){
   	if( cmd[ 2 ] == '0' ){
@@ -468,6 +483,7 @@ char *ED_read(  char* cmd  ){
 	Serial.print("nrOptionSelect:    "); Serial.println(ED.nrOptionSelect);
 	Serial.print("ANR_notchOn:       "); Serial.println(ED.ANR_notchOn);
 	Serial.print("spectrumScale:     "); Serial.println(ED.spectrumScale);
+	Serial.print("spectrumNoiseFloor:"); Serial.println(ED.spectrumNoiseFloor);
 	Serial.print("spectrum_zoom:     "); Serial.println(ED.spectrum_zoom);
 	Serial.print("CWFilterIndex:     "); Serial.println(ED.CWFilterIndex);
 	Serial.print("CWToneIndex:       "); Serial.println(ED.CWToneIndex);
