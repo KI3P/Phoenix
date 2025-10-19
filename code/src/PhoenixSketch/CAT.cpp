@@ -24,6 +24,7 @@ char* AG_read(  char* cmd );
 char* AG_write( char* cmd );
 char *BU_write( char* cmd );
 char *BD_write( char* cmd );
+char *DB_write( char* cmd );
 char *FA_write( char* cmd );
 char *FA_read(  char* cmd );
 char *FB_write( char* cmd );
@@ -66,12 +67,13 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 20
+#define NUM_SUPPORTED_COMMANDS 21
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
 		{ "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
 		{ "BU", 3,  0, BU_write, unsupported_cmd }, //band up
+		{ "DB", 3+4,3, DB_write, unsupported_cmd }, //dBm calibration
 		{ "FA", 14, 3, FA_write, FA_read },  //VFO A
 		{ "FB", 14, 3, FB_write, FB_read },  //VFO B
 		{ "FR", 14, 3, FR_write, FR_read }, //RECEIVE VFO
@@ -131,6 +133,12 @@ char *BD_write( char* cmd ){
 	SetButton(BAND_DN);
 	SetInterrupt(iBUTTON_PRESSED);
   	return empty_string_p;
+}
+
+char *DB_write( char* cmd  ){
+  	ED.dbm_calibration = ( float32_t ) atof( &cmd[2] );
+	Debug(ED.dbm_calibration);
+	return empty_string_p;
 }
 
 void set_vfo(int64_t freq, uint8_t vfo){

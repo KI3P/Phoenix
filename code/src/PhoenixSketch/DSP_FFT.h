@@ -2,6 +2,7 @@
 #define FFT_H
 #include "SDT.h"
 
+float32_t GetAudioPowerMax(void);
 float32_t log10f_fast(float32_t X);
 void CalcPSD512(float32_t *real, float32_t *imag);
 void FreqShiftFs4(DataBlock *data);

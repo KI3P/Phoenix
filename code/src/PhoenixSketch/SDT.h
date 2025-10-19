@@ -188,6 +188,7 @@ extern struct config_t {
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
     int32_t currentMicGain = -10;
+    float32_t dbm_calibration = 17.5;
     float32_t powerOutCW[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5};
     float32_t powerOutSSB[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5};
     float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1};

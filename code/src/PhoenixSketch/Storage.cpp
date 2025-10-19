@@ -65,6 +65,7 @@ void SaveDataToStorage(void){
     }
 
     doc["currentMicGain"] = ED.currentMicGain;
+    doc["dbm_calibration"] = ED.dbm_calibration;
 
     // Band-specific arrays
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
@@ -258,6 +259,7 @@ void RestoreDataFromStorage(void){
     }
 
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
+    ED.dbm_calibration = doc["dbm_calibration"] | ED.dbm_calibration;
 
     // Restore band-specific arrays
     if (doc["powerOutCW"].is<JsonArray>()) {

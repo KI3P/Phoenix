@@ -49,6 +49,7 @@ const uint16_t gradient[] = {  // Color array for waterfall background
 };
 
 static bool redrawSpectrum = false;
+static float32_t audioMaxSquaredAve = 0;
 
 int64_t GetCenterFreq_Hz(){
     if (ED.spectrum_zoom == 0)
@@ -115,7 +116,7 @@ Pane PaneStateOfHealth={5,445,260,30,DrawStateOfHealthPane,1};
 Pane PaneTime =        {270,445,260,30,DrawTimePane,1};
 Pane PaneSWR =         {535,15,150,40,DrawSWRPane,1};
 Pane PaneTXRXStatus =  {710,20,60,30,DrawTXRXStatusPane,1};
-Pane PaneSMeter =      {535,60,260,50,DrawSMeterPane,1};
+Pane PaneSMeter =      {515,60,260,50,DrawSMeterPane,1};
 Pane PaneAudioSpectrum={535,115,260,150,DrawAudioSpectrumPane,1};
 Pane PaneSettings =    {535,270,260,170,DrawSettingsPane,1};
 Pane PaneNameBadge =   {535,445,260,30,DrawNameBadgePane,1};
@@ -393,22 +394,13 @@ void ShowBandwidth() {
     int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2; // 257
     int pos_left;
     float32_t pixel_per_khz;
-    float32_t spectrum_pos_centre_f;
-
-    if (ED.spectrum_zoom != SPECTRUM_ZOOM_1)
-        spectrum_pos_centre_f = 128 * xExpand - 1;
-    else
-        spectrum_pos_centre_f = 64 * xExpand;
 
     pixel_per_khz = 0.0055652173913043;  // Al: I factored this constant: 512/92000;
-    //pixel_per_khz = ((1 << spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate) ;
     pos_left = centerLine + ((int)(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz / 1000.0 * pixel_per_khz));
     if (pos_left < spectrum_x) {
         pos_left = spectrum_x;
     }
 
-    // Need to add in code for zoom factor here
-    uint16_t filterWidthX = pos_left + newCursorPosition - centerLine;
     tft.writeTo(L2);
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
@@ -516,6 +508,43 @@ FASTRUN int16_t pixelnew(uint32_t i){
     else 
         return 220;
 }
+#define TCVSDR_SMETER
+#define SMETER_X PaneSMeter.x0+20
+#define SMETER_Y PaneSMeter.y0+24
+#define SMETER_BAR_LENGTH 180
+#define SMETER_BAR_HEIGHT 18
+uint16_t pixels_per_s = 12;
+void DisplaydbM() {
+    char buff[10];
+    int16_t smeterPad;
+    const float32_t slope = 10.0;
+    const float32_t cons = -92;
+    float32_t dbm;
+
+    tft.fillRect(SMETER_X + 1, SMETER_Y + 1, SMETER_BAR_LENGTH, SMETER_BAR_HEIGHT, RA8875_BLACK);  // Erase old bar
+    // dbm_calibration set to 22 in SDT.ino; gainCorrection is a value between -2 and +6 to compensate the frequency dependant pre-Amp gain
+    // RFgain is initialized to 1 in the bands[] init; cons=-92; slope=10
+    dbm = ED.dbm_calibration + bands[ED.currentBand[ED.activeVFO]].gainCorrection 
+            + slope * log10f_fast(audioMaxSquaredAve) + cons 
+            - (float32_t)bands[ED.currentBand[ED.activeVFO]].RFgain_dB * 1.5 
+            - ED.rfGainAllBands_dB;
+    dbm = dbm + ED.RAtten[ED.currentBand[ED.activeVFO]] - 31.0;  // input RF attenuator and PSA-8+ amplifier
+
+    // determine length of S-meter bar, limit it to the box and draw it
+    smeterPad = map(dbm, -73.0 - 9 * 6.0 /*S1*/, -73.0 /*S9*/, 0, 9 * pixels_per_s);
+    // make sure that it does not extend beyond the field
+    smeterPad = max(0, smeterPad);
+    smeterPad = min(SMETER_BAR_LENGTH, smeterPad);
+    tft.fillRect(SMETER_X + 1, SMETER_Y + 2, smeterPad, SMETER_BAR_HEIGHT - 2, RA8875_RED);  //bar 2*1 pixel smaller than the field
+
+    tft.setFontDefault();
+    tft.setTextColor(RA8875_WHITE);
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.fillRect(SMETER_X + 185, SMETER_Y, 80, tft.getFontHeight(), RA8875_BLACK);  // The dB figure at end of S
+    sprintf(buff,"%2.1fdBm",dbm);
+    tft.setCursor(SMETER_X + 184, SMETER_Y);
+    tft.print(buff);
+}
 
 uint16_t pixelold[MAX_WATERFALL_WIDTH];
 uint16_t waterfall[MAX_WATERFALL_WIDTH];
@@ -555,42 +584,36 @@ void ShowSpectrum(void){
         if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
         // Prevent spectrum from going above the top of the spectrum area
         if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
-        /*if (x1 > 188 && x1 < 330) {
-            if (y_new_plot < 120) y_new_plot = 120;
-            if (y1_new_plot < 120) y1_new_plot = 120;
-            if (y_old_plot < 120) y_old_plot = 120;
-            if (y_old2_plot < 120) y_old2_plot = 120;
-        }*/
+
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_prev, SPECTRUM_LEFT_X+x1, pixelold[x1], RA8875_BLACK);   // Erase the old spectrum
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
         y_prev = pixelold[x1]; 
         pixelold[x1] = y_current;
         x1++;
-        
-        ////////////////////////////////
         // Audio spectrum
         if (x1 < 128) {
             tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
-            //tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+1, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
             if (audioYPixel[x1] != 0) {
-                if (audioYPixel[x1] > CLIP_AUDIO_PEAK)  // audioSpectrumHeight = 118
+                if (audioYPixel[x1] > CLIP_AUDIO_PEAK)
                     audioYPixel[x1] = CLIP_AUDIO_PEAK;
                 if (x1 == middleSlice) {
                     smeterLength = y_current;
                 }
                 tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
-                //tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+1, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
             }
         }
-        
-        ////////////////////////////////
-
-        int test1 = -y_current + 230;  // Nudged waterfall towards blue.  KF5N July 23, 2023
+        if (x1 == 128){
+            // Draw the S-meter bar
+            // Running averaged values
+            audioMaxSquaredAve = .5 * GetAudioPowerMax() + .5 * audioMaxSquaredAve;
+            DisplaydbM();
+        }
+        int test1 = -y_current + 230;
         if (test1 < 0)
             test1 = 0;
         if (test1 > 117)
             test1 = 117;
-        waterfall[x1] = gradient[test1];  // Try to put pixel values in middle of gradient array.  KF5N
+        waterfall[x1] = gradient[test1];
     }
     if (x1 >= MAX_WATERFALL_WIDTH){
         x1 = 0;
@@ -830,12 +853,6 @@ void DrawTXRXStatusPane(void) {
     PaneTXRXStatus.stale = false;
 }
 
-
-uint16_t SMETER_X = PaneSMeter.x0+20;
-uint16_t SMETER_Y = PaneSMeter.y0+24;
-uint16_t SMETER_BAR_HEIGHT = 18;
-uint16_t SMETER_BAR_LENGTH = 180;
-uint16_t pixels_per_s = 12;
 void DrawSMeterContainer(void) {
     int32_t i;
     tft.setFontDefault();
@@ -884,12 +901,8 @@ void DrawSMeterPane(void) {
     if (!PaneSMeter.stale) return;
     tft.setFontDefault();
     // Black out the prior data
-    tft.fillRect(PaneSMeter.x0, PaneSMeter.y0, PaneSMeter.width, PaneSMeter.height, RA8875_BLACK);
-    // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneSMeter.x0, PaneSMeter.y0, PaneSMeter.width, PaneSMeter.height, RA8875_YELLOW);
-    
+    tft.fillRect(PaneSMeter.x0, PaneSMeter.y0, PaneSMeter.width, PaneSMeter.height, RA8875_BLACK);  
     DrawSMeterContainer();
-
     // Mark the pane as no longer stale
     PaneSMeter.stale = false;
 }

@@ -13,6 +13,7 @@ static float32_t DMAMEM FFT_ring_buffer_x[SPECTRUM_RES];
 static float32_t DMAMEM FFT_ring_buffer_y[SPECTRUM_RES];
 static uint32_t zoom_sample_ptr; /** Tracks the current position in the ring buffers */
 static uint32_t iFSF;
+static float32_t audioPowerMax;
 
 // These coefficients were derived by measurement, but they are approximately given by
 // (float32_t)(1 << spectrum_zoom) * (0.5/((float32_t)(1<<spectrum_zoom))^2.3 + 0.5)
@@ -25,6 +26,10 @@ extern float32_t* mag_coeffs[]; // in FIR.cpp
 // used by the unit tests
 float32_t * GetFilteredBufferAddress(void){
     return iFFT_buffer;
+}
+
+float32_t GetAudioPowerMax(void){
+    return audioPowerMax;
 }
 
 /**
@@ -513,6 +518,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     // So we have 512 / 4 = 128 bins to save and plot
     // Positive frequencies are from bin 1 to bin 129 in iFFT_buffer
     // Negative frequencies are from bin 1023 to 895 in iFFT_buffer
+    audioPowerMax = -1.0;
     for (size_t k = 0; k < FFT_LENGTH/4; k++){
         float32_t psq;
         switch (ED.modulation[ED.activeVFO]){
@@ -523,6 +529,8 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
                 psq = iFFT_buffer[1+(2*k)] * iFFT_buffer[1+(2*k)] + iFFT_buffer[1+(2*k+1)] * iFFT_buffer[1+(2*k+1)];
                 break;           
         }
+        if (psq > audioPowerMax) 
+            audioPowerMax = psq;
         audioYPixel[k] = 50 + map(15 * log10f(psq), 0, 100, 0, 120);
         if (audioYPixel[k] < 0)
             audioYPixel[k] = 0;
