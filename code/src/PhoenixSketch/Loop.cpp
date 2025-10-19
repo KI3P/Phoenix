@@ -480,12 +480,12 @@ void ConsumeInterrupt(void){
                 break;
             }
             case (iFILTER_INCREASE):{
-                FilterSetSSB(1);
+                FilterSetSSB(5);
                 Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
                         + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );            break;
             }
             case (iFILTER_DECREASE):{
-                FilterSetSSB(-1);
+                FilterSetSSB(-5);
                 Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
                         + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
                 break;

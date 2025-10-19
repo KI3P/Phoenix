@@ -305,6 +305,7 @@ const uint16_t WATERFALL_LEFT_X = SPECTRUM_LEFT_X;
 const uint16_t WATERFALL_TOP_Y = (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT + 5);
 const uint16_t FIRST_WATERFALL_LINE = (WATERFALL_TOP_Y + 20); // 255 + 35 = 290
 const uint16_t MAX_WATERFALL_ROWS = 170;   // Waterfall rows
+#define AUDIO_SPECTRUM_BOTTOM (PaneAudioSpectrum.y0+PaneAudioSpectrum.height-30)
 float xExpand = 1.4;
 uint16_t spectrum_x = 10;
 
@@ -411,6 +412,10 @@ void ShowBandwidth() {
     tft.writeTo(L2);
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
+
+    tft.setCursor(PaneSpectrum.x0+5, FILTER_PARAMETERS_Y);
+    tft.fillRect(PaneSpectrum.x0+5,FILTER_PARAMETERS_Y,8*tft.getFontWidth(),tft.getFontHeight(),RA8875_BLACK);
+    tft.print(displayScale[ED.spectrumScale].dbText);
 
     sprintf(buff,"%2.1fkHz",(float32_t)(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz / 1000.0f));
     tft.setCursor(FILTER_PARAMETERS_X, FILTER_PARAMETERS_Y);
@@ -519,7 +524,9 @@ static int16_t y_left;
 static int16_t y_prev = pixelold[0];
 static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
 static int16_t y_current = offset;
+static int16_t smeterLength;
 #define NCHUNKS 4
+#define CLIP_AUDIO_PEAK 115  // The pixel value where audio peak overwrites S-meter
 
 FASTRUN  // Place in tightly-coupled memory
          /*****
@@ -538,10 +545,8 @@ FASTRUN  // Place in tightly-coupled memory
 *****/
 void ShowSpectrum(void){
     Flag(2);
-    //int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
-    //int middleSlice = centerLine / 2;  // Approximate center element
-    //int filterLoPositionMarker;
-    //int filterHiPositionMarker;
+    int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+    int16_t middleSlice = centerLine / 2;  // Approximate center element
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);
     for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
         y_left = y_current; // use the value we calculated the last time through this loop
@@ -561,42 +566,24 @@ void ShowSpectrum(void){
         y_prev = pixelold[x1]; 
         pixelold[x1] = y_current;
         x1++;
-
-        //  What is the actual spectrum at this time?  It's a combination of the old and new spectrums.
-        //  In the case of a CW interrupt, the array pixelnew should be saved as the actual spectrum.
-        //pixelCurrent[x1] = pixelnew[x1];  //  This is the actual "old" spectrum!  This is required due to CW interrupts.  pixelCurrent gets copied to pixelold by the FFT function.  KF5N
-
-        /*
+        
+        ////////////////////////////////
         // Audio spectrum
-        if (x1 < 253) {                                                                             //AFP 09-01-22
-            //        tft.drawFastVLine(BAND_INDICATOR_X - 8 + x1, SPECTRUM_BOTTOM - 116, 115, RA8875_BLACK);  //AFP Erase old AUDIO spectrum line 247-116=
-            tft.drawFastVLine(532 + x1, 131, 115, RA8875_BLACK);                                    // 540 - 8 = 532
+        if (x1 < 128) {
+            tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
+            //tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+1, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
             if (audioYPixel[x1] != 0) {
                 if (audioYPixel[x1] > CLIP_AUDIO_PEAK)  // audioSpectrumHeight = 118
                     audioYPixel[x1] = CLIP_AUDIO_PEAK;
                 if (x1 == middleSlice) {
-                    smeterLength = y_new;
+                    smeterLength = y_current;
                 }
-                tft.drawFastVLine(532 + x1, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);  //AFP draw new AUDIO spectrum line
+                tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
+                //tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+1, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
             }
-            tft.drawFastHLine(SPECTRUM_LEFT_X - 1, SPECTRUM_TOP_Y + SPECTRUM_HEIGHT, MAX_WATERFALL_WIDTH, RA8875_YELLOW);
-            // The following lines calculate the position of the Filter bar below the spectrum display
-            // and then draw the Audio spectrum in its own container to the right of the Main spectrum display
-
-            filterLoPositionMarker = map(bands[currentBand].FLoCut, 0, 6000, 0, 256);
-            filterHiPositionMarker = map(bands[currentBand].FHiCut, 0, 6000, 0, 256);
-            //Draw Fiter indicator lines on audio plot AFP 10-30-22
-            //        tft.drawLine(BAND_INDICATOR_X - 6 + abs(filterLoPositionMarker), SPECTRUM_BOTTOM - 3, BAND_INDICATOR_X - 6 + abs(filterLoPositionMarker), SPECTRUM_BOTTOM - 112, RA8875_LIGHT_GREY);
-            //        tft.drawLine(BAND_INDICATOR_X - 7 + abs(filterHiPositionMarker), SPECTRUM_BOTTOM - 3, BAND_INDICATOR_X - 7 + abs(filterHiPositionMarker), SPECTRUM_BOTTOM - 112, RA8875_LIGHT_GREY);
-            tft.drawLine(534 + abs(filterLoPositionMarker), SPECTRUM_BOTTOM - 3, 534 + abs(filterLoPositionMarker), SPECTRUM_BOTTOM - 112, RA8875_LIGHT_GREY);
-            tft.drawLine(533 + abs(filterHiPositionMarker), SPECTRUM_BOTTOM - 3, 533 + abs(filterHiPositionMarker), SPECTRUM_BOTTOM - 112, RA8875_LIGHT_GREY);
-
-            if (filterLoPositionMarker != filterLoPositionMarkerOld || filterHiPositionMarker != filterHiPositionMarkerOld) {
-                DrawBandWidthIndicatorBar();
-            }
-            filterLoPositionMarkerOld = filterLoPositionMarker;
-            filterHiPositionMarkerOld = filterHiPositionMarker;
-        }*/
+        }
+        
+        ////////////////////////////////
 
         int test1 = -y_current + 230;  // Nudged waterfall towards blue.  KF5N July 23, 2023
         if (test1 < 0)
@@ -907,19 +894,47 @@ void DrawSMeterPane(void) {
     PaneSMeter.stale = false;
 }
 
+int32_t ohi = 0;
+int32_t olo = 0;
+void DrawAudioSpectContainer() {
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(RA8875_WHITE);
+    tft.drawRect(PaneAudioSpectrum.x0, PaneAudioSpectrum.y0, PaneAudioSpectrum.width, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0, RA8875_GREEN);
+    for (int k = 0; k < 6; k++) {
+        tft.drawFastVLine(PaneAudioSpectrum.x0 + k * 43.8, AUDIO_SPECTRUM_BOTTOM, 15, RA8875_GREEN);
+        tft.setCursor(PaneAudioSpectrum.x0 - 4 + k * 43.8, AUDIO_SPECTRUM_BOTTOM + 16);
+        tft.print(k);
+        tft.print("k");
+    }
+    tft.writeTo(L2);
+    // erase the old lines
+    int16_t fLo = map(olo, 0, 6000, 0, 256);
+    int16_t fHi = map(ohi, 0, 6000, 0, 256);
+    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(fLo), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
+    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(fHi), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
+
+    // The following lines calculate the position of the Filter bar below the spectrum display
+    // and then draw the Audio spectrum in its own container to the right of the Main spectrum display
+    int16_t filterLoPositionMarker = map(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, 0, 6000, 0, 256);
+    int16_t filterHiPositionMarker = map(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz, 0, 6000, 0, 256);
+    // Draw Filter indicator lines on audio plot
+    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterLoPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
+    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
+    tft.writeTo(L1);
+}
+
 void DrawAudioSpectrumPane(void) {
     // Only update if information is stale
+    if ((ohi != bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) ||
+        (olo != bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz))
+        PaneAudioSpectrum.stale = true;
     if (!PaneAudioSpectrum.stale) return;
-    tft.setFontDefault();
-    // Black out the prior data
+     // Black out the prior data
     tft.fillRect(PaneAudioSpectrum.x0, PaneAudioSpectrum.y0, PaneAudioSpectrum.width, PaneAudioSpectrum.height, RA8875_BLACK);
-    // Draw a box around the borders and put some text in the middle
-    tft.drawRect(PaneAudioSpectrum.x0, PaneAudioSpectrum.y0, PaneAudioSpectrum.width, PaneAudioSpectrum.height, RA8875_YELLOW);
-    // Put some text in it
-    tft.setFontScale((enum RA8875tsize)1);
-    tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneAudioSpectrum.x0, PaneAudioSpectrum.y0);
-    tft.print("Audio Spectrum");
+    DrawAudioSpectContainer();
+    ohi = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+    olo = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
     // Mark the pane as no longer stale
     PaneAudioSpectrum.stale = false;
 }

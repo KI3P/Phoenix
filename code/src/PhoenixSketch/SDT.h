@@ -497,6 +497,7 @@ extern bool CWLocked;
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t psdold[]; /** Holds the prior PSD data for the power spectrum display */
+extern float32_t audioYPixel[];
 extern AudioRecordQueue Q_in_L;
 extern AudioRecordQueue Q_in_R;
 extern AudioPlayQueue Q_out_L;

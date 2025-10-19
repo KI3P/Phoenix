@@ -504,6 +504,30 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     // filtering. Complex multiply filter mask with the frequency domain audio data.
     arm_cmplx_mult_cmplx_f32(buffer_spec_FFT, FIR_filter_mask, iFFT_buffer, FFT_LENGTH);
     
+    // Save the audio spectrum
+    // The sampled band is notionally -12,000 Hz to +12,000 Hz. 192khz / 8 = 24ksps
+    // The number of samples in I and Q are each 2048 / 8 = 256. We buffer multiple
+    // blocks of samples to get FFTs that are 512 samples long.
+    // The bandwidth of each frequency bin is 24000/512 = 46.875 Hz
+    // We want to display DC to 6 kHz, which 1/4 of the total bandwidth
+    // So we have 512 / 4 = 128 bins to save and plot
+    // Positive frequencies are from bin 1 to bin 129 in iFFT_buffer
+    // Negative frequencies are from bin 1023 to 895 in iFFT_buffer
+    for (size_t k = 0; k < FFT_LENGTH/4; k++){
+        float32_t psq;
+        switch (ED.modulation[ED.activeVFO]){
+            case LSB:
+                psq = iFFT_buffer[1023-(2*k)] * iFFT_buffer[1023-(2*k)] + iFFT_buffer[1023-(2*k+1)] * iFFT_buffer[1023-(2*k+1)];
+                break;
+            default: // USB, SAM, AM, etc
+                psq = iFFT_buffer[1+(2*k)] * iFFT_buffer[1+(2*k)] + iFFT_buffer[1+(2*k+1)] * iFFT_buffer[1+(2*k+1)];
+                break;           
+        }
+        audioYPixel[k] = 50 + map(15 * log10f(psq), 0, 100, 0, 120);
+        if (audioYPixel[k] < 0)
+            audioYPixel[k] = 0;
+    }
+
     // After the frequency domain filter mask and other processes are complete, do a
     // complex inverse FFT to return to the time domain (if sample rate = 192kHz, 
     // we are in 24ksps now, because we decimated by 8)
