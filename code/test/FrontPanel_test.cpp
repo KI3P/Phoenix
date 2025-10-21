@@ -153,8 +153,8 @@ TEST(FrontPanel, FilterDecrease){
     int32_t maxpre = FindMax("FilterDecrease_ReceiveOut_L.txt", 2048*4);
 
     // Decrease filter by 2500 Hz to cut off 2 kHz tone. It goes in steps
-    // of 10 each time, and is 3000 Hz at the start. So do this 250 times.
-    for (size_t k = 0; k < 250; k++){
+    // of 50 each time, and is 3000 Hz at the start. So do this 50 times.
+    for (size_t k = 0; k < 50; k++){
         SetInterrupt(iFILTER_DECREASE);
         loop();
     }
@@ -287,23 +287,32 @@ TEST(FrontPanel, FineTuneLimits){
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ED.spectrum_zoom = 1;
+    ED.modulation[ED.activeVFO] = LSB;
     InitializeSignalProcessing();
 
     uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << ED.spectrum_zoom);
     int32_t upper_limit = (int32_t)visible_bandwidth/2;
     int32_t lower_limit = -(int32_t)visible_bandwidth/2;
 
+    // since we have LSB
+    lower_limit -= bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz; // FLoCut_Hz is negative
+
+    // The AdjustFineTune function negates the limits when clamping (see Tune.cpp:80-83)
+    // So the actual fineTuneFreq_Hz limits are negated versions of the calculated limits
+    int32_t actual_upper_limit = -lower_limit;  // When going high, gets clamped to -lower_limit
+    int32_t actual_lower_limit = -upper_limit;  // When going low, gets clamped to -upper_limit
+
     // Test upper limit
-    ED.fineTuneFreq_Hz[ED.activeVFO] = upper_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = actual_upper_limit;
     SetInterrupt(iFINETUNE_INCREASE);
     loop();
-    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], upper_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], actual_upper_limit);
 
     // Test lower limit
-    ED.fineTuneFreq_Hz[ED.activeVFO] = lower_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = actual_lower_limit;
     SetInterrupt(iFINETUNE_DECREASE);
     loop();
-    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], lower_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], actual_lower_limit);
 }
 
 TEST(FrontPanel, FineTuneLimitsNoZoom){
@@ -312,22 +321,41 @@ TEST(FrontPanel, FineTuneLimitsNoZoom){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    ED.spectrum_zoom = 0; 
+    ED.spectrum_zoom = 0;
     InitializeSignalProcessing();
 
     uint32_t visible_bandwidth = SR[SampleRate].rate / (1 << ED.spectrum_zoom);
     int32_t upper_limit = (int32_t)visible_bandwidth/2;
     int32_t lower_limit = -(int32_t)visible_bandwidth/2;
 
+    // Even when zoom is 0, the modulation-based filter adjustments are applied (Tune.cpp:60-77)
+    // We need to account for the current modulation's filter settings
+    switch (ED.modulation[ED.activeVFO]){
+        case LSB:
+            lower_limit -= bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz; // FLoCut_Hz is negative
+            break;
+        case USB:
+            upper_limit -= bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            break;
+        default:
+            // For other modes, symmetric adjustment would be applied
+            break;
+    }
+
+    // The AdjustFineTune function negates the limits when clamping (see Tune.cpp:80-83)
+    // So the actual fineTuneFreq_Hz limits are negated versions of the calculated limits
+    int32_t actual_upper_limit = -lower_limit;  // When going high, gets clamped to -lower_limit
+    int32_t actual_lower_limit = -upper_limit;  // When going low, gets clamped to -upper_limit
+
     // Test upper limit
-    ED.fineTuneFreq_Hz[ED.activeVFO] = upper_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = actual_upper_limit;
     SetInterrupt(iFINETUNE_INCREASE);
     loop();
-    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], upper_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], actual_upper_limit);
 
     // Test lower limit
-    ED.fineTuneFreq_Hz[ED.activeVFO] = lower_limit;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = actual_lower_limit;
     SetInterrupt(iFINETUNE_DECREASE);
     loop();
-    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], lower_limit);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], actual_lower_limit);
 }

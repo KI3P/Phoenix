@@ -24,6 +24,14 @@ RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
 #define NUMBER_OF_PANES 12
 #define SPECTRUM_REFRESH_MS 200
 
+struct dispSc {
+    const char *dbText;
+    float32_t dBScale;
+    uint16_t pixelsPerDB;
+    uint16_t baseOffset;
+    float32_t offsetIncrement;
+};
+
 struct dispSc displayScale[] = // *dbText,dBScale, pixelsPerDB, baseOffset, offsetIncrement
     {
         { "20 dB/", 10.0, 2, 24, 1.00 },
@@ -111,7 +119,6 @@ Pane PaneVFOA =        {5,5,280,50,DrawVFOPanes,1};
 Pane PaneVFOB =        {300,5,220,40,DrawVFOPanes,1};
 Pane PaneFreqBandMod = {5,60,310,30,DrawFreqBandModPane,1};
 Pane PaneSpectrum =    {5,95,520,345,DrawSpectrumPane,1};
-//Pane PaneWaterfall =   {5,270,520,170,DrawWaterfallPane,1};
 Pane PaneStateOfHealth={5,445,260,30,DrawStateOfHealthPane,1};
 Pane PaneTime =        {270,445,260,30,DrawTimePane,1};
 Pane PaneSWR =         {535,15,150,40,DrawSWRPane,1};
@@ -122,12 +129,12 @@ Pane PaneSettings =    {535,270,260,170,DrawSettingsPane,1};
 Pane PaneNameBadge =   {535,445,260,30,DrawNameBadgePane,1};
 
 
-// An array of all the panes, useful for iterating over
-Pane WindowPanes[NUMBER_OF_PANES] = {PaneVFOA,PaneVFOB,PaneFreqBandMod,
-                                    PaneSpectrum,PaneStateOfHealth,
-                                    PaneTime,PaneSWR,PaneTXRXStatus,
-                                    PaneSMeter,PaneAudioSpectrum,PaneSettings,
-                                    PaneNameBadge};
+// An array of pointers to all the panes, useful for iterating over
+Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMod,
+                                    &PaneSpectrum,&PaneStateOfHealth,
+                                    &PaneTime,&PaneSWR,&PaneTXRXStatus,
+                                    &PaneSMeter,&PaneAudioSpectrum,&PaneSettings,
+                                    &PaneNameBadge};
 
 void FormatFrequency(long freq, char *freqBuffer) {
     if (freq >= 1000000) {
@@ -144,10 +151,11 @@ static uint8_t activeVFO_old = 10; // invalid at init, force a screen update
  */
 void DrawVFOPanes(void) {
     int64_t TxRxFreq = GetTXRXFreq_dHz()/100;
-    if ((TxRxFreq == TxRxFreq_old) && (ED.activeVFO == activeVFO_old))
+    if ((TxRxFreq == TxRxFreq_old) && (ED.activeVFO == activeVFO_old) && 
+        (!PaneVFOA.stale) && (!PaneVFOB.stale))
         return; // don't update
     // Which VFO needs to be updated?
-    if (ED.activeVFO != activeVFO_old){ // both!
+    if ((ED.activeVFO != activeVFO_old) || (PaneSettings.stale)){ // both!
         PaneVFOA.stale = 1;
         PaneVFOB.stale = 1;
     } else {
@@ -1006,10 +1014,10 @@ void UpdateVolumeSetting(void) {
     }
     bool redrawFunction = true;
     bool redrawValue = true;
-    if (volumeFunction == oldVolumeFunction){
+    if ((volumeFunction == oldVolumeFunction) && (!PaneSettings.stale)){
         redrawFunction = false;
         // has the value changed?
-        if (value == oldVolumeSetting){
+        if ((value == oldVolumeSetting) && (!PaneSettings.stale)){
             redrawValue = false;
         }
     }
@@ -1052,7 +1060,8 @@ void UpdateVolumeSetting(void) {
 
 AGCMode oldAGC = AGCInvalid;
 void UpdateAGCSetting(void){
-    if (oldAGC == ED.agc) return;
+    if ((oldAGC == ED.agc) && (!PaneSettings.stale))
+        return;
     oldAGC = ED.agc;
 
     tft.setFontScale((enum RA8875tsize)1);
@@ -1090,7 +1099,7 @@ void UpdateAGCSetting(void){
 int32_t oldFreqIncrement = 0;
 int64_t oldStepFineTune = 0;
 void UpdateIncrementSetting(void) {
-    if (oldFreqIncrement != ED.freqIncrement){
+    if ((oldFreqIncrement != ED.freqIncrement) || (PaneSettings.stale)){
         tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
@@ -1102,7 +1111,7 @@ void UpdateIncrementSetting(void) {
         oldFreqIncrement = ED.freqIncrement;
     }
 
-    if (oldStepFineTune != ED.stepFineTune){
+    if ((oldStepFineTune != ED.stepFineTune) || (PaneSettings.stale)){
         tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
@@ -1118,7 +1127,8 @@ void UpdateIncrementSetting(void) {
 
 uint8_t oldANR_notchOn = 8;
 void UpdateAutonotchSetting(void){
-    if (ED.ANR_notchOn == oldANR_notchOn) return;
+    if ((ED.ANR_notchOn == oldANR_notchOn) && (!PaneSettings.stale))
+        return;
     oldANR_notchOn = ED.ANR_notchOn;
 
     tft.setFontScale((enum RA8875tsize)0);
@@ -1137,7 +1147,7 @@ void UpdateAutonotchSetting(void){
 float32_t oldRAtten = -70;
 float32_t oldTAtten = -70;
 void UpdateRFGainSetting(void){
-    if (oldRAtten != ED.RAtten[ED.currentBand[ED.activeVFO]]){
+    if ((oldRAtten != ED.RAtten[ED.currentBand[ED.activeVFO]]) || (PaneSettings.stale)){
         oldRAtten = ED.RAtten[ED.currentBand[ED.activeVFO]];
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[5];
@@ -1160,7 +1170,7 @@ void UpdateRFGainSetting(void){
             comp = oldTAtten;
             break;
     }
-    if (oldTAtten != comp){
+    if ((oldTAtten != comp) || (PaneSettings.stale)){
         oldTAtten = comp;
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[5];
@@ -1174,7 +1184,8 @@ void UpdateRFGainSetting(void){
 
 NoiseReductionType oldNR = NRInvalid;
 void UpdateNoiseSetting(void){
-    if (oldNR == ED.nrOptionSelect) return;
+    if ((oldNR == ED.nrOptionSelect) && (!PaneSettings.stale))
+        return;
     oldNR = ED.nrOptionSelect;
     tft.setFontScale((enum RA8875tsize)0);
     char valueText[9];
@@ -1204,7 +1215,8 @@ void UpdateNoiseSetting(void){
 
 uint32_t oldZoom = 10000;
 void UpdateZoomSetting(void){
-    if (oldZoom == ED.spectrum_zoom) return;
+    if ((oldZoom == ED.spectrum_zoom) && (!PaneSettings.stale))
+        return;
     oldZoom = ED.spectrum_zoom;
     tft.setFontScale((enum RA8875tsize)0);
     char valueText[4];
@@ -1218,7 +1230,8 @@ void UpdateZoomSetting(void){
 KeyTypeId oldKeyType = KeyTypeId_Invalid;
 int32_t oldWPM = -1;
 void UpdateKeyTypeSetting(void){
-    if ((oldKeyType == ED.keyType) && (oldWPM == ED.currentWPM)) return;
+    if ((oldKeyType == ED.keyType) && (oldWPM == ED.currentWPM) && (!PaneSettings.stale)) 
+        return;
     oldKeyType = ED.keyType;
     oldWPM = ED.currentWPM;
     tft.setFontScale((enum RA8875tsize)0);
@@ -1244,7 +1257,8 @@ void UpdateKeyTypeSetting(void){
 
 int32_t oldDecoderFlag = -1;
 void UpdateDecoderSetting(void){
-    if (oldDecoderFlag == ED.decoderFlag) return;
+    if ((oldDecoderFlag == ED.decoderFlag) && (!PaneSettings.stale)) 
+        return;
     oldDecoderFlag = ED.decoderFlag;
     tft.setFontScale((enum RA8875tsize)0);
     char valueText[4];
@@ -1261,7 +1275,8 @@ void UpdateDecoderSetting(void){
 
 float32_t oldrfGainAllBands_dB = -1000;
 void UpdateDSPGainSetting(void){
-    if (oldrfGainAllBands_dB == ED.rfGainAllBands_dB) return;
+    if ((oldrfGainAllBands_dB == ED.rfGainAllBands_dB) && (!PaneSettings.stale)) 
+        return;
     oldrfGainAllBands_dB = ED.rfGainAllBands_dB;
     tft.setFontScale((enum RA8875tsize)0);
     char valueText[5];
@@ -1274,7 +1289,8 @@ void UpdateDSPGainSetting(void){
 
 int32_t oldAntennaSelection = -1;
 void UpdateAntennaSetting(void){
-    if (oldAntennaSelection == ED.antennaSelection[ED.currentBand[ED.activeVFO]]) return;
+    if ((oldAntennaSelection == ED.antennaSelection[ED.currentBand[ED.activeVFO]]) && (!PaneSettings.stale)) 
+        return;
     oldAntennaSelection = ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     tft.setFontScale((enum RA8875tsize)0);
     char valueText[2];
@@ -1310,7 +1326,7 @@ void DrawSettingsPane(void) {
 
     if (PaneSettings.stale){
         // Draw a box around the borders
-        tft.drawRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_YELLOW);
+        tft.drawRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_WHITE);
         // Mark the pane as no longer stale
         PaneSettings.stale = false;
     }
@@ -1397,6 +1413,10 @@ static void DrawHome(){
         Debug("Clearing the screen upon entry to HOME state");
         tft.fillWindow();
         uiSM.vars.clearScreen = false;
+        // Mark all the panes as stale so that they're redrawn
+        for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+            WindowPanes[i]->stale = true;
+        }
     }
     // Trigger a redraw of some of the panes
     if (millis()-timer_ms > 1000) {
@@ -1412,8 +1432,41 @@ static void DrawHome(){
     }
     // Draw each of the panes
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
-        WindowPanes[i].DrawFunction();
+        WindowPanes[i]->DrawFunction();
     }
+}
+
+void DrawMainMenu(void){
+    // Only draw if we're on the MAIN_MENU screen
+    if (!(uiSM.state_id == UISm_StateId_MAIN_MENU)) return;
+    // Clear the screen whenever we enter this state from another one.
+    if (uiSM.vars.clearScreen){
+        Debug("Clearing the screen upon entry to MAIN_MENU state");
+        tft.writeTo(L2);
+        tft.fillWindow();
+        tft.writeTo(L1);
+        tft.fillWindow();        
+        uiSM.vars.clearScreen = false;
+    }
+    tft.setTextColor(RA8875_MAGENTA);
+    tft.setCursor(50, WINDOW_HEIGHT/ 10);
+    tft.setFontScale(2);
+    tft.print("Main menu");
+}
+
+void DrawSecondaryMenu(void){
+    // Only draw if we're on the SECONDARY_MENU screen
+    if (!(uiSM.state_id == UISm_StateId_SECONDARY_MENU)) return;
+    // Clear the screen whenever we enter this state from another one.
+    if (uiSM.vars.clearScreen){
+        Debug("Clearing the screen upon entry to SECONDARY_MENU state");
+        tft.fillWindow();
+        uiSM.vars.clearScreen = false;
+    }
+    tft.setTextColor(RA8875_MAGENTA);
+    tft.setCursor(50, WINDOW_HEIGHT/ 10);
+    tft.setFontScale(2);
+    tft.print("Secondary menu");
 }
 
 void InitializeDisplay(void){
@@ -1461,6 +1514,14 @@ void DrawDisplay(void){
         }
         case (UISm_StateId_HOME):{
             DrawHome();
+            break;
+        }
+        case (UISm_StateId_MAIN_MENU):{
+            DrawMainMenu();
+            break;
+        }
+        case (UISm_StateId_SECONDARY_MENU):{
+            DrawSecondaryMenu();
             break;
         }
         default:

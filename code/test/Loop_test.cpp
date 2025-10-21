@@ -1244,7 +1244,7 @@ TEST(Loop, ResetTuningButtonCallsResetFunction) {
     EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 0L);
 
     // Center frequency should be adjusted by the fine tune amount that was reset
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14201500L); // 14200000 + 1500
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14198500L); // 14200000 - 1500
 
     // RXTX frequency should remain the same
     EXPECT_EQ(GetTXRXFreq_dHz(), oldRXTX);
@@ -1324,7 +1324,7 @@ TEST(Loop, DemodulationButtonWorksWithDifferentVFO) {
     EXPECT_EQ(ED.modulation[ED.activeVFO], AM);
 
     // VFO A should remain unchanged
-    EXPECT_EQ(ED.modulation[0], LSB); // Assuming VFO A was initialized to LSB
+    EXPECT_EQ(ED.modulation[0], bands[ED.currentBand[1]].mode); // Assuming VFO A was initialized to LSB
 }
 
 TEST(Loop, DemodulationButtonViaInterruptHandling) {

@@ -214,8 +214,8 @@ TEST(RFBoard, GetTXRXFreq_dHz_Test) {
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_48K;
-    // Calculation is: 100 * (7074000 + 100 - 48000/4) = 100 * (7074100 - 12000) = 100 * 7062100 = 706210000
-    EXPECT_EQ(GetTXRXFreq_dHz(), 706210000);
+    // Calculation is: 100 * (7074000 - 100 - 48000/4) = 100 * (7073900 - 12000) = 100 * 7061900 = 706190000
+    EXPECT_EQ(GetTXRXFreq_dHz(), 706190000);
 }
 
 TEST(RFBoard, GetCWTXFreq_dHz_LSB_Test) {
@@ -224,9 +224,8 @@ TEST(RFBoard, GetCWTXFreq_dHz_LSB_Test) {
     SampleRate = SAMPLE_RATE_192K;
     ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
     ED.CWToneIndex = 3; // 750 Hz
-    // Calculation is: 100 * (7074000 + 100 - 192000/4) = 100 * (7074100 - 48000) = 702610000
-    // GetTXRXFreq_dHz() - 100 * 750 = 702610000 - 75000 = 702535000
-    EXPECT_EQ(GetCWTXFreq_dHz(), 702535000);
+    // Calculation is: 100 * (7074000 - 100 - 192000/4 - 750) 
+    EXPECT_EQ(GetCWTXFreq_dHz(), 702515000);
 }
 
 TEST(RFBoard, GetCWTXFreq_dHz_USB_Test) {
@@ -235,9 +234,8 @@ TEST(RFBoard, GetCWTXFreq_dHz_USB_Test) {
     SampleRate = SAMPLE_RATE_192K;
     ED.currentBand[ED.activeVFO] = BAND_20M; // USB
     ED.CWToneIndex = 3; // 750 Hz
-    // Calculation is: 100 * (14074000 + 100 - 48000) = 1402610000
-    // GetTXRXFreq_dHz() + 100 * 750 = 1402610000 + 75000 = 1402685000
-    EXPECT_EQ(GetCWTXFreq_dHz(), 1402685000);
+    // Calculation is: 100 * (14074000 - 100 - 48000 + 750)
+    EXPECT_EQ(GetCWTXFreq_dHz(), 1402665000);
 }
 
 TEST(RFBoard, SetFreq_Test) {
@@ -272,7 +270,8 @@ TEST(RFBoard, SetCWVFOFrequency_Test) {
     ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
     ED.CWToneIndex = 3; // 750 Hz
     SetCWVFOFrequency(GetCWTXFreq_dHz());
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702535000);
+    // Calculation is: 100 * (7074000 - 100 - 192000/4 - 750) 
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702515000);
 }
 
 TEST(RFBoard, EnableCWVFOOutput_Test) {

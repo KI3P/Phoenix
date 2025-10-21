@@ -167,9 +167,18 @@ void FilterSetSSB(int32_t filter_change) {
 void HandleButtonPress(int32_t button){
     switch (button){
         case MENU_OPTION_SELECT:{
+            // Issue SELECT interrupt to UI
+            UISm_dispatch_event(&uiSM,UISm_EventId_SELECT);
             break;
         }
         case MAIN_MENU_UP:{
+            // Bring up the main menu
+            UISm_dispatch_event(&uiSM,UISm_EventId_MENU);
+            break;
+        }
+        case HOME_SCREEN:{
+            // Go back to the home screen
+            UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
             break;
         }
         case BAND_UP:{

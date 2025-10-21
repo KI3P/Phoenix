@@ -252,6 +252,12 @@ void __enable_irq(void) {
     // Mock implementation - does nothing in test environment
 }
 
+long map(long value, long fromLow, long fromHigh, long toLow, long toHigh) {
+    // Arduino map function implementation
+    // Maps a value from one range to another
+    return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
+}
+
 
 #include <cstring>
 // A mock C++ class that mimics the Arduino String class

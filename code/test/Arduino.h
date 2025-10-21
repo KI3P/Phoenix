@@ -33,6 +33,19 @@ void delayMicroseconds(uint32_t usec);
 int64_t millis(void);
 uint32_t micros(void);
 void MyDelay(unsigned long millisWait);
+long map(long value, long fromLow, long fromHigh, long toLow, long toHigh);
+
+// Arduino min/max functions - using inline functions to avoid conflicts with std::
+// These will be available in the global namespace for Arduino compatibility
+template<typename T1, typename T2>
+inline auto min(T1 a, T2 b) -> decltype((a < b) ? a : b) {
+    return (a < b) ? a : b;
+}
+
+template<typename T1, typename T2>
+inline auto max(T1 a, T2 b) -> decltype((a > b) ? a : b) {
+    return (a > b) ? a : b;
+}
 
 // Mock elapsedMicros class (Teensy-specific)
 class elapsedMicros {
@@ -66,9 +79,9 @@ extern uint32_t mock_HW_OCOTP_ANA1;
 #define TEMPMON_TEMPSENSE0 mock_TEMPMON_TEMPSENSE0
 #define TEMPMON_TEMPSENSE1 mock_TEMPMON_TEMPSENSE1
 #define HW_OCOTP_ANA1 mock_HW_OCOTP_ANA1
-#define TMS0_POWER_DOWN_MASK 0x1
-#define TMS1_MEASURE_FREQ(x) (x)
-#define TEMPMON_ROOMTEMP 25
+//#define TMS0_POWER_DOWN_MASK 0x1
+//#define TMS1_MEASURE_FREQ(x) (x)
+//#define TEMPMON_ROOMTEMP 25
 
 #include <cstdio>
 #include <cstdlib>

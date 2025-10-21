@@ -634,14 +634,15 @@ TEST(CAT, FT_read_ReturnsTransmitFrequency) {
     ED.centerFreq_Hz[VFO_B] = 14074000L;
     ED.fineTuneFreq_Hz[VFO_B] = 100L;
     SampleRate = SAMPLE_RATE_48K;
-    
+
     char command[] = "FT;";
     char *result = FT_read(command);
-    
+
     // Expected: GetTXRXFreq_dHz()/100 formatted
-    // GetTXRXFreq_dHz() = 100 * (14074000 + 100 - 12000) = 1406210000
-    // /100 = 14062100
-    EXPECT_STREQ(result, "FT00014062100;");
+    // GetTXRXFreq_dHz() = 100 * (centerFreq - fineTuneFreq - rate/4) (see Tune.cpp:98)
+    // GetTXRXFreq_dHz() = 100 * (14074000 - 100 - 12000) = 1406190000
+    // /100 = 14061900
+    EXPECT_STREQ(result, "FT00014061900;");
 }
 
 TEST(CAT, FR_write_SetsActiveVFOReceiveFrequency) {
@@ -664,15 +665,16 @@ TEST(CAT, FR_read_ReturnsReceiveFrequency) {
     ED.centerFreq_Hz[VFO_A] = 7074000L;
     ED.fineTuneFreq_Hz[VFO_A] = 200L;
     SampleRate = SAMPLE_RATE_48K;
-    
+
     char command[] = "FR;";
     char *result = FR_read(command);
-    
+
     // Expected: GetTXRXFreq_dHz()/100 formatted
-    // GetTXRXFreq_dHz() = 100 * (7074000 + 200 - 12000) = 706220000
-    // /100 = 7062200
+    // GetTXRXFreq_dHz() = 100 * (centerFreq - fineTuneFreq - rate/4) (see Tune.cpp:98)
+    // GetTXRXFreq_dHz() = 100 * (7074000 - 200 - 12000) = 706180000
+    // /100 = 7061800
     // Note: The function seems to have a typo returning "FT" instead of "FR"
-    EXPECT_STREQ(result, "FT00007062200;");
+    EXPECT_STREQ(result, "FT00007061800;");
 }
 
 TEST(CAT, AG_write_SetsAudioVolume) {

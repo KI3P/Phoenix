@@ -277,6 +277,13 @@ void buffer_pretty_buffer_array(void) {
     Debug("==========================================");
 }
 
+void Flag(uint8_t val){
+    digitalWrite(31, (val >> 0) & 0b1);  //testcode
+    digitalWrite(30, (val >> 1) & 0b1);  //testcode
+    digitalWrite(29, (val >> 2) & 0b1);  //testcode
+    digitalWrite(28, (val >> 3) & 0b1);  //testcode
+}
+
 //////////////////////////////////////////////////
 // Related to temperate and load monitoring
 

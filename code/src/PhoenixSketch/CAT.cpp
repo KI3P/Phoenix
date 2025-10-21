@@ -83,7 +83,7 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "MD", 4,  3, MD_write, MD_read }, //operating mode, CW, USB etc
 		{ "MG", 6,  3, MG_write, MG_read }, // mike gain
 		{ "NF", 3+3,  3, NF_write, NF_read }, // spectrum noise floor. 3 digit number
-		{ "NR", 3,  3, NR_write, NR_read }, // Noise reduction function: 0=off
+		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
 		{ "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD

@@ -131,7 +131,7 @@ int64_t GetCWTXFreq_dHz(void){
  * the RXTX frequency remains the same.
  */
 void ResetTuning(void){
-    ED.centerFreq_Hz[ED.activeVFO] = ED.centerFreq_Hz[ED.activeVFO] + ED.fineTuneFreq_Hz[ED.activeVFO];
+    ED.centerFreq_Hz[ED.activeVFO] = ED.centerFreq_Hz[ED.activeVFO] - ED.fineTuneFreq_Hz[ED.activeVFO];
     ED.fineTuneFreq_Hz[ED.activeVFO] = 0.0;
     return;
 }
