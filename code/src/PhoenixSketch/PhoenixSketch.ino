@@ -84,7 +84,7 @@ void setup(void){
     // Start the mode state machines
     Serial.println("...Starting state machines");
     modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
-    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    UpdateDitLength();
     ModeSm_start(&modeSM);
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;

@@ -603,5 +603,6 @@ float32_t TGetTemp(void);
 void Flag(uint8_t val);
 
 void MyDelay(unsigned long millisWait);
+void UpdateDitLength(void);
 
 #endif // SDT_H

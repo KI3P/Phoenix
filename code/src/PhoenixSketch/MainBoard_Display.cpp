@@ -24,6 +24,10 @@ RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
 #define NUMBER_OF_PANES 12
 #define SPECTRUM_REFRESH_MS 200
 
+///////////////////////////////////////////////////////////////////////////////
+// HOME SCREEN SECTION
+///////////////////////////////////////////////////////////////////////////////
+
 struct dispSc {
     const char *dbText;
     float32_t dBScale;
@@ -1357,6 +1361,47 @@ void DrawNameBadgePane(void) {
     PaneNameBadge.stale = false;
 }
 
+uint32_t timer_ms = 0;
+uint32_t timerDisplay_ms = 0;
+static void DrawHome(){
+    // Only draw if we're on the HOME screen
+    if (!(uiSM.state_id == UISm_StateId_HOME)) return;
+    // Clear the screen whenever we enter this state from another one.
+    // When we enter the UISm_StateId_HOME state, clearScreen is set to true.
+    tft.writeTo(L1);
+    if (uiSM.vars.clearScreen){
+        Debug("Clearing the screen upon entry to HOME state");
+        tft.fillWindow();
+        uiSM.vars.clearScreen = false;
+        // Mark all the panes as stale so that they're redrawn
+        for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+            WindowPanes[i]->stale = true;
+        }
+    }
+    // Trigger a redraw of some of the panes
+    if (millis()-timer_ms > 1000) {
+        timer_ms = millis();
+        PaneStateOfHealth.stale = true;
+        PaneTime.stale = true;
+    }
+
+    if (millis()-timerDisplay_ms > SPECTRUM_REFRESH_MS) {
+        timerDisplay_ms = millis();
+        if (redrawSpectrum == false)
+            redrawSpectrum = true;
+    }
+    // Draw each of the panes
+    for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+        WindowPanes[i]->DrawFunction();
+    }
+}
+///////////////////////////////////////////////////////////////////////////////
+// END OF HOME SCREEN SECTION
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// START OF SPLASH SCREEN SECTION
+///////////////////////////////////////////////////////////////////////////////
 
 void drawArray(const uint32_t * image, uint32_t isize, uint16_t iwidth, uint16_t x, uint16_t y){
     uint16_t pixels[iwidth]; // container
@@ -1401,40 +1446,360 @@ static void DrawSplash(){
     //drawArray(phoenix_image, 65536, 256, 400-128, 480-256);
 }
 
-uint32_t timer_ms = 0;
-uint32_t timerDisplay_ms = 0;
-static void DrawHome(){
-    // Only draw if we're on the HOME screen
-    if (!(uiSM.state_id == UISm_StateId_HOME)) return;
-    // Clear the screen whenever we enter this state from another one.
-    // When we enter the UISm_StateId_HOME state, clearScreen is set to true.
-    tft.writeTo(L1);
-    if (uiSM.vars.clearScreen){
-        Debug("Clearing the screen upon entry to HOME state");
-        tft.fillWindow();
-        uiSM.vars.clearScreen = false;
-        // Mark all the panes as stale so that they're redrawn
-        for (size_t i = 0; i < NUMBER_OF_PANES; i++){
-            WindowPanes[i]->stale = true;
-        }
-    }
-    // Trigger a redraw of some of the panes
-    if (millis()-timer_ms > 1000) {
-        timer_ms = millis();
-        PaneStateOfHealth.stale = true;
-        PaneTime.stale = true;
-    }
+///////////////////////////////////////////////////////////////////////////////
+// END OF SPLASH SCREEN SECTION
+///////////////////////////////////////////////////////////////////////////////
 
-    if (millis()-timerDisplay_ms > SPECTRUM_REFRESH_MS) {
-        timerDisplay_ms = millis();
-        if (redrawSpectrum == false)
-            redrawSpectrum = true;
+///////////////////////////////////////////////////////////////////////////////
+// START OF MENU SCREENS SECTION
+///////////////////////////////////////////////////////////////////////////////
+
+// Selecting a main menu brings up its secondary menu.
+// Selecting a secondary menu option does one of two things:
+//     1) Allows you to change the value of a variable.
+//     2) Calls a function.
+// We will need to distinguish between them in the future. Create an enum for this.
+// (enum optionType is now defined in MainBoard_Display.h)
+
+// Function to increment variable
+void IncrementVariable(const VariableParameter *bv) {
+    if (bv->variable == NULL) {
+        return;
     }
-    // Draw each of the panes
-    for (size_t i = 0; i < NUMBER_OF_PANES; i++){
-        WindowPanes[i]->DrawFunction();
+    
+    switch (bv->type) {
+        case TYPE_I8: {
+            int8_t value = *(int8_t *)bv->variable;
+            value = value + bv->limits.i8.step;
+            if (value > bv->limits.i8.max){
+                value = bv->limits.i8.max;
+            }
+            *(int8_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_I16: {
+            int16_t value = *(int16_t *)bv->variable;
+            value = value + bv->limits.i16.step;
+            if (value > bv->limits.i16.max){
+                value = bv->limits.i16.max;
+            }
+            *(int16_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_I32: {
+            int32_t value = *(int32_t *)bv->variable;
+            value = value + bv->limits.i32.step;
+            if (value > bv->limits.i32.max){
+                value = bv->limits.i32.max;
+            }
+            *(int32_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_I64: {
+            int64_t value = *(int64_t *)bv->variable;
+            value = value + bv->limits.i64.step;
+            if (value > bv->limits.i64.max){
+                value = bv->limits.i64.max;
+            }
+            *(int64_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_F32: {
+            float32_t value = *(float32_t *)bv->variable;
+            value = value + bv->limits.f32.step;
+            if (value > bv->limits.f32.max){
+                value = bv->limits.f32.max;
+            }
+            *(float32_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_KeyTypeId: {
+            int8_t value = *(int8_t *)bv->variable;
+            value = value + bv->limits.keyType.step;
+            if (value > (int8_t)bv->limits.keyType.max){
+                value = (int8_t)bv->limits.keyType.max;
+            }
+            *(KeyTypeId *)bv->variable = (KeyTypeId)value;
+            return;
+        }
+        case TYPE_BOOL: {
+            bool value = *(bool *)bv->variable;
+            *(bool *)bv->variable = !value;
+            return;
+        }
+        default:
+            return;
     }
 }
+
+// Function to decrement variable
+void DecrementVariable(const VariableParameter *bv) {
+    if (bv->variable == NULL) {
+        return;
+    }
+    switch (bv->type) {
+        case TYPE_I8: {
+            int8_t value = *(int8_t *)bv->variable;
+            value = value - bv->limits.i8.step;
+            if (value < bv->limits.i8.min){
+                value = bv->limits.i8.min;
+            }
+            *(int8_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_I16: {
+            int16_t value = *(int16_t *)bv->variable;
+            value = value - bv->limits.i16.step;
+            if (value < bv->limits.i16.min){
+                value = bv->limits.i16.min;
+            }
+            *(int16_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_I32: {
+            int32_t value = *(int32_t *)bv->variable;
+            value = value - bv->limits.i32.step;
+            if (value < bv->limits.i32.min){
+                value = bv->limits.i32.min;
+            }
+            *(int32_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_I64: {
+            int64_t value = *(int64_t *)bv->variable;
+            value = value - bv->limits.i64.step;
+            if (value < bv->limits.i64.min){
+                value = bv->limits.i64.min;
+            }
+            *(int64_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_F32: {
+            float32_t value = *(float32_t *)bv->variable;
+            value = value - bv->limits.f32.step;
+            if (value < bv->limits.f32.min){
+                value = bv->limits.f32.min;
+            }
+            *(float32_t *)bv->variable = value;
+            return;
+        }
+        case TYPE_KeyTypeId: {
+            int8_t value = *(int8_t *)bv->variable;
+            value = value - bv->limits.keyType.step;
+            if (value < (int8_t)bv->limits.keyType.min){
+                value = (int8_t)bv->limits.keyType.min;
+            }
+            *(KeyTypeId *)bv->variable = (KeyTypeId)value;
+            return;
+        }
+        case TYPE_BOOL: {
+            bool value = *(bool *)bv->variable;
+            *(bool *)bv->variable = !value;
+            return;
+        }
+        default:
+            return;
+    }
+}
+
+// Function to get variable value as a String
+String GetVariableValueAsString(const VariableParameter *vp) {
+    if (vp == NULL || vp->variable == NULL) {
+        return String("NULL");
+    }
+
+    switch(vp->type) {
+        case TYPE_I8:
+            return String(*(int8_t*)vp->variable);
+        case TYPE_I16:
+            return String(*(int16_t*)vp->variable);
+        case TYPE_I32:
+            return String(*(int32_t*)vp->variable);
+        case TYPE_I64:
+            return String((long)*(int64_t*)vp->variable);
+        case TYPE_F32:
+            return String(*(float32_t*)vp->variable);
+        case TYPE_KeyTypeId:
+            return String(*(int8_t*)vp->variable);
+        case TYPE_BOOL:
+            return String(*(bool*)vp->variable ? "true" : "false");
+        default:
+            return String("UNKNOWN_TYPE");
+    }
+}
+
+// structs that are used to construct the primary and secondary menus
+// (SecondaryMenuOption and PrimaryMenuOption are now defined in MainBoard_Display.h)
+
+///////////////////////////////////////
+// RF Set Menu
+///////////////////////////////////////
+
+VariableParameter ssbPower = {
+    .variable = NULL, // Will be set dynamically to &ED.powerOutSSB[ED.currentBand[ED.activeVFO]]
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.0f, .max=20.0f, .step=0.5f}}
+};
+
+VariableParameter cwPower = {
+    .variable = NULL, // Will be set dynamically to &ED.powerOutCW[ED.currentBand[ED.activeVFO]]
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.0f, .max=20.0f, .step=0.5f}}
+};
+
+VariableParameter gain = {
+    .variable = &ED.rfGainAllBands_dB,
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = -5.0f, .max=20.0f, .step=0.5f}}
+};
+
+VariableParameter rxAtten = {
+    .variable = NULL,  // Will be set dynamically to &ED.RAtten[ED.currentBand[ED.activeVFO]]
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.0f, .max=31.5f, .step=0.5f}}
+};
+
+VariableParameter txAttenCW = {
+    .variable = NULL,  // Will be set dynamically to &ED.XAttenCW[ED.currentBand[ED.activeVFO]]
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.0f, .max=31.5f, .step=0.5f}}
+};
+
+VariableParameter txAttenSSB = {
+    .variable = NULL,  // Will be set dynamically to &ED.XAttenSSB[ED.currentBand[ED.activeVFO]]
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.0f, .max=31.5f, .step=0.5f}}
+};
+
+VariableParameter antenna = {
+    .variable = NULL,  // Will be set dynamically to &ED.antennaSelection[ED.currentBand[ED.activeVFO]]
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max=3, .step=1}}
+};
+
+struct SecondaryMenuOption RFSet[7] = {
+    "SSB Power", variableOption, &ssbPower, NULL, NULL,
+    "CW Power", variableOption, &cwPower, NULL, NULL,
+    "Gain",variableOption, &gain, NULL, NULL,
+    "RX Attenuation",variableOption, &rxAtten, NULL, NULL,
+    "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, NULL,
+    "TX Attenuation (SSB)",variableOption, &txAttenSSB, NULL, NULL,
+    "Antenna",variableOption, &antenna, NULL, NULL,
+};
+
+// "100W PA", "XVTR", "Cancel"
+
+///////////////////////////////////////
+// CW Options
+///////////////////////////////////////
+
+VariableParameter wpm = {
+    .variable = &ED.currentWPM,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 5, .max=50, .step=1}}
+};
+
+void SelectStraightKey(void){
+    ED.keyType = KeyTypeId_Straight;
+}
+
+void SelectKeyer(void){
+    ED.keyType = KeyTypeId_Keyer;
+}
+
+void FlipPaddle(void){
+    ED.keyerFlip = !ED.keyerFlip;
+}
+
+VariableParameter cwf = {
+    .variable = &ED.CWFilterIndex,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max=5, .step=1}}
+};
+
+VariableParameter stv = {
+    .variable = &ED.sidetoneVolume,
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.0F, .max=100.0F, .step=0.5F}}
+};
+
+
+struct SecondaryMenuOption CWOptions[6] = {
+    "WPM", variableOption, &wpm, NULL, (void *)UpdateDitLength,
+    "Straight key", functionOption, NULL, (void *)SelectStraightKey, NULL,
+    "Keyer", functionOption, NULL, (void *)SelectKeyer, NULL,
+    "Flip paddle", functionOption, NULL, (void *)FlipPaddle, NULL,
+    "CW Filter", variableOption, &cwf, NULL, NULL,
+    "Sidetone volume", variableOption, &stv, NULL, NULL,
+};
+
+//   "Sidetone Note", "Xmit Delay"
+
+///////////////////////////////////////
+// Construct the primary menu
+///////////////////////////////////////
+
+struct PrimaryMenuOption primaryMenu[2] = {
+    "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
+    "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
+};
+
+const char *topMenus[] = {
+  "RF Set", "CW Options", "VFO Select",
+  "EEPROM", "AGC", "Spectrum Options",
+  "Noise Floor", "Mic Gain", "Mic Comp",
+  "EQ Rec Set", "EQ Xmt Set", "Calibrate",
+  "Bearing","Bode"
+};
+
+
+void UpdateArrayVariables(void){
+    // Update array-based variable pointers to point to current band element
+
+    // RF Set Menu
+    ssbPower.variable = &ED.powerOutSSB[ED.currentBand[ED.activeVFO]];
+    cwPower.variable = &ED.powerOutCW[ED.currentBand[ED.activeVFO]];
+    rxAtten.variable = &ED.RAtten[ED.currentBand[ED.activeVFO]];
+    txAttenCW.variable = &ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+    txAttenSSB.variable = &ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
+    antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
+
+    // CW Options
+    // none
+
+
+}
+
+/*
+
+int (*functionPtr[])() = {
+  &RFOptions, &CWOptions, &VFOSelect,
+  &EEPROMOptions, &AGCOptions, &SpectrumOptions,
+  &ButtonSetNoiseFloor, &MicGainSet, &MicOptions,
+  &EqualizerRecOptions, &EqualizerXmtOptions, &IQOptions,
+  &BearingMaps,
+  &BodeOptions
+};
+
+
+const char *secondaryChoices[][14] = {
+  { "Power level", "Gain", "RF In Atten", "RF Out Atten", "Antenna", "100W PA", "XVTR", "Cancel" },                       //RF
+  { "WPM", "Straight Key", "Keyer", "CW Filter", "Paddle Flip", "Sidetone Note", "Sidetone Vol", "Xmit Delay", "Cancel" },// CW             0
+  { "VFO A", "VFO B", "Split", "Cancel" },                                                                                // VFO            2
+  { "Save Current", "Set Defaults", "Get Favorite", "Set Favorite", "EEPROM-->SD", "SD-->EEPROM", "SD Dump", "Cancel" },  // EEPROM         3
+  { "Off", "Long", "Slow", "Medium", "Fast", "Cancel" },                                                                  // AGC            4
+  { "20 dB/unit", "10 dB/unit", " 5 dB/unit", " 2 dB/unit", " 1 dB/unit", "Cancel" },                                     // Spectrum       5
+  { "Set floor", "Cancel" },                                                                                              // Noise floor    6
+  { "Set Mic Gain", "Cancel" },                                                                                           // Mic gain       7
+  { "On", "Off", "Set Threshold", "Set Ratio", "Set Attack", "Set Decay", "Cancel" },                                     // Mic options    8
+  { "On", "Off", "EQRcSet", "Cancel" },                                                                                   // index = 9                                                                                // EQ Rec         9
+  { "On", "Off", "EQTxSet", "Cancel" },                                                                                   // EQ Trx         10
+  { "Freq Cal", "Rec IQ Cal", "Xmit IQ Cal", "CW PA Cal", "SSB PA Cal", "Two Tone Test", "R Freq Offset", "SWR Cal","Cancel" },  // Calibrate      11
+  { "Set Prefix", "Cancel" },
+  { "Run Bode Plot", "Set Start F.", "Set End F.", "Plot Ref.", "Cancel" }  // Bode Plot 13
+};
+*/
+
 
 void DrawMainMenu(void){
     // Only draw if we're on the MAIN_MENU screen
@@ -1445,13 +1810,64 @@ void DrawMainMenu(void){
         tft.writeTo(L2);
         tft.fillWindow();
         tft.writeTo(L1);
-        tft.fillWindow();        
+        tft.fillWindow();
         uiSM.vars.clearScreen = false;
+
+        UpdateArrayVariables();
+
+        // Print the primary menu options
+        for (size_t k=0; k<sizeof(primaryMenu)/sizeof(primaryMenu[0]); k++){
+            Debug(primaryMenu[k].label);
+            for (size_t m=0; m<primaryMenu[k].length; m++){
+                Debug(String("->") + String(primaryMenu[k].secondary[m].label));
+                if (primaryMenu[k].secondary[m].action == variableOption){
+                    Debug(String("Value before increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
+                    IncrementVariable(primaryMenu[k].secondary[m].varPam);
+                    Debug(String("Value after increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
+                } else if (primaryMenu[k].secondary[m].action == functionOption) {
+                    // Cast void* to function pointer and call it
+                    void (*funcPtr)(void) = (void (*)(void))primaryMenu[k].secondary[m].func;
+                    if (funcPtr != NULL) {
+                        funcPtr();
+                    }
+                }
+            }
+        }
     }
     tft.setTextColor(RA8875_MAGENTA);
     tft.setCursor(50, WINDOW_HEIGHT/ 10);
     tft.setFontScale(2);
     tft.print("Main menu");
+
+    /*
+    int8_t my_int = 42;
+    float32_t my_float = 3.14f;
+
+    // Create bounded variables
+    VariableParameter int_var = {
+        .variable = &my_int,
+        .type = TYPE_I8,
+        .limits = {.i8 = {.min = 0, .max = 100, .step = 5}}
+    };
+
+    VariableParameter float_var = {
+        .variable = &my_float,
+        .type = TYPE_F32,
+        .limits = {.f32 = {.min = 0.0f, .max = 10.0f, .step = 0.5f}}
+    };
+
+    // Check limits
+    char buff[50];
+    if (check_limits(&int_var)) {
+        sprintf(buff,"int value %d is within limits [%d, %d]\n", 
+                my_int, int_var.limits.i8.min, int_var.limits.i8.max);
+        Debug(buff);
+    } else {
+        sprintf(buff,"int value %d is OUT OF BOUNDS!\n", my_int);
+        Debug(buff);
+    }
+    */
+
 }
 
 void DrawSecondaryMenu(void){
@@ -1468,6 +1884,10 @@ void DrawSecondaryMenu(void){
     tft.setFontScale(2);
     tft.print("Secondary menu");
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// END OF MENU SCREENS SECTION
+///////////////////////////////////////////////////////////////////////////////
 
 void InitializeDisplay(void){
     pinMode(TFT_CS, OUTPUT);

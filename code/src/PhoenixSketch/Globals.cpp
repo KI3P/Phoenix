@@ -119,6 +119,11 @@ void MyDelay(unsigned long millisWait) {
         ;  // Twiddle thumbs until delay ends...
 }
 
+void UpdateDitLength(void){
+    float32_t dit_ms = 60000.0f/(50.0f*ED.currentWPM);
+    modeSM.vars.ditDuration_ms = (uint16_t)round(dit_ms);
+}
+
 void buffer_pretty_print(void) {
     Debug("=== Hardware Register Buffer Contents ===");
     Debug("Buffer size: " + String((unsigned int)buffer.count) + "/" + String((unsigned int)REGISTER_BUFFER_SIZE));
