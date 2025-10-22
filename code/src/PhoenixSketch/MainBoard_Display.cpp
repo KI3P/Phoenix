@@ -23,6 +23,7 @@ RA8875 tft = RA8875(TFT_CS, TFT_RESET);  // Instantiate the display object
 #define WINDOW_HEIGHT   480
 #define NUMBER_OF_PANES 12
 #define SPECTRUM_REFRESH_MS 200
+#define DARKGREY 0x7BEF           /* 128, 128, 128 */
 
 ///////////////////////////////////////////////////////////////////////////////
 // HOME SCREEN SECTION
@@ -1364,8 +1365,9 @@ void DrawNameBadgePane(void) {
 uint32_t timer_ms = 0;
 uint32_t timerDisplay_ms = 0;
 static void DrawHome(){
-    // Only draw if we're on the HOME screen
-    if (!(uiSM.state_id == UISm_StateId_HOME)) return;
+    // Only draw if we're on the HOME screen or the UPDATE screen
+    if (!((uiSM.state_id == UISm_StateId_HOME) || (uiSM.state_id == UISm_StateId_UPDATE))) 
+        return;
     // Clear the screen whenever we enter this state from another one.
     // When we enter the UISm_StateId_HOME state, clearScreen is set to true.
     tft.writeTo(L1);
@@ -1800,74 +1802,139 @@ const char *secondaryChoices[][14] = {
 };
 */
 
+uint8_t oavfo = 7;
+int32_t oband = -1;
+bool redrawMenu = true;
+size_t primaryMenuIndex = 0;
+size_t secondaryMenuIndex = 0;
+
+void IncrementPrimaryMenu(void){
+    primaryMenuIndex++;
+    if (primaryMenuIndex >= sizeof(primaryMenu)/sizeof(primaryMenu[0]))
+        primaryMenuIndex = 0;
+    secondaryMenuIndex = 0;
+    redrawMenu = true;
+}
+
+void DecrementPrimaryMenu(void){
+    if (primaryMenuIndex == 0)
+        primaryMenuIndex = sizeof(primaryMenu)/sizeof(primaryMenu[0]) - 1;
+    else
+        primaryMenuIndex--;
+    secondaryMenuIndex = 0;
+    redrawMenu = true;
+}
+
+void IncrementSecondaryMenu(void){
+    secondaryMenuIndex++;
+    if (secondaryMenuIndex >= primaryMenu[primaryMenuIndex].length)
+        secondaryMenuIndex = 0;
+    redrawMenu = true;
+}
+
+void DecrementSecondaryMenu(void){
+    if (secondaryMenuIndex == 0)
+        secondaryMenuIndex = primaryMenu[primaryMenuIndex].length - 1;
+    else
+        secondaryMenuIndex--;
+    redrawMenu = true;
+}
+
+void PrintMainMenuOptions(bool foreground){
+    // Print the primary menu options
+    int16_t x = 10;
+    int16_t y = 20;
+    int16_t delta = 27;
+
+    if (foreground)
+        tft.setTextColor(RA8875_WHITE);
+    else
+        tft.setTextColor(DARKGREY, RA8875_BLACK);                   
+    tft.setFontDefault();
+    tft.setFontScale(1);
+
+    for (size_t k=0; k<sizeof(primaryMenu)/sizeof(primaryMenu[0]); k++){
+        if (k == primaryMenuIndex){
+            if (foreground)
+                tft.setTextColor(RA8875_GREEN);
+            else
+                tft.setTextColor(RA8875_WHITE);
+        }
+        tft.setCursor(x,y);
+        tft.print(primaryMenu[k].label);
+        if (k == primaryMenuIndex){
+            if (foreground)
+                tft.setTextColor(RA8875_WHITE);
+            else
+                tft.setTextColor(DARKGREY, RA8875_BLACK);
+        }
+        y += delta;
+    }
+}
+
+void PrintSecondaryMenuOptions(bool foreground){
+    // Print the secondary menu options
+    int16_t x = 300;
+    int16_t y = 20;
+    int16_t delta = 27;
+
+    if (foreground)
+        tft.setTextColor(RA8875_WHITE);
+    else
+        tft.setTextColor(DARKGREY, RA8875_BLACK);                   
+    tft.setFontDefault();
+    tft.setFontScale(1);
+
+    for (size_t m=0; m<primaryMenu[primaryMenuIndex].length; m++){
+        if (m == secondaryMenuIndex){
+            if (foreground)
+                tft.setTextColor(RA8875_GREEN);
+            else
+               tft.setTextColor(DARKGREY, RA8875_BLACK);
+        }
+        tft.setCursor(x,y);
+        tft.print(primaryMenu[primaryMenuIndex].secondary[m].label);
+        if (m == secondaryMenuIndex){
+            if (foreground)
+                tft.setTextColor(RA8875_WHITE);
+            else
+                tft.setTextColor(DARKGREY, RA8875_BLACK);
+        }
+        y += delta;
+    }
+}
 
 void DrawMainMenu(void){
     // Only draw if we're on the MAIN_MENU screen
     if (!(uiSM.state_id == UISm_StateId_MAIN_MENU)) return;
     // Clear the screen whenever we enter this state from another one.
     if (uiSM.vars.clearScreen){
-        Debug("Clearing the screen upon entry to MAIN_MENU state");
+        Debug("Entry to MAIN_MENU state");
+        
         tft.writeTo(L2);
-        tft.fillWindow();
+        tft.fillRect(1, 5, 650, 460, RA8875_BLACK);  // Show Menu box
+        //tft.clearMemory();
         tft.writeTo(L1);
-        tft.fillWindow();
+        tft.fillRect(1, 5, 650, 460, RA8875_BLACK);  // Show Menu box
+        tft.drawRect(1, 5, 650, 460, RA8875_YELLOW);
+
         uiSM.vars.clearScreen = false;
+        redrawMenu = true;
+    }
+    if (!redrawMenu)
+        return;
+    redrawMenu = false;
 
+    // Update the array variables if the active VFO has changed:
+    if ((oavfo != ED.activeVFO) || (oband != ED.currentBand[ED.activeVFO])){
+        oavfo = ED.activeVFO;
+        oband = ED.currentBand[ED.activeVFO];
         UpdateArrayVariables();
-
-        // Print the primary menu options
-        for (size_t k=0; k<sizeof(primaryMenu)/sizeof(primaryMenu[0]); k++){
-            Debug(primaryMenu[k].label);
-            for (size_t m=0; m<primaryMenu[k].length; m++){
-                Debug(String("->") + String(primaryMenu[k].secondary[m].label));
-                if (primaryMenu[k].secondary[m].action == variableOption){
-                    Debug(String("Value before increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
-                    IncrementVariable(primaryMenu[k].secondary[m].varPam);
-                    Debug(String("Value after increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
-                } else if (primaryMenu[k].secondary[m].action == functionOption) {
-                    // Cast void* to function pointer and call it
-                    void (*funcPtr)(void) = (void (*)(void))primaryMenu[k].secondary[m].func;
-                    if (funcPtr != NULL) {
-                        funcPtr();
-                    }
-                }
-            }
-        }
     }
-    tft.setTextColor(RA8875_MAGENTA);
-    tft.setCursor(50, WINDOW_HEIGHT/ 10);
-    tft.setFontScale(2);
-    tft.print("Main menu");
 
-    /*
-    int8_t my_int = 42;
-    float32_t my_float = 3.14f;
-
-    // Create bounded variables
-    VariableParameter int_var = {
-        .variable = &my_int,
-        .type = TYPE_I8,
-        .limits = {.i8 = {.min = 0, .max = 100, .step = 5}}
-    };
-
-    VariableParameter float_var = {
-        .variable = &my_float,
-        .type = TYPE_F32,
-        .limits = {.f32 = {.min = 0.0f, .max = 10.0f, .step = 0.5f}}
-    };
-
-    // Check limits
-    char buff[50];
-    if (check_limits(&int_var)) {
-        sprintf(buff,"int value %d is within limits [%d, %d]\n", 
-                my_int, int_var.limits.i8.min, int_var.limits.i8.max);
-        Debug(buff);
-    } else {
-        sprintf(buff,"int value %d is OUT OF BOUNDS!\n", my_int);
-        Debug(buff);
-    }
-    */
-
+    PrintMainMenuOptions(true);
+    PrintSecondaryMenuOptions(false);
+    
 }
 
 void DrawSecondaryMenu(void){
@@ -1876,13 +1943,65 @@ void DrawSecondaryMenu(void){
     // Clear the screen whenever we enter this state from another one.
     if (uiSM.vars.clearScreen){
         Debug("Clearing the screen upon entry to SECONDARY_MENU state");
-        tft.fillWindow();
+        //tft.fillWindow();
+
+        tft.writeTo(L1);
+        tft.fillRect(1,  5, 650, 460, RA8875_BLACK);  // Show Menu box
+        tft.drawRect(1,  5, 650, 460, RA8875_YELLOW);
+
         uiSM.vars.clearScreen = false;
+        redrawMenu = true;
     }
-    tft.setTextColor(RA8875_MAGENTA);
-    tft.setCursor(50, WINDOW_HEIGHT/ 10);
-    tft.setFontScale(2);
-    tft.print("Secondary menu");
+
+    if (!redrawMenu)
+        return;
+    redrawMenu = false;
+
+    PrintMainMenuOptions(false);
+    PrintSecondaryMenuOptions(true);
+    
+        /*if (primaryMenu[k].secondary[m].action == variableOption){
+            Debug(String("Value before increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
+            IncrementVariable(primaryMenu[k].secondary[m].varPam);
+            Debug(String("Value after increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
+        } else if (primaryMenu[k].secondary[m].action == functionOption) {
+            // Cast void* to function pointer and call it
+            void (*funcPtr)(void) = (void (*)(void))primaryMenu[k].secondary[m].func;
+            if (funcPtr != NULL) {
+                funcPtr();
+            }
+        }*/
+    
+}
+
+bool redrawParameter = true;
+void DrawParameter(void){
+    // Draw a box and write the current value of the parameter into it
+    // Use the name badge pane
+    if (redrawParameter){
+        tft.fillRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_BLACK);
+        // Draw a box around the borders and put some text in the middle
+        tft.drawRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_RED);
+        
+        tft.setFontDefault();
+        tft.setFontScale((enum RA8875tsize)0.5);
+        tft.setCursor(PaneNameBadge.x0+5, PaneNameBadge.y0+5);
+        tft.setTextColor(RA8875_WHITE);
+        tft.print(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].label);
+        tft.print(": ");
+        tft.print(GetVariableValueAsString(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam));
+        redrawParameter = false;
+    }
+}
+
+void IncrementValue(void){
+    IncrementVariable(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam);
+    redrawParameter = true;
+}
+
+void DecrementValue(void){
+    DecrementVariable(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam);
+    redrawParameter = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1942,6 +2061,21 @@ void DrawDisplay(void){
         }
         case (UISm_StateId_SECONDARY_MENU):{
             DrawSecondaryMenu();
+            break;
+        }
+        case (UISm_StateId_UPDATE):{
+            if (primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].action == variableOption){
+                DrawHome();
+                DrawParameter();
+            } else {
+                // Send us back to the HOME screen
+                UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                // Cast void* to function pointer and call it
+                void (*funcPtr)(void) = (void (*)(void))primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].func;
+                if (funcPtr != NULL) {
+                    funcPtr();
+                }
+            }
             break;
         }
         default:

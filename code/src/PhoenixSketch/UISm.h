@@ -34,12 +34,13 @@ typedef enum UISm_StateId
     UISm_StateId_HOME = 2,
     UISm_StateId_MAIN_MENU = 3,
     UISm_StateId_SECONDARY_MENU = 4,
-    UISm_StateId_SPLASH = 5
+    UISm_StateId_SPLASH = 5,
+    UISm_StateId_UPDATE = 6
 } UISm_StateId;
 
 enum
 {
-    UISm_StateIdCount = 6
+    UISm_StateIdCount = 7
 };
 
 

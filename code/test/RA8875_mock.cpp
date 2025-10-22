@@ -26,6 +26,10 @@ void RA8875::setTextColor(uint16_t color) {
     _text_color = color;
 }
 
+void RA8875::setTextColor(uint16_t color1, uint16_t color2) {
+    _text_color = color1;
+}
+
 void RA8875::setCursor(uint16_t x, uint16_t y) {
     _cursor_x = x;
     _cursor_y = y;

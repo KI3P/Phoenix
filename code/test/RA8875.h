@@ -59,6 +59,7 @@ public:
 
     // Text operations
     void setTextColor(uint16_t color);
+    void setTextColor(uint16_t color1, uint16_t color2);
     void setCursor(uint16_t x, uint16_t y);
     void setFontScale(uint8_t scale);
     void setFontScale(enum RA8875tsize scale);

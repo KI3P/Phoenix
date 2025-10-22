@@ -285,6 +285,12 @@ CALIBRATION : CALIBRATION
 
 CALIBRATION : enter / #123; clearScreen = true#59; #125;
 
+UPDATE
+
+UPDATE : UPDATE
+
+UPDATE : enter / #123; clearScreen = true#59; #125;
+
 ROOT.(InitialState) --> SPLASH
 
 SPLASH --> HOME : do [splashCount_ms >= splashDuration_ms]
@@ -297,9 +303,15 @@ MAIN_MENU --> SECONDARY_MENU : SELECT
 
 SECONDARY_MENU --> HOME : HOME
 
-SECONDARY_MENU --> CALIBRATION : CAL
+SECONDARY_MENU --> UPDATE : SELECT
 
 CALIBRATION --> HOME : HOME
+
+UPDATE --> CALIBRATION : CAL
+
+UPDATE --> HOME : HOME
+
+UPDATE --> HOME : SELECT
 
 
 
@@ -369,10 +381,11 @@ evaluateGuard = null;
         MAIN_MENU : 3,
         SECONDARY_MENU : 4,
         SPLASH : 5,
+        UPDATE : 6,
     }
     static { Object.freeze(this.StateId); }
     
-    static StateIdCount = 6;
+    static StateIdCount = 7;
     static { Object.freeze(this.StateIdCount); }
     
     // Used internally by state machine. Feel free to inspect, but don't modify.
@@ -450,7 +463,7 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case UISm.EventId.HOME: this.#SECONDARY_MENU_home(); break;
-                    case UISm.EventId.CAL: this.#SECONDARY_MENU_cal(); break;
+                    case UISm.EventId.SELECT: this.#SECONDARY_MENU_select(); break;
                 }
                 break;
             
@@ -459,6 +472,16 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case UISm.EventId.DO: this.#SPLASH_do(); break;
+                }
+                break;
+            
+            // STATE: UPDATE
+            case UISm.StateId.UPDATE:
+                switch (eventId)
+                {
+                    case UISm.EventId.CAL: this.#UPDATE_cal(); break;
+                    case UISm.EventId.HOME: this.#UPDATE_home(); break;
+                    case UISm.EventId.SELECT: this.#UPDATE_select(); break;
                 }
                 break;
         }
@@ -482,6 +505,8 @@ evaluateGuard = null;
                 case UISm.StateId.SECONDARY_MENU: this.#SECONDARY_MENU_exit(); break;
                 
                 case UISm.StateId.SPLASH: this.#SPLASH_exit(); break;
+                
+                case UISm.StateId.UPDATE: this.#UPDATE_exit(); break;
                 
                 default: return;  // Just to be safe. Prevents infinite loop if state ID memory is somehow corrupted.
             }
@@ -726,27 +751,6 @@ evaluateGuard = null;
         this.stateId = UISm.StateId.ROOT;
     }
     
-    #SECONDARY_MENU_cal()
-    {
-        // SECONDARY_MENU behavior
-        // uml: CAL / { this.tracer?.edgeTransition("edge6"); } TransitionTo(CALIBRATION)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#SECONDARY_MENU_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
-            this.tracer?.edgeTransition("edge6");
-            
-            // Step 3: Enter/move towards transition target `CALIBRATION`.
-            this.#CALIBRATION_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for SECONDARY_MENU
-        
-        // No ancestor handles this event.
-    }
-    
     #SECONDARY_MENU_home()
     {
         // SECONDARY_MENU behavior
@@ -760,6 +764,27 @@ evaluateGuard = null;
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for SECONDARY_MENU
+        
+        // No ancestor handles this event.
+    }
+    
+    #SECONDARY_MENU_select()
+    {
+        // SECONDARY_MENU behavior
+        // uml: SELECT / { this.tracer?.edgeTransition("edge6"); } TransitionTo(UPDATE)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#SECONDARY_MENU_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
+            this.tracer?.edgeTransition("edge6");
+            
+            // Step 3: Enter/move towards transition target `UPDATE`.
+            this.#UPDATE_enter();
             
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
@@ -833,6 +858,105 @@ evaluateGuard = null;
         // No ancestor handles this event.
     }
     
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state UPDATE
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #UPDATE_enter()
+    {
+        this.stateId = UISm.StateId.UPDATE;
+        
+        // UPDATE behavior
+        // uml: enter / { this.tracer?.enterState('UPDATE'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('UPDATE');`
+            this.tracer?.enterState('UPDATE');
+        } // end of behavior for UPDATE
+        
+        // UPDATE behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");
+        } // end of behavior for UPDATE
+    }
+    
+    #UPDATE_exit()
+    {
+        // UPDATE behavior
+        // uml: exit / { this.tracer?.exitState('UPDATE'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('UPDATE');`
+            this.tracer?.exitState('UPDATE');
+        } // end of behavior for UPDATE
+        
+        this.stateId = UISm.StateId.ROOT;
+    }
+    
+    #UPDATE_cal()
+    {
+        // UPDATE behavior
+        // uml: CAL / { this.tracer?.edgeTransition("edge8"); } TransitionTo(CALIBRATION)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#UPDATE_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge8");`.
+            this.tracer?.edgeTransition("edge8");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATION`.
+            this.#CALIBRATION_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for UPDATE
+        
+        // No ancestor handles this event.
+    }
+    
+    #UPDATE_home()
+    {
+        // UPDATE behavior
+        // uml: HOME / { this.tracer?.edgeTransition("edge9"); } TransitionTo(HOME)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#UPDATE_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
+            this.tracer?.edgeTransition("edge9");
+            
+            // Step 3: Enter/move towards transition target `HOME`.
+            this.#HOME_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for UPDATE
+        
+        // No ancestor handles this event.
+    }
+    
+    #UPDATE_select()
+    {
+        // UPDATE behavior
+        // uml: SELECT / { this.tracer?.edgeTransition("edge10"); } TransitionTo(HOME)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#UPDATE_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
+            this.tracer?.edgeTransition("edge10");
+            
+            // Step 3: Enter/move towards transition target `HOME`.
+            this.#HOME_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for UPDATE
+        
+        // No ancestor handles this event.
+    }
+    
     // Thread safe.
     static stateIdToString(id)
     {
@@ -844,6 +968,7 @@ evaluateGuard = null;
             case UISm.StateId.MAIN_MENU: return "MAIN_MENU";
             case UISm.StateId.SECONDARY_MENU: return "SECONDARY_MENU";
             case UISm.StateId.SPLASH: return "SPLASH";
+            case UISm.StateId.UPDATE: return "UPDATE";
             default: return "?";
         }
     }
@@ -911,11 +1036,16 @@ evaluateGuard = null;
     "SELECT"
   ],
   "SECONDARY_MENU": [
-    "CAL",
-    "HOME"
+    "HOME",
+    "SELECT"
   ],
   "CALIBRATION": [
     "HOME"
+  ],
+  "UPDATE": [
+    "CAL",
+    "HOME",
+    "SELECT"
   ]
 };
 

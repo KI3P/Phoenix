@@ -55,5 +55,11 @@ struct PrimaryMenuOption {
 
 void DrawDisplay(void);
 void InitializeDisplay(void);
+void IncrementPrimaryMenu(void);
+void IncrementSecondaryMenu(void);
+void DecrementPrimaryMenu(void);
+void DecrementSecondaryMenu(void);
+void IncrementValue(void);
+void DecrementValue(void);
 
 #endif

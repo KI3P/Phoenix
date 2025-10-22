@@ -489,15 +489,56 @@ void ConsumeInterrupt(void){
                 break;
             }
             case (iFILTER_INCREASE):{
-                FilterSetSSB(5);
-                Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                        + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );            break;
+                switch (uiSM.state_id){
+                    case (UISm_StateId_HOME):{
+                        FilterSetSSB(5);
+                        Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                                + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
+                        break;
+                    }
+                    case (UISm_StateId_MAIN_MENU):{
+                        IncrementPrimaryMenu();
+                        break;
+                    }
+                    case (UISm_StateId_SECONDARY_MENU):{
+                        IncrementSecondaryMenu();
+                        break;
+                    }
+                    case (UISm_StateId_UPDATE):{
+                        IncrementValue();
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
             }
             case (iFILTER_DECREASE):{
-                FilterSetSSB(-5);
-                Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                        + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
+                switch (uiSM.state_id){
+                    case (UISm_StateId_HOME):{
+                        FilterSetSSB(-5);
+                        Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                                + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
+                        break;
+                    }
+                    case (UISm_StateId_MAIN_MENU):{
+                        DecrementPrimaryMenu();
+                        break;
+                    }
+                    case (UISm_StateId_SECONDARY_MENU):{
+                        DecrementSecondaryMenu();
+                        break;
+                    }
+                    case (UISm_StateId_UPDATE):{
+                        DecrementValue();
+                        break;
+                    }
+                    default:
+                        break;
+                }
                 break;
+
+
             }
             case (iCENTERTUNE_INCREASE):{
                 ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;

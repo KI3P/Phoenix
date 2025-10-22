@@ -39,15 +39,25 @@ static void SECONDARY_MENU_enter(UISm* sm);
 
 static void SECONDARY_MENU_exit(UISm* sm);
 
-static void SECONDARY_MENU_cal(UISm* sm);
-
 static void SECONDARY_MENU_home(UISm* sm);
+
+static void SECONDARY_MENU_select(UISm* sm);
 
 static void SPLASH_enter(UISm* sm);
 
 static void SPLASH_exit(UISm* sm);
 
 static void SPLASH_do(UISm* sm);
+
+static void UPDATE_enter(UISm* sm);
+
+static void UPDATE_exit(UISm* sm);
+
+static void UPDATE_cal(UISm* sm);
+
+static void UPDATE_home(UISm* sm);
+
+static void UPDATE_select(UISm* sm);
 
 
 // State machine constructor. Must be called before start or dispatch event functions. Not thread safe.
@@ -133,7 +143,7 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
             switch (event_id)
             {
                 case UISm_EventId_HOME: SECONDARY_MENU_home(sm); break;
-                case UISm_EventId_CAL: SECONDARY_MENU_cal(sm); break;
+                case UISm_EventId_SELECT: SECONDARY_MENU_select(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -144,6 +154,18 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
             switch (event_id)
             {
                 case UISm_EventId_DO: SPLASH_do(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: UPDATE
+        case UISm_StateId_UPDATE:
+            switch (event_id)
+            {
+                case UISm_EventId_CAL: UPDATE_cal(sm); break;
+                case UISm_EventId_HOME: UPDATE_home(sm); break;
+                case UISm_EventId_SELECT: UPDATE_select(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -169,6 +191,8 @@ static void exit_up_to_state_handler(UISm* sm, UISm_StateId desired_state)
             case UISm_StateId_SECONDARY_MENU: SECONDARY_MENU_exit(sm); break;
             
             case UISm_StateId_SPLASH: SPLASH_exit(sm); break;
+            
+            case UISm_StateId_UPDATE: UPDATE_exit(sm); break;
             
             default: return;  // Just to be safe. Prevents infinite loop if state ID memory is somehow corrupted.
         }
@@ -353,26 +377,6 @@ static void SECONDARY_MENU_exit(UISm* sm)
     sm->state_id = UISm_StateId_ROOT;
 }
 
-static void SECONDARY_MENU_cal(UISm* sm)
-{
-    // SECONDARY_MENU behavior
-    // uml: CAL TransitionTo(CALIBRATION)
-    {
-        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-        SECONDARY_MENU_exit(sm);
-        
-        // Step 2: Transition action: ``.
-        
-        // Step 3: Enter/move towards transition target `CALIBRATION`.
-        CALIBRATION_enter(sm);
-        
-        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-        return;
-    } // end of behavior for SECONDARY_MENU
-    
-    // No ancestor handles this event.
-}
-
 static void SECONDARY_MENU_home(UISm* sm)
 {
     // SECONDARY_MENU behavior
@@ -385,6 +389,26 @@ static void SECONDARY_MENU_home(UISm* sm)
         
         // Step 3: Enter/move towards transition target `HOME`.
         HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for SECONDARY_MENU
+    
+    // No ancestor handles this event.
+}
+
+static void SECONDARY_MENU_select(UISm* sm)
+{
+    // SECONDARY_MENU behavior
+    // uml: SELECT TransitionTo(UPDATE)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        SECONDARY_MENU_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `UPDATE`.
+        UPDATE_enter(sm);
         
         // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
         return;
@@ -443,6 +467,88 @@ static void SPLASH_do(UISm* sm)
     // No ancestor handles this event.
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state UPDATE
+////////////////////////////////////////////////////////////////////////////////
+
+static void UPDATE_enter(UISm* sm)
+{
+    sm->state_id = UISm_StateId_UPDATE;
+    
+    // UPDATE behavior
+    // uml: enter / { clearScreen = true; }
+    {
+        // Step 1: execute action `clearScreen = true;`
+        sm->vars.clearScreen = true;
+    } // end of behavior for UPDATE
+}
+
+static void UPDATE_exit(UISm* sm)
+{
+    sm->state_id = UISm_StateId_ROOT;
+}
+
+static void UPDATE_cal(UISm* sm)
+{
+    // UPDATE behavior
+    // uml: CAL TransitionTo(CALIBRATION)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        UPDATE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATION`.
+        CALIBRATION_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for UPDATE
+    
+    // No ancestor handles this event.
+}
+
+static void UPDATE_home(UISm* sm)
+{
+    // UPDATE behavior
+    // uml: HOME TransitionTo(HOME)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        UPDATE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `HOME`.
+        HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for UPDATE
+    
+    // No ancestor handles this event.
+}
+
+static void UPDATE_select(UISm* sm)
+{
+    // UPDATE behavior
+    // uml: SELECT TransitionTo(HOME)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        UPDATE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `HOME`.
+        HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for UPDATE
+    
+    // No ancestor handles this event.
+}
+
 // Thread safe.
 char const * UISm_state_id_to_string(UISm_StateId id)
 {
@@ -454,6 +560,7 @@ char const * UISm_state_id_to_string(UISm_StateId id)
         case UISm_StateId_MAIN_MENU: return "MAIN_MENU";
         case UISm_StateId_SECONDARY_MENU: return "SECONDARY_MENU";
         case UISm_StateId_SPLASH: return "SPLASH";
+        case UISm_StateId_UPDATE: return "UPDATE";
         default: return "?";
     }
 }
