@@ -1742,15 +1742,6 @@ struct PrimaryMenuOption primaryMenu[3] = {
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
 };
 
-const char *topMenus[] = {
-  "RF Set", "CW Options", "VFO Select",
-  "EEPROM", "AGC", "Spectrum Options",
-  "Noise Floor", "Mic Gain", "Mic Comp",
-  "EQ Rec Set", "EQ Xmt Set", "Calibrate",
-  "Bearing","Bode"
-};
-
-
 void UpdateArrayVariables(void){
     // Update array-based variable pointers to point to current band element
 
@@ -1769,6 +1760,14 @@ void UpdateArrayVariables(void){
 }
 
 /*
+// From the old code, work in progress
+const char *topMenus[] = {
+  "RF Set", "CW Options", "VFO Select",
+  "EEPROM", "AGC", "Spectrum Options",
+  "Noise Floor", "Mic Gain", "Mic Comp",
+  "EQ Rec Set", "EQ Xmt Set", "Calibrate",
+  "Bearing","Bode"
+};
 
 int (*functionPtr[])() = {
   &RFOptions, &CWOptions, &VFOSelect,
@@ -1778,7 +1777,6 @@ int (*functionPtr[])() = {
   &BearingMaps,
   &BodeOptions
 };
-
 
 const char *secondaryChoices[][14] = {
   { "Power level", "Gain", "RF In Atten", "RF Out Atten", "Antenna", "100W PA", "XVTR", "Cancel" },                       //RF
@@ -2032,6 +2030,8 @@ void DrawDisplay(void){
         }
         case (UISm_StateId_UPDATE):{
             if (primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].action == variableOption){
+                if (uiSM.vars.clearScreen)
+                    redrawParameter = true; // on first entry, draw the parameter
                 DrawHome();
                 DrawParameter();
             } else {
