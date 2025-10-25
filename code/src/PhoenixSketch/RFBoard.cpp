@@ -125,9 +125,11 @@ static int32_t check_range(int32_t val){
 static errno_t SetAttenuator(int32_t Attenuation_dBx2, uint8_t GPIO_register, bool (*RegisterWriteFunc)(void)){
     if (GPIO_register == TX) {
         SET_RF_GPB_TXATT( (uint8_t)check_range(Attenuation_dBx2) );
+        WriteGPIOBRegister();
     }
     if (GPIO_register == RX) {
         SET_RF_GPA_RXATT( (uint8_t)check_range(Attenuation_dBx2) );
+        WriteGPIOARegister();
     }
     if (RegisterWriteFunc()){
         error_state = ESUCCESS;

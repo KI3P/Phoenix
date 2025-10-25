@@ -390,6 +390,7 @@ void HandleKeyer(InterruptType interrupt){
     }
 }
 
+int32_t oldband = ED.currentBand[ED.activeVFO];
 /**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
  * issuing an event to the state machines or by updating a system parameter. Interrupt 
@@ -542,8 +543,16 @@ void ConsumeInterrupt(void){
             }
             case (iCENTERTUNE_INCREASE):{
                 ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
-                // Change the band if we tune out of the current band
-                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
+                // Change the band if we tune out of the current band. However,
+                // if we tune to a frequency outside the ham bands, keep the last
+                // valid band setting to keep demodulation working.
+                int32_t newband = GetBand(GetTXRXFreq(ED.activeVFO));
+                if (newband == -1){
+                    ED.currentBand[ED.activeVFO] = oldband;
+                } else {
+                    ED.currentBand[ED.activeVFO] = newband;
+                    oldband = newband;
+                }
                 UpdateRFHardwareState();
                 //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
@@ -552,8 +561,16 @@ void ConsumeInterrupt(void){
                 ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
                 if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
                     ED.centerFreq_Hz[ED.activeVFO] = 250000;
-                // Change the band if we tune out of the current band
-                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
+                // Change the band if we tune out of the current band. However,
+                // if we tune to a frequency outside the ham bands, keep the last
+                // valid band setting to keep demodulation working.
+                int32_t newband = GetBand(GetTXRXFreq(ED.activeVFO));
+                if (newband == -1){
+                    ED.currentBand[ED.activeVFO] = oldband;
+                } else {
+                    ED.currentBand[ED.activeVFO] = newband;
+                    oldband = newband;
+                }                
                 UpdateRFHardwareState();
                 //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;

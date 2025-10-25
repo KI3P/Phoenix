@@ -1679,13 +1679,25 @@ VariableParameter antenna = {
     .limits = {.i32 = {.min = 0, .max=3, .step=1}}
 };
 
+void UpdateRatten(void){
+    SetRXAttenuation(*(float32_t *)rxAtten.variable);
+}
+
+void UpdateTXAttenCW(void){
+    SetTXAttenuation(*(float32_t *)txAttenCW.variable);
+}
+
+void UpdateTXAttenSSB(void){
+    SetTXAttenuation(*(float32_t *)txAttenSSB.variable);
+}
+
 struct SecondaryMenuOption RFSet[7] = {
     "SSB Power", variableOption, &ssbPower, NULL, NULL,
     "CW Power", variableOption, &cwPower, NULL, NULL,
     "Gain",variableOption, &gain, NULL, NULL,
-    "RX Attenuation",variableOption, &rxAtten, NULL, NULL,
-    "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, NULL,
-    "TX Attenuation (SSB)",variableOption, &txAttenSSB, NULL, NULL,
+    "RX Attenuation",variableOption, &rxAtten, NULL, (void *)UpdateRatten,
+    "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
+    "TX Attenuation (SSB)",variableOption, &txAttenSSB, NULL, (void *)UpdateTXAttenSSB,
     "Antenna",variableOption, &antenna, NULL, NULL,
 };
 
@@ -1738,12 +1750,28 @@ struct SecondaryMenuOption CWOptions[6] = {
 //   "Sidetone Note", "Xmit Delay"
 
 ///////////////////////////////////////
+// Calibration Menu
+///////////////////////////////////////
+
+VariableParameter rflevelcal = {
+    .variable = &ED.dbm_calibration,
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = -20.0F, .max=50.0F, .step=0.5F}}
+};
+
+struct SecondaryMenuOption CalOptions[1] = {
+    "S meter level", variableOption, &rflevelcal, NULL, NULL,
+};
+
+
+///////////////////////////////////////
 // Construct the primary menu
 ///////////////////////////////////////
 
-struct PrimaryMenuOption primaryMenu[2] = {
+struct PrimaryMenuOption primaryMenu[3] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
+    "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
 };
 
 const char *topMenus[] = {
@@ -1915,8 +1943,6 @@ void DrawMainMenu(void){
         tft.fillRect(1, 5, 650, 460, RA8875_BLACK);  // Show Menu box
         //tft.clearMemory();
         tft.writeTo(L1);
-        tft.fillRect(1, 5, 650, 460, RA8875_BLACK);  // Show Menu box
-        tft.drawRect(1, 5, 650, 460, RA8875_YELLOW);
 
         uiSM.vars.clearScreen = false;
         redrawMenu = true;
@@ -1924,6 +1950,8 @@ void DrawMainMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    tft.fillRect(1, 5, 650, 460, RA8875_BLACK);  // Show Menu box
+    tft.drawRect(1, 5, 650, 460, RA8875_YELLOW);
 
     // Update the array variables if the active VFO has changed:
     if ((oavfo != ED.activeVFO) || (oband != ED.currentBand[ED.activeVFO])){
@@ -1943,12 +1971,6 @@ void DrawSecondaryMenu(void){
     // Clear the screen whenever we enter this state from another one.
     if (uiSM.vars.clearScreen){
         Debug("Clearing the screen upon entry to SECONDARY_MENU state");
-        //tft.fillWindow();
-
-        tft.writeTo(L1);
-        tft.fillRect(1,  5, 650, 460, RA8875_BLACK);  // Show Menu box
-        tft.drawRect(1,  5, 650, 460, RA8875_YELLOW);
-
         uiSM.vars.clearScreen = false;
         redrawMenu = true;
     }
@@ -1957,21 +1979,11 @@ void DrawSecondaryMenu(void){
         return;
     redrawMenu = false;
 
+    tft.fillRect(1,  5, 650, 460, RA8875_BLACK);  // Show Menu box
+    tft.drawRect(1,  5, 650, 460, RA8875_YELLOW);
+
     PrintMainMenuOptions(false);
     PrintSecondaryMenuOptions(true);
-    
-        /*if (primaryMenu[k].secondary[m].action == variableOption){
-            Debug(String("Value before increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
-            IncrementVariable(primaryMenu[k].secondary[m].varPam);
-            Debug(String("Value after increment: ") + GetVariableValueAsString(primaryMenu[k].secondary[m].varPam));
-        } else if (primaryMenu[k].secondary[m].action == functionOption) {
-            // Cast void* to function pointer and call it
-            void (*funcPtr)(void) = (void (*)(void))primaryMenu[k].secondary[m].func;
-            if (funcPtr != NULL) {
-                funcPtr();
-            }
-        }*/
-    
 }
 
 bool redrawParameter = true;
@@ -1997,11 +2009,19 @@ void DrawParameter(void){
 void IncrementValue(void){
     IncrementVariable(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam);
     redrawParameter = true;
+    void (*funcPtr)(void) = (void (*)(void))primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].postUpdateFunc;
+    if (funcPtr != NULL) {
+        funcPtr();
+    }
 }
 
 void DecrementValue(void){
     DecrementVariable(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam);
     redrawParameter = true;
+    void (*funcPtr)(void) = (void (*)(void))primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].postUpdateFunc;
+    if (funcPtr != NULL) {
+        funcPtr();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2020,27 +2040,6 @@ void InitializeDisplay(void){
     tft.clearMemory();
     tft.writeTo(L1);
     DrawDisplay();
-}
-
-/**
- * Show the value of a parameter. 
- */
-static void DrawValue(void){
-    Base *base = (Base *)uiSM.vars.uiUp;
-    switch (base->type){
-        case TYPE_INT32: {
-            UIValueUpdateInt *foo = (UIValueUpdateInt *)uiSM.vars.uiUp;
-            int32_t current_value = foo->getValueFunction();
-            Debug(current_value);
-            break;
-        }
-        case TYPE_FLOAT: {
-            UIValueUpdateFloat *foo = (UIValueUpdateFloat *)uiSM.vars.uiUp;
-            float current_value = foo->getValueFunction();
-            Debug(current_value);
-            break;
-        }
-    }
 }
 
 UISm_StateId oldstate = UISm_StateId_ROOT;

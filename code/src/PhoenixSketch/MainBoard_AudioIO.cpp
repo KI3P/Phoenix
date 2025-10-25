@@ -241,6 +241,10 @@ void InitializeAudio(void){
     pcm5102_mainBoard.inputSelect(AUDIO_INPUT_LINEIN);
     pcm5102_mainBoard.volume(0.5);
 
+    // Mute the sidetone channel now otherwise we get a short tone on radio startup
+    // before the state machine mutes it
+    MuteMixerChannels(&modeSelectOutL); // sidetone
+    MuteMixerChannels(&modeSelectOutR); // sidetone
     sidetone_oscillator.amplitude(ED.sidetoneVolume / 500);
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
 
