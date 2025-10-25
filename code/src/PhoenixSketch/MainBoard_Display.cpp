@@ -110,7 +110,6 @@ void BlankBox(Rectangle *rect){
 void DrawVFOPanes(void);
 void DrawFreqBandModPane(void);
 void DrawSpectrumPane(void);
-//void DrawWaterfallPane(void);
 void DrawStateOfHealthPane(void);
 void DrawTimePane(void);
 void DrawSWRPane(void);
@@ -332,72 +331,41 @@ uint16_t spectrum_x = 10;
   Return value;
     void
 *****/
-int32_t newCursorPosition = 0;
-float32_t pixel_per_khz;
-int32_t filterWidth;
-int32_t oldCursorPosition = 256;
-int32_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
-int32_t h = 135;
 #define FILTER_WIN 0x10  // Color of SSB filter width
-FASTRUN void DrawBandWidthIndicatorBar(void)
-{
-    float zoomMultFactor = 0.0;
-    float Zoom1Offset = 0.0;
-
+FASTRUN int16_t FreqToBin(int64_t freq_Hz){
+    int16_t val = SPECTRUM_RES*((float32_t)(freq_Hz - GetLowerFreq_Hz()) / (float32_t)(SR[SampleRate].rate/(1<<ED.spectrum_zoom)));
+    if (val < 0) val = 0;
+    if (val > SPECTRUM_RES) val = SPECTRUM_RES;
+    return val;
+}
+FASTRUN void DrawBandWidthIndicatorBar(void){
     // erase the previous bandwidth indicator bar:
     tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
-
-    switch (ED.spectrum_zoom) {
-        case 0:
-            zoomMultFactor = 0.5;
-            Zoom1Offset = 24000 * 0.0053333;
-            break;
-        case 1:
-            zoomMultFactor = 1.0;
-            Zoom1Offset = 0;
-            break;
-        case 2:
-            zoomMultFactor = 2.0;
-            Zoom1Offset = 0;
-            break;
-        case 3:
-            zoomMultFactor = 4.0;
-            Zoom1Offset = 0;
-            break;
-        case 4:
-            zoomMultFactor = 8.0;
-            Zoom1Offset = 0;
-            break;
-    }
-    newCursorPosition = (int32_t)(-ED.fineTuneFreq_Hz[ED.activeVFO] * 0.0053333) * zoomMultFactor - Zoom1Offset;
-
     tft.writeTo(L2);
-
-    pixel_per_khz = ((1 << ED.spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate);
-    filterWidth = (int32_t)(((bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - 
+    float32_t pixel_per_khz = ((1 << ED.spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate);
+    int16_t filterWidth = (int16_t)(((bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - 
                               bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) / 1000.0) * pixel_per_khz * 1.06);
-
+    int16_t vline = SPECTRUM_LEFT_X + FreqToBin(GetTXRXFreq(ED.activeVFO));
     switch (ED.modulation[ED.activeVFO]) {
         case LSB:
-            tft.fillRect(centerLine - filterWidth + newCursorPosition, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+            tft.fillRect(vline - filterWidth, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
 
         case USB:
-            tft.fillRect(centerLine + newCursorPosition, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+            tft.fillRect(vline, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
 
         case AM:
-            tft.fillRect(centerLine - (filterWidth ) * 0.93 + newCursorPosition, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+            tft.fillRect(vline - (filterWidth ) * 0.93, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
 
         case SAM:
-            tft.fillRect(centerLine - (filterWidth ) * 0.93 + newCursorPosition, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+            tft.fillRect(vline - (filterWidth ) * 0.93, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
         default:
             break;
     }
-    tft.drawFastVLine(centerLine + newCursorPosition, SPECTRUM_TOP_Y + 20, h - 10, RA8875_CYAN);
-    oldCursorPosition = newCursorPosition;
+    tft.drawFastVLine(vline, SPECTRUM_TOP_Y + 20, SPECTRUM_HEIGHT-25, RA8875_CYAN);
 }
 
 uint16_t FILTER_PARAMETERS_X = PaneSpectrum.x0 + PaneSpectrum.width / 3;// (XPIXELS * 0.22); // 800 * 0.22 = 176
