@@ -1731,15 +1731,40 @@ struct SecondaryMenuOption CalOptions[1] = {
     "S meter level", variableOption, &rflevelcal, NULL, NULL,
 };
 
+///////////////////////////////////////
+// Display menu
+///////////////////////////////////////
+
+VariableParameter spectrumfloor = {
+    .variable = &ED.spectrumNoiseFloor,
+    .type = TYPE_I16,
+    .limits = {.i16 = {.min = -100, .max=100, .step=1}}
+};
+
+VariableParameter spectrumscale = {
+    .variable = &ED.spectrumScale,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max=4, .step=1}}
+};
+
+void ScaleUpdated(void){
+    PaneSpectrum.stale = true;
+}
+
+struct SecondaryMenuOption DisplayOptions[2] = {
+    "Spectrum floor", variableOption, &spectrumfloor, NULL, NULL,
+    "Spectrum scale", variableOption, &spectrumscale, NULL, (void *)ScaleUpdated,
+};
 
 ///////////////////////////////////////
 // Construct the primary menu
 ///////////////////////////////////////
 
-struct PrimaryMenuOption primaryMenu[3] = {
+struct PrimaryMenuOption primaryMenu[4] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
+    "Display", DisplayOptions, sizeof(DisplayOptions)/sizeof(DisplayOptions[0]),
 };
 
 void UpdateArrayVariables(void){
