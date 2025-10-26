@@ -163,48 +163,48 @@ enum MorseStates { state0,
               state6 };
 
 extern struct config_t {
-    AGCMode agc = AGCOff; // was AGCLong
-    int32_t audioVolume = 30;
-    float32_t rfGainAllBands_dB = 0;
-    int64_t stepFineTune = FAST_TUNE_INCREMENT;
-    NoiseReductionType nrOptionSelect = NROff;
-    uint8_t ANR_notchOn = 0;
-    int32_t spectrumScale = 1; // was currentScale
-    int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {40,40,40,40,40,40,40,40,40,40,40,40};
-    uint32_t spectrum_zoom = 1;
-    int32_t CWFilterIndex = 5;
-    int32_t CWToneIndex = 3;
-    int32_t decoderFlag = DECODER_STATE; // CW decoder, 0=off, 1=on
-    KeyTypeId keyType = KEYER_TYPE;
-    int32_t currentWPM = DEFAULT_KEYER_WPM;
-    float32_t sidetoneVolume = 20.0;
-    int32_t freqIncrement = 1000;
-    float32_t freqCorrectionFactor = 0;
-    uint8_t activeVFO = 0;                                // 0(A) or 1(B)
-    ModulationType modulation[2] = {LSB, LSB};
-    int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND};
-    int64_t centerFreq_Hz[2] = {7030000L,7030000L};
-    int64_t fineTuneFreq_Hz[2] = {0, 0};
-    int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
-    int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
-    int32_t currentMicGain = -10;
-    float32_t dbm_calibration = 17.5;
-    float32_t powerOutCW[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5};
-    float32_t powerOutSSB[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5};
-    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1};
-    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    AGCMode agc = AGCOff; /** AGC mode */
+    int32_t audioVolume = 30; /** Output audio amplitude */
+    float32_t rfGainAllBands_dB = 0; /** Gain applied to the IQ samples in DSP chain */
+    int64_t stepFineTune = FAST_TUNE_INCREMENT; /** Increment value for fine tune */
+    NoiseReductionType nrOptionSelect = NROff; /** Noise reduction mode */
+    uint8_t ANR_notchOn = 0; /** Automatic notch filter on/off */
+    int32_t spectrumScale = 1; /** dB/pixel selection for spectrum display */
+    int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50}; /** Shift spectrum up/down on display */
+    uint32_t spectrum_zoom = 1; /** Zoom level for spectrum */
+    int32_t CWFilterIndex = 5; /** Selects the receive CW audio filter */
+    int32_t CWToneIndex = 3; /** Selects the transmitted CW tone frequency */
+    int32_t decoderFlag = DECODER_STATE; /** CW decoder on/off */
+    KeyTypeId keyType = KEYER_TYPE; /** CW key type: straight or keyer */
+    int32_t currentWPM = DEFAULT_KEYER_WPM; /** CW words per minute for keyer + decoder */
+    float32_t sidetoneVolume = 20.0; /** CW transmit sidetone volume */
+    int32_t freqIncrement = 1000; /** Increment value for center tune */
+    float32_t freqCorrectionFactor = 0; /** Correction value for Si5351 VFO */
+    uint8_t activeVFO = 0; /** Which VFO is currently active (0 or 1) */
+    ModulationType modulation[2] = {LSB, LSB}; /** Modulation type for each VFO */
+    int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND}; /** Band for each VFO */
+    int64_t centerFreq_Hz[2] = {7030000L,7030000L}; /** VFO center frequency for each VFO */
+    int64_t fineTuneFreq_Hz[2] = {0, 0}; /** Fine tune frequency for each VFO */
+    int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
+    int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
+    int32_t currentMicGain = -10; /** Gain of the mic used for SSB */
+    float32_t dbm_calibration = 17.5; /** Calibrates the S-meter scale on the display */
+    float32_t powerOutCW[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5}; /** Set output power in Watts in CW mode */
+    float32_t powerOutSSB[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5}; /** Set output power in Watts in SSB mode */
+    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1}; /** Receive IQ calibration amplitude correction */
+    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
+    float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
+    float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
+    float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board receive attenuation */
     int64_t lastFrequencies[NUMBER_OF_BANDS][3] = {{1850000,0,1},{3700000,0,1},{5351500,0,0},
                     {7150000,0,1},{10125000,0,0},{14200000,0,0},{18100000,0,0},
-                    {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0}}; // center tune, fine tune, modulation
-    int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    bool keyerFlip = KEYER_FLIP;                     // false = right paddle = DAH, true = DIT
-    float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+                    {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0}}; /** center tune, fine tune, modulation */
+    int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
+    bool keyerFlip = KEYER_FLIP; /**false = right paddle = DAH, true = DIT */
+    float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
+    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
+    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
+    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine
