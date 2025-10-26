@@ -523,8 +523,8 @@ extern elapsedMicros usec;
 #define RXTX        22 // Transmit/Receive (H=TX,L=RX)
 #define CW_ON_OFF   33 // CW on / off (H=ON,L=OFF) (V12 hardware)
 #define XMIT_MODE   34 // Transmit mode (H=SSB,L=CW) (V12 hardware)
-#define KEY1        35 // Tip for Straight key
-#define KEY2        36 // Ring
+#define KEY1        36 // Tip for Straight key
+#define KEY2        35 // Ring
 #define PTT         37
 #define FOR         26
 #define REV         27

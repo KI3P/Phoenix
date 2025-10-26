@@ -77,10 +77,13 @@ static void interrupt2() {
     uint8_t state = 0x00;
     uint8_t a_state;
     uint8_t b_state;
+    uint16_t both;
 
     while((pin = mcp2.getLastInterruptPin())!=MCP23XXX_INT_ERR) {
-        a_state = mcp2.readGPIOA();
-        b_state = mcp2.readGPIOB();
+        both = mcp2.readGPIOAB(); // save an I2C instruction for speed
+        // A is lower 8, B is upper 8
+        a_state = (both >> 0) & 0xFF;
+        b_state = (both >> 8) & 0xFF;
         switch(pin) {
             case 8:
             case 9:
@@ -243,6 +246,8 @@ void CheckForFrontPanelInterrupts(void){
     }
     if (digitalRead(INT_PIN_2) == 0){
         // We received an interrupt on pin 2
+        Flag(4);
         interrupt2();
+        Flag(0);
     }
 }

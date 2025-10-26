@@ -718,8 +718,8 @@ DataBlock * ReceiveProcessing(const char *fname){
         return NULL;
     }
     Flag(1);
-    // Clear overfull buffers
-    ClearAudioBuffers();
+    // Clear overfull buffers is not needed
+    //ClearAudioBuffers();
 
     SaveData(&data, 0);
     if (fname != nullptr){

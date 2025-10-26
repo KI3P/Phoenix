@@ -431,7 +431,8 @@ void ConsumeInterrupt(void){
                 break;
             }
             case (iKEY2_PRESSED):{
-                HandleKeyer(interrupt);
+                if (ED.keyType == KeyTypeId_Keyer)
+                    HandleKeyer(interrupt);
                 break;
             }
             case (iVOLUME_INCREASE):{
