@@ -36,7 +36,9 @@ void SaveDataToStorage(void){
     doc["nrOptionSelect"] = ED.nrOptionSelect;
     doc["ANR_notchOn"] = ED.ANR_notchOn;
     doc["spectrumScale"] = ED.spectrumScale;
-    doc["spectrumNoiseFloor"] = ED.spectrumNoiseFloor;
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        doc["spectrumNoiseFloor"][i] = ED.spectrumNoiseFloor[i];
+    }
     doc["spectrum_zoom"] = ED.spectrum_zoom;
     doc["CWFilterIndex"] = ED.CWFilterIndex;
     doc["CWToneIndex"] = ED.CWToneIndex;
@@ -215,7 +217,11 @@ void RestoreDataFromStorage(void){
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
     ED.ANR_notchOn = doc["ANR_notchOn"] | ED.ANR_notchOn;
     ED.spectrumScale = doc["spectrumScale"] | ED.spectrumScale;
-    ED.spectrumNoiseFloor = doc["spectrumNoiseFloor"] | ED.spectrumNoiseFloor;
+    if (doc["spectrumNoiseFloor"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.spectrumNoiseFloor[i] = doc["spectrumNoiseFloor"][i] | ED.spectrumNoiseFloor[i];
+        }
+    }
     ED.spectrum_zoom = doc["spectrum_zoom"] | ED.spectrum_zoom;
     ED.CWFilterIndex = doc["CWFilterIndex"] | ED.CWFilterIndex;
     ED.CWToneIndex = doc["CWToneIndex"] | ED.CWToneIndex;

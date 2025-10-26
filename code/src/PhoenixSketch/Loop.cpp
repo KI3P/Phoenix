@@ -577,13 +577,25 @@ void ConsumeInterrupt(void){
             }
             case (iFINETUNE_INCREASE):{
                 AdjustFineTune(+1);
-                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
+                int32_t newband = GetBand(GetTXRXFreq(ED.activeVFO));
+                if (newband == -1){
+                    ED.currentBand[ED.activeVFO] = oldband;
+                } else {
+                    ED.currentBand[ED.activeVFO] = newband;
+                    oldband = newband;
+                }
                 //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_DECREASE):{
                 AdjustFineTune(-1);
-                ED.currentBand[ED.activeVFO] = GetBand(GetTXRXFreq(ED.activeVFO));
+                int32_t newband = GetBand(GetTXRXFreq(ED.activeVFO));
+                if (newband == -1){
+                    ED.currentBand[ED.activeVFO] = oldband;
+                } else {
+                    ED.currentBand[ED.activeVFO] = newband;
+                    oldband = newband;
+                }
                 //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }

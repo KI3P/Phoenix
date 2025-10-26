@@ -170,7 +170,7 @@ extern struct config_t {
     NoiseReductionType nrOptionSelect = NROff;
     uint8_t ANR_notchOn = 0;
     int32_t spectrumScale = 1; // was currentScale
-    int16_t spectrumNoiseFloor = 40;
+    int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {40,40,40,40,40,40,40,40,40,40,40,40};
     uint32_t spectrum_zoom = 1;
     int32_t CWFilterIndex = 5;
     int32_t CWToneIndex = 3;

@@ -63,6 +63,7 @@ const uint16_t gradient[] = {  // Color array for waterfall background
 
 static bool redrawSpectrum = false;
 static float32_t audioMaxSquaredAve = 0;
+bool redrawParameter = true;
 
 int64_t GetCenterFreq_Hz(){
     if (ED.spectrum_zoom == 0)
@@ -532,7 +533,7 @@ uint16_t waterfall[MAX_WATERFALL_WIDTH];
 static int16_t x1 = 0;
 static int16_t y_left;
 static int16_t y_prev = pixelold[0];
-static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);//-currentNoiseFloor[currentBand];
+static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);//-currentNoiseFloor[currentBand];
 static int16_t y_current = offset;
 static int16_t smeterLength;
 #define NCHUNKS 4
@@ -557,7 +558,7 @@ void ShowSpectrum(void){
     Flag(2);
     int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
     int16_t middleSlice = centerLine / 2;  // Approximate center element
-    offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor);
+    offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
     for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
         y_left = y_current; // use the value we calculated the last time through this loop
         y_current = offset - pixelnew(x1);
@@ -1705,7 +1706,6 @@ VariableParameter stv = {
     .limits = {.f32 = {.min = 0.0F, .max=100.0F, .step=0.5F}}
 };
 
-
 struct SecondaryMenuOption CWOptions[6] = {
     "WPM", variableOption, &wpm, NULL, (void *)UpdateDitLength,
     "Straight key", functionOption, NULL, (void *)SelectStraightKey, NULL,
@@ -1736,7 +1736,7 @@ struct SecondaryMenuOption CalOptions[1] = {
 ///////////////////////////////////////
 
 VariableParameter spectrumfloor = {
-    .variable = &ED.spectrumNoiseFloor,
+    .variable = NULL,  // Will be set dynamically to &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]
     .type = TYPE_I16,
     .limits = {.i16 = {.min = -100, .max=100, .step=1}}
 };
@@ -1781,6 +1781,8 @@ void UpdateArrayVariables(void){
     // CW Options
     // none
 
+    // Display menu
+    spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
 
 }
 
@@ -1944,7 +1946,7 @@ void DrawMainMenu(void){
     tft.fillRect(1, 5, 650, 460, RA8875_BLACK);  // Show Menu box
     tft.drawRect(1, 5, 650, 460, RA8875_YELLOW);
 
-    // Update the array variables if the active VFO has changed:
+    // Update the array variables if the active VFO or band have changed:
     if ((oavfo != ED.activeVFO) || (oband != ED.currentBand[ED.activeVFO])){
         oavfo = ED.activeVFO;
         oband = ED.currentBand[ED.activeVFO];
@@ -1977,10 +1979,14 @@ void DrawSecondaryMenu(void){
     PrintSecondaryMenuOptions(true);
 }
 
-bool redrawParameter = true;
 void DrawParameter(void){
-    // Draw a box and write the current value of the parameter into it
-    // Use the name badge pane
+    // Update the array variables if the active VFO or band have changed:
+    if ((oavfo != ED.activeVFO) || (oband != ED.currentBand[ED.activeVFO])){
+        oavfo = ED.activeVFO;
+        oband = ED.currentBand[ED.activeVFO];
+        UpdateArrayVariables();
+        redrawParameter = true;
+    }
     if (redrawParameter){
         tft.fillRect(PaneNameBadge.x0, PaneNameBadge.y0, PaneNameBadge.width, PaneNameBadge.height, RA8875_BLACK);
         // Draw a box around the borders and put some text in the middle

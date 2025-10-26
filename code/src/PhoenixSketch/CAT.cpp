@@ -351,12 +351,12 @@ char *MG_read(  char* cmd ){
 char *NF_write( char* cmd ){
 	int nf = atoi( &cmd[2] );
 	Debug(nf);
-	ED.spectrumNoiseFloor = nf;
+	ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]] = nf;
   	return empty_string_p;
 }
 
 char *NF_read(  char* cmd ){
-  	sprintf( obuf, "NF%03d;", ED.spectrumNoiseFloor );
+  	sprintf( obuf, "NF%03d;", ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]] );
   	return obuf;
 }
 
@@ -491,7 +491,12 @@ char *ED_read(  char* cmd  ){
 	Serial.print("nrOptionSelect:    "); Serial.println(ED.nrOptionSelect);
 	Serial.print("ANR_notchOn:       "); Serial.println(ED.ANR_notchOn);
 	Serial.print("spectrumScale:     "); Serial.println(ED.spectrumScale);
-	Serial.print("spectrumNoiseFloor:"); Serial.println(ED.spectrumNoiseFloor);
+	Serial.print("spectrumNoiseFloor:");
+	for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+		Serial.print(ED.spectrumNoiseFloor[i]);
+		if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+	}
+	Serial.println();
 	Serial.print("spectrum_zoom:     "); Serial.println(ED.spectrum_zoom);
 	Serial.print("CWFilterIndex:     "); Serial.println(ED.CWFilterIndex);
 	Serial.print("CWToneIndex:       "); Serial.println(ED.CWToneIndex);
