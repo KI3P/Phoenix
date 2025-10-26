@@ -1,4 +1,5 @@
 #include "RA8875.h"
+#include "Arduino.h"
 #include <iostream>
 #include <iomanip>
 
@@ -60,6 +61,10 @@ void RA8875::setFont(const void* font) {
 }
 
 void RA8875::print(const char* text) {
+    // Mock implementation - could log the text if needed for testing
+}
+
+void RA8875::print(const String& str) {
     // Mock implementation - could log the text if needed for testing
 }
 

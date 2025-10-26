@@ -66,6 +66,7 @@ public:
     void setFontDefault();
     void setFont(const void* font);
     void print(const char* text);
+    void print(const class String& str);
     void print(int value);
     void print(int64_t value);
     void print(float value);

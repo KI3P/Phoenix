@@ -17,6 +17,7 @@ void PerformSignalProcessing(void){
             break;
         }
         case (ModeSm_StateId_SSB_TRANSMIT):{
+            TransmitProcessing(nullptr);
             break;
         }
         case (ModeSm_StateId_CW_RECEIVE):{
@@ -835,4 +836,22 @@ DataBlock * ReceiveProcessing(const char *fname){
     Flag(0);
 
     return &data;
+}
+
+/**
+ * Read a block of samples from the microphone and perform transmit signal processing
+ */
+void TransmitProcessing(const char *fname){
+
+    /*TXDecimateBy4(I,Q);// 2048 in, 512 out
+    TXDecimateBy2(I,Q);// 512 in, 256 out
+    DoExciterEQ(I); // 256
+    arm_copy_f32(I,Q,256);
+    TXDecimateBy2Again(I,Q); // 256 in, 128 out
+    HilbertTransform(I,Q); // 128
+    TXInterpolateBy2Again(I,Q,Io,Qo); // 128 in, 256 out
+    SidebandSelection(Io, Qo);
+    TXInterpolateBy2(Io,Qo,I,Q); // 256 in, 512 out
+    TXInterpolateBy4(I,Q,Io,Qo); // 512 in, 2048 out
+    */
 }

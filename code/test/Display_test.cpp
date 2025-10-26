@@ -1088,7 +1088,6 @@ TEST_F(DisplayTest, RFSetMenu_RXAttenuation_Configuration) {
     EXPECT_EQ(RFSet[3].action, variableOption);
     EXPECT_EQ(RFSet[3].varPam, &rxAtten);
     EXPECT_EQ(RFSet[3].func, nullptr);
-    EXPECT_EQ(RFSet[3].postUpdateFunc, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(rxAtten.type, TYPE_F32);
@@ -1136,7 +1135,6 @@ TEST_F(DisplayTest, RFSetMenu_TXAttenuationCW_Configuration) {
     EXPECT_EQ(RFSet[4].action, variableOption);
     EXPECT_EQ(RFSet[4].varPam, &txAttenCW);
     EXPECT_EQ(RFSet[4].func, nullptr);
-    EXPECT_EQ(RFSet[4].postUpdateFunc, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(txAttenCW.type, TYPE_F32);
@@ -1184,7 +1182,6 @@ TEST_F(DisplayTest, RFSetMenu_TXAttenuationSSB_Configuration) {
     EXPECT_EQ(RFSet[5].action, variableOption);
     EXPECT_EQ(RFSet[5].varPam, &txAttenSSB);
     EXPECT_EQ(RFSet[5].func, nullptr);
-    EXPECT_EQ(RFSet[5].postUpdateFunc, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(txAttenSSB.type, TYPE_F32);

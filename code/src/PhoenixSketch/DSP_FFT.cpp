@@ -782,27 +782,27 @@ void SidebandSelection(float32_t *I, float32_t *Q){
     }
 }
 
-void TXDecimateBy4(float32_t *I,float32_t *Q){
+void TXDecimateBy4(float32_t *I, float32_t *Q){
     // 192KHz effective sample rate here
     // decimation-by-4 in-place!
     arm_fir_decimate_f32(&FIR_dec1_EX_I, I, I, BUFFER_SIZE * N_BLOCKS);
     arm_fir_decimate_f32(&FIR_dec1_EX_Q, Q, Q, BUFFER_SIZE * N_BLOCKS);
 }
 
-void TXDecimateBy2(float32_t *I,float32_t *Q){
+void TXDecimateBy2(float32_t *I, float32_t *Q){
     // 48KHz effective sample rate here
     // decimation-by-2 in-place
     arm_fir_decimate_f32(&FIR_dec2_EX_I, I, I, 512);
     arm_fir_decimate_f32(&FIR_dec2_EX_Q, Q, Q, 512);
 }
 
-void TXDecimateBy2Again(float32_t *I,float32_t *Q){
+void TXDecimateBy2Again(float32_t *I, float32_t *Q){
     //Decimate by 2 to 12K SPS sample rate
     arm_fir_decimate_f32(&FIR_dec3_EX_I, I, I, 256);
     arm_fir_decimate_f32(&FIR_dec3_EX_Q, Q, Q, 256);
 }
 
-void TXInterpolateBy2Again(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout){
+void TXInterpolateBy2Again(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
     //Interpolate back to 24K SPS
     arm_fir_interpolate_f32(&FIR_int3_EX_I, I, Iout, 128);
     arm_scale_f32(Iout,2,Iout,256);
@@ -810,7 +810,7 @@ void TXInterpolateBy2Again(float32_t *I,float32_t *Q, float32_t *Iout,float32_t 
     arm_scale_f32(Qout,2,Qout,256);
 }
 
-void TXInterpolateBy2(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout){
+void TXInterpolateBy2(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
     //24KHz effective sample rate input, 48 kHz output
     arm_fir_interpolate_f32(&FIR_int1_EX_I, I, Iout, 256);
     arm_scale_f32(Iout,2,Iout,512);
@@ -818,7 +818,7 @@ void TXInterpolateBy2(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout
     arm_scale_f32(Qout,2,Qout,512);
 }
 
-void TXInterpolateBy4(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout){
+void TXInterpolateBy4(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
     //48KHz effective sample rate input, 128 kHz output
     arm_fir_interpolate_f32(&FIR_int2_EX_I, I, Iout, 512);
     arm_scale_f32(Iout,4,Iout,2048);

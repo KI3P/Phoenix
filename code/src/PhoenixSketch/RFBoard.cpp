@@ -117,12 +117,11 @@ static int32_t check_range(int32_t val){
  *
  * @param Attenuation_dBx2 The attenuation in units of 2x dB. [0 to 63]
  * @param GPIO_register A flag identifying the register for this attenuator
- * @param RegisterWriteFunc The function that writes the register to the attenuator
  * 
  * @return Error code. ESUCCESS if no failure. EGPIOWRITEFAIL if unable to write to GPIO bank.
  *  
  */
-static errno_t SetAttenuator(int32_t Attenuation_dBx2, uint8_t GPIO_register, bool (*RegisterWriteFunc)(void)){
+static errno_t SetAttenuator(int32_t Attenuation_dBx2, uint8_t GPIO_register){
     if (GPIO_register == TX) {
         SET_RF_GPB_TXATT( (uint8_t)check_range(Attenuation_dBx2) );
         WriteGPIOBRegister();
@@ -131,12 +130,7 @@ static errno_t SetAttenuator(int32_t Attenuation_dBx2, uint8_t GPIO_register, bo
         SET_RF_GPA_RXATT( (uint8_t)check_range(Attenuation_dBx2) );
         WriteGPIOARegister();
     }
-    if (RegisterWriteFunc()){
-        error_state = ESUCCESS;
-    } else {
-        error_state = EGPIOWRITEFAIL;
-    }
-    return error_state;
+    return ESUCCESS;
 }
 
 /**
@@ -250,7 +244,7 @@ errno_t SetRXAttenuation(float32_t rxAttenuation_dB){
     if (newRegisterValue == RF_GPA_RXATT_STATE){
         return ESUCCESS;
     } else {
-        return SetAttenuator((int32_t)round(2*rxAttenuation_dB), RX, WriteGPIOARegister);
+        return SetAttenuator((int32_t)round(2*rxAttenuation_dB), RX);
     }
 }
 
@@ -271,7 +265,7 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
     if (newRegisterValue == RF_GPB_TXATT_STATE){
         return ESUCCESS;
     } else {
-        return SetAttenuator((int32_t)round(2*txAttenuation_dB), TX, WriteGPIOBRegister);
+        return SetAttenuator((int32_t)round(2*txAttenuation_dB), TX);
     }
 }
 

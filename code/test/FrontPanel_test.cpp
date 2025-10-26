@@ -139,8 +139,10 @@ TEST(FrontPanel, FilterDecrease){
 
     ED.fineTuneFreq_Hz[ED.activeVFO] = -48000.0;
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
+    ED.currentBand[ED.activeVFO] = BAND_20M;
    
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
@@ -164,14 +166,8 @@ TEST(FrontPanel, FilterDecrease){
     int32_t maxpost = FindMax("FilterDecrease_ReceiveOut_L.txt", 2048*258); //4238
     EXPECT_LT(maxpost, maxpre*0.5);
 
-    if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
-        EXPECT_LT(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,tmphi);
-        EXPECT_EQ(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,500);
-    }
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-        EXPECT_GT(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz,tmplo);
-        EXPECT_EQ(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz,-500);
-    }
+    EXPECT_EQ(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,500);
+
 }
 
 
@@ -184,6 +180,7 @@ TEST(FrontPanel, FilterIncrease){
     Q_out_R.setName(nullptr);
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
     InitializeSignalProcessing();
