@@ -1362,7 +1362,7 @@ void MorseCharacterDisplay() {
     if (!IsMorseCharacterBufferUpdated())
         return;
     // blank out prior text    
-    tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
+    tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height+2, RA8875_BLACK);
     tft.setFontScale((enum RA8875tsize)1);
     tft.setTextColor(RA8875_WHITE);
     tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
