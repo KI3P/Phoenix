@@ -494,7 +494,6 @@ extern AGCConfig agc;
 extern UISm uiSM;
 extern ModeSm modeSM;
 extern bool displayFFTUpdated; /** Set true when psdnew is updated */
-extern bool CWLocked;
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t psdold[]; /** Holds the prior PSD data for the power spectrum display */
@@ -508,9 +507,6 @@ extern const float32_t CWToneOffsetsHz[];
 extern uint8_t SampleRate;
 extern float32_t SAM_carrier_freq_offset;
 extern float32_t SAM_carrier_freq_offsetOld;
-
-extern char morseCharacter;
-extern bool morseCharacterUpdated;
 
 extern VolumeFunction volumeFunction;
 

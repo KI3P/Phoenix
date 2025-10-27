@@ -18,5 +18,8 @@ void JackClusteredArrayMax(int32_t *array, int32_t elements, int32_t *maxCount, 
 void DoSignalHistogram(int64_t val);
 void ResetHistograms();
 void CWAudioFilter(DataBlock *data, FilterConfig *filters);
+bool IsCWDecodeLocked(void);
+char *GetMorseCharacterBuffer(void);
+bool IsMorseCharacterBufferUpdated(void);
 
 #endif // CWPROCESSING_H

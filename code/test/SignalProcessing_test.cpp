@@ -1767,10 +1767,16 @@ TEST(SignalProcessing, CWProcessing){
         // Set the time so that the millis() function is correct-ish
         SetMillisTime((uint64_t)(100.0+(float32_t)(k+1)*256.0/24000.0*1000.0));
         DoCWReceiveProcessing(&data, &filters);
-        if (morseCharacterUpdated){
-            fputc(morseCharacter, file);
-            EXPECT_EQ(morseCharacter,msg[mpoint++]);
-            morseCharacterUpdated = false;
+        if (IsMorseCharacterBufferUpdated()){
+            char *buff = GetMorseCharacterBuffer();
+            // Find the last non-null character
+            int k = 0;
+            for (k=0; k<32; k++){
+                if (buff[k+1] == '\0')
+                    break;
+            }
+            fputc(buff[k], file);
+            EXPECT_EQ(buff[k],msg[mpoint++]);
         }
     }
     fclose(file);

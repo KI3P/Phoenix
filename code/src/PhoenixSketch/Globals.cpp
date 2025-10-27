@@ -2,15 +2,10 @@
 
 struct config_t ED;
 bool displayFFTUpdated;
-bool CWLocked;
 bool psdupdated = false;
 float32_t psdnew[SPECTRUM_RES];
 float32_t psdold[SPECTRUM_RES];
 float32_t audioYPixel[SPECTRUM_RES/4];
-
-// Used by the CW decoder
-char morseCharacter;
-bool morseCharacterUpdated = false;
 
 VolumeFunction volumeFunction = AudioVolume;
 

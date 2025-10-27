@@ -21,6 +21,7 @@ static uint8_t currentDecoderIndex = 0;
 static int32_t gapHistogram[HISTOGRAM_ELEMENTS];
 static int32_t gapAtom, topGapIndex, topGapIndexOld, gapChar;
 static uint8_t endGapFlag;
+static bool CWLocked = false;
 uint8_t valFlag = 0;
 int64_t valRef1, gapRef1, valRef2;
 int64_t aveDitLength = 80;
@@ -90,6 +91,12 @@ void DoCWReceiveProcessing(DataBlock *data, FilterConfig *filters) {
     }
 }
 
+/**
+ * Return true if the CW decoder is locked, false if not
+ */
+bool IsCWDecodeLocked(void){
+    return CWLocked;
+}
 
 /**
  * Calculate Goertzal Algorithn to enable decoding CW
@@ -127,6 +134,35 @@ float32_t goertzel_mag(uint32_t numSamples, int32_t TARGET_FREQUENCY, uint32_t S
 
     magnitude = sqrtf(real * real + imag * imag);
     return magnitude;
+}
+
+#define MAX_DECODE_CHARS 15
+char decodeBuffer[MAX_DECODE_CHARS+1];
+static int16_t col = 0;
+bool morseCharacterUpdated = false;
+/**
+ * Add the character to the buffer
+ */
+void MorseCharacterAdd(char currentLetter) {
+    morseCharacterUpdated = true;
+    if (col < MAX_DECODE_CHARS) {  // Start scrolling?
+        decodeBuffer[col] = currentLetter;
+        col++;
+        decodeBuffer[col] = '\0';  // Make it a string
+    } else {
+        memmove(decodeBuffer, &decodeBuffer[1], MAX_DECODE_CHARS - 1);  // Slide array down 1 character.
+        decodeBuffer[col - 1] = currentLetter;                          // Add to end
+        decodeBuffer[col] = '\0';                                       // Make it a string
+    }
+}
+
+char *GetMorseCharacterBuffer(void){
+    morseCharacterUpdated = false;
+    return decodeBuffer;
+}
+
+bool IsMorseCharacterBufferUpdated(void){
+    return morseCharacterUpdated;
 }
 
 /**
@@ -216,8 +252,7 @@ void DoCWDecoding(uint8_t audioValue) {
         }
         case state5:{
             // Display the character
-            morseCharacter = bigMorseCodeTree[currentDecoderIndex];  // This always prints.  How do blanks get printed.
-            morseCharacterUpdated = true;
+            MorseCharacterAdd(bigMorseCodeTree[currentDecoderIndex]);  // This always prints.  How do blanks get printed.
             currentDecoderIndex = 0;                                       //Reset everything if char or word
             currentDashJump     = DECODER_BUFFER_SIZE;
             charProcessFlag     = false;  // Char printed and no longer in progress.
@@ -227,8 +262,7 @@ void DoCWDecoding(uint8_t audioValue) {
         }
         case state6:{
             //  Blank printing state.
-            morseCharacter = ' '; 
-            morseCharacterUpdated = true;
+            MorseCharacterAdd(' '); 
             blankFlag = true;
             decodeStates = state0;  // Start process for next incoming character.
             break;

@@ -659,6 +659,9 @@ void DrawSpectrumPane(void) {
 void DrawStateOfHealthPane(void) {
     // Only update if information is stale
     if (!PaneStateOfHealth.stale) return;
+    // We use this pane for the CW text decode, so don't draw if we're in that mode
+    if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag)) 
+        return;
     tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
@@ -759,7 +762,7 @@ void DrawTimePane(void) {
 }
 
 void DrawSWRPane(void) {
-    // Only update if information is stale
+/*    // Only update if information is stale
     if (!PaneSWR.stale) return;
     tft.setFontDefault();
     // Black out the prior data
@@ -773,6 +776,7 @@ void DrawSWRPane(void) {
     tft.print("SWR");
     // Mark the pane as no longer stale
     PaneSWR.stale = false;
+*/
 }
 
 ModeSm_StateId oldMState = ModeSm_StateId_ROOT;
@@ -1254,21 +1258,38 @@ void UpdateKeyTypeSetting(void){
 }
 
 int32_t oldDecoderFlag = -1;
+bool oldLockStatus = false;
 void UpdateDecoderSetting(void){
-    if ((oldDecoderFlag == ED.decoderFlag) && (!PaneSettings.stale)) 
+    if ((oldDecoderFlag == ED.decoderFlag) && 
+        (!PaneSettings.stale) && 
+        (oldLockStatus == IsCWDecodeLocked())) 
         return;
     oldDecoderFlag = ED.decoderFlag;
     tft.setFontScale((enum RA8875tsize)0);
+    
+    int16_t yoff = PaneSettings.height/5 + 3*tft.getFontHeight() + 1;
+    int16_t boxw = 12;
+    int16_t boxy = PaneSettings.y0+yoff+4;
+    int16_t boxx = PaneSettings.x0+PaneSettings.width-boxw-4;
     char valueText[4];
     if (ED.decoderFlag){
         sprintf(valueText,"On");
     } else {
         sprintf(valueText,"Off");
+        // Blank the decode box
+        tft.fillRect(boxx,boxy,boxw,boxw,RA8875_BLACK);
     }
     UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
         (char *)"Decoder:", 8, 
         valueText, 3, // longest length for this field
-        PaneSettings.height/5 + 3*tft.getFontHeight() + 1,true,true);
+        yoff,true,true);
+    if (ED.decoderFlag){
+        // Draw a green or red square depending on locked status
+        if (IsCWDecodeLocked())
+            tft.fillRect(boxx,boxy,boxw,boxw,RA8875_GREEN);
+        else
+            tft.fillRect(boxx,boxy,boxw,boxw,RA8875_RED);
+    }
 }
 
 float32_t oldrfGainAllBands_dB = -1000;
@@ -1331,6 +1352,25 @@ void DrawSettingsPane(void) {
 }
 /////////////////////////////////////////////////////////////////
 
+/**
+ * This function displays the decoded Morse code below waterfall in place of the state 
+ * of health data.
+ */
+void MorseCharacterDisplay() {
+    if ((modeSM.state_id != ModeSm_StateId_CW_RECEIVE) || (!ED.decoderFlag)) 
+        return;
+    if (!IsMorseCharacterBufferUpdated())
+        return;
+    // blank out prior text    
+    tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
+    tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
+    tft.print(GetMorseCharacterBuffer());   
+}
+
+/////////////////////////////////////////////////////////////////
+
 void DrawNameBadgePane(void) {
     // Only update if information is stale
     if (!PaneNameBadge.stale) return;
@@ -1389,6 +1429,7 @@ static void DrawHome(){
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
         WindowPanes[i]->DrawFunction();
     }
+    MorseCharacterDisplay(); // we might call this from somewhere else
 }
 ///////////////////////////////////////////////////////////////////////////////
 // END OF HOME SCREEN SECTION

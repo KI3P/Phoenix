@@ -15,18 +15,19 @@ void tick1ms(void){
 void setup(void){
     Serial.begin(115200);
     SerialUSB1.begin(38400); // For CAT control
-    //delay(1000); //testcode
     Serial.println("T41 SDT Setup");
     //Configure the pins for the auto shutdown
     pinMode(BEGIN_TEENSY_SHUTDOWN, INPUT);  // HI received here tells Teensy to start shutdown routine
     pinMode(SHUTDOWN_COMPLETE, OUTPUT);     // HI sent here tells ATTiny85 to cut the power
     digitalWrite(SHUTDOWN_COMPLETE, 0);  
-    
+
+    // Used to write the state to 4-bit readout for state timing measurements
     pinMode(31,OUTPUT); //testcode
     pinMode(30,OUTPUT); //testcode
     pinMode(29,OUTPUT); //testcode
     pinMode(28,OUTPUT); //testcode
     Flag(0);
+    
     Serial.println("...Initializing storage");
     InitializeStorage();
 
@@ -52,8 +53,6 @@ void setup(void){
     modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
     UpdateDitLength();
     ModeSm_start(&modeSM);
-    //ED.agc = AGCOff;
-    //ED.nrOptionSelect = NROff;
     uiSM.vars.splashDuration_ms = SPLASH_DURATION_MS;
     UISm_start(&uiSM);
 
