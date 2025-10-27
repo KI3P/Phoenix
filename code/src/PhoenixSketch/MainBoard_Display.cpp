@@ -891,6 +891,7 @@ void DrawSMeterPane(void) {
 
 int32_t ohi = 0;
 int32_t olo = 0;
+int32_t ofi = 0;
 void DrawAudioSpectContainer() {
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
@@ -916,13 +917,35 @@ void DrawAudioSpectContainer() {
     // Draw Filter indicator lines on audio plot
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterLoPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
+
+    if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE){
+        // Draw the CW filter line
+        // See DSP_FIR.cpp for filter coefficient definitions
+        // 0: CW_AudioFilterCoeffs1, LPF Fc = 840 Hz
+        // 1: CW_AudioFilterCoeffs2, LPF Fc = 1.08 kHz
+        // 2: CW_AudioFilterCoeffs3, LPF Fc = 1.32 kHz
+        // 3: CW_AudioFilterCoeffs4, LPF Fc = 1.80 kHz
+        // 4: CW_AudioFilterCoeffs5, LPF Fc = 2.0 kHz
+        // 5: Off
+        int16_t fcutoffs[] = {840,1080,1320,1800,2000,0};
+
+        // erase the old one
+        int16_t fcw = map(fcutoffs[ofi], 0, 6000, 0, 256);
+        tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + fcw, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
+        // draw the new one
+        int16_t cwFilterPosition = map(fcutoffs[ED.CWFilterIndex], 0, 6000, 0, 256);
+        if (cwFilterPosition > 0)
+            tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + cwFilterPosition, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_YELLOW);
+    }
+
     tft.writeTo(L1);
 }
 
 void DrawAudioSpectrumPane(void) {
     // Only update if information is stale
     if ((ohi != bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) ||
-        (olo != bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz))
+        (olo != bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) ||
+        (ofi != ED.CWFilterIndex))
         PaneAudioSpectrum.stale = true;
     if (!PaneAudioSpectrum.stale) return;
      // Black out the prior data
@@ -930,6 +953,7 @@ void DrawAudioSpectrumPane(void) {
     DrawAudioSpectContainer();
     ohi = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
     olo = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+    ofi = ED.CWFilterIndex;
     // Mark the pane as no longer stale
     PaneAudioSpectrum.stale = false;
 }
