@@ -65,6 +65,7 @@
 #define DDE                 14
 #define BEARING             15
 #define HOME_SCREEN         17
-#define VOLUMEBUTTON        18
-#define FINETUNEBUTTON      20
-#define VFOTOGGLE           21
+#define VOLUME_BUTTON       18
+#define FILTER_BUTTON       19
+#define FINETUNE_BUTTON     20
+#define VFO_TOGGLE          21

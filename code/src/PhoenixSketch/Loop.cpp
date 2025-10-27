@@ -9,7 +9,7 @@ static struct {
     volatile size_t count; // Number of items in buffer
 } interruptFifo = {{iNONE}, 0, 0, 0};
 
-static uint8_t switchFilterSideband = 0;
+static uint8_t changeFilterHiCut = 0;
 char strbuf[100];
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -179,7 +179,7 @@ void FilterSetSSB(int32_t filter_change) {
     // Change the band parameters
     switch (bands[ED.currentBand[ED.activeVFO]].mode) {
         case LSB:{
-            if (switchFilterSideband == 0)  // "0" = normal, "1" means change opposite filter
+            if (changeFilterHiCut == 0)  // "0" = LoCut, "1" = HiCut
             {
                 bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
@@ -190,7 +190,7 @@ void FilterSetSSB(int32_t filter_change) {
             break;
         }
         case USB:{
-            if (switchFilterSideband == 0) {
+            if (changeFilterHiCut == 0) {
                 bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
 
@@ -369,7 +369,7 @@ void HandleButtonPress(int32_t button){
             // Add this later
             break;
         }
-        case VFOTOGGLE:{
+        case VFO_TOGGLE:{
             if (ED.activeVFO == 0)
                 ED.activeVFO = 1;
             else
@@ -377,7 +377,7 @@ void HandleButtonPress(int32_t button){
             UpdateRFHardwareState();
             break;
         }
-        case VOLUMEBUTTON:{
+        case VOLUME_BUTTON:{
             // Rotate through the parameters controlled by the volume knob
             int8_t newvol = (int8_t)volumeFunction + 1;
             if (newvol > (int8_t)SidetoneVolume)
@@ -386,8 +386,16 @@ void HandleButtonPress(int32_t button){
             Debug("Volume knob function is " + String(volumeFunction));
             break;
         }
-        case FINETUNEBUTTON:{
+        case FINETUNE_BUTTON:{
             break;
+        }
+        case FILTER_BUTTON:{
+            if (changeFilterHiCut)
+                changeFilterHiCut = 0;
+            else
+                changeFilterHiCut = 1;
+            break;
+            Debug("changeFilterHiCut is " + String(changeFilterHiCut));
         }
         default:
             break;
