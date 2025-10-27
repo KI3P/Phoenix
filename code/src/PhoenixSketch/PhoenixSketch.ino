@@ -4,46 +4,12 @@
 IntervalTimer timer1ms;
 
 /**
- * This is run every 1ms. It dispatches do events to the state machines
+ * This is run every 1ms. It dispatches do events to the state machines which
+ * are needed for time dependent state changes like the CW keyer
  */
 void tick1ms(void){
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
-}
-
-const unsigned long DEBOUNCE_DELAY = 50; // 50ms debounce time
-volatile bool lastKey1State = LOW;
-volatile uint32_t lastKey1time;
-void Key1Change(void){
-    uint32_t currentTime = millis();
-    // Check if enough time has passed since last interrupt
-    if (currentTime - lastKey1time < DEBOUNCE_DELAY) {
-        return; // Ignore this interrupt (likely bounce)
-    }
-
-    bool currentState = digitalRead(KEY1);
-    if (currentState != lastKey1State) {
-        if (currentState == HIGH) {
-            // Rising edge detected
-            SetInterrupt(iKEY1_RELEASED);
-        } else {
-            // Falling edge detected  
-            SetInterrupt(iKEY1_PRESSED);
-        }
-        lastKey1State = currentState;
-    }
-    lastKey1time = currentTime;
-}
-
-volatile uint32_t lastKey2time;
-void Key2On(void){
-    uint32_t currentTime = millis();
-    // Check if enough time has passed since last interrupt
-    if (currentTime - lastKey2time < DEBOUNCE_DELAY) {
-        return; // Ignore this interrupt (likely bounce)
-    }
-    SetInterrupt(iKEY2_PRESSED);
-    lastKey2time = currentTime;
 }
 
 void setup(void){
@@ -86,22 +52,15 @@ void setup(void){
     modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
     UpdateDitLength();
     ModeSm_start(&modeSM);
-    ED.agc = AGCOff;
-    ED.nrOptionSelect = NROff;
+    //ED.agc = AGCOff;
+    //ED.nrOptionSelect = NROff;
     uiSM.vars.splashDuration_ms = SPLASH_DURATION_MS;
     UISm_start(&uiSM);
 
     UpdateAudioIOState();
 
     Serial.println("...Setting up key interrupts");
-    // Set up interrupts for key
-    pinMode(KEY1, INPUT_PULLUP);
-    pinMode(KEY2, INPUT_PULLUP);
-    lastKey1State = digitalRead(KEY1); // Initialize
-    lastKey1time = millis(); // for debounce
-    attachInterrupt(digitalPinToInterrupt(KEY1), Key1Change, CHANGE);
-    lastKey2time = millis(); // for debounce
-    attachInterrupt(digitalPinToInterrupt(KEY2), Key2On, FALLING);
+    SetupCWKeyInterrupts();
 
     timer1ms.begin(tick1ms, 1000);  // run tick1ms every 1ms
     

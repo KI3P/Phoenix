@@ -41,5 +41,6 @@ void SetKey1Dit(void);
 void SetKey1Dah(void);
 void ShutdownTeensy(void);
 size_t GetInterruptFifoSize(void);
+void SetupCWKeyInterrupts(void);
 
 #endif // LOOP_H

@@ -244,6 +244,40 @@ uint8_t getPinMode(uint16_t pin){
     return 0;
 }
 
+// Interrupt function mocks
+// For testing purposes, we just store the interrupt settings but don't actually
+// call the callbacks. Tests can call the interrupt handlers directly if needed.
+#define MAX_INTERRUPTS 16
+struct InterruptInfo {
+    uint8_t pin;
+    voidFuncPtr callback;
+    int mode;
+    bool active;
+};
+static InterruptInfo interrupts[MAX_INTERRUPTS] = {{0, nullptr, 0, false}};
+
+void attachInterrupt(uint8_t interrupt, voidFuncPtr callback, int mode) {
+    if (interrupt < MAX_INTERRUPTS) {
+        interrupts[interrupt].pin = interrupt;
+        interrupts[interrupt].callback = callback;
+        interrupts[interrupt].mode = mode;
+        interrupts[interrupt].active = true;
+    }
+}
+
+void detachInterrupt(uint8_t interrupt) {
+    if (interrupt < MAX_INTERRUPTS) {
+        interrupts[interrupt].active = false;
+        interrupts[interrupt].callback = nullptr;
+    }
+}
+
+uint8_t digitalPinToInterrupt(uint8_t pin) {
+    // In the mock, we just return the pin number itself as the interrupt number
+    // In real hardware, there's a mapping, but for testing this is sufficient
+    return pin;
+}
+
 void __disable_irq(void) {
     // Mock implementation - does nothing in test environment
 }

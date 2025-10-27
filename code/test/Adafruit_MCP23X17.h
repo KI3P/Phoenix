@@ -3,11 +3,8 @@
 #include <cstdint>
 #include "Wire.h"
 
-// Constants for interrupt and pin modes
-#define CHANGE 1
-#define INPUT_PULLUP 2
-#define LOW 0
-#define HIGH 1
+// MCP23X17-specific constants
+// (Arduino constants like CHANGE, INPUT_PULLUP, LOW, HIGH are defined in Arduino.h)
 #define MCP23XXX_INT_ERR 255
 
 class Adafruit_MCP23X17 {

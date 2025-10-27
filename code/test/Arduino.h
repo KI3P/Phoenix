@@ -21,6 +21,12 @@ uint8_t digitalRead(uint16_t pin);
 void pinMode(uint16_t pin, uint8_t val);
 uint8_t getPinMode(uint16_t pin);
 
+// Interrupt functions
+typedef void (*voidFuncPtr)(void);
+void attachInterrupt(uint8_t interrupt, voidFuncPtr callback, int mode);
+void detachInterrupt(uint8_t interrupt);
+uint8_t digitalPinToInterrupt(uint8_t pin);
+
 void StartMillis(void);
 void AddMillisTime(uint64_t delta_ms);
 void SetMillisTime(uint64_t time_ms);
@@ -67,8 +73,17 @@ private:
 };
 
 #define OUTPUT 1
+#define INPUT 0
+#define INPUT_PULLUP 2
 #define HEX 16
 #define BIN 2
+
+// Interrupt modes
+#define RISING 0
+#define FALLING 1
+#define CHANGE 2
+#define LOW 0
+#define HIGH 1
 
 // Teensy 4.1 temperature monitor registers (mock)
 // Use mock variables instead of hardware addresses to avoid segfault

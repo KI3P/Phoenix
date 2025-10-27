@@ -1,25 +1,5 @@
 #include "SDT.h"
 
-// We should have an interrupt timer that ticks every 1 ms.
-// Every time it ticks we pass a Do event to the state machines.
-
-/* We have interrupts attached to the various buttons. They set event
- * flags that the loop polls for and acts upon. Two types of actions happen.
- * First, we might act immediately on the input.
- * Second, we issue an Event to the state machines.
- */
-
-/*
-SSB Receive State
-
-Button          Response
-MODE            Issue ModeSm_EventId_MODE
-PTT_PRESSED     Issue ModeSm_EventId_PTT_PRESSED
-FREQ_INC        Update frequency increment value
-FREQ_ENC_INC    Increase the tune frequency by increment
-FREQ_ENC_DEC    Decrease the tune frequency by increment
-*/
-
 // FIFO buffer for interrupt events
 #define INTERRUPT_BUFFER_SIZE 16
 static struct {
@@ -31,6 +11,10 @@ static struct {
 
 static uint8_t switchFilterSideband = 0;
 char strbuf[100];
+
+///////////////////////////////////////////////////////////////////////////////
+// CW key section
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Sets the key type.
@@ -54,6 +38,69 @@ void SetKey1Dah(void){
 void SetKey1Dit(void){
     ED.keyerFlip = false;
 }
+
+const uint32_t DEBOUNCE_DELAY = 50; // 50ms debounce time
+static bool lastKey1State = HIGH; // starts high due to input pullup
+static uint32_t lastKey1ChangeTime = 0;
+static volatile bool key1PendingRead = false;
+
+FASTRUN void Key1Change(void){
+    // On ANY edge change, just note that something changed and restart the timer
+    lastKey1ChangeTime = millis();
+    key1PendingRead = true;
+}
+
+/**
+ * Process Key1 debouncing by reading the actual pin state after the debounce
+ * period has elapsed. This ensures the final stable state is always captured,
+ * even if switch bouncing occurs during the transition.
+ *
+ * This should be called regularly from the main loop.
+ */
+void ProcessKey1Debounce(void){
+    if (key1PendingRead) {
+        uint32_t currentTime = millis();
+        // Check if enough time has passed since last edge
+        if (currentTime - lastKey1ChangeTime >= DEBOUNCE_DELAY) {
+            // Now read the actual state - this is guaranteed to be stable
+            bool currentState = digitalRead(KEY1);
+            if (currentState != lastKey1State) {
+                if (currentState) {
+                    // Rising edge detected
+                    SetInterrupt(iKEY1_RELEASED);
+                } else {
+                    // Falling edge detected
+                    SetInterrupt(iKEY1_PRESSED);
+                }
+                lastKey1State = currentState;
+            }
+            key1PendingRead = false;
+        }
+    }
+}
+
+static uint32_t lastKey2time = 0;
+FASTRUN void Key2On(void){
+    uint32_t currentTime = millis();
+    // Check if enough time has passed since last interrupt
+    if (currentTime - lastKey2time < DEBOUNCE_DELAY) {
+        return; // Ignore this interrupt (likely bounce)
+    }
+    SetInterrupt(iKEY2_PRESSED);
+    lastKey2time = currentTime;
+}
+
+void SetupCWKeyInterrupts(void){
+    // Set up interrupts for key
+    pinMode(KEY1, INPUT_PULLUP);
+    pinMode(KEY2, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(KEY1), Key1Change, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(KEY2), Key2On, FALLING);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Interrupt buffer section
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Get the next interrupt from the FIFO buffer.
@@ -110,6 +157,10 @@ void PrependInterrupt(InterruptType i){
     interruptFifo.buffer[interruptFifo.tail] = i;
     interruptFifo.count++;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Code that handles interrupts
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Called every 1 milliseconds by the system timer. It dispatches a DO event to the 
@@ -631,6 +682,10 @@ void ConsumeInterrupt(void){
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// The main loop
+///////////////////////////////////////////////////////////////////////////////
+
 /**
  * Shut down the radio gracefully when informed by the Shutdown circuitry 
  * that the power button has been pressed.
@@ -648,9 +703,10 @@ FASTRUN void loop(void){
     // This is the loop that is executed again and again
 
     // Check for signal to begin shutdown and perform shutdown routine if requested
-    if (digitalRead(BEGIN_TEENSY_SHUTDOWN) == HIGH) ShutdownTeensy();
+    if (digitalRead(BEGIN_TEENSY_SHUTDOWN)) ShutdownTeensy();
 
     // Step 1: Check for new events and handle them
+    ProcessKey1Debounce();
     CheckForFrontPanelInterrupts();
     CheckForCATSerialEvents();
     ConsumeInterrupt();
