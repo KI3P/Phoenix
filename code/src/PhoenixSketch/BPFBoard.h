@@ -1,8 +1,14 @@
 #ifndef BPF_CONTROL_h
 #define BPF_CONTROL_h
 
+// BPF control macros
+#define SET_BPF_BAND(val) (hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)val & 0x0000000F) << BPFBAND0BIT));buffer_add()
+#define GET_BPF_BAND ((hardwareRegister & 0xF0000000) >> BPFBAND0BIT)
+
 /*
-BPF band         BPF word   Band code Band# 1<<#                 Hex     Flip hex bytes
+BPF word is the control word we need to write to the BPF GPIOAB register. How do we
+calculate the BPF word, given the band number?
+ BPF band        BPF word   Band code Band# 1<<#                 Hex     Flip hex bytes
  BPF_BAND_BYPASS 0x0008     0b1111    15    1000 0000 0000 0000  0x8000  0x0080
  BPF_BAND_6M     0x0004     0b1010    10    0000 0100 0000 0000  0x0400  0x0004
  BPF_BAND_10M    0x0002     0b1001    9     0000 0010 0000 0000  0x0200  0x0002
@@ -16,15 +22,11 @@ BPF band         BPF word   Band code Band# 1<<#                 Hex     Flip he
  BPF_BAND_80M    0x0400     0b0010    2     0000 0000 0000 0100  0x0004  0x0400
  BPF_BAND_160M   0x0200     0b0001    1     0000 0000 0000 0010  0x0002  0x0200
 
-To get which bit to make high in the control word:
-(1 << band#) then flip bytes
-handle special case of bypass
+Therefore, to get which bit to make high in the control word (i.e., get the BPF word):
+1) Calculate (1 << band#) 
+2) Flip bytes
+3) Handle special case of bypass
 */
-
-// BPF control macros
-#define SET_BPF_BAND(val) (hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)val & 0x0000000F) << BPFBAND0BIT));buffer_add()
-#define GET_BPF_BAND ((hardwareRegister & 0xF0000000) >> BPFBAND0BIT)
-
 #define BPF_WORD ({ \
     uint16_t shifted = 1 << GET_BPF_BAND; \
     uint16_t swapped = ((shifted >> 8) & 0xFF) | ((shifted & 0xFF) << 8); \

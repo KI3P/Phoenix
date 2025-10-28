@@ -7,6 +7,11 @@ const char *filename = "config.txt";
 LittleFS_Program myfs;
 static bool SDpresent = false;
 
+/**
+ * Initialize the storage subsystem.
+ * Initializes both the LittleFS program flash storage (1MB) and optional SD card storage.
+ * Automatically attempts to restore the configuration from storage after initialization.
+ */
 void InitializeStorage(void){
     if (!myfs.begin(1024 * 1024)) { // minimum size is 64 KB
         Serial.printf("Error starting %s\n", "Program flash DISK");
@@ -129,6 +134,14 @@ void SaveDataToStorage(void){
     }
 }
 
+/**
+ * List all files and directories in the specified directory.
+ * Prints directory contents to Serial output with file names and sizes.
+ * Used for debugging and verifying storage contents.
+ *
+ * @param fs Reference to the LittleFS_Program filesystem object
+ * @param dirname Directory path to list (e.g., "/")
+ */
 void listDir(LittleFS_Program &fs, const char *dirname) {
     //Serial.printf("Listing directory: %s\r\n", dirname);
 

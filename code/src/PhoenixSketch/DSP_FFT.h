@@ -18,6 +18,7 @@ void SetIIRCoeffs(float32_t *coefficient_set, float32_t f0, float32_t Q,
                     float32_t sample_rate, FilterType filter_type);
 void UpdateFIRFilterMask(FilterConfig *filters);
 void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters);
+void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut);
 void ZoomFFTPrep(uint32_t spectrum_zoom, FilterConfig *filters);
 errno_t DecimateBy8(DataBlock *data, FilterConfig *filters);
 errno_t DecimateBy4(DataBlock *data, FilterConfig *filters);

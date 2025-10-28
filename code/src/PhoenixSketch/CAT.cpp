@@ -86,13 +86,18 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
 		{ "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
 		{ "PC", 6,  3, PC_write, PC_read }, // output power
-		{ "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD
+		{ "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
 		{ "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
 		{ "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
 		{ "TX", 4,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
-		{ "ED", 0,  3, unsupported_cmd, ED_read } // print out the state of the EEPROM data
+		{ "ED", 0,  3, unsupported_cmd, ED_read } // print out the state of the EEPROM data -- NOT a Kenwood keyword
 	};
 
+/**
+ * Handler for unsupported CAT commands
+ * @param cmd The CAT command string
+ * @return Error response "?;" indicating unsupported command
+ */
 char *unsupported_cmd( char *cmd ){
  	sprintf( obuf, "?;");
   	return obuf;
@@ -135,12 +140,25 @@ char *BD_write( char* cmd ){
   	return empty_string_p;
 }
 
+/**
+ * Set the dBm calibration value
+ * @param cmd CAT command containing calibration value after position 2
+ * @return Empty string
+ */
 char *DB_write( char* cmd  ){
   	ED.dbm_calibration = ( float32_t ) atof( &cmd[2] );
 	Debug(ED.dbm_calibration);
 	return empty_string_p;
 }
 
+/**
+ * Set VFO frequency and save previous frequency to lastFrequencies array
+ * @param freq Frequency in Hz to set
+ * @param vfo VFO number (VFO_A or VFO_B)
+ *
+ * Saves current frequency settings, determines new band, and updates VFO parameters.
+ * Triggers tune update interrupt after setting new frequency.
+ */
 void set_vfo(int64_t freq, uint8_t vfo){
 	// Save the current VFO settings to the lastFrequencies array
 	// lastFrequencies is [NUMBER_OF_BANDS][2]
@@ -154,14 +172,27 @@ void set_vfo(int64_t freq, uint8_t vfo){
 	SetInterrupt(iUPDATE_TUNE);
 }
 
+/**
+ * Set VFO A frequency
+ * @param freq Frequency in Hz to set for VFO A
+ */
 void set_vfo_a( long freq ){
 	set_vfo(freq, VFO_A);
 }
 
+/**
+ * Set VFO B frequency
+ * @param freq Frequency in Hz to set for VFO B
+ */
 void set_vfo_b( long freq ){
 	set_vfo(freq, VFO_B);
 }
 
+/**
+ * CAT command FA - Set VFO A frequency
+ * @param cmd CAT command string with frequency after position 2
+ * @return Response string with set frequency
+ */
 char *FA_write( char* cmd ){
   	long freq = atol( &cmd[ 2 ] );
   	set_vfo_a( freq );
@@ -169,26 +200,43 @@ char *FA_write( char* cmd ){
   	return obuf;
 }
 
+/**
+ * CAT command FA - Read VFO A frequency
+ * @param cmd CAT command string
+ * @return Response string with current VFO A frequency
+ */
 char *FA_read(  char* cmd  ){
-	sprintf( obuf, "FA%011lld;", ED.centerFreq_Hz[VFO_A] ); 
+	sprintf( obuf, "FA%011lld;", ED.centerFreq_Hz[VFO_A] );
   	return obuf;
 }
 
-//VFO B frequency
+/**
+ * CAT command FB - Set VFO B frequency
+ * @param cmd CAT command string with frequency after position 2
+ * @return Response string with set frequency
+ */
 char *FB_write( char* cmd  ){
   	long freq = atol( &cmd[ 2 ] );
   	set_vfo_b( freq );
 	sprintf( obuf, "FB%011ld;", freq );
-  	return obuf;	
+  	return obuf;
 }
 
-//VFO B
-char *FB_read(  char* cmd  ){  
+/**
+ * CAT command FB - Read VFO B frequency
+ * @param cmd CAT command string
+ * @return Response string with current VFO B frequency
+ */
+char *FB_read(  char* cmd  ){
   	sprintf( obuf, "FB%011lld;", ED.centerFreq_Hz[VFO_B] );
   	return obuf;
 }
 
-// Transmit Frequency
+/**
+ * CAT command FT - Set transmit frequency (assumes no SPLIT operation)
+ * @param cmd CAT command string with frequency after position 2
+ * @return Response string with set frequency
+ */
 char *FT_write( char* cmd  ){
   	//Assuming not SPLIT;  fix it later.
   	long freq = atol( &cmd[ 2 ] );
@@ -197,14 +245,22 @@ char *FT_write( char* cmd  ){
   	return obuf;
 }
 
-// Transmit Frequency
+/**
+ * CAT command FT - Read transmit frequency (assumes no SPLIT operation)
+ * @param cmd CAT command string
+ * @return Response string with current transmit frequency
+ */
 char *FT_read(  char* cmd  ){
   	//Assuming not SPLIT; fix it later.
 	sprintf( obuf, "FT%011lld;", GetTXRXFreq_dHz()/100 );
 	return obuf;
 }
 
-// Receive Frequency
+/**
+ * CAT command FR - Set receive frequency (assumes no SPLIT operation)
+ * @param cmd CAT command string with frequency after position 2
+ * @return Response string with set frequency
+ */
 char *FR_write( char* cmd  ){
   	long freq = atol( &cmd[ 2 ] );
   	//Assuming not SPLIT; fix it later.
@@ -213,17 +269,31 @@ char *FR_write( char* cmd  ){
   	return obuf;
 }
 
-// Receive Frequency
+/**
+ * CAT command FR - Read receive frequency (assumes no SPLIT operation)
+ * @param cmd CAT command string
+ * @return Response string with current receive frequency
+ */
 char *FR_read(  char* cmd  ){
 	sprintf( obuf, "FT%011lld;", GetTXRXFreq_dHz()/100 );
   	return obuf;
 }
 
+/**
+ * CAT command ID - Read radio identification
+ * @param cmd CAT command string
+ * @return Response "ID019;" (Kenwood TS-2000 identifier)
+ */
 char *ID_read(  char* cmd  ){
   	sprintf( obuf, "ID019;");
   	return obuf;                            // Kenwood TS-2000 ID
 }
 
+/**
+ * CAT command IF - Read complete radio status information
+ * @param cmd CAT command string
+ * @return Response string with frequency, mode, RX/TX status, and other parameters
+ */
 char *IF_read(  char* cmd ){
 	int mode;
 	if (( modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) | 
@@ -278,6 +348,11 @@ char *IF_read(  char* cmd ){
   	return obuf;
 }
 
+/**
+ * CAT command MD - Set operating mode (LSB, USB, CW, AM)
+ * @param cmd CAT command string with mode number: 1=LSB, 2=USB, 3=CW, 5=AM
+ * @return Empty string
+ */
 char *MD_write( char* cmd  ){
   	int p1 = atoi( &cmd[2] );
 	switch( p1 ){
@@ -312,6 +387,11 @@ char *MD_write( char* cmd  ){
   	return empty_string_p;
 }
 
+/**
+ * CAT command MD - Read current operating mode
+ * @param cmd CAT command string
+ * @return Response string with mode: MD1 (LSB), MD2 (USB), MD3 (CW), MD5 (AM/SAM)
+ */
 char *MD_read( char* cmd ){
 	if( ( modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) | 
 		( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK ) |
@@ -328,6 +408,11 @@ char *MD_read( char* cmd ){
 	return obuf;  //Huh? How'd we get here?
 }
 
+/**
+ * CAT command MG - Set microphone gain
+ * @param cmd CAT command string with gain value (0-100, converted to -40 to +30 dB)
+ * @return Empty string
+ */
 char *MG_write( char* cmd ){
 	int g = atoi( &cmd[2] );
 	// convert from 0..100 to -40..30
@@ -340,6 +425,11 @@ char *MG_write( char* cmd ){
   	return empty_string_p;
 }
 
+/**
+ * CAT command MG - Read microphone gain
+ * @param cmd CAT command string
+ * @return Response string with gain value (0-100, converted from -40 to +30 dB)
+ */
 char *MG_read(  char* cmd ){
 	// convert from -40 .. 30 to 0..100
 	int g = ( int )( ( double )( ED.currentMicGain + 40 ) * 100.0 / 70.0 );
@@ -347,7 +437,11 @@ char *MG_read(  char* cmd ){
   	return obuf;
 }
 
-// spectrumNoiseFloor
+/**
+ * CAT command NF - Set spectrum noise floor for current band
+ * @param cmd CAT command string with noise floor value
+ * @return Empty string
+ */
 char *NF_write( char* cmd ){
 	int nf = atoi( &cmd[2] );
 	Debug(nf);
@@ -355,11 +449,21 @@ char *NF_write( char* cmd ){
   	return empty_string_p;
 }
 
+/**
+ * CAT command NF - Read spectrum noise floor for current band
+ * @param cmd CAT command string
+ * @return Response string with noise floor value
+ */
 char *NF_read(  char* cmd ){
   	sprintf( obuf, "NF%03d;", ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]] );
   	return obuf;
 }
 
+/**
+ * CAT command NR - Set noise reduction mode
+ * @param cmd CAT command string with NR mode (0=off, other values select NR type)
+ * @return Empty string
+ */
 char *NR_write( char* cmd ){
   	if( cmd[ 2 ] == '0' ){
 		ED.nrOptionSelect = NROff;
@@ -369,14 +473,21 @@ char *NR_write( char* cmd ){
   	return empty_string_p;
 }
 
-//Noise reduction
+/**
+ * CAT command NR - Read noise reduction mode
+ * @param cmd CAT command string
+ * @return Response string with current NR mode
+ */
 char *NR_read(  char* cmd ){
   	sprintf( obuf, "NR%d;", ED.nrOptionSelect );
   	return obuf;
 }
 
-
-//Auto-notch
+/**
+ * CAT command NT - Set auto-notch filter on/off
+ * @param cmd CAT command string with value (0=off, 1=on)
+ * @return Empty string
+ */
 char *NT_write( char* cmd ){
 	uint8_t v = atoi( &cmd[2] );
 	if (v < 2){
@@ -385,12 +496,20 @@ char *NT_write( char* cmd ){
   	return empty_string_p;
 }
 
-//auto-notch
+/**
+ * CAT command NT - Read auto-notch filter status
+ * @param cmd CAT command string
+ * @return Empty string
+ */
 char *NT_read(  char* cmd ){
   	return empty_string_p;
 }
 
-//output power
+/**
+ * CAT command PC - Set output power level
+ * @param cmd CAT command string with power value (mode-specific: SSB or CW)
+ * @return Response string with set power value
+ */
 char *PC_write( char* cmd ){
   	int requested_power = atoi( &cmd[ 3 ]);
 	if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) | 
@@ -404,7 +523,11 @@ char *PC_write( char* cmd ){
   	return obuf;
 }
 
-//output power
+/**
+ * CAT command PC - Read output power level
+ * @param cmd CAT command string
+ * @return Response string with current power value (mode-specific: SSB or CW)
+ */
 char *PC_read(  char* cmd ){
   	unsigned int o_param;
 	if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) | 
@@ -417,7 +540,11 @@ char *PC_read(  char* cmd ){
   	return obuf;
 }
 
-//PSD
+/**
+ * CAT command PD - Read Power Spectral Density data (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response string "PD;" after printing all PSD values to Serial
+ */
 char *PD_read(  char* cmd ){
 	for (int j = 0; j < SPECTRUM_RES; j++){
 		sprintf( obuf, "%d,%4.3f", j, psdnew[j] );
@@ -427,7 +554,11 @@ char *PD_read(  char* cmd ){
   	return obuf;
 }
 
-// Turn the power off
+/**
+ * CAT command PS - Turn radio power off
+ * @param cmd CAT command string
+ * @return Response "PS0;" (requests shutdown from ATtiny)
+ */
 char *PS_write( char* cmd ){
  	// Ask the AtTiny to do it
 	ShutdownTeensy();
@@ -435,13 +566,21 @@ char *PS_write( char* cmd ){
   	return obuf;    //Nope.  Not doing that.
 }
 
-// Tell them that the power's on.
+/**
+ * CAT command PS - Read power status
+ * @param cmd CAT command string
+ * @return Response "PS1;" (power is on - if we're responding, power must be on)
+ */
 char *PS_read(  char* cmd ){
   	sprintf( obuf, "PS1;");
   	return obuf;          // The power's on.  Otherwise, we're not answering!
 }
 
-//Choose main or subreceiver
+/**
+ * CAT command RX - Switch to receive mode
+ * @param cmd CAT command string
+ * @return Response "RX0;" after releasing PTT or key depending on current mode
+ */
 char *RX_write( char* cmd ){
 	switch (modeSM.state_id){
 		case (ModeSm_StateId_SSB_TRANSMIT):{
@@ -459,7 +598,11 @@ char *RX_write( char* cmd ){
   	return obuf;   // We'll support that later.
 }
 
-//Transmit NOW!
+/**
+ * CAT command TX - Switch to transmit mode
+ * @param cmd CAT command string
+ * @return Response "TX0;" after pressing PTT or key depending on current mode
+ */
 char *TX_write( char* cmd ){
 	switch (modeSM.state_id){
 		case (ModeSm_StateId_SSB_RECEIVE):{
@@ -477,6 +620,11 @@ char *TX_write( char* cmd ){
   	return obuf;
 }
 
+/**
+ * CAT command ED - Dump EEPROM data structure to Serial (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "ED;" after printing all ED struct contents to Serial for debugging
+ */
 char *ED_read(  char* cmd  ){
 	// Print out the state of the EEPROM data
 	/*The situation is this: the radio works correctly, demodulating as expected, on the first run.
@@ -571,6 +719,13 @@ char *ED_read(  char* cmd  ){
   	return obuf;
 }
 
+/**
+ * Poll SerialUSB1 for incoming CAT commands and process them
+ *
+ * Reads characters from the CAT serial port, buffers them until a semicolon
+ * terminator is received, then parses and executes the command via command_parser().
+ * Sends response back over SerialUSB1. Handles buffer overflow by clearing the buffer.
+ */
 void CheckForCATSerialEvents(void){
 	int i;
 	char c;
@@ -628,6 +783,15 @@ void CheckForCATSerialEvents(void){
 	}
 }
 
+/**
+ * Parse and execute a received CAT command
+ * @param command Null-terminated command string ending with semicolon
+ * @return Response string to send back to host
+ *
+ * Compares command against valid_commands table and calls appropriate
+ * read or write handler based on command length. Returns "?;" for
+ * unsupported or malformed commands.
+ */
 char *command_parser( char* command ){
 	// loop through the entire list of supported commands
 	//Serial.println( String("command_parser(): cmd is ") + String(command) );

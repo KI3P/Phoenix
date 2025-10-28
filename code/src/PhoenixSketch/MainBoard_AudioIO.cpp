@@ -1,7 +1,60 @@
+/**
+ * @file MainBoard_AudioIO.cpp
+ * @brief Audio I/O management and routing for Phoenix SDR
+ *
+ * This module manages all audio input/output routing and configuration using the
+ * OpenAudio library (a fork of the Teensy Audio Library). It handles the complex
+ * switching between receive and transmit modes, ensuring proper signal paths for:
+ * - Receive: ADC → DSP → Speaker
+ * - Transmit SSB: Microphone → DSP → DAC → Exciter
+ * - Transmit CW: Sidetone generator → Speaker (monitoring only)
+ *
+ * Hardware Architecture:
+ * ----------------------
+ * The Phoenix SDR uses two SGTL5000 audio codecs:
+ *
+ * 1. **Teensy Audio Board (sgtl5000_teensy)** - Transmit Path
+ *    - Input: Microphone (for SSB voice transmission)
+ *    - Output: I/Q signals to exciter board
+ *    - Address: LOW
+ *
+ * 2. **Main Board (pcm5102_mainBoard)** - Receive Path
+ *    - Input: I/Q signals from receiver (line-in from PCM1808)
+ *    - Output: Demodulated audio to speaker via PCM5102
+ *    - Address: HIGH
+ *
+ * Audio Signal Flow:
+ * ------------------
+ * The OpenAudio library uses a graph of interconnected audio processing blocks.
+ * This module defines:
+ * - **i2s_quadIn**: 4-channel input (mic L/R, RX I/Q)
+ * - **i2s_quadOut**: 4-channel output (TX I/Q, speaker L/R)
+ * - **Mixers**: Route signals between processing blocks based on radio mode
+ * - **Queues**: Transfer audio samples between interrupt context and main loop
+ * - **Sidetone**: Sine wave generator for CW monitoring
+ *
+ * Mode-Based Routing:
+ * -------------------
+ * The UpdateAudioIOState() function reconfigures the audio graph based on
+ * the current ModeSm state:
+ * - **SSB_RECEIVE/CW_RECEIVE**: RX I/Q → DSP → Speaker
+ * - **SSB_TRANSMIT**: Microphone → DSP → TX I/Q
+ * - **CW_TRANSMIT_*_MARK**: Sidetone → Speaker (no RF I/Q)
+ *
+ * Sample Rate Configuration:
+ * --------------------------
+ * The I2S interface supports multiple sample rates (48/96/192 kHz) configured
+ * via PLL settings. SetI2SFreq() calculates and applies the required clock
+ * divisors for the Teensy 4.1's audio subsystem.
+ *
+ * @see MainBoard_AudioIO.h for audio graph definitions
+ * @see https://github.com/chipaudette/OpenAudio_ArduinoLibrary
+ */
+
 #include "MainBoard_AudioIO.h"
 
 /**
- * The transition from analog to digital and digital to analog are handled using a fork 
+ * The transition from analog to digital and digital to analog are handled using a fork
  * of the Teensy Audio Library: https://github.com/chipaudette/OpenAudio_ArduinoLibrary
  * 
  * i2s_quadIn is a quad channel audio input. It's channels are: 
@@ -95,10 +148,32 @@ AudioControlSGTL5000_Extended sgtl5000_teensy;
 
 static ModeSm_StateId previousAudioIOState = ModeSm_StateId_ROOT;
 
+/**
+ * Get the previous audio I/O state.
+ *
+ * Returns the ModeSm state that the audio routing was last configured for.
+ * Used to detect state changes and avoid unnecessary reconfiguration of the
+ * audio graph when the mode hasn't changed.
+ *
+ * @return The previous ModeSm_StateId that audio routing was configured for
+ */
 ModeSm_StateId GetAudioPreviousState(void){
     return previousAudioIOState;
 }
 
+/**
+ * Select a single active channel on a 4-channel audio mixer.
+ *
+ * This function implements a "one-hot" selection pattern where exactly one
+ * input channel is enabled (gain=1.0) and all others are muted (gain=0.0).
+ * Used to route signals through the audio graph by enabling/disabling mixer inputs.
+ *
+ * Example: To route RX I/Q through the audio DSP chain, select channel 0 on
+ * the receive mixer. To route sidetone to speakers, select channel 2.
+ *
+ * @param mixer Pointer to the AudioMixer4 object to configure
+ * @param channel Channel number to enable (0-3), all others will be muted
+ */
 void SelectMixerChannel(AudioMixer4 *mixer, uint8_t channel){
     for (uint8_t k = 0; k < 4; k++){
         if (k == channel) mixer->gain(k,1);
@@ -106,16 +181,81 @@ void SelectMixerChannel(AudioMixer4 *mixer, uint8_t channel){
     }
 }
 
+/**
+ * Mute all channels on a 4-channel audio mixer.
+ *
+ * Sets all four mixer channel gains to 0.0, effectively blocking all signal flow
+ * through the mixer. Used during state transitions and when a particular signal
+ * path needs to be completely disabled (e.g., muting TX output during receive).
+ *
+ * @param mixer Pointer to the AudioMixer4 object to mute
+ */
 void MuteMixerChannels(AudioMixer4 *mixer){
     for (uint8_t k = 0; k < 4; k++){
         mixer->gain(k,0);
     }
 }
 
+/**
+ * Update the microphone gain for SSB transmission.
+ *
+ * Applies the current microphone gain setting (ED.currentMicGain) to the
+ * SGTL5000 codec on the Teensy Audio Board. This controls the input amplification
+ * for the microphone before SSB processing and modulation.
+ *
+ * Should be called when:
+ * - User adjusts mic gain
+ * - Transitioning to SSB transmit mode
+ * - Restoring settings from storage
+ */
 void UpdateTransmitAudioGain(void){
     sgtl5000_teensy.micGain(ED.currentMicGain);
 }
 
+/**
+ * Reconfigure audio I/O routing based on current radio mode state.
+ *
+ * This is the central audio routing function that responds to ModeSm state changes.
+ * It reconfigures the entire audio graph (mixers and queues) to match the operational
+ * requirements of each mode.
+ *
+ * Mode-Specific Configurations:
+ * ------------------------------
+ * **SSB_RECEIVE / CW_RECEIVE:**
+ * - Start RX I/Q input queues (Q_in_L, Q_in_R)
+ * - Stop microphone input queues
+ * - Route RX I/Q (channels 2,3) → DSP processing
+ * - Route DSP output → speaker (channels 0)
+ * - Mute TX I/Q outputs and microphone inputs
+ *
+ * **SSB_TRANSMIT:**
+ * - Start microphone input queues (Q_in_L_Ex, Q_in_R_Ex)
+ * - Stop RX I/Q input queues
+ * - Apply microphone gain setting
+ * - Route microphone (channels 0,1) → DSP → TX I/Q output
+ * - Mute speaker and RX I/Q inputs
+ *
+ * **CW_TRANSMIT_*_MARK (dit, dah, or straight key):**
+ * - Stop all input queues (no mic, no RX I/Q)
+ * - Route sidetone oscillator (channel 2) → speaker
+ * - Mute all TX I/Q outputs (CW keying handled by RF board, not audio)
+ * - Mute all other inputs/outputs
+ *
+ * **Other states (INIT, etc.):**
+ * - Stop all input queues
+ * - Mute all mixer channels (silence)
+ *
+ * Optimization:
+ * -------------
+ * Tracks previousAudioIOState to avoid redundant reconfiguration when the
+ * state hasn't changed, minimizing audio glitches and CPU overhead.
+ *
+ * @note This function should be called from the main loop whenever a mode
+ *       transition occurs, typically triggered by UpdateRFHardwareState()
+ *
+ * @see ModeSm state machine for state transition logic
+ * @see UpdateRFHardwareState() in RFBoard.cpp
+ */
 void UpdateAudioIOState(void){
     if (modeSM.state_id == previousAudioIOState){
         // Already in this state, no need to change
@@ -215,7 +355,44 @@ void UpdateAudioIOState(void){
 }
 
 /**
- * Perform setup of the audio input and output
+ * Initialize all audio subsystems and configure hardware codecs.
+ *
+ * Performs complete initialization sequence for the dual-codec audio architecture:
+ *
+ * Initialization Steps:
+ * ---------------------
+ * 1. **I2S Clock Configuration**
+ *    - Sets I2S sample rate via PLL (48/96/192 kHz from SR[SampleRate].rate)
+ *    - Configures both SAI1 and SAI2 peripherals
+ *
+ * 2. **Teensy Audio Board Codec (sgtl5000_teensy)** - Transmit Path
+ *    - Address: LOW
+ *    - Input: Microphone with 10 dB initial gain
+ *    - Output: Line-out level 13 (I/Q to exciter)
+ *    - Disables ADC high-pass filter (reduces noise per PJRC forum recommendation)
+ *
+ * 3. **Main Board Codec (pcm5102_mainBoard)** - Receive Path
+ *    - Address: HIGH
+ *    - Input: Line-in from RX I/Q (PCM1808)
+ *    - Output: Speaker at 50% volume
+ *
+ * 4. **Audio Memory Allocation**
+ *    - 500 blocks for regular audio (int16 samples)
+ *    - 10 blocks for floating-point audio (F32)
+ *
+ * 5. **Sidetone Generator**
+ *    - Frequency: SIDETONE_FREQUENCY (typically 600-800 Hz)
+ *    - Amplitude: ED.sidetoneVolume / 500 (normalized 0.0-1.0)
+ *    - Initially muted to prevent startup tone
+ *
+ * This function must be called during radio initialization before entering the
+ * main loop, after hardware power-up but before audio processing begins.
+ *
+ * @note Memory allocation sizes (500/10) are sized for the maximum expected
+ *       processing depth at the highest sample rate
+ *
+ * @see SetI2SFreq() for sample rate configuration details
+ * @see SR[] array in Config.h for supported sample rates
  */
 void InitializeAudio(void){
     SetI2SFreq(SR[SampleRate].rate);

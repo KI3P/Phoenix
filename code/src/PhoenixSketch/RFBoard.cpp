@@ -281,6 +281,18 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 //    }
 //}
 
+/**
+ * Get the current SSB VFO frequency setting.
+ *
+ * Returns the frequency of the SSB VFO (CLK0 & CLK1 quadrature outputs)
+ * used for SSB reception and transmission. The internal frequency is stored
+ * in deci-Hertz (Hz × 10) but this function returns the value in Hertz.
+ *
+ * @return Current SSB VFO frequency in Hz
+ *
+ * @see SetSSBVFOFrequency() to change the frequency
+ * @see SSBVFOFreq_dHz internal storage variable
+ */
 int64_t GetSSBVFOFrequency(void){
     return SSBVFOFreq_dHz/100;
 }
@@ -456,14 +468,45 @@ void DisableSSBVFOOutput(void){
 }
 
 // CW VFO Control Functions
+
+/**
+ * Set the CW VFO frequency for Morse code transmission.
+ *
+ * Configures the Si5351 CLK2 output frequency used for CW (Morse code) operation.
+ * The frequency is stored and set in deci-Hertz units (Hz × 10) for high precision.
+ *
+ * Optimization: Skips the Si5351 write if the requested frequency matches the
+ * current setting, preventing unnecessary I2C transactions.
+ *
+ * In CW mode, this frequency typically includes an offset for the sidetone pitch
+ * (e.g., centerFreq + 700Hz for a 700Hz tone). The tune state machine handles
+ * this offset calculation.
+ *
+ * @param frequency_dHz Desired CW VFO frequency in deci-Hertz (Hz × 10)
+ *
+ * @see GetCWVFOFrequency() to read current frequency
+ * @see EnableCWVFOOutput() to enable CLK2 output
+ * @see Tune.cpp for CW frequency offset handling
+ */
 void SetCWVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == CWVFOFreq_dHz) return;
     CWVFOFreq_dHz = frequency_dHz;
     si5351.set_freq(CWVFOFreq_dHz, SI5351_CLK2);
-} // frequency in Hz * 100
+}
 
-
+/**
+ * Get the current CW VFO frequency setting.
+ *
+ * Returns the frequency of the CW VFO (CLK2 output) used for CW transmission.
+ * The internal frequency is stored in deci-Hertz (Hz × 10) but this function
+ * returns the value in Hertz.
+ *
+ * @return Current CW VFO frequency in Hz
+ *
+ * @see SetCWVFOFrequency() to change the frequency
+ * @see CWVFOFreq_dHz internal storage variable
+ */
 int64_t GetCWVFOFrequency(void){
     return CWVFOFreq_dHz/100;
 }
@@ -524,6 +567,21 @@ void CWoff(void){
     CLEAR_BIT(hardwareRegister,CWBIT);
 }
 
+/**
+ * Get the current CW keying state.
+ *
+ * Returns the state of the CW transmit keying line (CW_ON_OFF pin).
+ * This indicates whether CW RF output is currently enabled (key down)
+ * or disabled (key up).
+ *
+ * The state is read from the CWBIT in the hardware register, which tracks
+ * the CW_ON_OFF digital output pin state.
+ *
+ * @return true if CW output is enabled (key down), false if disabled (key up)
+ *
+ * @see CWon() to enable CW output
+ * @see CWoff() to disable CW output
+ */
 bool getCWState(void){
     return GET_BIT(hardwareRegister,CWBIT);
 }
@@ -581,6 +639,21 @@ void SelectTXCWModulation(void){
     CLEAR_BIT(hardwareRegister,MODEBIT); // XMIT_CW
 }
 
+/**
+ * Get the current transmit modulation mode.
+ *
+ * Returns the state of the transmit modulation selector (XMIT_MODE pin).
+ * This determines which modulation circuit is active for transmission:
+ * - SSB modulation path (for voice/SSB)
+ * - CW modulation path (for Morse code)
+ *
+ * The state is read from the MODEBIT in the hardware register.
+ *
+ * @return XMIT_SSB (1) if SSB modulation is selected, XMIT_CW (0) if CW modulation is selected
+ *
+ * @see SelectTXSSBModulation() to select SSB mode
+ * @see SelectTXCWModulation() to select CW mode
+ */
 bool getModulationState(void){
     return GET_BIT(hardwareRegister,MODEBIT);
 }
@@ -613,6 +686,21 @@ void DisableCalFeedback(void){
     CLEAR_BIT(hardwareRegister,CALBIT); // CAL_OFF
 }
 
+/**
+ * Get the current calibration feedback state.
+ *
+ * Returns whether the calibration signal feedback path is currently enabled
+ * or disabled. The calibration feedback allows the transmit signal to be
+ * routed back to the receiver for calibration and testing purposes.
+ *
+ * The state is read from the CALBIT in the hardware register, which tracks
+ * the CAL digital output pin state.
+ *
+ * @return CAL_ON (1) if calibration feedback is enabled, CAL_OFF (0) if disabled
+ *
+ * @see EnableCalFeedback() to enable calibration feedback
+ * @see DisableCalFeedback() to disable calibration feedback
+ */
 bool getCalFeedbackState(void){
     return GET_BIT(hardwareRegister,CALBIT);
 }
@@ -645,10 +733,42 @@ void SelectRXMode(void){
     CLEAR_BIT(hardwareRegister,RXTXBIT); //RX
 }
 
+/**
+ * Get the current RX/TX state.
+ *
+ * Returns whether the radio is currently in receive or transmit mode.
+ * This state controls the antenna relay, power amplifier enable, and
+ * receiver/transmitter signal routing.
+ *
+ * The state is read from the RXTXBIT in the hardware register, which tracks
+ * the RXTX digital output pin state.
+ *
+ * @return TX (1) if in transmit mode, RX (0) if in receive mode
+ *
+ * @see SelectTXMode() to switch to transmit
+ * @see SelectRXMode() to switch to receive
+ */
 bool getRXTXState(void){
     return GET_BIT(hardwareRegister,RXTXBIT);
 }
 
+/**
+ * Read both GPIO registers from the RF board MCP23017 chip.
+ *
+ * Performs a 16-bit read of both GPIOA and GPIOB registers from the
+ * MCP23017 I2C GPIO expander on the RF board. These registers control
+ * the digital attenuators:
+ * - GPIOA: RX attenuation (6 bits, 0-31.5 dB in 0.5 dB steps)
+ * - GPIOB: TX attenuation (6 bits, 0-31.5 dB in 0.5 dB steps)
+ *
+ * Used for debugging and diagnostics to verify the actual hardware
+ * register states match the intended settings.
+ *
+ * @return 16-bit value with GPIOB in upper byte, GPIOA in lower byte
+ *
+ * @see SetRXAttenuation() to set RX attenuator
+ * @see SetTXAttenuation() to set TX attenuator
+ */
 uint16_t GetRFMCPRegisters(void){
     return mcpAtten.readGPIOAB();
 }

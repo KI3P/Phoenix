@@ -82,10 +82,6 @@ void AdjustFineTune(int32_t filter_change){
     if (-ED.fineTuneFreq_Hz[ED.activeVFO] < lower_limit) 
         ED.fineTuneFreq_Hz[ED.activeVFO] = -lower_limit;
     //Debug("Fine tune post: " + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
-
-    // The fine tune is applied after the spectrum is shifted by samplerate/4. So the 
-    // actual frequency in the RF domain is: TXRXFreq = centerFreq+fineTuneFreq-48kHz
-    //ED.currentFreq[ED.activeVFO] = GetTXRXFreq_dHz()/100;
 }
 
 /**
@@ -136,6 +132,13 @@ void ResetTuning(void){
     return;
 }
 
+/**
+ * Determine which amateur radio band a given frequency belongs to.
+ * Searches through all defined bands to find which one contains the frequency.
+ *
+ * @param freq Frequency in Hz
+ * @return Band index (FIRST_BAND to LAST_BAND) if found, or -1 if frequency is not within any defined band
+ */
 int8_t GetBand(int64_t freq){
     for(uint8_t i = FIRST_BAND; i <= LAST_BAND; i++){
         if(freq >= bands[i].fBandLow_Hz && freq <= bands[i].fBandHigh_Hz){

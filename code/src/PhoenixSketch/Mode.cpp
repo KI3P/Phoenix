@@ -1,5 +1,7 @@
 #include "SDT.h"
 
+// This file contains the entry and exit functions called upon changing states
+
 void ModeSSBReceiveEnter(void){
     UpdateRFHardwareState();
     UpdateAudioIOState();

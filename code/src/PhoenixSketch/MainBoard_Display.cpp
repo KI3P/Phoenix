@@ -1,3 +1,86 @@
+/**
+ * @file MainBoard_Display.cpp
+ * @brief Display management for the Phoenix SDR using RA8875 TFT controller
+ *
+ * This module manages the 800x480 TFT display, rendering all user interface elements
+ * including spectrum display, waterfall, VFO frequencies, S-meter, settings, and menus.
+ *
+ * Design Philosophy:
+ * ------------------
+ * Functions in this file follow a strict read-only pattern:
+ * 1. Read the state of the radio from global variables (ED, filters, bands, etc.)
+ * 2. Draw on the display based on that state
+ * 3. **DO NOT modify any external state variables**
+ *
+ * This separation ensures the display code cannot accidentally affect radio operation,
+ * maintaining clear boundaries between visualization and control logic.
+ *
+ * Display Architecture:
+ * ---------------------
+ * The screen is divided into **12 panes**, each responsible for displaying specific
+ * information:
+ *
+ * **Left Column (Spectrum and Status):**
+ * - PaneVFOA: VFO A frequency (large, top-left)
+ * - PaneVFOB: VFO B frequency (smaller, below VFO A)
+ * - PaneFreqBandMod: Current band name and modulation mode
+ * - PaneSpectrum: RF spectrum display with waterfall (largest pane)
+ * - PaneStateOfHealth: Hardware status and diagnostics
+ * - PaneTime: Current time display
+ *
+ * **Right Column (Meters and Controls):**
+ * - PaneSWR: Standing Wave Ratio and power meters
+ * - PaneTXRXStatus: TX/RX indicator
+ * - PaneSMeter: Receive signal strength meter
+ * - PaneAudioSpectrum: Demodulated audio frequency spectrum
+ * - PaneSettings: Dynamic settings display (changes based on active encoder)
+ * - PaneNameBadge: User callsign and radio identification
+ *
+ * Pane System:
+ * ------------
+ * Each pane has:
+ * - Position (x0, y0) and size (width, height)
+ * - DrawFunction pointer for rendering
+ * - stale flag indicating whether redraw is needed
+ *
+ * The DrawDisplay() function iterates through all panes and calls DrawFunction()
+ * only when stale==true, minimizing unnecessary screen updates for efficiency.
+ *
+ * Spectrum Display:
+ * -----------------
+ * The RF spectrum (PaneSpectrum) uses FFT data from the DSP chain:
+ * - Frequency axis: Center frequency ± sample rate / (2 × zoom)
+ * - Amplitude axis: Configurable dB scale (1, 2, 5, 10, 20 dB/div)
+ * - Waterfall: Color-coded history scrolling downward
+ * - Tuning indicator: Line showing receive frequency
+ * - Filter bandwidth: Visual representation of current filter shape
+ *
+ * Menu System:
+ * ------------
+ * The display supports a hierarchical menu system for configuration:
+ * - Primary menu: Top-level categories (Settings, Calibration, etc.)
+ * - Secondary menu: Options within each category
+ * - Parameter update: Value adjustment screen for selected setting
+ *
+ * Hardware:
+ * ---------
+ * - Display: 800x480 TFT with RA8875 controller
+ * - Interface: SPI (CS=10, RESET=9)
+ * - Color depth: 16-bit RGB565
+ * - Touch: Not currently implemented
+ *
+ * Performance:
+ * ------------
+ * Display updates are rate-limited to prevent flickering and reduce CPU load:
+ * - Spectrum refresh: Every SPECTRUM_REFRESH_MS (200ms)
+ * - Panes only redraw when stale flag is set
+ * - Text is blanked before redrawing to prevent ghosting
+ *
+ * @see RA8875 library documentation for low-level display control
+ * @see DSP_FFT.cpp for spectrum data generation
+ * @see UISm state machine for menu navigation logic
+ */
+
 #include "SDT.h"
 #include <RA8875.h>
 #include <TimeLib.h>                   // Part of Teensy Time library
@@ -5,13 +88,11 @@
 #include "FreeSansBold18pt7b.h"
 
 /*
- * Functions in this file do two things only: 
- * 1) They read the state of the radio, 
+ * Functions in this file do two things only:
+ * 1) They read the state of the radio,
  * 2) They draw on the display.
  * They do not change the value of any variable that is declared outside of this file.
  */
-
-//#include "phoenix.cpp"
 
 // pins for the display CS and reset
 #define TFT_CS 10
@@ -65,6 +146,15 @@ static bool redrawSpectrum = false;
 static float32_t audioMaxSquaredAve = 0;
 bool redrawParameter = true;
 
+/**
+ * Get the center frequency for the spectrum display.
+ *
+ * When zoom is disabled (zoom==0), returns the VFO center frequency.
+ * When zoom is enabled, offsets the display by -SR/4 to show the zoomed
+ * portion of the spectrum centered on screen.
+ *
+ * @return Center frequency in Hz for spectrum display
+ */
 int64_t GetCenterFreq_Hz(){
     if (ED.spectrum_zoom == 0)
         return ED.centerFreq_Hz[ED.activeVFO];
@@ -72,10 +162,26 @@ int64_t GetCenterFreq_Hz(){
         return ED.centerFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4;
 }
 
+/**
+ * Get the lower edge frequency of the spectrum display.
+ *
+ * Calculates: Center - (SampleRate / (2 × 2^zoom))
+ * Accounts for zoom level to determine visible frequency range.
+ *
+ * @return Lower frequency edge in Hz
+ */
 int64_t GetLowerFreq_Hz(){
     return GetCenterFreq_Hz()-SR[SampleRate].rate/(2*(1<<ED.spectrum_zoom));
 }
 
+/**
+ * Get the upper edge frequency of the spectrum display.
+ *
+ * Calculates: Center + (SampleRate / (2 × 2^zoom))
+ * Accounts for zoom level to determine visible frequency range.
+ *
+ * @return Upper frequency edge in Hz
+ */
 int64_t GetUpperFreq_Hz(){
     return GetCenterFreq_Hz()+SR[SampleRate].rate/(2*(1<<ED.spectrum_zoom));
 }
@@ -93,9 +199,22 @@ struct Rectangle {
     uint16_t x0;     /**< top left corner, horizontal coordinate */
     uint16_t y0;     /**< top left corner, vertical coordinate */
     uint16_t width;  /**< horizontal left to right size */
-    uint16_t height; /**< vertical top to bottom size */  
+    uint16_t height; /**< vertical top to bottom size */
 };
 
+/**
+ * Calculate the bounding rectangle for a text string.
+ *
+ * Computes the rectangle dimensions needed to contain text of a given
+ * character count and font size. Used to blank areas before redrawing text.
+ *
+ * @param x0 Top-left X coordinate of text position
+ * @param y0 Top-left Y coordinate of text position
+ * @param rect Pointer to Rectangle struct to fill with calculated dimensions
+ * @param Nchars Number of characters in the text string
+ * @param charWidth Width of each character in pixels
+ * @param charHeight Height of each character in pixels
+ */
 void CalculateTextCorners(int16_t x0,int16_t y0,Rectangle *rect,int16_t Nchars,
                         uint16_t charWidth,uint16_t charHeight){
     rect->x0 = x0;
@@ -104,6 +223,14 @@ void CalculateTextCorners(int16_t x0,int16_t y0,Rectangle *rect,int16_t Nchars,
     rect->height = charHeight;
 }
 
+/**
+ * Fill a rectangular area with black pixels.
+ *
+ * Clears the specified rectangle by filling it with RA8875_BLACK.
+ * Used to erase old text/graphics before redrawing to prevent ghosting.
+ *
+ * @param rect Pointer to Rectangle defining the area to blank
+ */
 void BlankBox(Rectangle *rect){
     tft.fillRect(rect->x0, rect->y0, rect->width, rect->height, RA8875_BLACK);
 }
@@ -133,7 +260,6 @@ Pane PaneAudioSpectrum={535,115,260,150,DrawAudioSpectrumPane,1};
 Pane PaneSettings =    {535,270,260,170,DrawSettingsPane,1};
 Pane PaneNameBadge =   {535,445,260,30,DrawNameBadgePane,1};
 
-
 // An array of pointers to all the panes, useful for iterating over
 Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMod,
                                     &PaneSpectrum,&PaneStateOfHealth,
@@ -141,6 +267,16 @@ Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMod,
                                     &PaneSMeter,&PaneAudioSpectrum,&PaneSettings,
                                     &PaneNameBadge};
 
+/**
+ * Format a frequency value as a human-readable string with thousands separators.
+ *
+ * Converts a frequency in Hz to a formatted string with dots as thousands separators.
+ * - Frequencies >= 1 MHz: "xxx.xxx.xxx" format (e.g., "14.285.000")
+ * - Frequencies < 1 MHz: "    xxx.xxx" format (e.g., "    455.000")
+ *
+ * @param freq Frequency value in Hz
+ * @param freqBuffer Output buffer to receive formatted string (must be at least 15 chars)
+ */
 void FormatFrequency(long freq, char *freqBuffer) {
     if (freq >= 1000000) {
         sprintf(freqBuffer, "%3ld.%03ld.%03ld", freq / (long)1000000, (freq % (long)1000000) / (long)1000, freq % (long)1000);
@@ -151,8 +287,23 @@ void FormatFrequency(long freq, char *freqBuffer) {
 
 static int64_t TxRxFreq_old = 0;   // invalid at init, force a screen update
 static uint8_t activeVFO_old = 10; // invalid at init, force a screen update
+
 /**
- * Update both VFO panes
+ * Render both VFO A and VFO B frequency displays.
+ *
+ * Displays the current operating frequencies for both VFOs with color coding:
+ * - **Green**: Active VFO, frequency within band limits
+ * - **Red**: Active VFO, frequency out of band
+ * - **Light Grey**: Inactive VFO
+ *
+ * VFO A (larger): Top-left pane, shows primary VFO frequency
+ * VFO B (smaller): Below VFO A, shows secondary VFO frequency
+ *
+ * Optimization: Only redraws when frequency changes or VFO switches to avoid flicker.
+ * Tracks previous frequency (TxRxFreq_old) and active VFO (activeVFO_old) for
+ * change detection.
+ *
+ * Format: "xxx.xxx.xxx" Hz with thousands separators (e.g., "14.285.000")
  */
 void DrawVFOPanes(void) {
     int64_t TxRxFreq = GetTXRXFreq_dHz()/100;
@@ -183,9 +334,7 @@ void DrawVFOPanes(void) {
         // Update VFO A pane
         // Black out the prior data
         tft.fillRect(PaneVFOA.x0, PaneVFOA.y0, PaneVFOA.width, PaneVFOA.height, RA8875_BLACK);
-        // Draw a box around the borders
-        //tft.drawRect(PaneVFOA.x0, PaneVFOA.y0, PaneVFOA.width, PaneVFOA.height, RA8875_YELLOW);
-
+        
         TxRxFreq = GetTXRXFreq(0);
         if (TxRxFreq < bands[ED.currentBand[0]].fBandLow_Hz || 
             TxRxFreq > bands[ED.currentBand[0]].fBandHigh_Hz) {
@@ -211,8 +360,6 @@ void DrawVFOPanes(void) {
         // Update VFO B pane
         // Black out the prior data
         tft.fillRect(PaneVFOB.x0, PaneVFOB.y0, PaneVFOB.width, PaneVFOB.height, RA8875_BLACK);
-        // Draw a box around the borders
-        //tft.drawRect(PaneVFOB.x0, PaneVFOB.y0, PaneVFOB.width, PaneVFOB.height, RA8875_YELLOW);
         
         TxRxFreq = GetTXRXFreq(1);
         if (TxRxFreq < bands[ED.currentBand[1]].fBandLow_Hz || 
@@ -240,6 +387,20 @@ int64_t oldCenterFreq = 0;
 int32_t oldBand = -1;
 ModeSm_StateId oldState = ModeSm_StateId_ROOT;
 ModulationType oldModulation = DCF77;
+
+/**
+ * Render the frequency, band name, and modulation mode pane.
+ *
+ * Displays a compact status line showing:
+ * - Current operating frequency (formatted with commas)
+ * - Band name (e.g., "20m", "40m", "160m")
+ * - Modulation mode (USB, LSB, CW, AM, SAM)
+ * - TX/RX status indicator
+ *
+ * Located below the VFO panes, this provides at-a-glance operating information.
+ *
+ * Optimization: Only redraws when center frequency, band, mode, or modulation changes.
+ */
 void DrawFreqBandModPane(void) {
     // Only update if information is stale
     if ((oldCenterFreq != ED.centerFreq_Hz[ED.activeVFO]) ||
@@ -258,8 +419,6 @@ void DrawFreqBandModPane(void) {
     tft.setFontDefault();
     // Black out the prior data
     tft.fillRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_BLACK);
-    // Draw a box around the borders and put some text in the middle
-    //tft.drawRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_YELLOW);
     
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_CYAN);
@@ -324,21 +483,21 @@ float xExpand = 1.4;
 uint16_t spectrum_x = 10;
 
 
-/*****
-  Purpose: Draw Tuned Bandwidth on Spectrum Plot
-
-  Parameter list:
-
-  Return value;
-    void
-*****/
-#define FILTER_WIN 0x10  // Color of SSB filter width
+/**
+ * Convert a frequency in Hz to spectrum bin number
+ * @param freq_Hz Frequency to convert
+ */
 FASTRUN int16_t FreqToBin(int64_t freq_Hz){
     int16_t val = SPECTRUM_RES*((float32_t)(freq_Hz - GetLowerFreq_Hz()) / (float32_t)(SR[SampleRate].rate/(1<<ED.spectrum_zoom)));
     if (val < 0) val = 0;
     if (val > SPECTRUM_RES) val = SPECTRUM_RES;
     return val;
 }
+
+#define FILTER_WIN 0x10  // Color of SSB filter width
+/**
+ * Draw Tuned Bandwidth on Spectrum Plot
+ */
 FASTRUN void DrawBandWidthIndicatorBar(void){
     // erase the previous bandwidth indicator bar:
     tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
@@ -371,6 +530,23 @@ FASTRUN void DrawBandWidthIndicatorBar(void){
 
 uint16_t FILTER_PARAMETERS_X = PaneSpectrum.x0 + PaneSpectrum.width / 3;// (XPIXELS * 0.22); // 800 * 0.22 = 176
 uint16_t FILTER_PARAMETERS_Y = PaneSpectrum.y0+1; //(YPIXELS * 0.213); // 480 * 0.23 = 110
+
+/**
+ * Display filter bandwidth and dB scale information on the spectrum pane.
+ *
+ * Renders text overlay on the spectrum display showing:
+ * - **dB Scale**: Current vertical scale (e.g., "20 dB/", "5 dB/")
+ * - **Low Cut Frequency**: Lower edge of filter passband (e.g., "0.3kHz")
+ * - **High Cut Frequency**: Upper edge of filter passband (e.g., "2.7kHz")
+ *
+ * This information is drawn on Layer 2 (overlay layer) at the top-left of the
+ * spectrum pane, providing real-time feedback on current filter settings.
+ *
+ * Called whenever filter parameters change or spectrum pane is redrawn.
+ *
+ * @see displayScale[] for dB scale configurations
+ * @see bands[].FLoCut_Hz and FHiCut_Hz for filter edge frequencies
+ */
 void ShowBandwidth() {
     char buff[10];
     int centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2; // 257
@@ -404,6 +580,22 @@ void ShowBandwidth() {
 
 }
 
+/**
+ * Draw frequency labels along the bottom of the spectrum display.
+ *
+ * Renders frequency markers showing the edges and center of the visible spectrum:
+ * - Left edge: Lower frequency limit
+ * - Center: Center frequency
+ * - Right edge: Upper frequency limit
+ *
+ * Frequencies are formatted with proper units (MHz/kHz) and positioned to align
+ * with the spectrum plot. Labels adjust based on zoom level to show the currently
+ * visible frequency range.
+ *
+ * Called when spectrum pane is redrawn or frequency/zoom changes.
+ *
+ * @see GetLowerFreq_Hz(), GetCenterFreq_Hz(), GetUpperFreq_Hz()
+ */
 void DrawFrequencyBarValue(void) {
     char txt[16];
 
@@ -478,16 +670,37 @@ void DrawFrequencyBarValue(void) {
         if (ED.spectrum_zoom > 2 || freq_calc > 1000) {
             idx++;
         }
-    }    
+    }
 }
 
+/**
+ * Calculate vertical pixel position for a spectrum FFT bin.
+ *
+ * Converts FFT power spectral density (PSD) data to a screen Y-coordinate
+ * for spectrum display rendering. The calculation combines:
+ * - Base offset from display scale configuration (displayScale[].baseOffset)
+ * - Per-band pixel offset for calibration (bands[].pixel_offset)
+ * - Scaled PSD value (dBScale × psdnew[i])
+ *
+ * Result is clamped to maximum value of 220 to prevent drawing outside
+ * the spectrum pane boundaries.
+ *
+ * FASTRUN optimization: Placed in RAM for real-time performance during
+ * spectrum rendering at high refresh rates.
+ *
+ * @param i Index into psdnew[] FFT power array
+ * @return Vertical pixel position (0-220) for drawing spectrum line
+ *
+ * @see displayScale[] for dB scale configurations
+ * @see psdnew[] in DSP_FFT.cpp for FFT power data
+ */
 FASTRUN int16_t pixelnew(uint32_t i){
-    int16_t result = displayScale[ED.spectrumScale].baseOffset + 
-                    bands[ED.currentBand[ED.activeVFO]].pixel_offset + 
+    int16_t result = displayScale[ED.spectrumScale].baseOffset +
+                    bands[ED.currentBand[ED.activeVFO]].pixel_offset +
                     (int16_t)(displayScale[ED.spectrumScale].dBScale * psdnew[i]);
-    if (result < 220) 
+    if (result < 220)
         return result;
-    else 
+    else
         return 220;
 }
 #define TCVSDR_SMETER
@@ -496,6 +709,31 @@ FASTRUN int16_t pixelnew(uint32_t i){
 #define SMETER_BAR_LENGTH 180
 #define SMETER_BAR_HEIGHT 18
 uint16_t pixels_per_s = 12;
+
+/**
+ * Calculate and display the S-meter reading with dBm value.
+ *
+ * Performs signal strength measurement and rendering:
+ * 1. Calculate signal level in dBm from audio power (audioMaxSquaredAve)
+ * 2. Apply calibration factors:
+ *    - dbm_calibration: System-wide calibration offset
+ *    - gainCorrection: Per-band pre-amp gain compensation
+ *    - RFgain_dB: Per-band RF gain setting
+ *    - rfGainAllBands_dB: Global RF gain adjustment
+ *    - RAtten: Receive attenuator setting
+ * 3. Map dBm to S-meter scale (S1 to S9, then dB over S9)
+ * 4. Draw horizontal bar graph in red
+ * 5. Display numeric dBm value at end of bar
+ *
+ * S-Meter Scale:
+ * - S1 = -127 dBm, S9 = -73 dBm (6 dB per S-unit)
+ * - Above S9: Displayed as dB over S9
+ *
+ * Calculation uses log10f_fast() for efficient power-to-dB conversion.
+ *
+ * @note audioMaxSquaredAve is updated by DSP processing chain
+ * @see DrawSMeterPane() for S-meter container rendering
+ */
 void DisplaydbM() {
     char buff[10];
     int16_t smeterPad;
@@ -539,22 +777,42 @@ static int16_t smeterLength;
 #define NCHUNKS 4
 #define CLIP_AUDIO_PEAK 115  // The pixel value where audio peak overwrites S-meter
 
-FASTRUN  // Place in tightly-coupled memory
-         /*****
-  Purpose: Show Spectrum display
-            Note that this routine calls the Audio process Function during each display cycle,
-            for each of the 512 display frequency bins.  This means that the audio is refreshed at the maximum rate
-            and does not have to wait for the display to complete drawinf the full spectrum.
-            However, the display data are only updated ONCE during each full display cycle,
-            ensuring consistent data for the erase/draw cycle at each frequency point.
-
-  Parameter list:
-    void
-
-  Return value;
-    void
-*****/
-void ShowSpectrum(void){
+/**
+ * Render the real-time spectrum line display (FASTRUN - executes from RAM).
+ *
+ * This is the core spectrum rendering function, called at 5 Hz (200ms intervals).
+ * It draws the yellow frequency spectrum line showing signal amplitudes across
+ * the visible frequency range.
+ *
+ * Rendering Process:
+ * 1. Iterate through all frequency bins (MAX_WATERFALL_WIDTH points)
+ * 2. For each bin:
+ *    - Erase old spectrum line (black)
+ *    - Draw new spectrum line (yellow) based on psdnew[] FFT data
+ *    - Generate waterfall color value from amplitude
+ * 3. After all bins processed:
+ *    - Scroll waterfall down using BTE (Block Transfer Engine)
+ *    - Write new waterfall row at top
+ *
+ * Performance Optimization:
+ * - FASTRUN annotation places function in tightly-coupled RAM for speed
+ * - Processes spectrum in NCHUNKS (4) to interleave with audio processing
+ * - Uses hardware BTE for waterfall scrolling (no CPU overhead)
+ *
+ * Amplitude Scaling:
+ * - Uses displayScale[].dBScale and baseOffset for vertical positioning
+ * - Applies per-band pixel_offset and spectrumNoiseFloor adjustments
+ * - Clips to spectrum pane boundaries (SPECTRUM_TOP_Y to SPECTRUM_HEIGHT)
+ *
+ * Waterfall Encoding:
+ * - Maps amplitude to gradient[] color array (blue→green→yellow→red)
+ * - Saturates at 117 bins (upper limit of color scale)
+ *
+ * @note This function is called only when psdupdated==true and redrawSpectrum==true
+ * @see psdnew[] for FFT magnitude data
+ * @see gradient[] for waterfall color mapping
+ */
+FASTRUN void ShowSpectrum(void){
     Flag(2);
     int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
     int16_t middleSlice = centerLine / 2;  // Approximate center element
@@ -622,6 +880,31 @@ uint32_t oz = 8;
 int64_t ocf = 0;
 int64_t oft = 0;
 ModulationType omd = IQ;
+
+/**
+ * Render the RF spectrum display pane with waterfall.
+ *
+ * The largest and most complex pane, displaying:
+ * - **Real-time spectrum**: FFT magnitude plot (upper portion)
+ * - **Waterfall**: Scrolling color-coded frequency history (lower portion)
+ * - **Tuning indicator**: Red vertical line showing receive frequency
+ * - **Filter bandwidth**: Visual representation of filter passband
+ * - **Frequency axis**: Labeled frequency markers
+ * - **Amplitude axis**: dB scale with configurable range
+ *
+ * The spectrum uses FFT data from DSP_FFT.cpp, rate-limited to 5 Hz (200ms)
+ * to balance responsiveness with CPU load.
+ *
+ * Waterfall Scrolling:
+ * Uses RA8875 Block Transfer Engine (BTE) to efficiently move pixel data
+ * between display layers, creating smooth scrolling without CPU overhead.
+ *
+ * Optimization: Only redraws frame/grid when zoom, center freq, fine tune,
+ * or modulation changes. Spectrum data updates continuously when psdupdated==true.
+ *
+ * @see ShowSpectrum() for spectrum line rendering
+ * @see DSP_FFT.cpp for FFT data generation
+ */
 void DrawSpectrumPane(void) {
     // Only update if information is stale
     if ((oz != ED.spectrum_zoom) || 
@@ -656,6 +939,24 @@ void DrawSpectrumPane(void) {
     PaneSpectrum.stale = false;
 }
 
+/**
+ * Render the state of health pane showing DSP load and system status.
+ *
+ * Displays critical system performance metrics:
+ * - **DSP Load**: Percentage of CPU time spent on audio processing
+ *   - Green: Normal operation (< 100%)
+ *   - Red: Overload condition (≥ 100%, audio glitches likely)
+ * - **Loop Time**: Main loop execution time in microseconds
+ * - **Audio Underruns**: Count of audio buffer underflows
+ *
+ * Special Mode: In CW receive mode with decoder enabled, this pane is repurposed
+ * to display decoded Morse code characters instead of health metrics.
+ *
+ * DSP load is calculated as: (avg processing time / audio block time) × 100
+ * where audio block time = (128 samples × N_BLOCKS) / sample_rate
+ *
+ * Located at bottom-left of screen for at-a-glance system monitoring.
+ */
 void DrawStateOfHealthPane(void) {
     // Only update if information is stale
     if (!PaneStateOfHealth.stale) return;
@@ -714,6 +1015,20 @@ void DrawStateOfHealthPane(void) {
     PaneStateOfHealth.stale = false;
 }
 
+/**
+ * Render the time pane showing current time and date.
+ *
+ * Displays local time using Teensy's RTC (Real-Time Clock):
+ * - **Time**: HH:MM:SS format (12-hour or 24-hour based on TIME_24H define)
+ * - **Timezone**: Abbreviation (e.g., EST, PST) from MY_TIMEZONE define
+ * - **Date**: Month/Day/Year format
+ * - **AM/PM**: Shown in 12-hour format only
+ *
+ * The display uses the TimeLib library to access the Teensy 4.1's built-in RTC.
+ * Time must be set via serial interface or NTP during initialization.
+ *
+ * Located at bottom-center of screen, adjacent to state of health pane.
+ */
 void DrawTimePane(void) {
     // Only update if information is stale
     if (!PaneTime.stale) return;
@@ -761,6 +1076,21 @@ void DrawTimePane(void) {
     PaneTime.stale = false;
 }
 
+/**
+ * Render the SWR (Standing Wave Ratio) pane (currently disabled/placeholder).
+ *
+ * This pane is intended to display transmit power and SWR measurements:
+ * - Forward power (watts)
+ * - Reflected power (watts)
+ * - SWR ratio
+ *
+ * Currently the implementation is commented out and the pane is not actively drawn.
+ * SWR measurements are available from the LPF board via ReadSWR(), ReadForwardPower(),
+ * and ReadReflectedPower() but are not yet integrated into the display system.
+ *
+ * @note Future enhancement - integrate with LPFBoard.cpp SWR measurement
+ * @see ReadSWR(), ReadForwardPower(), ReadReflectedPower() in LPFBoard.cpp
+ */
 void DrawSWRPane(void) {
 /*    // Only update if information is stale
     if (!PaneSWR.stale) return;
@@ -780,6 +1110,26 @@ void DrawSWRPane(void) {
 }
 
 ModeSm_StateId oldMState = ModeSm_StateId_ROOT;
+
+/**
+ * Render the TX/RX status indicator pane.
+ *
+ * Displays a highly visible status indicator showing current operating mode:
+ * - **"RX"**: Green background - Radio is receiving (SSB_RECEIVE, CW_RECEIVE states)
+ * - **"TX"**: Red background - Radio is transmitting (all transmit states)
+ *
+ * The indicator updates automatically based on ModeSm state changes. Uses large,
+ * bold text with high-contrast background colors for instant recognition.
+ *
+ * State Detection:
+ * Monitors modeSM.state_id and maps to RX/TX:
+ * - RX: SSB_RECEIVE, CW_RECEIVE
+ * - TX: SSB_TRANSMIT, all CW_TRANSMIT_* states
+ *
+ * Optimization: Only redraws when modeSM state transitions between RX and TX modes.
+ *
+ * Located at top-right of screen, adjacent to SWR pane.
+ */
 void DrawTXRXStatusPane(void) {
     // Only update if information is stale
     TXRXType state;
@@ -839,6 +1189,25 @@ void DrawTXRXStatusPane(void) {
     PaneTXRXStatus.stale = false;
 }
 
+/**
+ * Draw the S-meter container with scale markings (one-time initialization).
+ *
+ * Renders the static elements of the S-meter display:
+ * - Horizontal bar outline (white for S1-S9, green for >S9)
+ * - Tick marks at each S-unit (taller on odd numbers)
+ * - S-unit labels: S1, S3, S5, S7, S9, +20dB
+ * - Vertical end markers
+ *
+ * S-Meter Scale:
+ * - White section: S1 through S9 (9 units × 12 pixels = 108 pixels)
+ * - Green section: S9+ in 10dB increments (+10dB, +20dB, +30dB)
+ * - Total bar length: 180 pixels
+ *
+ * Called once when S-meter pane is initialized. The actual signal level bar
+ * is drawn dynamically by DisplaydbM().
+ *
+ * @see DisplaydbM() for dynamic S-meter bar rendering
+ */
 void DrawSMeterContainer(void) {
     int32_t i;
     tft.setFontDefault();
@@ -881,7 +1250,22 @@ void DrawSMeterContainer(void) {
 
 }
 
-
+/**
+ * Render the S-meter pane (container and dynamic signal level).
+ *
+ * Initializes and updates the S-meter display showing receive signal strength:
+ * 1. On first draw (when stale): Render static container with scale markings
+ * 2. Continuously: Update dynamic signal level bar via DisplaydbM()
+ *
+ * The S-meter provides real-time feedback on received signal strength in both
+ * S-units (S1-S9) and dBm. Located in the upper-right section of the display.
+ *
+ * Optimization: Container is only redrawn when pane.stale==true, but DisplaydbM()
+ * is called every display cycle to update the signal level bar.
+ *
+ * @see DrawSMeterContainer() for static scale rendering
+ * @see DisplaydbM() for dynamic signal level calculation and display
+ */
 void DrawSMeterPane(void) {
     // Only update if information is stale
     if (!PaneSMeter.stale) return;
@@ -896,6 +1280,35 @@ void DrawSMeterPane(void) {
 int32_t ohi = 0;
 int32_t olo = 0;
 int32_t ofi = 0;
+
+/**
+ * Draw the audio spectrum pane container with frequency scale and filter markers.
+ *
+ * Renders the static and dynamic elements of the audio spectrum display:
+ * 1. **Frequency scale**: 0-6 kHz horizontal axis with tick marks
+ * 2. **SSB filter markers**: Vertical lines showing FLoCut_Hz and FHiCut_Hz
+ * 3. **CW filter marker**: Yellow line showing CW audio filter cutoff frequency
+ *
+ * The container is rendered to layer L2 to allow overdrawing of dynamic
+ * spectrum data on layer L1 without erasing the static markers.
+ *
+ * Filter marker positions are calculated by mapping filter frequencies
+ * (0-6000 Hz) to pixel positions (0-256 pixels) within the pane.
+ *
+ * In CW receive mode, displays the active CW audio filter cutoff:
+ * - Filter 0: 840 Hz (narrow)
+ * - Filter 1: 1.08 kHz
+ * - Filter 2: 1.32 kHz
+ * - Filter 3: 1.80 kHz
+ * - Filter 4: 2.0 kHz (wide)
+ * - Filter 5: Off
+ *
+ * Called by DrawAudioSpectrumPane() when filter settings change.
+ *
+ * @see DrawAudioSpectrumPane() for pane update logic
+ * @see DSP_FIR.cpp for CW filter coefficient definitions
+ * @see bands[].FLoCut_Hz and FHiCut_Hz for SSB filter edges
+ */
 void DrawAudioSpectContainer() {
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
@@ -945,6 +1358,33 @@ void DrawAudioSpectContainer() {
     tft.writeTo(L1);
 }
 
+/**
+ * Render the audio spectrum pane showing demodulated audio frequency content.
+ *
+ * Updates the audio spectrum display when filter settings change:
+ * - **SSB filters**: FLoCut_Hz (low-cut frequency) or FHiCut_Hz (high-cut frequency)
+ * - **CW filter**: CWFilterIndex (selects one of 5 CW audio filter bandwidths)
+ *
+ * The pane displays:
+ * 1. 0-6 kHz frequency scale with tick marks
+ * 2. Vertical lines marking filter cutoff frequencies
+ * 3. Real-time audio spectrum from demodulated signal
+ *
+ * Optimization: Only redraws when filter parameters change (detected by
+ * comparing current values against cached ohi, olo, ofi variables).
+ *
+ * Redraw process:
+ * 1. Clear pane with black background
+ * 2. Call DrawAudioSpectContainer() to render scale and filter markers
+ * 3. Cache current filter values to detect future changes
+ * 4. Mark pane as no longer stale
+ *
+ * Located in the right column below the S-meter, above the settings pane.
+ *
+ * @see DrawAudioSpectContainer() for container rendering
+ * @see bands[].FLoCut_Hz and FHiCut_Hz for SSB filter edges
+ * @see ED.CWFilterIndex for active CW filter selection
+ */
 void DrawAudioSpectrumPane(void) {
     // Only update if information is stale
     if ((ohi != bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) ||
@@ -967,8 +1407,48 @@ void DrawAudioSpectrumPane(void) {
 uint16_t column1x = 0;
 uint16_t column2x = 0;
 
+/**
+ * Update a single setting display line in the settings pane.
+ *
+ * Renders a label-value pair for a radio setting with flexible partial updates:
+ * - **Label** (left, white): Setting name/function
+ * - **Value** (right, green): Current setting value
+ *
+ * Partial update capability allows redrawing just the label or value to
+ * minimize screen refresh time and reduce flicker.
+ *
+ * Text positioning:
+ * - Label: Right-aligned at (PaneSettings.x0 + xoffset)
+ * - Value: Left-aligned at (PaneSettings.x0 + xoffset + 1*charWidth)
+ *
+ * Update process:
+ * 1. Calculate text bounding box using CalculateTextCorners()
+ * 2. Clear old text with BlankBox() (prevents ghosting)
+ * 3. Render new text at calculated position
+ *
+ * Example usage:
+ * ```c
+ * UpdateSetting(12, 16, 100, "Volume", 6, "75", 2, 10, true, true);
+ * ```
+ * Renders "Volume: 75" with 12px-wide × 16px-high characters.
+ *
+ * @param charWidth Width of each character in pixels
+ * @param charHeight Height of each character in pixels
+ * @param xoffset Horizontal offset from PaneSettings.x0 for label right edge
+ * @param labelText Setting label text (e.g., "Volume", "AGC", "RF Gain")
+ * @param NLabelChars Number of characters in label (for box sizing)
+ * @param valueText Setting value text (e.g., "75", "ON", "12.5 dB")
+ * @param NValueChars Number of characters in value (for box sizing)
+ * @param yoffset Vertical offset from PaneSettings.y0
+ * @param redrawFunction If true, redraw the label text
+ * @param redrawValue If true, redraw the value text
+ *
+ * @see CalculateTextCorners() for bounding box calculation
+ * @see BlankBox() for text clearing
+ * @see DrawSettingsPane() for pane management
+ */
 void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
-                   char *labelText, uint8_t NLabelChars, 
+                   char *labelText, uint8_t NLabelChars,
                    char *valueText, uint8_t NValueChars,
                    uint16_t yoffset, bool redrawFunction, bool redrawValue){
     int16_t x = PaneSettings.x0 + xoffset - NLabelChars*charWidth;
@@ -1397,9 +1877,49 @@ void DrawNameBadgePane(void) {
 
 uint32_t timer_ms = 0;
 uint32_t timerDisplay_ms = 0;
+
+/**
+ * Render the main operating screen with all 12 display panes.
+ *
+ * This is the primary display function for normal radio operation, managing:
+ * - **Screen initialization**: Clears display when entering from another UI state
+ * - **Periodic updates**: Triggers time-based pane refreshes
+ * - **Pane rendering**: Calls DrawFunction() for each of the 12 panes
+ * - **CW display**: Shows decoded Morse characters
+ *
+ * Update Strategy:
+ * ----------------
+ * 1. **On state entry** (uiSM.vars.clearScreen == true):
+ *    - Clears entire screen with fillWindow()
+ *    - Marks all panes as stale to force complete redraw
+ *    - Resets clearScreen flag
+ *
+ * 2. **Periodic updates** (timer-based):
+ *    - Every 1000ms: Mark State of Health and Time panes stale
+ *    - Every SPECTRUM_REFRESH_MS (200ms): Set spectrum redraw flag
+ *
+ * 3. **Continuous updates**:
+ *    - Iterate through all 12 panes, calling DrawFunction() for each
+ *    - Each pane only redraws if its stale flag is true
+ *    - Display Morse characters in CW mode
+ *
+ * Active in UI States:
+ * --------------------
+ * - **UISm_StateId_HOME**: Normal operation
+ * - **UISm_StateId_UPDATE**: While adjusting parameters (shows parameter overlay)
+ *
+ * Performance:
+ * ------------
+ * The stale flag system minimizes screen updates, preventing flicker and
+ * reducing CPU load. Only panes with changed data are redrawn.
+ *
+ * @see WindowPanes[] array containing all 12 pane pointers
+ * @see MorseCharacterDisplay() for CW character rendering
+ * @see uiSM (UI state machine) in UISm.cpp
+ */
 static void DrawHome(){
     // Only draw if we're on the HOME screen or the UPDATE screen
-    if (!((uiSM.state_id == UISm_StateId_HOME) || (uiSM.state_id == UISm_StateId_UPDATE))) 
+    if (!((uiSM.state_id == UISm_StateId_HOME) || (uiSM.state_id == UISm_StateId_UPDATE)))
         return;
     // Clear the screen whenever we enter this state from another one.
     // When we enter the UISm_StateId_HOME state, clearScreen is set to true.
@@ -1497,7 +2017,55 @@ static void DrawSplash(){
 // We will need to distinguish between them in the future. Create an enum for this.
 // (enum optionType is now defined in MainBoard_Display.h)
 
-// Function to increment variable
+/**
+ * Increment a variable with type-safe bounds checking.
+ *
+ * Generic increment function supporting multiple data types through a VariableParameter
+ * descriptor. Adds the configured step value to the variable and clamps the result
+ * to the maximum limit defined in the parameter structure.
+ *
+ * Supported Types:
+ * ----------------
+ * - **TYPE_I8**: 8-bit signed integer
+ * - **TYPE_I16**: 16-bit signed integer
+ * - **TYPE_I32**: 32-bit signed integer
+ * - **TYPE_I64**: 64-bit signed integer
+ * - **TYPE_F32**: 32-bit floating point
+ * - **TYPE_KeyTypeId**: Keyer type enumeration (straight, iambic A/B, bug)
+ * - **TYPE_BOOL**: Boolean toggle (flips value, ignores step/limits)
+ *
+ * Operation:
+ * ----------
+ * 1. Read current value from variable pointer
+ * 2. Add step value from limits structure
+ * 3. Clamp to max if exceeded
+ * 4. Write result back to variable
+ *
+ * Used by menu system and encoder handlers to adjust radio parameters
+ * (volume, gain, frequency, filter settings, etc.) with proper bounds enforcement.
+ *
+ * Safety:
+ * -------
+ * - Returns immediately if variable pointer is NULL
+ * - Type-specific bounds prevent overflow/underflow
+ * - Each type has dedicated min/max/step values in limits union
+ *
+ * Example:
+ * ```c
+ * VariableParameter volumeParam = {
+ *     .variable = &ED.audioVolume,
+ *     .type = TYPE_I32,
+ *     .limits.i32 = {.min = 0, .max = 100, .step = 5}
+ * };
+ * IncrementVariable(&volumeParam);  // Increases volume by 5, max 100
+ * ```
+ *
+ * @param bv Pointer to VariableParameter describing the variable and its constraints
+ *
+ * @see DecrementVariable() for decrement with min clamping
+ * @see VariableParameter structure in MainBoard_Display.h
+ * @see primaryMenu[] and secondaryMenu[] for menu parameter definitions
+ */
 void IncrementVariable(const VariableParameter *bv) {
     if (bv->variable == NULL) {
         return;
@@ -1568,7 +2136,58 @@ void IncrementVariable(const VariableParameter *bv) {
     }
 }
 
-// Function to decrement variable
+/**
+ * Decrement a variable with type-safe bounds checking.
+ *
+ * Generic decrement function supporting multiple data types through a VariableParameter
+ * descriptor. Subtracts the configured step value from the variable and clamps the result
+ * to the minimum limit defined in the parameter structure.
+ *
+ * Supported Types:
+ * ----------------
+ * - **TYPE_I8**: 8-bit signed integer
+ * - **TYPE_I16**: 16-bit signed integer
+ * - **TYPE_I32**: 32-bit signed integer
+ * - **TYPE_I64**: 64-bit signed integer
+ * - **TYPE_F32**: 32-bit floating point
+ * - **TYPE_KeyTypeId**: Keyer type enumeration (straight, iambic A/B, bug)
+ * - **TYPE_BOOL**: Boolean toggle (flips value, ignores step/limits)
+ *
+ * Operation:
+ * ----------
+ * 1. Read current value from variable pointer
+ * 2. Subtract step value from limits structure
+ * 3. Clamp to min if below minimum
+ * 4. Write result back to variable
+ *
+ * Used by menu system and encoder handlers to adjust radio parameters
+ * (volume, gain, frequency, filter settings, etc.) with proper bounds enforcement.
+ *
+ * Safety:
+ * -------
+ * - Returns immediately if variable pointer is NULL
+ * - Type-specific bounds prevent overflow/underflow
+ * - Each type has dedicated min/max/step values in limits union
+ *
+ * Example:
+ * ```c
+ * VariableParameter rfGainParam = {
+ *     .variable = &bands[ED.currentBand].RFgain,
+ *     .type = TYPE_I8,
+ *     .limits.i8 = {.min = 0, .max = 15, .step = 1}
+ * };
+ * DecrementVariable(&rfGainParam);  // Decreases RF gain by 1, min 0
+ * ```
+ *
+ * Note: For boolean types, both increment and decrement perform the same
+ * toggle operation, flipping the value between true and false.
+ *
+ * @param bv Pointer to VariableParameter describing the variable and its constraints
+ *
+ * @see IncrementVariable() for increment with max clamping
+ * @see VariableParameter structure in MainBoard_Display.h
+ * @see primaryMenu[] and secondaryMenu[] for menu parameter definitions
+ */
 void DecrementVariable(const VariableParameter *bv) {
     if (bv->variable == NULL) {
         return;
@@ -1832,6 +2451,27 @@ struct PrimaryMenuOption primaryMenu[4] = {
     "Display", DisplayOptions, sizeof(DisplayOptions)/sizeof(DisplayOptions[0]),
 };
 
+/**
+ * Update menu variable pointers to reference current band-specific values.
+ *
+ * Many radio parameters are stored per-band (e.g., power output, attenuation,
+ * antenna selection). When the user changes bands, menu items must be updated
+ * to point to the correct array element for the new band.
+ *
+ * This function updates VariableParameter pointers in menu structures to
+ * reference the appropriate band-indexed array element based on ED.currentBand[].
+ *
+ * Updated Parameters:
+ * - **RF Set Menu**: SSB power, CW power, RX atten, TX atten (CW/SSB), antenna
+ * - **Display Menu**: Spectrum noise floor
+ *
+ * Must be called whenever:
+ * - Band changes (via band up/down buttons or tuning out of band)
+ * - Active VFO changes (different VFO may be on different band)
+ * - Entering menu system (to ensure correct initial values)
+ *
+ * @see ED.currentBand[] for per-VFO band tracking
+ */
 void UpdateArrayVariables(void){
     // Update array-based variable pointers to point to current band element
 
@@ -1894,6 +2534,19 @@ bool redrawMenu = true;
 size_t primaryMenuIndex = 0;
 size_t secondaryMenuIndex = 0;
 
+/**
+ * Advance to the next primary menu category (with wrap-around).
+ *
+ * Moves selection down in the primary menu column:
+ * RF Options → CW Options → Calibration → Display → (wraps to RF Options)
+ *
+ * When advancing to a new primary category, resets secondary menu selection
+ * to the first option (index 0) and marks the menu for redraw.
+ *
+ * Called when user rotates the filter encoder upward while in MAIN_MENU state.
+ *
+ * @see DecrementPrimaryMenu() for opposite direction
+ */
 void IncrementPrimaryMenu(void){
     primaryMenuIndex++;
     if (primaryMenuIndex >= sizeof(primaryMenu)/sizeof(primaryMenu[0]))
@@ -1902,6 +2555,19 @@ void IncrementPrimaryMenu(void){
     redrawMenu = true;
 }
 
+/**
+ * Move to the previous primary menu category (with wrap-around).
+ *
+ * Moves selection up in the primary menu column:
+ * Display → Calibration → CW Options → RF Options → (wraps to Display)
+ *
+ * When moving to a new primary category, resets secondary menu selection
+ * to the first option (index 0) and marks the menu for redraw.
+ *
+ * Called when user rotates the filter encoder downward while in MAIN_MENU state.
+ *
+ * @see IncrementPrimaryMenu() for opposite direction
+ */
 void DecrementPrimaryMenu(void){
     if (primaryMenuIndex == 0)
         primaryMenuIndex = sizeof(primaryMenu)/sizeof(primaryMenu[0]) - 1;
@@ -1911,6 +2577,21 @@ void DecrementPrimaryMenu(void){
     redrawMenu = true;
 }
 
+/**
+ * Advance to the next secondary menu option within current category (with wrap-around).
+ *
+ * Moves selection down in the secondary menu column (right side of menu screen).
+ * When reaching the end of the list, wraps back to the first option.
+ *
+ * Example in "RF Options" category:
+ * SSB Power → CW Power → RX Atten → ... → Antenna → (wraps to SSB Power)
+ *
+ * Marks the menu for redraw to highlight the new selection.
+ *
+ * Called when user rotates the filter encoder upward while in SECONDARY_MENU state.
+ *
+ * @see DecrementSecondaryMenu() for opposite direction
+ */
 void IncrementSecondaryMenu(void){
     secondaryMenuIndex++;
     if (secondaryMenuIndex >= primaryMenu[primaryMenuIndex].length)
@@ -1918,6 +2599,21 @@ void IncrementSecondaryMenu(void){
     redrawMenu = true;
 }
 
+/**
+ * Move to the previous secondary menu option within current category (with wrap-around).
+ *
+ * Moves selection up in the secondary menu column (right side of menu screen).
+ * When reaching the beginning of the list, wraps to the last option.
+ *
+ * Example in "RF Options" category:
+ * Antenna → ... → RX Atten → CW Power → SSB Power → (wraps to Antenna)
+ *
+ * Marks the menu for redraw to highlight the new selection.
+ *
+ * Called when user rotates the filter encoder downward while in SECONDARY_MENU state.
+ *
+ * @see IncrementSecondaryMenu() for opposite direction
+ */
 void DecrementSecondaryMenu(void){
     if (secondaryMenuIndex == 0)
         secondaryMenuIndex = primaryMenu[primaryMenuIndex].length - 1;
@@ -2068,6 +2764,24 @@ void DrawParameter(void){
     }
 }
 
+/**
+ * Increment the value of the currently selected menu parameter.
+ *
+ * Called when the user rotates an encoder clockwise while in the UPDATE state.
+ * Increments the variable associated with the currently selected menu option,
+ * marks the display for redraw, and executes any post-update callback function.
+ *
+ * Process:
+ * 1. Call IncrementVariable() on the associated VariableParameter
+ * 2. Set redrawParameter flag to update display
+ * 3. Execute postUpdateFunc if defined (e.g., UpdateRFHardwareState())
+ *
+ * Post-update functions allow immediate application of changes to hardware
+ * (e.g., changing band immediately updates VFO frequency).
+ *
+ * @see DecrementValue() for opposite direction
+ * @see IncrementVariable() for variable increment logic
+ */
 void IncrementValue(void){
     IncrementVariable(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam);
     redrawParameter = true;
@@ -2077,6 +2791,24 @@ void IncrementValue(void){
     }
 }
 
+/**
+ * Decrement the value of the currently selected menu parameter.
+ *
+ * Called when the user rotates an encoder counter-clockwise while in the UPDATE state.
+ * Decrements the variable associated with the currently selected menu option,
+ * marks the display for redraw, and executes any post-update callback function.
+ *
+ * Process:
+ * 1. Call DecrementVariable() on the associated VariableParameter
+ * 2. Set redrawParameter flag to update display
+ * 3. Execute postUpdateFunc if defined (e.g., UpdateRFHardwareState())
+ *
+ * Post-update functions allow immediate application of changes to hardware
+ * (e.g., changing band immediately updates VFO frequency).
+ *
+ * @see IncrementValue() for opposite direction
+ * @see DecrementVariable() for variable decrement logic
+ */
 void DecrementValue(void){
     DecrementVariable(primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].varPam);
     redrawParameter = true;
@@ -2090,6 +2822,32 @@ void DecrementValue(void){
 // END OF MENU SCREENS SECTION
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Initialize the RA8875 TFT display hardware and configure layers.
+ *
+ * Performs complete display initialization sequence:
+ * 1. Configure SPI chip select pin
+ * 2. Initialize RA8875 controller at 800x480 resolution
+ *    - SPI clock: 20 MHz (write), 4 MHz (read)
+ *    - 8-bit wide SPI interface
+ * 3. Set rotation to 0 (landscape orientation)
+ * 4. Enable dual-layer mode for graphics compositing
+ * 5. Set layer effect to OR (blend layers)
+ * 6. Clear both Layer 1 and Layer 2 memory
+ * 7. Set active drawing layer to L1
+ * 8. Perform initial DrawDisplay() to render home screen
+ *
+ * Dual-Layer Architecture:
+ * - Layer 1 (L1): Main display content (panes, spectrum, text)
+ * - Layer 2 (L2): Overlays (menus, pop-ups)
+ * - OR blending: Visible pixels from either layer are shown
+ *
+ * This function must be called during radio initialization before entering
+ * the main loop, after SPI bus initialization.
+ *
+ * @note SPI speed settings (20MHz write, 4MHz read) are optimized for
+ *       the RA8875 controller and may need adjustment for different displays
+ */
 void InitializeDisplay(void){
     pinMode(TFT_CS, OUTPUT);
     digitalWrite(TFT_CS, HIGH);
@@ -2105,6 +2863,45 @@ void InitializeDisplay(void){
 }
 
 UISm_StateId oldstate = UISm_StateId_ROOT;
+
+/**
+ * Main display rendering function - routes to appropriate screen based on UI state.
+ *
+ * This is the top-level display management function called from the main loop.
+ * It dispatches to different rendering functions based on the current UISm
+ * (User Interface State Machine) state.
+ *
+ * UI State Routing:
+ * -----------------
+ * - **SPLASH**: DrawSplash() - Startup logo and initialization screen
+ * - **HOME**: DrawHome() - Main operating screen with 12 panes
+ * - **MAIN_MENU**: DrawMainMenu() - Primary menu categories (Settings, Calibration, etc.)
+ * - **SECONDARY_MENU**: DrawSecondaryMenu() - Sub-options within selected category
+ * - **UPDATE**: DrawParameter() or execute action function
+ *   - variableOption: Show parameter adjustment screen
+ *   - actionOption: Execute function and return to HOME
+ *
+ * The function tracks the previous UI state to detect transitions and
+ * handle state-specific rendering requirements (e.g., clearing screen on entry).
+ *
+ * Drawing Strategy:
+ * -----------------
+ * Each pane has a `stale` flag that indicates whether it needs redrawing.
+ * The pane's DrawFunction is only called when stale==true, minimizing
+ * unnecessary screen updates and reducing CPU load.
+ *
+ * Performance:
+ * ------------
+ * Called every iteration of the main loop (~100 Hz), but most calls result
+ * in no actual rendering due to stale flag optimization. Actual redraw rate
+ * is much lower (spectrum: 5 Hz, other panes: on-change only).
+ *
+ * @note This function should be called from loop() after all state updates
+ *       and DSP processing have completed
+ *
+ * @see UISm state machine for UI navigation logic
+ * @see Pane struct for pane-based rendering architecture
+ */
 void DrawDisplay(void){
     //if (uiSM.state_id == oldstate) return;
     switch (uiSM.state_id){

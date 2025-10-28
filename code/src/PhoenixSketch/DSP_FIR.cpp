@@ -1303,6 +1303,9 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
     FFT512Forward(FIR_filter_mask);
 }
 
+/**
+ * Used by the unit tests
+ */
 void setdspfirfilename(char *fnm){
     dspfirfilename = fnm; // "FIR_filter_samples.txt"
 }

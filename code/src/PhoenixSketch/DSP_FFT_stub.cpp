@@ -38,6 +38,8 @@ void FFT512Reverse(float32_t *buffer){
     arm_cfft_f32(&arm_cfft_sR_f32_len512, buffer, 1, 1);
 }
 
-// These really don't belong here, but it saves the bother of creating another stub
+// These really don't belong here, but it saves the bother of creating another stub.
+// These functions are used by the unit tests to examine data as it flows through the
+// DSP chains.
 void WriteIQFile(DataBlock *data, const char* fname){} // do nothing
 void WriteFloatFile(float32_t *data, size_t N, const char* fname){} // do nothing

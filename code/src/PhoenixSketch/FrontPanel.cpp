@@ -34,14 +34,30 @@ static Rotary_V12 filterEncoder( FILTER_REVERSED );
 static Rotary_V12 tuneEncoder( MAIN_TUNE_REVERSED );
 static Rotary_V12 fineTuneEncoder( FINE_TUNE_REVERSED );
 
+/**
+ * Get the currently pressed button number.
+ *
+ * @return Button number (0-15 for MCP1, 16-21 for MCP2), or -1 if no button pressed
+ */
 int32_t GetButton(void){
     return ButtonPressed;
 }
 
+/**
+ * Set the button pressed state.
+ *
+ * @param bt Button number to set, or -1 to clear the button pressed state
+ */
 void SetButton(int32_t bt){
     ButtonPressed = bt;
 }
 
+/**
+ * Set the state of a front panel LED.
+ *
+ * @param led LED number (LED1=0 or LED2=1)
+ * @param state LED state (HIGH/LOW)
+ */
 FASTRUN
 void FrontPanelSetLed(uint8_t led, uint8_t state) {
     switch (led) {
@@ -54,6 +70,11 @@ void FrontPanelSetLed(uint8_t led, uint8_t state) {
     }
 }
 
+/**
+ * Interrupt handler for MCP23017 #1 (switches 1-16).
+ * Reads button presses from pins 0-15 on the first MCP23017,
+ * applies debouncing, and sets the iBUTTON_PRESSED interrupt.
+ */
 FASTRUN
 static void interrupt1() {
     uint8_t pin;
@@ -66,11 +87,18 @@ static void interrupt1() {
                 button_press_ms = millis();
                 SetInterrupt(iBUTTON_PRESSED);
             }
-        } 
+        }
     }
     mcp1.clearInterrupts();
 }
 
+/**
+ * Interrupt handler for MCP23017 #2 (switches 17-22, encoders, LEDs).
+ * Handles:
+ * - Switches 17-18 and encoder switches on pins 0-5 (port A)
+ * - Four rotary encoders on pins 8-15 (port B)
+ * - Generates appropriate encoder and button press interrupts
+ */
 FASTRUN
 static void interrupt2() {
     uint8_t pin;
@@ -187,6 +215,13 @@ static void interrupt2() {
     mcp2.clearInterrupts();
 }
 
+/**
+ * Initialize the front panel hardware.
+ * Configures two MCP23017 I2C GPIO expanders for:
+ * - MCP1: 16 front panel switches (pins 0-15)
+ * - MCP2: 6 switches (pins 0-5), 2 LEDs (pins 6-7), 4 rotary encoders (pins 8-15)
+ * Sets up interrupt-on-change for all inputs and configures debouncing.
+ */
 void InitializeFrontPanel(void) {
     bool failed=false;
     Debug("Initializing front panel");
@@ -239,6 +274,12 @@ void InitializeFrontPanel(void) {
     pinMode(INT_PIN_2, INPUT_PULLUP);  
 }
 
+/**
+ * Poll for and process front panel interrupts.
+ * Checks the interrupt pins for both MCP23017 devices and calls
+ * the appropriate interrupt handlers to process button presses
+ * and encoder changes. Should be called regularly from main loop.
+ */
 void CheckForFrontPanelInterrupts(void){
     if (digitalRead(INT_PIN_1) == 0){
         // We received an interrupt on pin 1
@@ -246,8 +287,6 @@ void CheckForFrontPanelInterrupts(void){
     }
     if (digitalRead(INT_PIN_2) == 0){
         // We received an interrupt on pin 2
-        Flag(4);
         interrupt2();
-        Flag(0);
     }
 }

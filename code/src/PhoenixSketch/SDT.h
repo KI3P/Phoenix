@@ -2,7 +2,7 @@
 #define SDT_H
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx 1.0"
+#define VERSION "Phx RC"
 
 #define Debug(x) Serial.println(x)
 
@@ -26,12 +26,75 @@ typedef int errno_t;
 
 #define CLEAR_VAR(x) memset(x, 0, sizeof(x))
 
-#define BEGIN_TEENSY_SHUTDOWN 0
-#define SHUTDOWN_COMPLETE 1
+#define BEGIN_TEENSY_SHUTDOWN   0
+#define SHUTDOWN_COMPLETE       1
 
-// The structure that holds the configuration information
-#define EQUALIZER_CELL_COUNT                    14
+#define EQUALIZER_CELL_COUNT    14
 
+// Teensy pins used for particular functions
+#define RXTX        22 // Transmit/Receive (H=TX,L=RX)
+#define CW_ON_OFF   33 // CW on / off (H=ON,L=OFF) (V12 hardware)
+#define XMIT_MODE   34 // Transmit mode (H=SSB,L=CW) (V12 hardware)
+#define KEY1        36 // Tip for Straight key
+#define KEY2        35 // Ring
+#define PTT         37
+#define FOR         26
+#define REV         27
+#define CAL         38  // RX board calibration control (H=CAL,L=normal)
+
+// The 32 bit register that records the state of the radio hardware
+extern uint32_t hardwareRegister;
+
+// The bit map for hardwareRegister
+#define LPFBAND0BIT  0
+#define LPFBAND1BIT  1
+#define LPFBAND2BIT  2
+#define LPFBAND3BIT  3
+#define ANT0BIT      4
+#define ANT1BIT      5
+#define XVTRBIT      6
+#define PA100WBIT    7
+#define TXBPFBIT     8
+#define RXBPFBIT     9
+#define RXTXBIT      10
+#define CWBIT        11
+#define MODEBIT      12
+#define CALBIT       13
+#define CWVFOBIT     14
+#define SSBVFOBIT    15
+#define TXATTLSB     16
+#define TXATTMSB     21
+#define RXATTLSB     22
+#define RXATTMSB     27
+#define BPFBAND0BIT  28
+#define BPFBAND1BIT  29
+#define BPFBAND2BIT  30
+#define BPFBAND3BIT  31
+
+#define BAND_NF_BCD   0b1111
+#define BAND_6M_BCD   0b1010
+#define BAND_10M_BCD  0b1001
+#define BAND_12M_BCD  0b1000
+#define BAND_15M_BCD  0b0111
+#define BAND_17M_BCD  0b0110
+#define BAND_20M_BCD  0b0101
+#define BAND_30M_BCD  0b0100
+#define BAND_40M_BCD  0b0011
+#define BAND_60M_BCD  0b0000
+#define BAND_80M_BCD  0b0010
+#define BAND_160M_BCD 0b0001
+
+// Macros used to manipulate the hardware register
+#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
+#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)));buffer_add()
+#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)));buffer_add()
+#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)));buffer_add()
+#define GET_LPF_BAND (uint8_t)(hardwareRegister & 0x0000000F)
+
+// Every time the value of hardwareRegister is updated, store this in a rolling buffer
+#define REGISTER_BUFFER_SIZE 100
+
+// Band configuration
 #define BAND_160M                               0
 #define BAND_80M                                1
 #define BAND_60M                                2
@@ -44,44 +107,46 @@ typedef int errno_t;
 #define BAND_10M                                9
 #define BAND_6M                                 10
 #define BAND_4M                                 11
-
 #define FIRST_BAND                              BAND_160M
 #define LAST_BAND                               BAND_6M
 #define NUMBER_OF_BANDS                         12
 #define MAX_FAVORITES                           13
 
-#define DECODER_STATE                           0  // 0 = off, 1 = on
+// Zoom
+#define SPECTRUM_ZOOM_MIN  0
+#define SPECTRUM_ZOOM_1    0
+#define SPECTRUM_ZOOM_2    1
+#define SPECTRUM_ZOOM_4    2
+#define SPECTRUM_ZOOM_8    3
+#define SPECTRUM_ZOOM_16   4
+#define SPECTRUM_ZOOM_MAX  4
+#define SPECTRUM_RES       512
+#define FFT_LENGTH         SPECTRUM_RES
 
-#define SPECTRUM_ZOOM_MIN 0
-#define SPECTRUM_ZOOM_1 0
-#define SPECTRUM_ZOOM_2 1
-#define SPECTRUM_ZOOM_4 2
-#define SPECTRUM_ZOOM_8 3
-#define SPECTRUM_ZOOM_16 4
-#define SPECTRUM_ZOOM_MAX 4
-#define SPECTRUM_RES 512
-#define FFT_LENGTH SPECTRUM_RES
-
-#define SAMPLE_RATE_MIN 6
-#define SAMPLE_RATE_8K 0
-#define SAMPLE_RATE_11K 1
-#define SAMPLE_RATE_16K 2
-#define SAMPLE_RATE_22K 3
-#define SAMPLE_RATE_32K 4
-#define SAMPLE_RATE_44K 5
-#define SAMPLE_RATE_48K 6
-#define SAMPLE_RATE_50K 7
-#define SAMPLE_RATE_88K 8
-#define SAMPLE_RATE_96K 9
+#define SAMPLE_RATE_MIN  6
+#define SAMPLE_RATE_8K   0
+#define SAMPLE_RATE_11K  1
+#define SAMPLE_RATE_16K  2
+#define SAMPLE_RATE_22K  3
+#define SAMPLE_RATE_32K  4
+#define SAMPLE_RATE_44K  5
+#define SAMPLE_RATE_48K  6
+#define SAMPLE_RATE_50K  7
+#define SAMPLE_RATE_88K  8
+#define SAMPLE_RATE_96K  9
 #define SAMPLE_RATE_100K 10
 #define SAMPLE_RATE_101K 11
 #define SAMPLE_RATE_176K 12
 #define SAMPLE_RATE_192K 13
 #define SAMPLE_RATE_234K 14
 #define SAMPLE_RATE_256K 15
-#define SAMPLE_RATE_281K 16  // ??
+#define SAMPLE_RATE_281K 16
 #define SAMPLE_RATE_353K 17
-#define SAMPLE_RATE_MAX 15
+#define SAMPLE_RATE_MAX  15
+
+#define BUFFER_SIZE                             128
+#define N_BLOCKS                                16
+#define READ_BUFFER_SIZE                        (BUFFER_SIZE * N_BLOCKS)
 
 #ifndef PI
 #define PI 3.1415926535897932384626433832795f
@@ -94,7 +159,7 @@ typedef int errno_t;
 #endif
 #define FOUR_PI (2.0f * TWO_PI)
 #define SIX_PI (3.0f * TWO_PI)
-#define FIR_FILTER_WINDOW 1
+#define FIR_FILTER_WINDOW 1 /** Change the type of filter window used */
 
 #define VFO_A 0
 #define VFO_B 1
@@ -150,10 +215,8 @@ enum VolumeFunction {
     MicGain = 2,
     SidetoneVolume = 3,
     InvalidVolumeFunction = 100
-    //NoiseFloorLevel = 4
 };
 
-// This enum is used by an experimental Morse decoder.
 enum MorseStates { state0,
               state1,
               state2,
@@ -162,35 +225,42 @@ enum MorseStates { state0,
               state5,
               state6 };
 
+/** Radio configuration parameters that are kept in persistent storage */
 extern struct config_t {
-    AGCMode agc = AGCOff; /** AGC mode */
-    int32_t audioVolume = 30; /** Output audio amplitude */
-    float32_t rfGainAllBands_dB = 0; /** Gain applied to the IQ samples in DSP chain */
+    AGCMode agc = AGCOff;           /** AGC mode */
+    int32_t audioVolume = 30;       /** Output audio amplitude */
+    float32_t rfGainAllBands_dB = 0;/** Gain applied to the IQ samples in DSP chain */
     int64_t stepFineTune = FAST_TUNE_INCREMENT; /** Increment value for fine tune */
     NoiseReductionType nrOptionSelect = NROff; /** Noise reduction mode */
-    uint8_t ANR_notchOn = 0; /** Automatic notch filter on/off */
-    int32_t spectrumScale = 1; /** dB/pixel selection for spectrum display */
+    uint8_t ANR_notchOn = 0;        /** Automatic notch filter on/off */
+    int32_t spectrumScale = 1;      /** dB/pixel selection for spectrum display */
     int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50}; /** Shift spectrum up/down on display */
-    uint32_t spectrum_zoom = 1; /** Zoom level for spectrum */
-    int32_t CWFilterIndex = 5; /** Selects the receive CW audio filter */
-    int32_t CWToneIndex = 3; /** Selects the transmitted CW tone frequency */
-    int32_t decoderFlag = DECODER_STATE; /** CW decoder on/off */
+    uint32_t spectrum_zoom = 1;     /** Zoom level for spectrum */
+    int32_t CWFilterIndex = 5;      /** Selects the receive CW audio filter */
+    int32_t CWToneIndex = 3;        /** Selects the transmitted CW tone frequency */
+    int32_t decoderFlag = 0;        /** CW decoder on/off */
     KeyTypeId keyType = KEYER_TYPE; /** CW key type: straight or keyer */
     int32_t currentWPM = DEFAULT_KEYER_WPM; /** CW words per minute for keyer + decoder */
-    float32_t sidetoneVolume = 20.0; /** CW transmit sidetone volume */
-    int32_t freqIncrement = 1000; /** Increment value for center tune */
+    float32_t sidetoneVolume = 20.0;/** CW transmit sidetone volume */
+    int32_t freqIncrement = DEFAULTFREQINCREMENT; /** Increment value for center tune */
     float32_t freqCorrectionFactor = 0; /** Correction value for Si5351 VFO */
-    uint8_t activeVFO = 0; /** Which VFO is currently active (0 or 1) */
+    uint8_t activeVFO = 0;          /** Which VFO is currently active (0 or 1) */
     ModulationType modulation[2] = {LSB, LSB}; /** Modulation type for each VFO */
     int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND}; /** Band for each VFO */
-    int64_t centerFreq_Hz[2] = {7030000L,7030000L}; /** VFO center frequency for each VFO */
+    int64_t centerFreq_Hz[2] = {CURRENT_FREQ_A,CURRENT_FREQ_B}; /** VFO center frequency for each VFO */
     int64_t fineTuneFreq_Hz[2] = {0, 0}; /** Fine tune frequency for each VFO */
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
-    int32_t currentMicGain = -10; /** Gain of the mic used for SSB */
+    int32_t currentMicGain = -10;   /** Gain of the mic used for SSB */
     float32_t dbm_calibration = 17.5; /** Calibrates the S-meter scale on the display */
-    float32_t powerOutCW[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5}; /** Set output power in Watts in CW mode */
-    float32_t powerOutSSB[NUMBER_OF_BANDS] = {5,5,5,5,5,5,5,5,5,5,5,5}; /** Set output power in Watts in SSB mode */
+    float32_t powerOutCW[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL}; /** Set output power in Watts in CW mode */
+    float32_t powerOutSSB[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL}; /** Set output power in Watts in SSB mode */
     float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1}; /** Receive IQ calibration amplitude correction */
     float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
     float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
@@ -220,29 +290,30 @@ struct BIT {
 
 /** Contains the parameters that define a band */
 struct band {
-    int64_t freqVFO1_Hz; // Frequency of VFO1 in Hz (hardware mixer)
-    float32_t freqVFO2_Hz;  // UNUSED Frequency of VFO2 in Hz (DSP mixer) 
-    int64_t fBandLow_Hz;     // Lower band edge
-    int64_t fBandHigh_Hz;    // Upper band edge
-    const char *name;  // name of band
-    ModulationType mode;
-    int32_t FHiCut_Hz;
-    int32_t FLoCut_Hz;
-    float32_t RFgain_dB;       // dB
-    uint8_t band_type;
-    float32_t gainCorrection;  // is hardware dependent and has to be calibrated ONCE and hardcoded in the table below
-    int32_t AGC_thresh;
-    int16_t pixel_offset;
+    int64_t freqVFO1_Hz;    /** Frequency of VFO1 in Hz (hardware mixer) */
+    float32_t freqVFO2_Hz;  /** UNUSED Frequency of VFO2 in Hz (DSP mixer) */
+    int64_t fBandLow_Hz;    /** Lower band edge */
+    int64_t fBandHigh_Hz;   /** Upper band edge */
+    const char *name;       /** Name of band */
+    ModulationType mode;    /** Modulation type (USB, LSB) */
+    int32_t FHiCut_Hz;      /** Audio bandpass filter edge */
+    int32_t FLoCut_Hz;      /** Audio bandpass filter edge */
+    float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
+    uint8_t band_type;      /** UNUSED */
+    float32_t gainCorrection; /** (CANDIDATE FOR REPLACEMENT BY BAND-DEPENDENT dbm_calibration) is hardware dependent and has to be calibrated ONCE and hardcoded in the table below */
+    int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
+    int16_t pixel_offset;   /** Offset the spectrum in display plot */
 };
 
 /** Contains the block of audio time samples being processed */
 struct DataBlock {
-    uint32_t N;             // Number of samples
-    uint32_t sampleRate_Hz; // Sample rate
-    float32_t *I;           // Contains N samples
-    float32_t *Q;           // Contains N samples
+    uint32_t N;             /** Number of samples */
+    uint32_t sampleRate_Hz; /** Sample rate */
+    float32_t *I;           /** Buffer of I samples */
+    float32_t *Q;           /** Buffer of Q samples */
 }; 
 
+/** Contains the sample rate details */
 typedef struct SR_Descriptor {
     const uint8_t SR_n;
     const uint32_t rate;
@@ -251,20 +322,21 @@ typedef struct SR_Descriptor {
 
 /** Contains the structs and parameters for a decimation filter*/
 struct DecimationFilter{
-    float32_t M;  // decimation factor
-    float32_t n_samplerate_Hz;  // samplerate before decimation, Hz
-    float32_t n_att_dB;        // need here for later def's, dB
-    float32_t n_desired_BW_Hz;  // desired max BW of the filters, Hz
-    float32_t *FIR_dec_I_state;
-    float32_t *FIR_dec_Q_state;
-    float32_t *FIR_dec_coeffs;
-    float32_t n_fpass;
-    float32_t n_fstop;
-    uint16_t n_dec_taps;
-    arm_fir_decimate_instance_f32 FIR_dec_I;
-    arm_fir_decimate_instance_f32 FIR_dec_Q;
+    float32_t M;                /** Decimation factor */
+    float32_t n_samplerate_Hz;  /** Samplerate before decimation, Hz */
+    float32_t n_att_dB;         /** Attenuation of the stopband, dB */
+    float32_t n_desired_BW_Hz;  /** Desired max BW of the filters, Hz */
+    float32_t *FIR_dec_I_state; /** Pointer to the state vector for I decimator FIR filter*/
+    float32_t *FIR_dec_Q_state; /** Pointer to the state vector for Q decimator FIR filter */
+    float32_t *FIR_dec_coeffs;  /** Pointer to the decimator FIR filter coefficients */
+    float32_t n_fpass;          /** FIR filter passband edge */
+    float32_t n_fstop;          /** FIR filter stopband edge */
+    uint16_t n_dec_taps;        /** Number of taps in FIR filter*/
+    arm_fir_decimate_instance_f32 FIR_dec_I; /** Decimating FIR filter instance for I */
+    arm_fir_decimate_instance_f32 FIR_dec_Q; /** Decimating FIR filter instance for Q */
 };
 
+// These coefficients are defined in DSP_FIR.cpp and used by the filters
 extern float32_t (*EQ_Coeffs[14])[20];
 extern float32_t CW_Filter_Coeffs2[64];
 extern float32_t CW_AudioFilterCoeffs1[30];
@@ -272,16 +344,17 @@ extern float32_t CW_AudioFilterCoeffs2[30];
 extern float32_t CW_AudioFilterCoeffs3[30];
 extern float32_t CW_AudioFilterCoeffs4[30];
 extern float32_t CW_AudioFilterCoeffs5[30];
+
 /** Contains the filter structs and parameters */
 struct FilterConfig {
     // Receive decimation filters
     struct DecimationFilter DecimateRxStage1;
     struct DecimationFilter DecimateRxStage2;
-    const uint32_t DF1 = 4;  // decimation factor stage 1
-    const uint32_t DF2 = 2;  // decimation factor stage 2
-    uint32_t DF;               // combined decimation factor
-    const float32_t n_att_dB = 90.0;        // need here for later def's, dB
-    const float32_t n_desired_BW_Hz = 9000.0;  // desired max BW of the filters, kHz
+    const uint32_t DF1 = 4;  /** decimation factor stage 1 */
+    const uint32_t DF2 = 2;  /** decimation factor stage 2 */
+    uint32_t DF;             /** combined decimation factor */
+    const float32_t n_att_dB = 90.0;  
+    const float32_t n_desired_BW_Hz = 9000.0;
     
     // Zoom FFT filters
     arm_biquad_casd_df1_inst_f32 biquadZoomI;
@@ -299,8 +372,8 @@ struct FilterConfig {
 
     // Audio equalization filters
     const uint32_t eqNumStages = 4;
-    arm_biquad_cascade_df2T_instance_f32 S_Rec[14];
-    arm_biquad_cascade_df2T_instance_f32 S_Xmt[14];
+    arm_biquad_cascade_df2T_instance_f32 S_Rec[EQUALIZER_CELL_COUNT];
+    arm_biquad_cascade_df2T_instance_f32 S_Xmt[EQUALIZER_CELL_COUNT];
     float32_t *eqFiltBuffer;
     float32_t *eqSumBuffer;
 
@@ -328,6 +401,7 @@ struct FilterConfig {
     float32_t FIR_int2_coeffs[32];
     float32_t *FIR_int2_state;
 
+    // Steps that are peformed when a FilterConfig object is created
     FilterConfig() {
         // Receive decimation filters
         DF = DF1 * DF2;        // decimation factor
@@ -346,7 +420,7 @@ struct FilterConfig {
         // Audio equalization filters
         eqFiltBuffer = (float32_t *)calloc(READ_BUFFER_SIZE/DF, sizeof(float32_t));
         eqSumBuffer = (float32_t *)calloc(READ_BUFFER_SIZE/DF, sizeof(float32_t));
-        for (size_t i = 0; i<14; i++){
+        for (size_t i = 0; i<EQUALIZER_CELL_COUNT; i++){
             S_Rec[i].numStages = eqNumStages;
             S_Rec[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
             S_Rec[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
@@ -376,13 +450,15 @@ struct FilterConfig {
         FIR_int2_state = (float32_t *)calloc(INT2_STATE_SIZE, sizeof(float32_t));
         arm_fir_interpolate_init_f32(&FIR_int2, DF1, 32, FIR_int2_coeffs, FIR_int2_state, READ_BUFFER_SIZE/DF1);
     }
+    // Steps that are performed when FilterConfig object is destroyed. This only happens
+    // when radio is turned off, so isn't really necessary.
     ~FilterConfig() {
         free(biquadZoomI.pState);
         free(biquadZoomQ.pState);
         free(biquadAudioLowPass.pState);
         free(eqFiltBuffer);
         free(eqSumBuffer);
-        for (size_t i = 0; i<14; i++){
+        for (size_t i = 0; i<EQUALIZER_CELL_COUNT; i++){
             free(S_Rec[i].pState);
             free(S_Xmt[i].pState);
         }
@@ -391,6 +467,9 @@ struct FilterConfig {
     }
 };
 
+/** Keep all the AGC configuration parameters in a struct. Consider moving this to DSP.cpp
+ * as it is used nowhere else.
+ */
 struct AGCConfig {
     // Start variables taken from wdsp
     const float32_t tau_attack            = 0.001; // tau_attack
@@ -460,15 +539,11 @@ struct AGCConfig {
 #define EGPIOWRITEFAIL      -2
 #define EFAIL               -10
 
-// Functions for the Mode state machine
+// State machines
 #include "Mode.h"
-// Functions for the UI state machine
-#include "UI.h"
-
 #include "ModeSm.h"
 #include "UISm.h"
 #include "HardwareSM.h"
-
 // Others
 #include "Loop.h"
 #include "Tune.h"
@@ -486,6 +561,7 @@ struct AGCConfig {
 #include "CAT.h"
 #include "Storage.h"
 
+// Globally-visible variables. Can we get rid of these entirely?
 extern struct BIT bit_results;
 extern struct band bands[];
 extern const struct SR_Descriptor SR[];
@@ -496,7 +572,6 @@ extern ModeSm modeSM;
 extern bool displayFFTUpdated; /** Set true when psdnew is updated */
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
-extern float32_t psdold[]; /** Holds the prior PSD data for the power spectrum display */
 extern float32_t audioYPixel[];
 extern AudioRecordQueue Q_in_L;
 extern AudioRecordQueue Q_in_R;
@@ -505,8 +580,6 @@ extern AudioPlayQueue Q_out_R;
 
 extern const float32_t CWToneOffsetsHz[];
 extern uint8_t SampleRate;
-extern float32_t SAM_carrier_freq_offset;
-extern float32_t SAM_carrier_freq_offsetOld;
 
 extern VolumeFunction volumeFunction;
 
@@ -515,87 +588,33 @@ extern int64_t elapsed_micros_sum;
 extern float32_t elapsed_micros_mean;
 extern elapsedMicros usec;
 
-// Hardware definitions
-#define RXTX        22 // Transmit/Receive (H=TX,L=RX)
-#define CW_ON_OFF   33 // CW on / off (H=ON,L=OFF) (V12 hardware)
-#define XMIT_MODE   34 // Transmit mode (H=SSB,L=CW) (V12 hardware)
-#define KEY1        36 // Tip for Straight key
-#define KEY2        35 // Ring
-#define PTT         37
-#define FOR         26
-#define REV         27
-#define CAL         38  // RX board calibration control (H=CAL,L=normal)
-
-// The 32 bit register that records the state of the radio hardware
-extern uint32_t hardwareRegister;
-
-// The bit map for hardwareRegister
-#define LPFBAND0BIT  0
-#define LPFBAND1BIT  1
-#define LPFBAND2BIT  2
-#define LPFBAND3BIT  3
-#define ANT0BIT      4
-#define ANT1BIT      5
-#define XVTRBIT      6
-#define PA100WBIT    7
-#define TXBPFBIT     8
-#define RXBPFBIT     9
-#define RXTXBIT      10
-#define CWBIT        11
-#define MODEBIT      12
-#define CALBIT       13
-#define CWVFOBIT     14
-#define SSBVFOBIT    15
-#define TXATTLSB     16
-#define TXATTMSB     21
-#define RXATTLSB     22
-#define RXATTMSB     27
-#define BPFBAND0BIT  28
-#define BPFBAND1BIT  29
-#define BPFBAND2BIT  30
-#define BPFBAND3BIT  31
-
-#define BAND_NF_BCD   0b1111
-#define BAND_6M_BCD   0b1010
-#define BAND_10M_BCD  0b1001
-#define BAND_12M_BCD  0b1000
-#define BAND_15M_BCD  0b0111
-#define BAND_17M_BCD  0b0110
-#define BAND_20M_BCD  0b0101
-#define BAND_30M_BCD  0b0100
-#define BAND_40M_BCD  0b0011
-#define BAND_60M_BCD  0b0000
-#define BAND_80M_BCD  0b0010
-#define BAND_160M_BCD 0b0001
-
-#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
-#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)));buffer_add()
-#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)));buffer_add()
-#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)));buffer_add()
-#define GET_LPF_BAND (uint8_t)(hardwareRegister & 0x0000000F)
-
-// Every time the value of hardwareRegister is updated, store this in a rolling buffer
-#define REGISTER_BUFFER_SIZE 100
-
+/** Structure of a hardware register buffer entry */
 typedef struct {
     uint32_t timestamp;
     uint32_t register_value;
 } BufferEntry;
 
+/** Rolling buffer to store hardware register changes */
 typedef struct {
     BufferEntry entries[REGISTER_BUFFER_SIZE];
     size_t head;        // Index where next entry will be written
     size_t count;       // Number of valid entries (up to BUFFER_SIZE)
 } RollingBuffer;
 extern RollingBuffer buffer;
+
+// Functions to use the hardware register buffer
 void buffer_add(void);
 void buffer_flush(void);
 void buffer_pretty_print(void);
 void buffer_pretty_buffer_array(void);
 void pretty_print_line(BufferEntry entry);
 void buffer_pretty_print_last_entry(void);
+
+// Reading the Teensy temperature
 void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp);
 float32_t TGetTemp(void);
+
+// Used to write a value to some unused pins on the Teensy for debug purposes
 void Flag(uint8_t val);
 
 void MyDelay(unsigned long millisWait);

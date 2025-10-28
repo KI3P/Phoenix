@@ -21,13 +21,20 @@ static float32_t audioPowerMax;
 //static const float32_t zoomMultiplierCoeff[5] = {1.0, 1.21902468, 2.07876308, 3.98758528, 7.88521392};
 static const float32_t zoomMultiplierCoeff[5] = {1.0, 1.0, 1.0, 1.0, 1.0};
 
-extern float32_t* mag_coeffs[]; // in FIR.cpp
+extern float32_t* mag_coeffs[]; // in DSP_FIR.cpp
 
-// used by the unit tests
+/**
+ * Get pointer to the filtered FFT buffer (for unit testing)
+ * @return Pointer to iFFT_buffer array
+ */
 float32_t * GetFilteredBufferAddress(void){
     return iFFT_buffer;
 }
 
+/**
+ * Get the maximum audio power from the last FFT processing
+ * @return Maximum power spectral value from most recent audio spectrum calculation
+ */
 float32_t GetAudioPowerMax(void){
     return audioPowerMax;
 }
@@ -43,18 +50,18 @@ float32_t GetAudioPowerMax(void){
   * @return The fast approximation for log10(X)
   */
 float32_t log10f_fast(float32_t X) {
-  float Y, F;
-  int E;
-  F = frexpf(fabsf(X), &E);
-  Y = 1.23149591368684f;
-  Y *= F;
-  Y += -4.11852516267426f;
-  Y *= F;
-  Y += 6.02197014179219f;
-  Y *= F;
-  Y += -3.13396450166353f;
-  Y += E;
-  return (Y * 0.3010299956639812f);
+    float Y, F;
+    int E;
+    F = frexpf(fabsf(X), &E);
+    Y = 1.23149591368684f;
+    Y *= F;
+    Y += -4.11852516267426f;
+    Y *= F;
+    Y += 6.02197014179219f;
+    Y *= F;
+    Y += -3.13396450166353f;
+    Y += E;
+    return (Y * 0.3010299956639812f);
 }
 
 /**
@@ -62,19 +69,17 @@ float32_t log10f_fast(float32_t X) {
  */
 void ResetPSD(void){
     for (size_t x = 0; x < SPECTRUM_RES; x++) {
-      FFT_spec[x] = 0;
-      FFT_spec_old[x] = 0;
-      psdnew[x] = 0;
-      psdold[x] = 0;
+        FFT_spec[x] = 0;
+        FFT_spec_old[x] = 0;
+        psdnew[x] = 0;
     }
 }
 
 /**
  * Calculate a 512-point power spectrum from the complex data stored in real 
  * and imag arrays. A Hanning window is applied to the data. The result is
- * written into the global array psdnew. Before overwriting, the data in psdnew
- * is copied into psdold. The value of the data in the psd buffers is
- * log10( I*I + Q*Q ). So the units are log10(V^2 / Hz).
+ * written into the global array psdnew. The value of the data in the psd buffers
+ * is log10( I*I + Q*Q ). So the units are log10(V^2 / Hz).
  * 
  * Note that this function requires that there are at least 512 samples in the
  * arrays being passed
@@ -113,12 +118,20 @@ void CalcPSD512(float32_t *I, float32_t *Q)
 
     // scale the magnitude values and convert to int for spectrum display
     for (size_t i = 0; i < SPECTRUM_RES; i++) {
-        psdold[i] = psdnew[i];
         psdnew[i] = log10f_fast(FFT_spec[i]);
     }
     psdupdated = true;
 }
 
+/**
+ * Calculate a 256-point power spectrum from complex I/Q data
+ * @param I Pointer to array containing real (I) samples
+ * @param Q Pointer to array containing imaginary (Q) samples
+ *
+ * Similar to CalcPSD512 but operates on 256 samples. Applies Hanning window,
+ * performs 256-point FFT, calculates magnitudes, applies spectrum AGC, and
+ * converts to log scale. Result written to first half of psdnew array.
+ */
 void CalcPSD256(float32_t *I, float32_t *Q)
 {
     // interleave real and imaginary input values [real, imag, real, imag . . .]
@@ -145,7 +158,6 @@ void CalcPSD256(float32_t *I, float32_t *Q)
 
     // scale the magnitude values and convert to int for spectrum display
     for (size_t i = 0; i < SPECTRUM_RES/2; i++) {
-        psdold[i] = psdnew[i];
         psdnew[i] = log10f_fast(FFT_spec[i]);
     }
 }
@@ -215,9 +227,18 @@ void FreqShiftF(DataBlock *data, float32_t freqShift_Hz){
     }
 }
 
-// This method has problems. It saves 50us each loop, but introduces artifacts between adjacent
-// blocks of samples
-void FreqShiftF2(float32_t *I, float32_t *Q, uint32_t blocksize, 
+/**
+ * Alternative frequency translation method using rotating phasor (deprecated)
+ * @param I Pointer to I (real) channel data
+ * @param Q Pointer to Q (imaginary) channel data
+ * @param blocksize Number of samples to process
+ * @param freqShift_Hz Frequency shift in Hz
+ * @param sampleRate_Hz Sample rate in Hz
+ *
+ * WARNING: This method has problems. It saves 50us each loop but introduces
+ * artifacts between adjacent blocks of samples. Use FreqShiftF() instead.
+ */
+void FreqShiftF2(float32_t *I, float32_t *Q, uint32_t blocksize,
                 float32_t freqShift_Hz, uint32_t sampleRate_Hz){
     float32_t NCO_INC = TWO_PI * (freqShift_Hz) /(float32_t)sampleRate_Hz;
     float32_t OSC_COS = arm_cos_f32 (NCO_INC);
@@ -246,9 +267,16 @@ void FreqShiftF2(float32_t *I, float32_t *Q, uint32_t blocksize,
     }
 }
 
+/**
+ * Update the FIR filter mask for convolution filtering
+ * @param filters Filter configuration structure
+ *
+ * Recalculates the frequency-domain filter mask used by ConvolutionFilter().
+ * Should be called whenever filter parameters change (e.g., bandwidth adjustments).
+ */
 void UpdateFIRFilterMask(FilterConfig *filters){
     // FIR filter mask
-    InitFilterMask(FIR_filter_mask, filters); 
+    InitFilterMask(FIR_filter_mask, filters);
 }
 
 /**
@@ -311,6 +339,49 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
 
 }
 
+/**
+ * Change the FIR filter settings.
+ * @param filter_change The positive or negative increment to the filter bandwidth
+ */
+void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
+    // Change the band parameters
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            if (changeFilterHiCut == 0)  // "0" = LoCut, "1" = HiCut
+            {
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            } else {
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            }
+            break;
+        }
+        case USB:{
+            if (changeFilterHiCut == 0) {
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+
+            } else {
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            }
+            break;
+        }
+        case AM:
+        case SAM:{
+            bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+              bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+            bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    // Calculate the new FIR filter mask
+    UpdateFIRFilterMask(&filters);
+}
 
 /**
  * ZoomFFTPrep() calculates the appropriate structures for the filter-and-decimate
@@ -352,7 +423,7 @@ void ZoomFFTPrep(uint32_t spectrum_zoom, FilterConfig *filters){
  * @param filters Struct holding the filter variables and objects
  * @return true if we calculated a PSD, false if we did not
  * 
- * The resulting PSD is written to the psdnew and psdold global arrays. 
+ * The resulting PSD is written to the psdnew global array. 
  */
 bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, FilterConfig *filters)
 {
@@ -514,7 +585,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     // The number of samples in I and Q are each 2048 / 8 = 256. We buffer multiple
     // blocks of samples to get FFTs that are 512 samples long.
     // The bandwidth of each frequency bin is 24000/512 = 46.875 Hz
-    // We want to display DC to 6 kHz, which 1/4 of the total bandwidth
+    // We want to display DC to 6 kHz, which is 1/4 of the total bandwidth
     // So we have 512 / 4 = 128 bins to save and plot
     // Positive frequencies are from bin 1 to bin 129 in iFFT_buffer
     // Negative frequencies are from bin 1023 to 895 in iFFT_buffer
@@ -549,6 +620,17 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
     return ESUCCESS;
 }
 
+/**
+ * Apply a single equalizer band filter to the audio data
+ * @param data Data block containing audio samples to filter
+ * @param filters Filter configuration structure containing EQ filter instances
+ * @param bf Band filter index (0-13 for 14 EQ bands)
+ * @param TXRX RX or TX mode selector
+ *
+ * Applies one band of the 14-band graphic equalizer, scales by the band's
+ * gain setting, and accumulates result in eqSumBuffer. Handles NaN detection
+ * and recovery in filter state. Alternating bands have inverted sign.
+ */
 void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXType TXRX){
     int sign = 1;
     if (bf%2 == 0) sign = -1;
@@ -577,10 +659,21 @@ void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXT
     arm_add_f32(filters->eqSumBuffer, filters->eqFiltBuffer, filters->eqSumBuffer, data->N);
 }
 
+/**
+ * Apply 14-band graphic equalizer to audio signal
+ * @param data Data block containing audio samples (I channel only)
+ * @param filters Filter configuration structure
+ * @param TXRX RX or TX mode selector
+ *
+ * Processes audio through all EQUALIZER_CELL_COUNT (14) equalizer bands, 
+ * accumulating filtered and scaled outputs. Final equalized audio replaces 
+ * original data in data->I. Uses either receive or transmit EQ settings 
+ * based on TXRX parameter.
+ */
 void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX){
     // Apply 14 successive filters, accumulating in filters->eqSumBuffer as we go
     memset(filters->eqSumBuffer, 0, sizeof(float32_t) * (READ_BUFFER_SIZE/filters->DF));
-    for (int i = 0; i < 14; i++) {
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
         ApplyEQBandFilter(data, filters, i, TXRX);
     }
     // Overwrite data->I with the filtered and accumulated data
@@ -590,6 +683,9 @@ void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX){
 }
 
 //////////////////////////////////////////////////////////////////////////
+// Transmit DSP chain, still a work in progress
+//////////////////////////////////////////////////////////////////////////
+
 #define FIXED
 
 arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
@@ -710,12 +806,30 @@ float32_t DMAMEM FIR_int2_EX_I_state[519];
 float32_t DMAMEM FIR_int2_EX_Q_state[519];
 #endif
 
+/**
+ * Apply Hilbert transform to create I/Q signals from audio
+ * @param I Pointer to I (real) channel buffer (in/out)
+ * @param Q Pointer to Q (imaginary) channel buffer (in/out)
+ *
+ * Applies 45-degree and -45-degree phase shift FIR filters to create quadrature
+ * signals from real audio input. Operates at 12 kHz sample rate with 128-sample
+ * blocks. Used in transmit chain for SSB generation.
+ */
 void HilbertTransform(float32_t *I,float32_t *Q){
     //Hilbert transforms at 12K, with 5KHz bandwidth, buffer size 128
     arm_fir_f32(&FIR_Hilbert_L, I, I, 128);
     arm_fir_f32(&FIR_Hilbert_R, Q, Q, 128);
 }
 
+/**
+ * Initialize transmit decimation and interpolation filter structures
+ *
+ * Sets up the complete transmit DSP chain filters:
+ * - Decimation filters (192k->48k, 48k->24k, 24k->12k)
+ * - Hilbert transform filters for SSB generation
+ * - Interpolation filters (12k->24k, 24k->48k, 48k->192k)
+ * All filter states are cleared and ARM DSP filter instances are initialized.
+ */
 void TXDecInit(void){
     CLEAR_VAR(FIR_dec1_EX_I_state);
     CLEAR_VAR(FIR_dec1_EX_Q_state);
@@ -775,6 +889,14 @@ void TXDecInit(void){
 
 }
 
+/**
+ * Select upper or lower sideband by inverting I channel if needed
+ * @param I Pointer to I (real) channel buffer
+ * @param Q Pointer to Q (imaginary) channel buffer
+ *
+ * For USB mode, inverts the I channel signal (multiplies by -1).
+ * LSB is selected by default (no inversion). Operates on 256-sample blocks.
+ */
 void SidebandSelection(float32_t *I, float32_t *Q){
     // Math works out for selecting LSB by default
     if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
@@ -782,6 +904,13 @@ void SidebandSelection(float32_t *I, float32_t *Q){
     }
 }
 
+/**
+ * Decimate transmit signal by factor of 4 (192 kHz -> 48 kHz)
+ * @param I Pointer to I channel buffer (2048 samples in, 512 out)
+ * @param Q Pointer to Q channel buffer (2048 samples in, 512 out)
+ *
+ * Applies FIR decimation filter in-place. Input: 192 kHz, Output: 48 kHz.
+ */
 void TXDecimateBy4(float32_t *I, float32_t *Q){
     // 192KHz effective sample rate here
     // decimation-by-4 in-place!
@@ -789,6 +918,13 @@ void TXDecimateBy4(float32_t *I, float32_t *Q){
     arm_fir_decimate_f32(&FIR_dec1_EX_Q, Q, Q, BUFFER_SIZE * N_BLOCKS);
 }
 
+/**
+ * Decimate transmit signal by factor of 2 (48 kHz -> 24 kHz)
+ * @param I Pointer to I channel buffer (512 samples in, 256 out)
+ * @param Q Pointer to Q channel buffer (512 samples in, 256 out)
+ *
+ * Applies FIR decimation filter in-place. Input: 48 kHz, Output: 24 kHz.
+ */
 void TXDecimateBy2(float32_t *I, float32_t *Q){
     // 48KHz effective sample rate here
     // decimation-by-2 in-place
@@ -796,12 +932,30 @@ void TXDecimateBy2(float32_t *I, float32_t *Q){
     arm_fir_decimate_f32(&FIR_dec2_EX_Q, Q, Q, 512);
 }
 
+/**
+ * Decimate transmit signal by factor of 2 again (24 kHz -> 12 kHz)
+ * @param I Pointer to I channel buffer (256 samples in, 128 out)
+ * @param Q Pointer to Q channel buffer (256 samples in, 128 out)
+ *
+ * Applies FIR decimation filter in-place. Input: 24 kHz, Output: 12 kHz.
+ * This is the third decimation stage in the transmit chain.
+ */
 void TXDecimateBy2Again(float32_t *I, float32_t *Q){
     //Decimate by 2 to 12K SPS sample rate
     arm_fir_decimate_f32(&FIR_dec3_EX_I, I, I, 256);
     arm_fir_decimate_f32(&FIR_dec3_EX_Q, Q, Q, 256);
 }
 
+/**
+ * Interpolate transmit signal by factor of 2 (12 kHz -> 24 kHz)
+ * @param I Pointer to input I channel buffer (128 samples)
+ * @param Q Pointer to input Q channel buffer (128 samples)
+ * @param Iout Pointer to output I channel buffer (256 samples)
+ * @param Qout Pointer to output Q channel buffer (256 samples)
+ *
+ * Applies FIR interpolation filter and scales by 2 to compensate for interpolation.
+ * First interpolation stage in transmit chain.
+ */
 void TXInterpolateBy2Again(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
     //Interpolate back to 24K SPS
     arm_fir_interpolate_f32(&FIR_int3_EX_I, I, Iout, 128);
@@ -810,6 +964,16 @@ void TXInterpolateBy2Again(float32_t *I, float32_t *Q, float32_t *Iout, float32_
     arm_scale_f32(Qout,2,Qout,256);
 }
 
+/**
+ * Interpolate transmit signal by factor of 2 (24 kHz -> 48 kHz)
+ * @param I Pointer to input I channel buffer (256 samples)
+ * @param Q Pointer to input Q channel buffer (256 samples)
+ * @param Iout Pointer to output I channel buffer (512 samples)
+ * @param Qout Pointer to output Q channel buffer (512 samples)
+ *
+ * Applies FIR interpolation filter and scales by 2 to compensate for interpolation.
+ * Second interpolation stage in transmit chain.
+ */
 void TXInterpolateBy2(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
     //24KHz effective sample rate input, 48 kHz output
     arm_fir_interpolate_f32(&FIR_int1_EX_I, I, Iout, 256);
@@ -818,6 +982,16 @@ void TXInterpolateBy2(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qo
     arm_scale_f32(Qout,2,Qout,512);
 }
 
+/**
+ * Interpolate transmit signal by factor of 4 (48 kHz -> 192 kHz)
+ * @param I Pointer to input I channel buffer (512 samples)
+ * @param Q Pointer to input Q channel buffer (512 samples)
+ * @param Iout Pointer to output I channel buffer (2048 samples)
+ * @param Qout Pointer to output Q channel buffer (2048 samples)
+ *
+ * Applies FIR interpolation filter and scales by 4 to compensate for interpolation.
+ * Final interpolation stage in transmit chain, produces output at DAC sample rate.
+ */
 void TXInterpolateBy4(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
     //48KHz effective sample rate input, 128 kHz output
     arm_fir_interpolate_f32(&FIR_int2_EX_I, I, Iout, 512);
@@ -886,7 +1060,15 @@ float32_t DMAMEM xmt_EQ12_float_buffer_L[256];
 float32_t DMAMEM xmt_EQ13_float_buffer_L[256];
 float32_t DMAMEM xmt_EQ14_float_buffer_L[256];
 
-void DoExciterEQ(float32_t *float_buffer_L_EX)  
+/**
+ * Apply 14-band transmit equalizer to audio signal
+ * @param float_buffer_L_EX Pointer to audio buffer (256 samples, modified in place)
+ *
+ * Processes audio through all 14 transmit EQ bands using biquad filters. Each band
+ * is scaled by its transmit EQ gain setting and accumulated. Alternating bands have
+ * inverted sign. Final equalized audio replaces input buffer contents.
+ */
+void DoExciterEQ(float32_t *float_buffer_L_EX)
 {
   arm_biquad_cascade_df2T_f32(&S1_Xmt, float_buffer_L_EX, xmt_EQ1_float_buffer_L, 256);
   arm_biquad_cascade_df2T_f32(&S2_Xmt, float_buffer_L_EX, xmt_EQ2_float_buffer_L, 256);

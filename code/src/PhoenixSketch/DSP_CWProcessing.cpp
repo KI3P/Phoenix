@@ -32,7 +32,15 @@ char *bigMorseCodeTree = (char *)"-EISH5--4--V---3--UF--------?-2--ARL---------.
 //                                012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678
 //                                         10        20        30        40        50        60        70        80        90       100       110       120
 
-
+/**
+ * Initialize CW processing and decoder
+ * @param wpm Words per minute for initial decoder speed
+ * @param filters Filter configuration containing decimation factor
+ * @return Pointer to sine buffer used for CW tone correlation
+ *
+ * Generates a reference sine wave at the CW tone frequency for correlation-based
+ * detection. Resets decoder histograms and sets initial dit length based on WPM.
+ */
 float32_t * InitializeCWProcessing(uint32_t wpm, FilterConfig *filters){
     float32_t theta = 0.0;
     // phs = 2 * PI * freqSideTone / 24000
@@ -48,7 +56,14 @@ float32_t * InitializeCWProcessing(uint32_t wpm, FilterConfig *filters){
 }
 
 /**
- * Process CW specific signals
+ * Process CW receive signals using correlation and Goertzel detection
+ * @param data Data block containing I/Q samples to process
+ * @param filters Filter configuration including CW decode FIR filter
+ *
+ * Applies FIR filtering to incoming signal, then uses both correlation with a
+ * reference sine wave and Goertzel magnitude detection to identify CW signals.
+ * Combined coefficient determines if signal is present and drives the decoder.
+ * Updates CW lock status based on signal strength. Only active when decoder is enabled.
  */
 void DoCWReceiveProcessing(DataBlock *data, FilterConfig *filters) {
     float32_t goertzelMagnitude;
@@ -99,7 +114,7 @@ bool IsCWDecodeLocked(void){
 }
 
 /**
- * Calculate Goertzal Algorithn to enable decoding CW
+ * Calculate Goertzel Algorithm to enable decoding CW
  * 
  * @param numSamples Number of sample in data array
  * @param TARGET_FREQUENCY Frequency for which the magnitude of the transform is to be found
@@ -140,8 +155,14 @@ float32_t goertzel_mag(uint32_t numSamples, int32_t TARGET_FREQUENCY, uint32_t S
 char decodeBuffer[MAX_DECODE_CHARS+1];
 static int16_t col = 0;
 bool morseCharacterUpdated = false;
+
 /**
- * Add the character to the buffer
+ * Add a decoded character to the morse character buffer
+ * @param currentLetter The character to add to the decode buffer
+ *
+ * Appends the character to the decode buffer, scrolling left if buffer is full.
+ * Sets the morseCharacterUpdated flag to indicate new data is available.
+ * Buffer holds up to MAX_DECODE_CHARS characters.
  */
 void MorseCharacterAdd(char currentLetter) {
     morseCharacterUpdated = true;
@@ -156,11 +177,22 @@ void MorseCharacterAdd(char currentLetter) {
     }
 }
 
+/**
+ * Get pointer to the morse character decode buffer
+ * @return Pointer to null-terminated string containing decoded characters
+ *
+ * Retrieves the decode buffer and clears the update flag. Call
+ * IsMorseCharacterBufferUpdated() first to check if new data is available.
+ */
 char *GetMorseCharacterBuffer(void){
     morseCharacterUpdated = false;
     return decodeBuffer;
 }
 
+/**
+ * Check if morse character buffer has been updated
+ * @return True if new decoded characters are available, false otherwise
+ */
 bool IsMorseCharacterBufferUpdated(void){
     return morseCharacterUpdated;
 }
@@ -448,8 +480,11 @@ void DoSignalHistogram(int64_t val) {
 }
 
 /**
- * This function uses the current WPM to set an estimate ditLength any time the tune
- * endcoder is changed
+ * Reset CW decoder histograms and timing parameters to defaults
+ *
+ * Initializes decoder to 15 WPM starting values. Clears signal and gap histograms.
+ * Called when decoder is reset or when tuning changes require reacquisition.
+ * Sets ditLength=80ms, dahLength=240ms, and geometric mean threshold=160ms.
  */
 void ResetHistograms() {
     gapAtom = 80;
@@ -468,6 +503,20 @@ void ResetHistograms() {
     //UpdateWPMField();
 }
 
+/**
+ * Apply selected CW audio filter to received signal
+ * @param data Data block containing I/Q audio samples to filter
+ * @param filters Filter configuration containing CW audio filter instances
+ *
+ * Applies the currently selected CW audio filter based on ED.CWFilterIndex:
+ *   0: 0.8 KHz bandwidth
+ *   1: 1.0 KHz bandwidth
+ *   2: 1.3 KHz bandwidth
+ *   3: 1.8 KHz bandwidth
+ *   4: 2.0 KHz bandwidth
+ *   5: Off (no filtering)
+ * Data from I channel is filtered. Filtered output is placed in data->I and data->Q 
+ */
 void CWAudioFilter(DataBlock *data, FilterConfig *filters){
     switch (ED.CWFilterIndex) {
         case 0: // 0.8 KHz

@@ -8,7 +8,6 @@
 #define UISM_H
 #include <stdint.h>
 #include <stdint.h> // for count var
-#include "UI.h"
 #include "Mode.h"
 //#include "SDT.h"
 

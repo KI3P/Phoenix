@@ -1,3 +1,89 @@
+/**
+ * @file Loop.cpp
+ * @brief Main program loop implementation for Phoenix SDR Radio
+ *
+ * ARCHITECTURE OVERVIEW
+ * =====================
+ * The Phoenix SDR is a Teensy 4.1-based amateur radio transceiver that uses a
+ * state machine architecture for deterministic hardware control and real-time
+ * digital signal processing.
+ *
+ * Core Architectural Principles:
+ * ------------------------------
+ * 1. STATE MACHINE CONTROL
+ *    - Hardware state changes are managed by StateSmith-generated state machines
+ *    - ModeSm: Controls radio operating mode (SSB_RECEIVE, SSB_TRANSMIT, CW modes)
+ *    - UISm: Manages user interface states (HOME, MAIN_MENU, SECONDARY_MENU, UPDATE)
+ *    - Tune state machine: Manages VFO frequency control for RX/TX operations
+ *    - All state transitions are event-driven and deterministic
+ *
+ * 2. EVENT-DRIVEN ARCHITECTURE
+ *    - Hardware interrupts (buttons, encoders, CW keys) are queued in a FIFO buffer
+ *    - Main loop processes events sequentially from the interrupt buffer
+ *    - Events trigger state machine transitions via dispatch_event() calls
+ *    - Timer interrupts dispatch periodic DO events to state machines
+ *
+ * 3. REAL-TIME CONSTRAINTS
+ *    - Main loop must complete within ~10ms to prevent audio buffer overflow
+ *    - DSP processing is optimized and uses FASTRUN annotation for critical paths
+ *    - Interrupt handlers are kept minimal, deferring work to main loop
+ *
+ * ROLE OF Loop.cpp
+ * ================
+ * This file implements the central event processing and main loop execution.
+ * It serves as the "glue" between hardware events and state machine control.
+ *
+ * Key Responsibilities:
+ * ---------------------
+ * 1. INTERRUPT BUFFER MANAGEMENT
+ *    - Maintains a FIFO queue for hardware interrupt events (iNONE, iPTT_PRESSED, etc.)
+ *    - Provides thread-safe SetInterrupt() for ISRs to queue events
+ *    - ConsumeInterrupt() processes events and dispatches to state machines
+ *
+ * 2. CW KEY HANDLING
+ *    - Debounces CW key inputs (KEY1, KEY2)
+ *    - Supports both straight key and iambic keyer operation
+ *    - Routes key events to ModeSm for transmit control
+ *
+ * 3. USER INPUT PROCESSING
+ *    - Processes encoder rotations (tuning, volume, filter adjustment)
+ *    - Handles button presses (band change, mode toggle, menu navigation)
+ *    - Routes UI events to UISm for menu system control
+ *
+ * 4. MAIN LOOP EXECUTION (loop() function)
+ *    - Polls for hardware interrupts from front panel and CAT interface
+ *    - Processes debouncing for mechanical contacts
+ *    - Consumes interrupt events and dispatches to appropriate handlers
+ *    - Performs real-time DSP processing via PerformSignalProcessing()
+ *    - Updates display via DrawDisplay()
+ *    - Monitors for shutdown signal and performs graceful shutdown
+ *
+ * Main Loop Execution Flow:
+ * --------------------------
+ *   1. Check for shutdown signal
+ *   2. Poll and debounce CW key inputs
+ *   3. Check front panel for button/encoder events
+ *   4. Check CAT serial interface for commands
+ *   5. Process next event from interrupt FIFO
+ *   6. Perform DSP processing on audio buffers
+ *   7. Update display with current radio state
+ *   8. Loop repeats (target < 10ms per iteration)
+ *
+ * Integration with Other Modules:
+ * --------------------------------
+ * - ModeSm/UISm: Receives dispatched events from interrupt processing
+ * - RFBoard/Tune: Updated via UpdateRFHardwareState() when frequency changes
+ * - DSP modules: Called via PerformSignalProcessing() for audio processing
+ * - FrontPanel: Polled for button/encoder events via CheckForFrontPanelInterrupts()
+ * - CAT: Polled for serial commands via CheckForCATSerialEvents()
+ * - Storage: Called during shutdown to save radio state
+ *
+ * @see ModeSm.cpp for radio mode state machine implementation
+ * @see UISm.cpp for user interface state machine implementation
+ * @see Tune.cpp for VFO control state machine implementation
+ * @see DSP.cpp for signal processing implementation
+ */
+
 #include "SDT.h"
 
 // FIFO buffer for interrupt events
@@ -44,6 +130,15 @@ static bool lastKey1State = HIGH; // starts high due to input pullup
 static uint32_t lastKey1ChangeTime = 0;
 static volatile bool key1PendingRead = false;
 
+/**
+ * Interrupt service routine for KEY1 state changes (both rising and falling edges).
+ *
+ * This fast interrupt handler runs in RAM (FASTRUN) to minimize latency. It does not
+ * directly read the pin state to avoid bounce issues. Instead, it records the time of
+ * the edge change and sets a flag for the main loop to process after debounce delay.
+ *
+ * @see ProcessKey1Debounce() for debounce processing in main loop
+ */
 FASTRUN void Key1Change(void){
     // On ANY edge change, just note that something changed and restart the timer
     lastKey1ChangeTime = millis();
@@ -80,6 +175,17 @@ void ProcessKey1Debounce(void){
 }
 
 static uint32_t lastKey2time = 0;
+
+/**
+ * Interrupt service routine for KEY2 falling edge (key press).
+ *
+ * This fast interrupt handler runs in RAM (FASTRUN) to minimize latency. It performs
+ * simple time-based debouncing by ignoring interrupts that occur within DEBOUNCE_DELAY
+ * of the previous interrupt. Valid key presses are queued to the interrupt FIFO.
+ *
+ * Only falling edges (key press) are handled; KEY2 releases are not monitored for
+ * iambic keyer operation.
+ */
 FASTRUN void Key2On(void){
     uint32_t currentTime = millis();
     // Check if enough time has passed since last interrupt
@@ -90,6 +196,16 @@ FASTRUN void Key2On(void){
     lastKey2time = currentTime;
 }
 
+/**
+ * Configure GPIO pins and attach interrupt handlers for CW key inputs.
+ *
+ * Sets up KEY1 and KEY2 pins with internal pull-up resistors (keys ground the inputs
+ * when pressed). Attaches interrupt handlers:
+ * - KEY1: Triggers on CHANGE (both edges) for debounce processing in main loop
+ * - KEY2: Triggers on FALLING edge for iambic keyer second paddle
+ *
+ * Must be called during initialization before entering main loop.
+ */
 void SetupCWKeyInterrupts(void){
     // Set up interrupts for key
     pinMode(KEY1, INPUT_PULLUP);
@@ -119,6 +235,11 @@ InterruptType GetInterrupt(void){
     return result;
 }
 
+/**
+ * Get the current number of pending interrupts in the FIFO buffer.
+ *
+ * @return Number of interrupt events currently queued in the buffer (0-16).
+ */
 size_t GetInterruptFifoSize(void){
     return interruptFifo.count;
 }
@@ -158,10 +279,6 @@ void PrependInterrupt(InterruptType i){
     interruptFifo.count++;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Code that handles interrupts
-///////////////////////////////////////////////////////////////////////////////
-
 /**
  * Called every 1 milliseconds by the system timer. It dispatches a DO event to the 
  * state machines.
@@ -171,50 +288,28 @@ void TimerInterrupt(void){
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Code for handling button presses and state changes
+///////////////////////////////////////////////////////////////////////////////
+
 /**
- * Change the FIR filter settings.
- * @param filter_change The positive or negative increment to the filter bandwidth
+ * Process button press events from the front panel.
+ *
+ * Routes button presses to appropriate handlers based on button ID. Handles:
+ * - Band selection (BAND_UP, BAND_DN)
+ * - Mode toggles (TOGGLE_MODE, DEMODULATION)
+ * - Tuning increment changes (MAIN_TUNE_INCREMENT, FINE_TUNE_INCREMENT)
+ * - VFO control (VFO_TOGGLE, RESET_TUNING)
+ * - DSP controls (NOISE_REDUCTION, NOTCH_FILTER, DECODER_TOGGLE)
+ * - UI navigation (MENU_OPTION_SELECT, MAIN_MENU_UP, HOME_SCREEN)
+ * - Display controls (ZOOM)
+ * - Volume/filter encoder mode changes
+ *
+ * Some button handlers dispatch events to state machines (UISm, ModeSm), while
+ * others directly modify system parameters and update hardware state.
+ *
+ * @param button Button ID from the front panel (defined in button constants)
  */
-void FilterSetSSB(int32_t filter_change) {
-    // Change the band parameters
-    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
-        case LSB:{
-            if (changeFilterHiCut == 0)  // "0" = LoCut, "1" = HiCut
-            {
-                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
-                  bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            } else {
-                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
-                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            }
-            break;
-        }
-        case USB:{
-            if (changeFilterHiCut == 0) {
-                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
-                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-
-            } else {
-                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
-                  bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            }
-            break;
-        }
-        case AM:
-        case SAM:{
-            bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
-              bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
-            break;
-        }
-        case IQ:
-        case DCF77:
-            break;
-    }
-    // Calculate the new FIR filter mask
-    UpdateFIRFilterMask(&filters);
-}
-
 void HandleButtonPress(int32_t button){
     switch (button){
         case MENU_OPTION_SELECT:{
@@ -398,7 +493,21 @@ void HandleButtonPress(int32_t button){
 }
 
 /**
- * The keyer requires special handling logic because of its timers
+ * Handle iambic keyer paddle events with special timing considerations.
+ *
+ * The iambic keyer state machine requires special handling because paddle events
+ * may arrive while the state machine is still processing previous dit/dah sequences.
+ * This function implements the "memory" feature of iambic keyers:
+ *
+ * State-dependent behavior:
+ * - CW_RECEIVE or CW_TRANSMIT_KEYER_WAIT: Process paddle press immediately
+ * - CW_TRANSMIT_DIT_MARK, CW_TRANSMIT_DAH_MARK, or CW_TRANSMIT_KEYER_SPACE:
+ *   Prepend interrupt to FIFO head so it's processed as soon as current element completes
+ * - All other states: Discard the interrupt (not in keyer mode)
+ *
+ * Supports ED.keyerFlip to swap dit/dah paddle assignments for left/right-handed operators.
+ *
+ * @param interrupt The keyer interrupt (iKEY1_PRESSED or iKEY2_PRESSED)
  */
 void HandleKeyer(InterruptType interrupt){
     if ((interrupt != iKEY1_PRESSED) && (interrupt != iKEY2_PRESSED))
@@ -509,7 +618,8 @@ void ConsumeInterrupt(void){
                     }
                     case SidetoneVolume:{
                         ED.sidetoneVolume += 1.0;
-                        if (ED.sidetoneVolume > 500) ED.sidetoneVolume = 500; // 0 to 500 range
+                        if (ED.sidetoneVolume > 500) 
+                            ED.sidetoneVolume = 500; // 0 to 500 range
                         break;
                     }
                     default:
@@ -531,12 +641,14 @@ void ConsumeInterrupt(void){
                     case MicGain:{
                         ED.currentMicGain--;
                         // peg to zero if it goes too low, unsigned int expected
-                        if (ED.currentMicGain < 0) ED.currentMicGain = 0;
+                        if (ED.currentMicGain < 0) 
+                            ED.currentMicGain = 0;
                         break;
                     }
                     case SidetoneVolume:{
                         ED.sidetoneVolume -= 1.0;
-                        if (ED.sidetoneVolume < 0) ED.sidetoneVolume = 0; // 0 to 500 range
+                        if (ED.sidetoneVolume < 0) 
+                            ED.sidetoneVolume = 0; // 0 to 500 range
                         break;
                     }
                     default:
@@ -547,7 +659,7 @@ void ConsumeInterrupt(void){
             case (iFILTER_INCREASE):{
                 switch (uiSM.state_id){
                     case (UISm_StateId_HOME):{
-                        FilterSetSSB(5);
+                        FilterSetSSB(5,changeFilterHiCut);
                         Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
                                 + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
                         break;
@@ -572,7 +684,7 @@ void ConsumeInterrupt(void){
             case (iFILTER_DECREASE):{
                 switch (uiSM.state_id){
                     case (UISm_StateId_HOME):{
-                        FilterSetSSB(-5);
+                        FilterSetSSB(-5,changeFilterHiCut);
                         Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
                                 + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
                         break;
@@ -690,8 +802,17 @@ void ConsumeInterrupt(void){
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Shut down the radio gracefully when informed by the Shutdown circuitry 
- * that the power button has been pressed.
+ * Perform graceful shutdown sequence when power-off is requested.
+ *
+ * Called when the external power management circuit (ATTiny) signals that the
+ * power button has been pressed. This function:
+ * 1. Saves all radio state to persistent storage (EEPROM)
+ * 2. Signals shutdown completion to the ATTiny via SHUTDOWN_COMPLETE pin
+ * 3. Waits for the ATTiny to cut power to the Teensy
+ *
+ * This function does not return - power will be cut during the delay.
+ *
+ * @note This is a blocking function that delays for 1 second
  */
 void ShutdownTeensy(void){
     // Do whatever is needed before cutting power here
@@ -702,9 +823,31 @@ void ShutdownTeensy(void){
     MyDelay(1000); // wait for the turn off command
 }
 
+/**
+ * Main program loop - executed repeatedly while radio is powered on.
+ *
+ * This is the central execution loop of the Phoenix SDR firmware. It runs continuously
+ * and must complete each iteration within ~10ms to prevent audio buffer overflow.
+ *
+ * The loop performs these steps in order:
+ * 1. Monitor for shutdown signal from power management circuit
+ * 2. Process CW key debouncing (main loop polling for stable state)
+ * 3. Check front panel for button/encoder events
+ * 4. Check CAT serial interface for computer control commands
+ * 5. Consume and process next interrupt event from FIFO
+ * 6. Perform real-time DSP on audio buffers
+ * 7. Update display with current radio state
+ *
+ * Execution Constraints:
+ * - FASTRUN annotation places this function in RAM for maximum speed
+ * - Target execution time: < 10ms per iteration to maintain audio streaming
+ * - All operations must be non-blocking or have bounded execution time
+ *
+ * @note This function never returns under normal operation
+ * @see PerformSignalProcessing() for DSP implementation
+ * @see ConsumeInterrupt() for event processing
+ */
 FASTRUN void loop(void){
-    // This is the loop that is executed again and again
-
     // Check for signal to begin shutdown and perform shutdown routine if requested
     if (digitalRead(BEGIN_TEENSY_SHUTDOWN)) ShutdownTeensy();
 
@@ -719,5 +862,4 @@ FASTRUN void loop(void){
 
     // Step 3: Draw the display
     DrawDisplay();
-
 }

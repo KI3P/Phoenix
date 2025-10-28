@@ -85,6 +85,11 @@ const float32_t sqrtHann[256] = {
   0.024637449, 0.01231966, 0
 };
 
+/**
+ * Initialize buffers and variables for Kim1 noise reduction algorithm.
+ * Clears all FFT buffers, sample buffers, and processing arrays used by
+ * the Kim & Ruwisch 2002 noise reduction algorithm.
+ */
 void InitializeKim1NoiseReduction(void){
     CLEAR_VAR(NR_FFT_buffer);
     CLEAR_VAR(NR_last_sample_buffer_L);
@@ -258,6 +263,11 @@ void Kim1_NR(DataBlock *data){
     }
 }
 
+/**
+ * Initialize buffers for XANR (variable leak LMS) noise reduction.
+ * Clears the delay line buffer (ANR_d) and weight coefficient buffer (ANR_w)
+ * used by the automatic notch/noise reduction algorithm.
+ */
 void InitializeXanrNoiseReduction(void){
     CLEAR_VAR(ANR_d);
     CLEAR_VAR(ANR_w);
@@ -320,6 +330,12 @@ void Xanr(DataBlock *data, uint8_t ANR_notch) {
 }
 
 
+/**
+ * Initialize buffers and parameters for spectral noise reduction.
+ * Sets initial values for all per-bin arrays used in the spectral subtraction
+ * algorithm including gains, SNR estimates, noise estimates, and buffers.
+ * Based on Romanin et al. 2009, Schmitt et al. 2002, and Gerkmann & Hendriks 2002.
+ */
 void InitializeSpectralNoiseReduction(void){
     for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++){
         NR_last_sample_buffer_L[bindx] = 0.1;

@@ -4,24 +4,26 @@ float32_t DMAMEM float_buffer_L[READ_BUFFER_SIZE];
 float32_t DMAMEM float_buffer_R[READ_BUFFER_SIZE];
 
 DataBlock data;
+float32_t SAM_carrier_freq_offset = 0;
+float32_t SAM_carrier_freq_offsetOld = 0;
 
 static int16_t *sp_L1;
 static int16_t *sp_R1;
 static uint32_t n_clear;
 static char *filename = nullptr;
 
+/**
+ * Perform the appropriate IQ signal processing depending on the state we're in
+ */
 void PerformSignalProcessing(void){
     switch (modeSM.state_id){
-        case (ModeSm_StateId_SSB_RECEIVE):{
+        case (ModeSm_StateId_SSB_RECEIVE):
+        case (ModeSm_StateId_CW_RECEIVE):{
             ReceiveProcessing(nullptr);
             break;
         }
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
-            break;
-        }
-        case (ModeSm_StateId_CW_RECEIVE):{
-            ReceiveProcessing(nullptr);
             break;
         }
         default:{
@@ -31,9 +33,16 @@ void PerformSignalProcessing(void){
     }
 }
 
+/**
+ * Used by the unit tests
+ */
 float32_t GetAmpCorrectionFactor(uint32_t bandN){
     return ED.IQAmpCorrectionFactor[bandN];
 }
+
+/**
+ * Used by the unit tests
+ */
 float32_t GetPhaseCorrectionFactor(uint32_t bandN){
     return ED.IQPhaseCorrectionFactor[bandN];
 }
@@ -578,16 +587,10 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
       case LSB:
         // for SSB copy real part in both outputs
         arm_copy_f32(data->I, data->Q, data->N);
-        //for (unsigned i = 0; i < data->N; i++) {
-        //    data->Q[i] = data->I[i];
-        //}
         break;
       case USB:
         // for SSB copy real part in both outputs
         arm_copy_f32(data->I, data->Q, data->N);
-        //for (unsigned i = 0; i < data->N; i++) {
-        //    data->Q[i] = data->I[i];
-        //}
         break;
       case AM:
         // Magnitude estimation Lyons (2011): page 652 / libcsdr
@@ -693,10 +696,16 @@ void InitializeSignalProcessing(void){
     InitializeCWProcessing(ED.currentWPM, &filters);
 }
 
+/**
+ * Used by the unit tests. Sets the name of the file to save samples to.
+ */
 void setfilename(char *fnm){
     filename = fnm;
 }
 
+/**
+ * Used by the unit tests. Saves data to a file for offline examination.
+ */
 void SaveData(DataBlock *data, uint32_t suffix){
     if (filename != nullptr){
         char fn2[100];

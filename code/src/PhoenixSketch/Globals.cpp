@@ -4,7 +4,6 @@ struct config_t ED;
 bool displayFFTUpdated;
 bool psdupdated = false;
 float32_t psdnew[SPECTRUM_RES];
-float32_t psdold[SPECTRUM_RES];
 float32_t audioYPixel[SPECTRUM_RES/4];
 
 VolumeFunction volumeFunction = AudioVolume;
@@ -83,22 +82,117 @@ uint8_t SampleRate = SAMPLE_RATE_192K;
 
 const float32_t CWToneOffsetsHz[] = {400, 562.5, 656.5, 750.0, 843.75 };
 
-float32_t SAM_carrier_freq_offset = 0;
-float32_t SAM_carrier_freq_offsetOld = 0;
 ModeSm modeSM;
 UISm uiSM;
 uint32_t hardwareRegister;
+
+/**
+ * Simple blocking delay function.
+ *
+ * @param millisWait Number of milliseconds to wait
+ */
+void MyDelay(unsigned long millisWait) {
+    unsigned long now = millis();
+    while (millis() - now < millisWait)
+        ;  // Twiddle thumbs until delay ends...
+}
+
+/**
+ * Update the CW dit duration based on current WPM setting.
+ * Calculates dit length using the standard formula: 1200ms / WPM.
+ * Updates modeSM.vars.ditDuration_ms with the result.
+ */
+void UpdateDitLength(void){
+    float32_t dit_ms = 60000.0f/(50.0f*ED.currentWPM);
+    modeSM.vars.ditDuration_ms = (uint16_t)round(dit_ms);
+}
+
+//////////////////////////////////////////////////
+// Related to temperate and load monitoring
+
+int64_t elapsed_micros_idx_t = 0;
+int64_t elapsed_micros_sum = 0;
+float32_t elapsed_micros_mean = 0.0;
+elapsedMicros usec = 0;
+
+float32_t s_hotT_ROOM; /*!< The value of s_hotTemp minus room temperature(25¡æ).*/
+uint32_t panicAlarmTemp; /*!< The panic alarm temperature.*/
+uint32_t roomCount;      /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
+uint32_t s_roomC_hotC;   /*!< The value of s_roomCount minus s_hotCount.*/
+uint32_t s_hotTemp;      /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at room temperature .*/
+uint32_t s_hotCount;     /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
+#define TEMPMON_ROOMTEMP 25.0f
+#define TMS0_POWER_DOWN_MASK (0x1U)
+#define TMS1_MEASURE_FREQ(x) (((uint32_t)(((uint32_t)(x)) << 0U)) & 0xFFFFU)
+
+/**
+ * Initialize the Teensy 4.x on-die temperature monitor.
+ * Powers on the temperature sensor, configures measurement frequency,
+ * and reads calibration data from OCOTP fuses for accurate temperature calculation.
+ *
+ * @param freq Measurement frequency in Hz
+ * @param lowAlarmTemp Low temperature alarm threshold (Celsius)
+ * @param highAlarmTemp High temperature alarm threshold (Celsius)
+ * @param panicAlarmTemp Panic temperature alarm threshold (Celsius)
+ */
+void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp) {
+    uint32_t calibrationData;
+    uint32_t roomCount;
+    //first power on the temperature sensor - no register change
+    TEMPMON_TEMPSENSE0 &= ~TMS0_POWER_DOWN_MASK;
+    TEMPMON_TEMPSENSE1 = TMS1_MEASURE_FREQ(freq);
+
+    calibrationData = HW_OCOTP_ANA1;
+    s_hotTemp = (uint32_t)(calibrationData & 0xFFU) >> 0x00U;
+    s_hotCount = (uint32_t)(calibrationData & 0xFFF00U) >> 0X08U;
+    roomCount = (uint32_t)(calibrationData & 0xFFF00000U) >> 0x14U;
+    s_hotT_ROOM = s_hotTemp - TEMPMON_ROOMTEMP;
+    s_roomC_hotC = roomCount - s_hotCount;
+}
+
+/*****
+  Purpose: Read the Teensy's temperature. Get worried over 50C
+
+  Parameter list:
+    void
+  Return value:
+    float           temperature Centigrade
+*****/
+float32_t TGetTemp() {
+    uint32_t nmeas;
+    float tmeas;
+    while (!(TEMPMON_TEMPSENSE0 & 0x4U)) {
+    ;
+    }
+    /* ready to read temperature code value */
+    nmeas = (TEMPMON_TEMPSENSE0 & 0xFFF00U) >> 8U;
+    tmeas = s_hotTemp - (float)((nmeas - s_hotCount) * s_hotT_ROOM / s_roomC_hotC);  // Calculate temperature
+    return tmeas;
+}
+
+//////////////////////////////////////////////////
+// Functions related to the rolling buffer of hardware state events. Used by the unit tests.
+
 RollingBuffer buffer = {0};
 
+/**
+ * Add the current hardware register state to the rolling buffer.
+ * Records a timestamped snapshot of hardwareRegister for debugging and testing.
+ * The buffer wraps around when full, overwriting the oldest entry.
+ */
 void buffer_add(void) {
     buffer.entries[buffer.head].timestamp = micros();
-    buffer.entries[buffer.head].register_value = hardwareRegister;  
+    buffer.entries[buffer.head].register_value = hardwareRegister;
     buffer.head = (buffer.head + 1) % REGISTER_BUFFER_SIZE;  // Wrap around
     if (buffer.count < REGISTER_BUFFER_SIZE) {
         buffer.count++;
     }
 }
 
+/**
+ * Clear all entries from the hardware register buffer.
+ * Resets all timestamps and register values to zero and resets buffer pointers.
+ */
 void buffer_flush(void) {
     for (size_t i = 0; i < REGISTER_BUFFER_SIZE; i++){
         buffer.entries[i].timestamp = 0;
@@ -108,17 +202,11 @@ void buffer_flush(void) {
     buffer.head = 0;
 }
 
-void MyDelay(unsigned long millisWait) {
-    unsigned long now = millis();
-    while (millis() - now < millisWait)
-        ;  // Twiddle thumbs until delay ends...
-}
-
-void UpdateDitLength(void){
-    float32_t dit_ms = 60000.0f/(50.0f*ED.currentWPM);
-    modeSM.vars.ditDuration_ms = (uint16_t)round(dit_ms);
-}
-
+/**
+ * Print the hardware register buffer in a human-readable table format.
+ * Displays all entries with timestamp, register value in decimal, binary, and hex.
+ * Entries are shown from oldest to newest.
+ */
 void buffer_pretty_print(void) {
     Debug("=== Hardware Register Buffer Contents ===");
     Debug("Buffer size: " + String((unsigned int)buffer.count) + "/" + String((unsigned int)REGISTER_BUFFER_SIZE));
@@ -182,6 +270,14 @@ void buffer_pretty_print(void) {
     Debug("==========================================");
 }
 
+/**
+ * Extract and convert a bit field from a register value to a binary string.
+ *
+ * @param register_value The 32-bit register value
+ * @param MSB Most significant bit position of the field
+ * @param LSB Least significant bit position of the field
+ * @return Binary string representation of the bit field (MSB first)
+ */
 String regtostring(uint32_t register_value,uint8_t MSB, uint8_t LSB){
   // Convert register value to binary string
   String binary = "";
@@ -192,10 +288,16 @@ String regtostring(uint32_t register_value,uint8_t MSB, uint8_t LSB){
   return binary;
 }
 
+/**
+ * Print a single buffer entry with decoded hardware register fields.
+ * Displays timestamp and individual bit fields (LPF, BPF, antenna, mode flags, etc.).
+ *
+ * @param entry The BufferEntry to print
+ */
 void pretty_print_line(BufferEntry entry){
   String line = "| ";
   line += String((unsigned int)entry.timestamp, DEC);
-  // Pad timestamp 
+  // Pad timestamp
   while (line.length() < 15) line += " ";
   line += " | ";
   line += regtostring(entry.register_value,LPFBAND3BIT,LPFBAND0BIT);
@@ -231,10 +333,15 @@ void pretty_print_line(BufferEntry entry){
   Debug(line);
 }
 
+/**
+ * Print only the most recent buffer entry with decoded register fields.
+ * Shows a table header and the last entry added to the buffer.
+ * Useful for quickly checking current hardware state.
+ */
 void buffer_pretty_print_last_entry(void) {
   Debug("|               |              X 1     R   M   C S               |");
-  Debug("|               |           A  V 0 T R X   O C V V               |");
-  Debug("|               |           n  T 0 X X T C D A F F               |");
+  Debug("|               |           A  V 0 T R X   O C A F F               |");
+  Debug("|               |           n  T 0 X X T C D L O O               |");
   Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
   Debug("|---------------|------------------------------------------------|");
   BufferEntry entry;
@@ -243,6 +350,12 @@ void buffer_pretty_print_last_entry(void) {
   pretty_print_line(entry);
 }
 
+/**
+ * Print all buffer entries with decoded hardware register fields.
+ * Similar to buffer_pretty_print() but displays decoded bit fields
+ * (LPF, BPF, antenna, mode flags, etc.) instead of raw hex values.
+ * Entries are shown from oldest to newest.
+ */
 void buffer_pretty_buffer_array(void) {
     Debug("=== Hardware Register Buffer Contents ===");
     Debug("Buffer size: " + String((unsigned int)buffer.count) + "/" + String((unsigned int)REGISTER_BUFFER_SIZE));
@@ -277,64 +390,15 @@ void buffer_pretty_buffer_array(void) {
     Debug("==========================================");
 }
 
+/**
+ * Set debug flag pins for oscilloscope/logic analyzer monitoring.
+ * Outputs a 4-bit value on GPIO pins 28-31 for timing analysis.
+ *
+ * @param val 4-bit value to output on pins (0-15)
+ */
 void Flag(uint8_t val){
     digitalWrite(31, (val >> 0) & 0b1);  //testcode
     digitalWrite(30, (val >> 1) & 0b1);  //testcode
     digitalWrite(29, (val >> 2) & 0b1);  //testcode
     digitalWrite(28, (val >> 3) & 0b1);  //testcode
 }
-
-//////////////////////////////////////////////////
-// Related to temperate and load monitoring
-
-int64_t elapsed_micros_idx_t = 0;
-int64_t elapsed_micros_sum = 0;
-float32_t elapsed_micros_mean = 0.0;
-elapsedMicros usec = 0;
-
-float32_t s_hotT_ROOM; /*!< The value of s_hotTemp minus room temperature(25¡æ).*/
-uint32_t panicAlarmTemp; /*!< The panic alarm temperature.*/
-uint32_t roomCount;      /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
-uint32_t s_roomC_hotC;   /*!< The value of s_roomCount minus s_hotCount.*/
-uint32_t s_hotTemp;      /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at room temperature .*/
-uint32_t s_hotCount;     /*!< The value of TEMPMON_TEMPSENSE0[TEMP_VALUE] at the hot temperature.*/
-#define TEMPMON_ROOMTEMP 25.0f
-#define TMS0_POWER_DOWN_MASK (0x1U)
-#define TMS1_MEASURE_FREQ(x) (((uint32_t)(((uint32_t)(x)) << 0U)) & 0xFFFFU)
-
-void initTempMon(uint16_t freq, uint32_t lowAlarmTemp, uint32_t highAlarmTemp, uint32_t panicAlarmTemp) {
-    uint32_t calibrationData;
-    uint32_t roomCount;
-    //first power on the temperature sensor - no register change
-    TEMPMON_TEMPSENSE0 &= ~TMS0_POWER_DOWN_MASK;
-    TEMPMON_TEMPSENSE1 = TMS1_MEASURE_FREQ(freq);
-
-    calibrationData = HW_OCOTP_ANA1;
-    s_hotTemp = (uint32_t)(calibrationData & 0xFFU) >> 0x00U;
-    s_hotCount = (uint32_t)(calibrationData & 0xFFF00U) >> 0X08U;
-    roomCount = (uint32_t)(calibrationData & 0xFFF00000U) >> 0x14U;
-    s_hotT_ROOM = s_hotTemp - TEMPMON_ROOMTEMP;
-    s_roomC_hotC = roomCount - s_hotCount;
-}
-
-/*****
-  Purpose: Read the Teensy's temperature. Get worried over 50C
-
-  Parameter list:
-    void
-  Return value:
-    float           temperature Centigrade
-*****/
-float32_t TGetTemp() {
-    uint32_t nmeas;
-    float tmeas;
-    while (!(TEMPMON_TEMPSENSE0 & 0x4U)) {
-    ;
-    }
-    /* ready to read temperature code value */
-    nmeas = (TEMPMON_TEMPSENSE0 & 0xFFF00U) >> 8U;
-    tmeas = s_hotTemp - (float)((nmeas - s_hotCount) * s_hotT_ROOM / s_roomC_hotC);  // Calculate temperature
-    return tmeas;
-}
-
-//////////////////////////////////////////////////
