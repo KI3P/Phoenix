@@ -1298,7 +1298,7 @@ TEST(SignalProcessing, AudioIIRFilterCorrect){
     
 }
 
-/*TEST(SignalProcessing, DemodulateAM){
+TEST(SignalProcessing, DemodulateAM){
     // Generate an AM modulated signal as it appears at IF frequencies.
     // In the simplest case, I is offset from zero and has some amplitude. Q is all zeros.
     
@@ -1334,7 +1334,7 @@ TEST(SignalProcessing, AudioIIRFilterCorrect){
 
     // Does it match the expected result?
     //EXPECT_EQ(1,0);
-}*/
+}
 
 /*TEST(SignalProcessing, DemodulateSAM){
     EXPECT_EQ(1,0);
@@ -1382,7 +1382,7 @@ void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32
     *gain = amp/0.1;
 }
 
-/*TEST(SignalProcessing, ReceiveEQPlotPassbands){
+TEST(SignalProcessing, ReceiveEQPlotPassbands){
     // Generate a bunch of tones between fmin and fmax. Measure the output of
     // the filtered data for each tone. Measure the passband in this way.
 
@@ -1394,7 +1394,7 @@ void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32
     float32_t gain[Npoints];
     float32_t freq[Npoints];
     char strbuf[50];
-
+ 
     for (uint16_t bf = 0; bf < 14; bf++){
         for (int i = 0; i<Npoints; i++){
             freq[i] = fmin + (float32_t)i*fstep;
@@ -1403,7 +1403,7 @@ void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32
         sprintf(strbuf,"ReceiveEQ_band_%d.txt",bf);
         WriteIQFile(freq,gain,strbuf,Npoints);
     }
-}*/
+}
 
 TEST(SignalProcessing, ReceiveEQPassbands){
     DataBlock *dout;
