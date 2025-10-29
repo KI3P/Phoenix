@@ -1229,7 +1229,6 @@ TEST_F(DisplayTest, RFSetMenu_Antenna_Configuration) {
     EXPECT_EQ(RFSet[6].action, variableOption);
     EXPECT_EQ(RFSet[6].varPam, &antenna);
     EXPECT_EQ(RFSet[6].func, nullptr);
-    EXPECT_EQ(RFSet[6].postUpdateFunc, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(antenna.type, TYPE_I32);

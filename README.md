@@ -21,7 +21,11 @@ Phoenix SDR is built around a state machine-driven architecture that ensures det
 
 ## State machines
 
-The state of the radio hardware is controlled by a radio mode state machine. This is the only place in the code where the hardware state is changed. Using a state machine to control the hardware ensures that all hardware is always in a known configuration state.
+The behavior of the radio is controlled by a set of state machines. Hardware interrupts, like button presses, are handled by the main loop and used to dispatch events to the Mode and UI state machines, as well as update the shared global configuration settings. The Mode State Machine drives two further state machines: one controls the hardware state, and the other controls the frequencies of the VFOs. The architecture of the state machines is shown in the diagram below.
+
+![](images/state_machine_architecture.png)
+
+The state of the radio hardware is controlled by a radio mode state machine. Using a state machine to control the hardware ensures that all hardware is always in a known configuration state. The state machine UML diagram is found in the file `code/src/PhoenixSketch/ModeSm.drawio`, and is shown below.
 
 ![The state machine that controls the radio operating mode](images/RadioModeSm-design.png)
 
