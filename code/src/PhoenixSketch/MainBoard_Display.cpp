@@ -2351,7 +2351,7 @@ struct SecondaryMenuOption RFSet[7] = {
     "RX Attenuation",variableOption, &rxAtten, NULL, (void *)UpdateRatten,
     "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
     "TX Attenuation (SSB)",variableOption, &txAttenSSB, NULL, (void *)UpdateTXAttenSSB,
-    "Antenna",variableOption, &antenna, NULL, NULL,
+    "Antenna",variableOption, &antenna, NULL, (void *)UpdateTuneState,
 };
 
 // "100W PA", "XVTR", "Cancel"

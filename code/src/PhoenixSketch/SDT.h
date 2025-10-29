@@ -2,7 +2,7 @@
 #define SDT_H
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx RC"
+#define VERSION "Phx Alpha"
 
 #define Debug(x) Serial.println(x)
 
