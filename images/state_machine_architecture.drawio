@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.8 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36" version="28.2.8">
   <diagram name="State Machine Architecture" id="state-machine-arch">
-    <mxGraphModel dx="1598" dy="924" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="900" math="0" shadow="0">
+    <mxGraphModel dx="1917" dy="1109" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="900" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -97,31 +97,34 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="yZ03nLWbBo4yx16Ja4qs-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;strokeColor=#dc2626;strokeWidth=3;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=block;endFill=1;" edge="1" parent="1" source="hardwaresm" target="rf-hardware">
+        <mxCell id="yZ03nLWbBo4yx16Ja4qs-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;strokeColor=#dc2626;strokeWidth=3;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=block;endFill=1;" parent="1" source="hardwaresm" target="rf-hardware" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="hardwaresm" value="&lt;b&gt;Hardware State (HardwareSM.cpp)&lt;/b&gt;&lt;br&gt;RF Hardware Configuration Bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#10b981;strokeWidth=3;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
-          <mxGeometry x="585" y="540" width="340" height="180" as="geometry" />
+        <mxCell id="hardwaresm" value="&lt;b&gt;Hardware State (HardwareSM.cpp)&lt;/b&gt;&lt;br&gt;RF Hardware Configuration Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#10b981;strokeWidth=3;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="770" y="540" width="300" height="180" as="geometry" />
         </mxCell>
-        <mxCell id="hardwaresm-states" value="&lt;b&gt;RF Hardware States:&lt;/b&gt;&lt;br&gt;• RFReceive&lt;br&gt;• RFTransmit (SSB)&lt;br&gt;• RFCWMark (carrier ON)&lt;br&gt;• RFCWSpace (carrier OFF)&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Maps ModeSm states → Hardware config&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#059669;strokeWidth=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
-          <mxGeometry x="605" y="595" width="280" height="115" as="geometry" />
+        <mxCell id="hardwaresm-states" value="&lt;b&gt;RF Hardware States:&lt;/b&gt;&lt;br&gt;• RFReceive&lt;br&gt;• RFTransmit (SSB)&lt;br&gt;• RFCWMark (carrier ON)&lt;br&gt;• RFCWSpace (carrier OFF)&lt;br&gt;&lt;br&gt;&lt;font&gt;Maps ModeSm states → Hardware config&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#059669;strokeWidth=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
+          <mxGeometry x="780" y="590" width="280" height="115" as="geometry" />
         </mxCell>
         <mxCell id="arrow-modesm-hardwaresm" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#10b981;strokeWidth=3;endArrow=block;endFill=1;" parent="1" source="modesm" target="hardwaresm" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="tune-state" value="&lt;b style=&quot;font-family: Helvetica; font-size: 14px;&quot;&gt;Tune State (Tune.cpp)&lt;/b&gt;&lt;br style=&quot;font-family: Helvetica; font-size: 14px;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; font-size: 14px;&quot;&gt;VFO Frequency Management&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#eab308;strokeWidth=2;fontSize=11;align=center;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
-          <mxGeometry x="235" y="540" width="300" height="180" as="geometry" />
+          <mxGeometry x="420" y="540" width="300" height="180" as="geometry" />
         </mxCell>
-        <mxCell id="rf-hardware" value="&lt;b&gt;RF Hardware and DSP&lt;/b&gt;&lt;br&gt;&lt;br&gt;• VFO Control (Si5351)&lt;br&gt;• Antenna/Relay Control&lt;br&gt;• Filter Selection&lt;br&gt;• DSP Configuration&lt;div&gt;...&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#dc2626;strokeWidth=2;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
-          <mxGeometry x="470" y="780" width="190" height="110" as="geometry" />
+        <mxCell id="rf-hardware" value="&lt;b&gt;Hardware and DSP layer&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;• VFO Control (Si5351)&lt;br&gt;• Antenna/Relay Control&lt;br&gt;• Filter Selection&lt;br&gt;• DSP Configuration&lt;div&gt;...&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#dc2626;strokeWidth=2;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
+          <mxGeometry x="407.5" y="770" width="325" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="arrow-tune-rfhw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;strokeColor=#dc2626;strokeWidth=3;endArrow=block;endFill=1;" parent="1" source="tune-state" target="rf-hardware" edge="1">
+        <mxCell id="arrow-tune-rfhw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#dc2626;strokeWidth=3;endArrow=block;endFill=1;" parent="1" source="tune-state" target="rf-hardware" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="shared-state" value="&lt;b&gt;Shared Global Configuration Settings&lt;/b&gt;&lt;br&gt;&lt;br&gt;EEPROMData ED:&lt;br&gt;• centerFreq_Hz&lt;br&gt;• activeVFO, currentBand&lt;br&gt;• modulation, keyType&lt;br&gt;..." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#db2777;strokeWidth=2;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;dashed=1;dashPattern=3 3;" parent="1" vertex="1">
           <mxGeometry x="75" y="770" width="205" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="yZ03nLWbBo4yx16Ja4qs-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#eab308;strokeWidth=3;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=block;endFill=1;" edge="1" parent="1" source="modesm" target="tune-state">
+        <mxCell id="yZ03nLWbBo4yx16Ja4qs-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#eab308;strokeWidth=3;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=block;endFill=1;" parent="1" source="modesm" target="tune-state" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v-TkcGI2fMnNLQ0W7Wf2-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;strokeWidth=3;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=block;endFill=1;fillColor=#ffe6cc;" edge="1" parent="1" source="modesm" target="v-TkcGI2fMnNLQ0W7Wf2-2">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="modesm" value="&lt;b&gt;ModeSm (ModeSm.cpp)&lt;/b&gt;&lt;br&gt;Radio Operating Mode Controller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#ec4899;strokeWidth=3;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
@@ -130,8 +133,17 @@
         <mxCell id="modesm-states" value="&lt;b&gt;Key States:&lt;/b&gt;&lt;br&gt;• SSB_RECEIVE&lt;br&gt;• SSB_TRANSMIT&lt;br&gt;• CW_RECEIVE&lt;br&gt;• CW_TRANSMIT_MARK&lt;br&gt;• CW_TRANSMIT_SPACE&lt;br&gt;• CW_TRANSMIT_DIT/DAH_MARK&lt;br&gt;• CALIBRATE_* states" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#db2777;strokeWidth=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
           <mxGeometry x="420" y="345" width="280" height="125" as="geometry" />
         </mxCell>
-        <mxCell id="yZ03nLWbBo4yx16Ja4qs-1" value="&lt;b&gt;Tune States:&lt;/b&gt;&lt;br&gt;• TuneReceive&lt;br&gt;• TuneSSBTX&lt;br&gt;• TuneCWTX (with tone offset)&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Maps ModeSm states &amp;amp;&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;font-size: 10px; background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;global settings → Tune config&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#059669;strokeWidth=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" vertex="1" parent="1">
-          <mxGeometry x="245" y="590" width="280" height="115" as="geometry" />
+        <mxCell id="yZ03nLWbBo4yx16Ja4qs-1" value="&lt;b&gt;Tune States:&lt;/b&gt;&lt;br&gt;• TuneReceive&lt;br&gt;• TuneSSBTX&lt;br&gt;• TuneCWTX (with tone offset)&lt;br&gt;&lt;br&gt;&lt;font&gt;&lt;font style=&quot;&quot;&gt;Maps ModeSm states &amp;amp;&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;global settings → Tune config&lt;/span&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#059669;strokeWidth=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" parent="1" vertex="1">
+          <mxGeometry x="430" y="590" width="280" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="v-TkcGI2fMnNLQ0W7Wf2-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;strokeColor=#dc2626;strokeWidth=3;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=block;endFill=1;" edge="1" parent="1" source="v-TkcGI2fMnNLQ0W7Wf2-2" target="rf-hardware">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v-TkcGI2fMnNLQ0W7Wf2-2" value="&lt;b style=&quot;font-family: Helvetica; font-size: 14px;&quot;&gt;Audio State (MainBoard_AudioIO.cpp)&lt;/b&gt;&lt;br style=&quot;font-family: Helvetica; font-size: 14px;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; font-size: 14px;&quot;&gt;Analog/Digital Interface Management&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;align=center;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" vertex="1" parent="1">
+          <mxGeometry x="70" y="540" width="300" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="v-TkcGI2fMnNLQ0W7Wf2-3" value="&lt;font&gt;Maps ModeSm states to configurations of the OpenAudio graph that controls the flow of data between the DACs, ADCs, and the DSP chain&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#059669;strokeWidth=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontFamily=monospace;" vertex="1" parent="1">
+          <mxGeometry x="80" y="590" width="280" height="115" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
