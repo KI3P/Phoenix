@@ -2402,6 +2402,38 @@ struct SecondaryMenuOption CWOptions[6] = {
 //   "Sidetone Note", "Xmit Delay"
 
 ///////////////////////////////////////
+// AGC Options
+///////////////////////////////////////
+
+void SelectAGCOff(void){ ED.agc = AGCOff; }
+void SelectAGCLong(void){ ED.agc = AGCLong; }
+void SelectAGCSlow(void){ ED.agc = AGCSlow; }
+void SelectAGCMedium(void){ ED.agc = AGCMed; }
+void SelectAGCFast(void){ ED.agc = AGCFast; }
+
+struct SecondaryMenuOption AGCOptions[5] = {
+    "Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
+    "Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
+    "Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
+    "Medium", functionOption, NULL, (void *)SelectAGCMedium, NULL,
+    "Fast", functionOption, NULL, (void *)SelectAGCFast, NULL,
+};
+
+///////////////////////////////////////
+// Microphone Options
+///////////////////////////////////////
+
+VariableParameter micg = {
+    .variable = &ED.currentMicGain,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = -10, .max=30, .step=1}}
+};
+
+struct SecondaryMenuOption MicOptions[1] = {
+    "Mic gain", variableOption, &micg, NULL, NULL,
+};
+
+///////////////////////////////////////
 // Calibration Menu
 ///////////////////////////////////////
 
@@ -2414,6 +2446,8 @@ VariableParameter rflevelcal = {
 struct SecondaryMenuOption CalOptions[1] = {
     "S meter level", variableOption, &rflevelcal, NULL, NULL,
 };
+
+// "Freq Cal", "Rec IQ Cal", "Xmit IQ Cal", "CW PA Cal", "SSB PA Cal", "Two Tone Test", "R Freq Offset", "SWR Cal"
 
 ///////////////////////////////////////
 // Display menu
@@ -2444,11 +2478,13 @@ struct SecondaryMenuOption DisplayOptions[2] = {
 // Construct the primary menu
 ///////////////////////////////////////
 
-struct PrimaryMenuOption primaryMenu[4] = {
+struct PrimaryMenuOption primaryMenu[6] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
-    "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
+    "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
+    "AGC Setting", AGCOptions, sizeof(AGCOptions)/sizeof(AGCOptions[0]),
     "Display", DisplayOptions, sizeof(DisplayOptions)/sizeof(DisplayOptions[0]),
+    "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
 };
 
 /**
@@ -2511,15 +2547,15 @@ int (*functionPtr[])() = {
 };
 
 const char *secondaryChoices[][14] = {
-  { "Power level", "Gain", "RF In Atten", "RF Out Atten", "Antenna", "100W PA", "XVTR", "Cancel" },                       //RF
-  { "WPM", "Straight Key", "Keyer", "CW Filter", "Paddle Flip", "Sidetone Note", "Sidetone Vol", "Xmit Delay", "Cancel" },// CW             0
+DONE  { "Power level", "Gain", "RF In Atten", "RF Out Atten", "Antenna", "100W PA", "XVTR", "Cancel" },                       //RF
+DONE  { "WPM", "Straight Key", "Keyer", "CW Filter", "Paddle Flip", "Sidetone Note", "Sidetone Vol", "Xmit Delay", "Cancel" },// CW             0
   { "VFO A", "VFO B", "Split", "Cancel" },                                                                                // VFO            2
   { "Save Current", "Set Defaults", "Get Favorite", "Set Favorite", "EEPROM-->SD", "SD-->EEPROM", "SD Dump", "Cancel" },  // EEPROM         3
-  { "Off", "Long", "Slow", "Medium", "Fast", "Cancel" },                                                                  // AGC            4
-  { "20 dB/unit", "10 dB/unit", " 5 dB/unit", " 2 dB/unit", " 1 dB/unit", "Cancel" },                                     // Spectrum       5
-  { "Set floor", "Cancel" },                                                                                              // Noise floor    6
-  { "Set Mic Gain", "Cancel" },                                                                                           // Mic gain       7
-  { "On", "Off", "Set Threshold", "Set Ratio", "Set Attack", "Set Decay", "Cancel" },                                     // Mic options    8
+DONE { "Off", "Long", "Slow", "Medium", "Fast", "Cancel" },                                                                  // AGC            4
+DONE { "20 dB/unit", "10 dB/unit", " 5 dB/unit", " 2 dB/unit", " 1 dB/unit", "Cancel" },                                     // Spectrum       5
+DONE { "Set floor", "Cancel" },                                                                                              // Noise floor    6
+DONE { "Set Mic Gain", "Cancel" },                                                                                           // Mic gain       7
+DONE { "On", "Off", "Set Threshold", "Set Ratio", "Set Attack", "Set Decay", "Cancel" },                                     // Mic options    8
   { "On", "Off", "EQRcSet", "Cancel" },                                                                                   // index = 9                                                                                // EQ Rec         9
   { "On", "Off", "EQTxSet", "Cancel" },                                                                                   // EQ Trx         10
   { "Freq Cal", "Rec IQ Cal", "Xmit IQ Cal", "CW PA Cal", "SSB PA Cal", "Two Tone Test", "R Freq Offset", "SWR Cal","Cancel" },  // Calibrate      11

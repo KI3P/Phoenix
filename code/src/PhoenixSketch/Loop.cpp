@@ -196,6 +196,54 @@ FASTRUN void Key2On(void){
     lastKey2time = currentTime;
 }
 
+static bool lastPTTState = HIGH; // starts high due to input pullup
+static uint32_t lastPTTChangeTime = 0;
+static volatile bool PTTPendingRead = false;
+
+/**
+ * Interrupt service routine for PTT state changes (both rising and falling edges).
+ *
+ * This fast interrupt handler runs in RAM (FASTRUN) to minimize latency. It does not
+ * directly read the pin state to avoid bounce issues. Instead, it records the time of
+ * the edge change and sets a flag for the main loop to process after debounce delay.
+ *
+ * @see ProcessPTTDebounce() for debounce processing in main loop
+ */
+FASTRUN void PTTChange(void){
+    // On ANY edge change, just note that something changed and restart the timer
+    lastPTTChangeTime = millis();
+    PTTPendingRead = true;
+}
+
+/**
+ * Process PTT debouncing by reading the actual pin state after the debounce
+ * period has elapsed. This ensures the final stable state is always captured,
+ * even if switch bouncing occurs during the transition.
+ *
+ * This should be called regularly from the main loop.
+ */
+void ProcessPTTDebounce(void){
+    if (PTTPendingRead) {
+        uint32_t currentTime = millis();
+        // Check if enough time has passed since last edge
+        if (currentTime - lastPTTChangeTime >= DEBOUNCE_DELAY) {
+            // Now read the actual state - this is guaranteed to be stable
+            bool currentState = digitalRead(PTT);
+            if (currentState != lastPTTState) {
+                if (currentState) {
+                    // Rising edge detected
+                    SetInterrupt(iPTT_RELEASED);
+                } else {
+                    // Falling edge detected
+                    SetInterrupt(iPTT_PRESSED);
+                }
+                lastPTTState = currentState;
+            }
+            PTTPendingRead = false;
+        }
+    }
+}
+
 /**
  * Configure GPIO pins and attach interrupt handlers for CW key inputs.
  *
@@ -210,8 +258,10 @@ void SetupCWKeyInterrupts(void){
     // Set up interrupts for key
     pinMode(KEY1, INPUT_PULLUP);
     pinMode(KEY2, INPUT_PULLUP);
+    pinMode(PTT, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(KEY1), Key1Change, CHANGE);
     attachInterrupt(digitalPinToInterrupt(KEY2), Key2On, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PTT), PTTChange, CHANGE);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -840,6 +890,7 @@ FASTRUN void loop(void){
 
     // Step 1: Check for new events and handle them
     ProcessKey1Debounce();
+    ProcessPTTDebounce();
     CheckForFrontPanelInterrupts();
     CheckForCATSerialEvents();
     ConsumeInterrupt();
