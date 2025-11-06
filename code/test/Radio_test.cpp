@@ -188,6 +188,10 @@ TEST(Radio, RadioStateRunThrough) {
     Q_in_R.setChannel(1);
     Q_in_L.clear();
     Q_in_R.clear();
+    Q_in_L_Ex.setChannel(0);
+    Q_in_R_Ex.setChannel(1);
+    Q_in_L_Ex.clear();
+    Q_in_R_Ex.clear();
     StartMillis();
 
     //-------------------------------------------------------------

@@ -145,7 +145,8 @@ extern uint32_t hardwareRegister;
 #define SAMPLE_RATE_MAX  15
 
 #define BUFFER_SIZE                             128
-#define N_BLOCKS                                16
+#define N_BLOCKS                                16 // receive: IQ input
+#define N_BLOCKS_EX                             16 // transmit: mic input
 #define READ_BUFFER_SIZE                        (BUFFER_SIZE * N_BLOCKS)
 
 #ifndef PI
@@ -577,6 +578,12 @@ extern AudioRecordQueue Q_in_L;
 extern AudioRecordQueue Q_in_R;
 extern AudioPlayQueue Q_out_L;
 extern AudioPlayQueue Q_out_R;
+
+extern AudioRecordQueue Q_in_L_Ex;
+extern AudioRecordQueue Q_in_R_Ex;
+extern AudioPlayQueue Q_out_L_Ex;
+extern AudioPlayQueue Q_out_R_Ex;
+
 
 extern const float32_t CWToneOffsetsHz[];
 extern uint8_t SampleRate;

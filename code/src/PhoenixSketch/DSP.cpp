@@ -7,8 +7,10 @@ DataBlock data;
 float32_t SAM_carrier_freq_offset = 0;
 float32_t SAM_carrier_freq_offsetOld = 0;
 
-static int16_t *sp_L1;
+static int16_t *sp_L1; // used by receive chain
 static int16_t *sp_R1;
+static int16_t *sp_L2; // used by transmit chain
+static int16_t *sp_R2;
 static uint32_t n_clear;
 static char *filename = nullptr;
 void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
@@ -855,9 +857,65 @@ DataBlock * ReceiveProcessing(const char *fname){
 }
 
 /**
+ * Read in N_BLOCKS blocks of BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex 
+ * AudioRecordQueue objects into the data float buffers. This is the transmit chain,
+ * input comes from the microphone. The samples are converted to normalized floats in 
+ * the range -1 to +1.
+ * 
+ * @param data The data block to put the samples in
+ * @return ESUCCESS if samples were read, EFAIL if insufficient samples are available
+ */ 
+errno_t ReadMicrophoneBuffer(DataBlock *data){
+    // are there at least N_BLOCKS buffers in each channel available ?
+    if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
+        // get audio samples from the audio  buffers and convert them to float
+        // read in 32 blocks á 128 samples in I and Q
+        for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
+            sp_L2 = Q_in_L_Ex.readBuffer();
+            sp_R2 = Q_in_R_Ex.readBuffer();
+
+            // Using arm_Math library, convert to float one buffer_size.
+            // Float_buffer samples are now standardized from > -1.0 to < 1.0
+            arm_q15_to_float(sp_L2, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_R2, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
+            Q_in_L_Ex.freeBuffer();
+            Q_in_R_Ex.freeBuffer();
+        }
+        data->N = N_BLOCKS_EX * BUFFER_SIZE;
+        data->sampleRate_Hz = SR[SampleRate].rate;
+        return ESUCCESS;
+    } else {
+        return EFAIL;
+    }
+}
+
+/**
+ * Play the data contained in data->I and data->Q on the transmitter exciter output
+ */
+void PlayIQData(DataBlock *data){
+    for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
+        sp_L2 = Q_out_L_Ex.getBuffer();
+        sp_R2 = Q_out_R_Ex.getBuffer();
+        arm_float_to_q15(&data->I[BUFFER_SIZE * i], sp_L2, BUFFER_SIZE);
+        arm_float_to_q15(&data->Q[BUFFER_SIZE * i], sp_R2, BUFFER_SIZE);
+        Q_out_L_Ex.playBuffer();  // play it !
+        Q_out_R_Ex.playBuffer();  // play it !
+    }
+}
+
+/**
  * Read a block of samples from the microphone and perform transmit signal processing
  */
-void TransmitProcessing(const char *fname){
+DataBlock * TransmitProcessing(const char *fname){
+
+    data.I = float_buffer_L;
+    data.Q = float_buffer_R;
+
+    // Read data from microphone input buffer
+    if (ReadMicrophoneBuffer(&data)){
+        // There is no data available, skip the rest
+        return NULL;
+    }
 
     /*TXDecimateBy4(I,Q);// 2048 in, 512 out
     TXDecimateBy2(I,Q);// 512 in, 256 out
@@ -870,4 +928,8 @@ void TransmitProcessing(const char *fname){
     TXInterpolateBy2(Io,Qo,I,Q); // 256 in, 512 out
     TXInterpolateBy4(I,Q,Io,Qo); // 512 in, 2048 out
     */
+
+    // Play the data on the output buffer
+    PlayIQData(&data);
+    return &data;
 }

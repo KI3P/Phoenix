@@ -236,14 +236,31 @@ TEST(Loop, CATTransmitCommandViaRepeatedLoop){
     // Test that TX commands work correctly via loop() execution
     // This verifies the complete chain: CAT serial -> command parser -> state machine
 
+    // Initialize audio buffers and hardware needed by loop()
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    Q_in_L_Ex.setChannel(0);
+    Q_in_R_Ex.setChannel(1);
+    Q_in_L_Ex.clear();
+    Q_in_R_Ex.clear();
+    InitializeFrontPanel();
+    InitializeAudio();
+    InitializeRFHardware();
+    InitializeSignalProcessing();
+
     // Clear any existing data in the serial buffer and interrupts
     SerialUSB1.clearBuffer();
     ConsumeInterrupt();
     EXPECT_EQ(GetInterrupt(), iNONE);
 
     // Test SSB mode transition
-    UISm_start(&uiSM);
     ModeSm_start(&modeSM);
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 
     // Feed a CAT command to trigger transmit
