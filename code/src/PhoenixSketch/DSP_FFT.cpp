@@ -120,6 +120,9 @@ void CalcPSD512(float32_t *I, float32_t *Q)
     for (size_t i = 0; i < SPECTRUM_RES; i++) {
         psdnew[i] = log10f_fast(FFT_spec[i]);
     }
+    // this bin is always nan for some reason
+    // TODO: figure out why
+    psdnew[170] = (psdnew[170-1]+psdnew[170+1])/2; 
     psdupdated = true;
 }
 

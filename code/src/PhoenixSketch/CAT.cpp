@@ -55,6 +55,7 @@ char *SA_write( char* cmd );
 char *SA_read(  char* cmd );
 char *TX_write( char* cmd );
 char *ED_read(  char* cmd );
+char *PR_read( char* cmd);
 
 typedef struct	{
 	char name[3];   //two chars plus zero terminator
@@ -67,7 +68,7 @@ typedef struct	{
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 21
+#define NUM_SUPPORTED_COMMANDS 22
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 	{
 		{ "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -90,7 +91,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
 		{ "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
 		{ "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
 		{ "TX", 4,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
-		{ "ED", 0,  3, unsupported_cmd, ED_read } // print out the state of the EEPROM data -- NOT a Kenwood keyword
+		{ "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
+		{ "PR", 0,  3, unsupported_cmd, PR_read } // print out the state of the hardware register -- NOT a Kenwood keyword
 	};
 
 /**
@@ -627,10 +629,6 @@ char *TX_write( char* cmd ){
  */
 char *ED_read(  char* cmd  ){
 	// Print out the state of the EEPROM data
-	/*The situation is this: the radio works correctly, demodulating as expected, on the first run.
-	However, on power cycle the output appears to be muted. Why? Look at the state of the EEPROM
-	data after first run and then again after reboot to see if there is a plausible explanation.*/
-
 	Serial.println("=== ED Struct Contents ===");
 	Serial.print("agc:               "); Serial.println(ED.agc);
 	Serial.print("audioVolume:       "); Serial.println(ED.audioVolume);
@@ -718,6 +716,18 @@ char *ED_read(  char* cmd  ){
   	sprintf( obuf, "ED;");
   	return obuf;
 }
+
+/**
+ * CAT command PR - Pretty print the contents of the hardware register (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "PR;" after printing hardware register to Serial for debugging
+ */
+char *PR_read(  char* cmd  ){
+	buffer_pretty_print_last_entry();
+  	sprintf( obuf, "PR;");
+  	return obuf;
+}
+
 
 /**
  * Poll SerialUSB1 for incoming CAT commands and process them

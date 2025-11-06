@@ -340,7 +340,7 @@ void pretty_print_line(BufferEntry entry){
  */
 void buffer_pretty_print_last_entry(void) {
   Debug("|               |              X 1     R   M   C S               |");
-  Debug("|               |           A  V 0 T R X   O C A F F               |");
+  Debug("|               |           A  V 0 T R X   O C A F F             |");
   Debug("|               |           n  T 0 X X T C D L O O               |");
   Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
   Debug("|---------------|------------------------------------------------|");

@@ -727,7 +727,7 @@ void ConsumeInterrupt(void){
                 // Change the band if we tune out of the current band. However,
                 // if we tune to a frequency outside the ham bands, keep the last
                 // valid band setting to keep demodulation working.
-                AdjustBand();
+                //AdjustBand();
                 UpdateRFHardwareState();
                 //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
@@ -736,20 +736,20 @@ void ConsumeInterrupt(void){
                 ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
                 if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
                     ED.centerFreq_Hz[ED.activeVFO] = 250000;
-                AdjustBand();                
+                //AdjustBand();                
                 UpdateRFHardwareState();
                 //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_INCREASE):{
                 AdjustFineTune(+1);
-                AdjustBand();
+                //AdjustBand();
                 //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }
             case (iFINETUNE_DECREASE):{
                 AdjustFineTune(-1);
-                AdjustBand();
+                //AdjustBand();
                 //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
                 break;
             }

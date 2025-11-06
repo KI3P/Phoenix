@@ -11,6 +11,7 @@ static int16_t *sp_L1;
 static int16_t *sp_R1;
 static uint32_t n_clear;
 static char *filename = nullptr;
+void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
 
 /**
  * Perform the appropriate IQ signal processing depending on the state we're in
@@ -596,6 +597,12 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
         // Magnitude estimation Lyons (2011): page 652 / libcsdr
         for (unsigned i = 0; i < data->N; i++) { 
           audiotmp = AlphaBetaMag(data->I[i], data->Q[i]);
+          // There is a weird bug where sometimes we get nan samples.
+          // This is a place where they can persist unless we excise them.
+          // TODO: figure out a better way to not read nan samples
+          if (isnan(audiotmp)){
+            audiotmp = 0.0;
+          }
           w = audiotmp + wold * 0.99f;  // Response to below 200Hz
           data->I[i] = w - wold;
           wold = w;
@@ -726,7 +733,7 @@ DataBlock * ReceiveProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    Flag(1);
+    //Flag(1);
     // Clear overfull buffers is not needed
     //ClearAudioBuffers();
 
@@ -842,7 +849,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
-    Flag(0);
+    //Flag(0);
 
     return &data;
 }

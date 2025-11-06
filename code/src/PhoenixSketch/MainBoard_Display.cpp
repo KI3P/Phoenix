@@ -813,7 +813,7 @@ static int16_t smeterLength;
  * @see gradient[] for waterfall color mapping
  */
 FASTRUN void ShowSpectrum(void){
-    Flag(2);
+    //Flag(2);
     int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
     int16_t middleSlice = centerLine / 2;  // Approximate center element
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
@@ -873,7 +873,7 @@ FASTRUN void ShowSpectrum(void){
         // Then write new row data into the missing top row on layer 1 to get a scroll effect using display hardware, not the CPU.
         tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
     }
-    Flag(0);
+    //Flag(0);
 }
 
 uint32_t oz = 8;
