@@ -186,41 +186,39 @@ TEST(TransmitChain, DecimateByX){
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
     add_comb(I,Q,sampleRate_Hz,Nsamples);
     WriteIQFile(I,Q,"TXDecimateBy4_original_IQ.txt",Nsamples);
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
     DataBlock data;
     data.I = I;
     data.Q = Q;
-    TXDecimateBy4(&data);
+    TXDecimateBy4(&data,&TXfilters);
     WriteIQFile(I,Q,"TXDecimateBy4_decimated_IQ_pass1.txt",Nsamples/4/2);
     data.I = &I[2048];
     data.Q = &Q[2048];
-    TXDecimateBy4(&data);
+    TXDecimateBy4(&data,&TXfilters);
     WriteIQFile(&I[2048],&Q[2048],"TXDecimateBy4_decimated_IQ_pass2.txt",Nsamples/4/2);
 
     CreateIQTone(I, Q, 1024, sampleRate_Hz/4, tone_Hz);
     add_comb(I,Q,sampleRate_Hz/4,1024);
-    TXDecInit();
     WriteIQFile(I,Q,"TXDecimateBy2_original_IQ.txt",1024);
     data.I = I;
     data.Q = Q;
-    TXDecimateBy2(&data);
+    TXDecimateBy2(&data,&TXfilters);
     WriteIQFile(I,Q,"TXDecimateBy2_decimated_IQ_pass1.txt",256);
     data.I = &I[512];
     data.Q = &Q[512];
-    TXDecimateBy2(&data);
+    TXDecimateBy2(&data,&TXfilters);
     WriteIQFile(&I[512],&Q[512],"TXDecimateBy2_decimated_IQ_pass2.txt",256);
 
     CreateIQTone(I, Q, 512, sampleRate_Hz/8, tone_Hz);
     add_comb(I,Q,sampleRate_Hz/8,512);
-    TXDecInit();
     WriteIQFile(I,Q,"TXDecimateBy16_original_IQ.txt",512);
     data.I = I;
     data.Q = Q;
-    TXDecimateBy2(&data);
+    TXDecimateBy2(&data,&TXfilters);
     WriteIQFile(I,Q,"TXDecimateBy16_decimated_IQ_pass1.txt",128);
     data.I = &I[256];
     data.Q = &Q[256];
-    TXDecimateBy2(&data);
+    TXDecimateBy2(&data,&TXfilters);
     WriteIQFile(&I[256],&Q[256],"TXDecimateBy16_decimated_IQ_pass2.txt",128);
 
     EXPECT_EQ(1,1);
@@ -252,7 +250,7 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
     float32_t gainx2x2[Npoints];
     float32_t freq[Npoints];   
 
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
 
     float32_t amp;
     DataBlock data;
@@ -263,10 +261,10 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
 
         data.I = I;
         data.Q = Q;
-        TXDecimateBy4(&data);
+        TXDecimateBy4(&data,&TXfilters);
         data.I = &I[2048];
         data.Q = &Q[2048];
-        TXDecimateBy4(&data);
+        TXDecimateBy4(&data,&TXfilters);
         
         amp = getmax(&I[2048],Nsamples/4/2);
         gainx4[i] = amp/0.5;
@@ -276,10 +274,10 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
     CreateIQTone(I, Q, 1024, 192000/4, 20000);
     data.I = I;
     data.Q = Q;
-    TXDecimateBy2(&data);
+    TXDecimateBy2(&data,&TXfilters);
     data.I = &I[512];
     data.Q = &Q[512];
-    TXDecimateBy2(&data);
+    TXDecimateBy2(&data,&TXfilters);
     WriteIQFile(&I[512],&Q[512],"TXDecimateBy2_6000.txt",256);
     for (int i = 0; i<Npoints; i++){
         freq[i] = fmin + (float32_t)i*fstep;
@@ -288,10 +286,10 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
 
         data.I = I;
         data.Q = Q;
-        TXDecimateBy2(&data);
+        TXDecimateBy2(&data,&TXfilters);
         data.I = &I[512];
         data.Q = &Q[512];
-        TXDecimateBy2(&data);
+        TXDecimateBy2(&data,&TXfilters);
 
         gainx2[i] = getmax(&I[512+128],128)/0.5;
     }
@@ -305,10 +303,10 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
 
         data.I = I;
         data.Q = Q;
-        TXDecimateBy2(&data);
+        TXDecimateBy2(&data,&TXfilters);
         data.I = &I[256];
         data.Q = &Q[256];
-        TXDecimateBy2(&data);
+        TXDecimateBy2(&data,&TXfilters);
 
         gainx2x2[i] = getmax(&I[256+64],64)/0.5;
     }
@@ -335,7 +333,8 @@ TEST(TransmitChain, HilbertPassband){
     float32_t mag[Npoints];
     float32_t freq[Npoints];   
 
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
+
     float32_t amp;
     for (int i = 0; i<Npoints; i++){
         freq[i] = fmin + (float32_t)i*fstep;
@@ -344,10 +343,10 @@ TEST(TransmitChain, HilbertPassband){
 
         data.I = I;
         data.Q = Q;
-        HilbertTransform(&data);
+        HilbertTransform(&data,&TXfilters);
         data.I = &I[128];
         data.Q = &Q[128];
-        HilbertTransform(&data);
+        HilbertTransform(&data,&TXfilters);
 
         mag[i] = 0;
         for (int j=0; j<Nsamples/2; j++){
@@ -487,10 +486,11 @@ TEST(TransmitChain, InterpolateByN){
     data.N = 128;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
+
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
     WriteIQFile(I,Q,"TXInterpolateBy2x2_original_IQ.txt",Nsamples);
-    TXInterpolateBy2Again(&data);
+    TXInterpolateBy2Again(&data,&TXfilters);
     WriteIQFile(data.I,data.Q,"TXInterpolateBy2x2_interpolated_IQ_pass1.txt",256);
 
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
@@ -498,7 +498,7 @@ TEST(TransmitChain, InterpolateByN){
     data.Q = &Q[128];
     data.N = 128;  // Reset N before second call
     data.sampleRate_Hz = sampleRate_Hz;
-    TXInterpolateBy2Again(&data);
+    TXInterpolateBy2Again(&data,&TXfilters);
     WriteIQFile(data.I,data.Q,"TXInterpolateBy2x2_interpolated_IQ_pass2.txt",256);
 
 
@@ -515,7 +515,7 @@ TEST(TransmitChain, InterpolateByN){
     tone_Hz = 24000/4;
     CreateIQTone(I2, Q2, Nsamples, sampleRate_Hz, tone_Hz);
     WriteIQFile(I2,Q2,"TXInterpolateBy2_original_IQ.txt",Nsamples);
-    TXInterpolateBy2(&data);
+    TXInterpolateBy2(&data,&TXfilters);
     WriteIQFile(data.I,data.Q,"TXInterpolateBy2_interpolated_IQ_pass1.txt",512);
 
     CreateIQTone(I2, Q2, Nsamples, sampleRate_Hz, tone_Hz);
@@ -523,7 +523,7 @@ TEST(TransmitChain, InterpolateByN){
     data.Q = &Q2[256];
     data.N = 256;
     data.sampleRate_Hz = sampleRate_Hz;
-    TXInterpolateBy2(&data);
+    TXInterpolateBy2(&data,&TXfilters);
     WriteIQFile(data.I,data.Q,"TXInterpolateBy2_interpolated_IQ_pass2.txt",512);
 
 
@@ -540,7 +540,7 @@ TEST(TransmitChain, InterpolateByN){
     data.Q = Q4;
     data.N = 512;
     data.sampleRate_Hz = sampleRate_Hz;
-    TXInterpolateBy4(&data);
+    TXInterpolateBy4(&data,&TXfilters);
     WriteIQFile(data.I,data.Q,"TXInterpolateBy4_interpolated_IQ_pass1.txt",2048);
 
     CreateIQTone(I4, Q4, Nsamples, sampleRate_Hz, tone_Hz);
@@ -548,7 +548,7 @@ TEST(TransmitChain, InterpolateByN){
     data.Q = &Q4[512];
     data.N = 512;
     data.sampleRate_Hz = sampleRate_Hz;
-    TXInterpolateBy4(&data);
+    TXInterpolateBy4(&data,&TXfilters);
     WriteIQFile(data.I,data.Q,"TXInterpolateBy4_interpolated_IQ_pass2.txt",2048);
 
     EXPECT_EQ(1,1);
@@ -577,7 +577,7 @@ TEST(TransmitChain, InterpolateByNPassband){
     float32_t gainx2x2[Npoints];
     float32_t freq[Npoints];
 
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
 
     float32_t amp;
     for (int i = 0; i<Npoints; i++){
@@ -585,11 +585,11 @@ TEST(TransmitChain, InterpolateByNPassband){
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz, freq[i]);
         data.I = I;
         data.Q = Q;
-        TXInterpolateBy2Again(&data);
+        TXInterpolateBy2Again(&data,&TXfilters);
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz, freq[i]);
         data.I = &I[128];
         data.Q = &Q[128];
-        TXInterpolateBy2Again(&data);
+        TXInterpolateBy2Again(&data,&TXfilters);
         amp = getmax(data.I,256);
         gainx2x2[i] = amp/0.5;
 
@@ -597,11 +597,11 @@ TEST(TransmitChain, InterpolateByNPassband){
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2, freq[i]);
         data.I = I;
         data.Q = Q;
-        TXInterpolateBy2(&data);
+        TXInterpolateBy2(&data,&TXfilters);
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2, freq[i]);
         data.I = &I[256];
         data.Q = &Q[256];
-        TXInterpolateBy2(&data);
+        TXInterpolateBy2(&data,&TXfilters);
         amp = getmax(data.I,512);
         gainx2[i] = amp/0.5;
 
@@ -609,13 +609,13 @@ TEST(TransmitChain, InterpolateByNPassband){
         data.I = I;
         data.Q = Q;
         data.N = 512;
-        TXInterpolateBy4(&data);
+        TXInterpolateBy4(&data,&TXfilters);
 
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2*4, freq[i]);
         data.I = &I[512];
         data.Q = &Q[512];
         data.N = 512;
-        TXInterpolateBy4(&data);
+        TXInterpolateBy4(&data,&TXfilters);
         amp = getmax(data.I,2048);
         gainx4[i] = amp/0.5;
 
@@ -632,16 +632,16 @@ void end2end(float32_t *I, float32_t *Q){
     data.Q = Q;
     data.N = 2048;
     data.sampleRate_Hz = 192000;
-    TXDecimateBy4(&data); // 2048 in, 512 out
-    TXDecimateBy2(&data);// 512 in, 256 out
+    TXDecimateBy4(&data,&TXfilters); // 2048 in, 512 out
+    TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &filters, TX);
     arm_copy_f32(data.I,data.Q,256);
-    TXDecimateBy2Again(&data); // 256 in, 128 out
-    HilbertTransform(&data); // 128
-    TXInterpolateBy2Again(&data); // 128 in, 256 out
+    TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
+    HilbertTransform(&data,&TXfilters); // 128
+    TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
     SidebandSelection(&data);
-    TXInterpolateBy2(&data); // 256 in, 512 out
-    TXInterpolateBy4(&data); // 512 in, 2048 out
+    TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
+    TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
 }
 
 TEST(TransmitChain, EndToEnd){
@@ -662,7 +662,7 @@ TEST(TransmitChain, EndToEnd){
     float32_t sbs[Npoints];
     float32_t tone[Npoints];
     float32_t image[Npoints];
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
 
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_16;
     InitializeFilters(spectrum_zoom, &filters);
@@ -733,7 +733,8 @@ TEST(TransmitChain, TwoTone){
     float32_t tone1_Hz = 700.0;
     float32_t tone2_Hz = 1900.0;
 
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
+
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_16;
     InitializeFilters(spectrum_zoom, &filters);
     ZoomFFTPrep(spectrum_zoom, &filters);

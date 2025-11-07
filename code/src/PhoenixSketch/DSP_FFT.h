@@ -37,14 +37,14 @@ void CalcPSD256(float32_t *I, float32_t *Q);
 float32_t * GetFilteredBufferAddress(void);
 void setdspfirfilename(char *fnm);
 
-void TXDecInit(void);
-void TXDecimateBy4(DataBlock *data);
-void TXDecimateBy2(DataBlock *data);
-void TXDecimateBy2Again(DataBlock *data);
-void HilbertTransform(DataBlock *data);
-void TXInterpolateBy2Again(DataBlock *data);
-void TXInterpolateBy2(DataBlock *data);
-void TXInterpolateBy4(DataBlock *data);
+void InitializeTransmitFilters(TransmitFilterConfig *TXfilters);
+void TXDecimateBy4(DataBlock *data, TransmitFilterConfig *TXfilters);
+void TXDecimateBy2(DataBlock *data, TransmitFilterConfig *TXfilters);
+void TXDecimateBy2Again(DataBlock *data, TransmitFilterConfig *TXfilters);
+void HilbertTransform(DataBlock *data, TransmitFilterConfig *TXfilters);
+void TXInterpolateBy2Again(DataBlock *data, TransmitFilterConfig *TXfilters);
+void TXInterpolateBy2(DataBlock *data, TransmitFilterConfig *TXfilters);
+void TXInterpolateBy4(DataBlock *data, TransmitFilterConfig *TXfilters);
 void SidebandSelection(DataBlock *data);
 
 // The functions that are placed in a stub to enable unit test substitution

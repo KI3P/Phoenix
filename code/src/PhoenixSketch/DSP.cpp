@@ -698,7 +698,7 @@ void PlayBuffer(DataBlock *data){
  */
 void InitializeSignalProcessing(void){
     InitializeFilters(ED.spectrum_zoom,&filters);
-    TXDecInit();
+    InitializeTransmitFilters(&TXfilters);
     InitializeAGC(&agc, SR[SampleRate].rate/filters.DF);
     InitializeKim1NoiseReduction();
     InitializeXanrNoiseReduction();
@@ -918,16 +918,16 @@ DataBlock * TransmitProcessing(const char *fname){
         return NULL;
     }
 
-    TXDecimateBy4(&data);// 2048 in, 512 out
-    TXDecimateBy2(&data);// 512 in, 256 out
+    TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
+    TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &filters, TX);
     arm_copy_f32(data.I,data.Q,256);
-    TXDecimateBy2Again(&data); // 256 in, 128 out
-    HilbertTransform(&data); // 128
-    TXInterpolateBy2Again(&data); // 128 in, 256 out
+    TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
+    HilbertTransform(&data,&TXfilters); // 128
+    TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
     SidebandSelection(&data);
-    TXInterpolateBy2(&data); // 256 in, 512 out
-    TXInterpolateBy4(&data); // 512 in, 2048 out
+    TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
+    TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
 
     // Play the data on the output buffer
     PlayIQData(&data);

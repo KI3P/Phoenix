@@ -343,6 +343,76 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
 }
 
 /**
+ * Initialize transmit decimation and interpolation filter structures. This is done once at startup.
+ *
+ * Sets up the complete transmit DSP chain filters:
+ * - Decimation filters (192k->48k, 48k->24k, 24k->12k)
+ * - Hilbert transform filters for SSB generation
+ * - Interpolation filters (12k->24k, 24k->48k, 48k->192k)
+ * All filter states are cleared and ARM DSP filter instances are initialized.
+ * 
+ * @param TXfilters Struct holding the filter variables and objects
+ */
+void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
+    // ****************************************************************************************
+	// *  Decimate by 4: 192K to 48K SPS
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_dec1_EX_I_state);
+    CLEAR_VAR(TXfilters->FIR_dec1_EX_Q_state);
+    arm_fir_decimate_init_f32(&TXfilters->FIR_dec1_EX_I, 48, 4, coeffs192K_10K_LPF_FIR, TXfilters->FIR_dec1_EX_I_state, 2048);
+    arm_fir_decimate_init_f32(&TXfilters->FIR_dec1_EX_Q, 48, 4, coeffs192K_10K_LPF_FIR, TXfilters->FIR_dec1_EX_Q_state, 2048);
+    
+    // ****************************************************************************************
+	// *  Decimate by 2: 48K to 24K SPS
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_dec2_EX_I_state);
+    CLEAR_VAR(TXfilters->FIR_dec2_EX_Q_state);
+    arm_fir_decimate_init_f32(&TXfilters->FIR_dec2_EX_I, 48, 2, coeffs48K_8K_LPF_FIR, TXfilters->FIR_dec2_EX_I_state, 512);
+    arm_fir_decimate_init_f32(&TXfilters->FIR_dec2_EX_Q, 48, 2, coeffs48K_8K_LPF_FIR, TXfilters->FIR_dec2_EX_Q_state, 512);
+
+    // ****************************************************************************************
+	// *  Decimate by 2, again: 24K to 12K SPS
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_dec3_EX_I_state);
+    CLEAR_VAR(TXfilters->FIR_dec3_EX_Q_state);
+    arm_fir_decimate_init_f32(&TXfilters->FIR_dec3_EX_I, 48, 2, coeffs12K_8K_LPF_FIR, TXfilters->FIR_dec3_EX_I_state, 256);
+    arm_fir_decimate_init_f32(&TXfilters->FIR_dec3_EX_Q, 48, 2, coeffs12K_8K_LPF_FIR, TXfilters->FIR_dec3_EX_Q_state, 256);
+
+    // ****************************************************************************************
+	// *  Hilbert transform
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_Hilbert_state_L);
+    CLEAR_VAR(TXfilters->FIR_Hilbert_state_R);
+    arm_fir_init_f32(&TXfilters->FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, TXfilters->FIR_Hilbert_state_L, 128);
+    arm_fir_init_f32(&TXfilters->FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg_45, TXfilters->FIR_Hilbert_state_R, 128);
+
+    // ****************************************************************************************
+	// *  Interpolate by 2, again: 12K to 24K SPS
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_int3_EX_I_state);
+    CLEAR_VAR(TXfilters->FIR_int3_EX_Q_state);
+    arm_fir_interpolate_init_f32(&TXfilters->FIR_int3_EX_I, 2, 48, FIR_int3_12ksps_48tap_2k7, TXfilters->FIR_int3_EX_I_state, 128);
+    arm_fir_interpolate_init_f32(&TXfilters->FIR_int3_EX_Q, 2, 48, FIR_int3_12ksps_48tap_2k7, TXfilters->FIR_int3_EX_Q_state, 128);
+
+    // ****************************************************************************************
+	// *  Interpolate by 2: 24K to 48K SPS
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_int1_EX_I_state);
+    CLEAR_VAR(TXfilters->FIR_int1_EX_Q_state);
+    arm_fir_interpolate_init_f32(&TXfilters->FIR_int1_EX_I, 2, 48, coeffs48K_8K_LPF_FIR, TXfilters->FIR_int1_EX_I_state, 256);
+    arm_fir_interpolate_init_f32(&TXfilters->FIR_int1_EX_Q, 2, 48, coeffs48K_8K_LPF_FIR, TXfilters->FIR_int1_EX_Q_state, 256);
+
+    // ****************************************************************************************
+	// *  Interpolate by 4: 48K to 192K SPS
+	// ****************************************************************************************
+    CLEAR_VAR(TXfilters->FIR_int2_EX_I_state);
+    CLEAR_VAR(TXfilters->FIR_int2_EX_Q_state);
+    arm_fir_interpolate_init_f32(&TXfilters->FIR_int2_EX_I, 4, 48, coeffs192K_10K_LPF_FIR, TXfilters->FIR_int2_EX_I_state, 512);
+    arm_fir_interpolate_init_f32(&TXfilters->FIR_int2_EX_Q, 4, 48, coeffs192K_10K_LPF_FIR, TXfilters->FIR_int2_EX_Q_state, 512);
+
+}
+
+/**
  * Change the FIR filter settings.
  * @param filter_change The positive or negative increment to the filter bandwidth
  */
@@ -686,209 +756,22 @@ void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX){
 }
 
 //////////////////////////////////////////////////////////////////////////
-// Transmit DSP chain, still a work in progress
+// Transmit DSP chain
 //////////////////////////////////////////////////////////////////////////
-
-#define FIXED
-
-arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
-arm_fir_decimate_instance_f32 FIR_dec1_EX_Q;
-float32_t DMAMEM FIR_dec1_EX_I_state[2095];
-float32_t DMAMEM FIR_dec1_EX_Q_state[2095];
-extern float32_t coeffs192K_10K_LPF_FIR[48];
-
-arm_fir_decimate_instance_f32 FIR_dec2_EX_I;
-arm_fir_decimate_instance_f32 FIR_dec2_EX_Q;
-#ifdef FIXED
-float32_t DMAMEM FIR_dec2_EX_I_state[559]; // was 535 before being fixed
-float32_t DMAMEM FIR_dec2_EX_Q_state[559];
-#else
-float32_t DMAMEM FIR_dec2_EX_I_state[535];
-float32_t DMAMEM FIR_dec2_EX_Q_state[535];
-#endif
-extern float32_t coeffs48K_8K_LPF_FIR[48];
-
-arm_fir_decimate_instance_f32 FIR_dec3_EX_I;
-arm_fir_decimate_instance_f32 FIR_dec3_EX_Q;
-#ifdef FIXED
-float32_t FIR_dec3_EX_I_state[303];// State vector size should be numtaps+blocksize-1 = 48+256-1 = 303
-float32_t FIR_dec3_EX_Q_state[303];
-#else
-float32_t FIR_dec3_EX_I_state[280]; //267, but this segfaults
-float32_t FIR_dec3_EX_Q_state[280];
-#endif
-extern float32_t coeffs12K_8K_LPF_FIR[48];
-
-arm_fir_instance_f32 FIR_Hilbert_L;
-arm_fir_instance_f32 FIR_Hilbert_R;
-float32_t FIR_Hilbert_state_L[100 + 256 - 1];
-float32_t FIR_Hilbert_state_R[100 + 256 - 1];
-extern float32_t FIR_Hilbert_coeffs_45[100];
-extern float32_t FIR_Hilbert_coeffs_neg_45[100];
-
-arm_fir_interpolate_instance_f32 FIR_int3_EX_I;
-arm_fir_interpolate_instance_f32 FIR_int3_EX_Q;
-#ifdef FIXED
-float32_t DMAMEM FIR_int3_EX_I_state[175]; // was 151 
-float32_t DMAMEM FIR_int3_EX_Q_state[175]; // 48+128-1 = 175
-#else
-float32_t DMAMEM FIR_int3_EX_I_state[519];
-float32_t DMAMEM FIR_int3_EX_Q_state[519];
-#endif
-
-#ifdef FIXED
-float32_t FIR_int3_12ksps_48tap_2k7[48] = {
- -2.285169471669272310E-6,
--33.85457593285185850E-6,
--90.05495214272963270E-6,
--102.5104398169568180E-6,
- 58.41569034528380660E-6,
- 454.7904191315104190E-6,
- 871.4162433760077420E-6,
- 749.7881965886456330E-6,
--468.4956850258753320E-6,
--0.002616105921239791,
--0.004246098300098818,
--0.003078738032270572,
- 0.002226282725246520,
- 0.009889569653623405,
- 0.014414561535852018,
- 0.009226938890949424,
--0.007959807904613685,
--0.030336057178768423,
--0.042078062750789499,
--0.025361321875102511,
- 0.028447546456669172,
- 0.110201064956298028,
- 0.193569812629121624,
- 0.246261318040085941,
- 0.246261318040085941,
- 0.193569812629121624,
- 0.110201064956298028,
- 0.028447546456669172,
--0.025361321875102511,
--0.042078062750789499,
--0.030336057178768423,
--0.007959807904613685,
- 0.009226938890949424,
- 0.014414561535852018,
- 0.009889569653623405,
- 0.002226282725246520,
--0.003078738032270572,
--0.004246098300098818,
--0.002616105921239791,
--468.4956850258753320E-6,
- 749.7881965886456330E-6,
- 871.4162433760077420E-6,
- 454.7904191315104190E-6,
- 58.41569034528380660E-6,
--102.5104398169568180E-6,
--90.05495214272963270E-6,
--33.85457593285185850E-6,
--2.285169471669272310E-6,
-};
-#endif
-
-arm_fir_interpolate_instance_f32 FIR_int1_EX_I;
-arm_fir_interpolate_instance_f32 FIR_int1_EX_Q;
-#ifdef FIXED
-float32_t DMAMEM FIR_int1_EX_I_state[303]; // 256 + 48 - 1 = 303
-float32_t DMAMEM FIR_int1_EX_Q_state[303]; // 256 + 48 - 1 = 303
-#else
-float32_t DMAMEM FIR_int1_EX_I_state[279];
-float32_t DMAMEM FIR_int1_EX_Q_state[279];
-#endif
-
-arm_fir_interpolate_instance_f32 FIR_int2_EX_I;
-arm_fir_interpolate_instance_f32 FIR_int2_EX_Q;
-#ifdef FIXED
-float32_t DMAMEM FIR_int2_EX_I_state[559]; // 512+48-1 = 559
-float32_t DMAMEM FIR_int2_EX_Q_state[559]; // 512+48-1 = 559
-#else
-float32_t DMAMEM FIR_int2_EX_I_state[519];
-float32_t DMAMEM FIR_int2_EX_Q_state[519];
-#endif
 
 /**
  * Apply Hilbert transform to create I/Q signals from audio
  * @param data Pointer to DataBlock containing I (real) channel buffer (in/out) and Q (imaginary) channel buffer (in/out)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies 45-degree and -45-degree phase shift FIR filters to create quadrature
  * signals from real audio input. Operates at 12 kHz sample rate with 128-sample
  * blocks. Used in transmit chain for SSB generation.
  */
-void HilbertTransform(DataBlock *data){
+void HilbertTransform(DataBlock *data, TransmitFilterConfig *TXfilters){
     //Hilbert transforms at 12K, with 5KHz bandwidth, buffer size 128
-    arm_fir_f32(&FIR_Hilbert_L, data->I, data->I, 128);
-    arm_fir_f32(&FIR_Hilbert_R, data->Q, data->Q, 128);
-}
-
-/**
- * Initialize transmit decimation and interpolation filter structures
- *
- * Sets up the complete transmit DSP chain filters:
- * - Decimation filters (192k->48k, 48k->24k, 24k->12k)
- * - Hilbert transform filters for SSB generation
- * - Interpolation filters (12k->24k, 24k->48k, 48k->192k)
- * All filter states are cleared and ARM DSP filter instances are initialized.
- */
-void TXDecInit(void){
-    CLEAR_VAR(FIR_dec1_EX_I_state);
-    CLEAR_VAR(FIR_dec1_EX_Q_state);
-    arm_fir_decimate_init_f32(&FIR_dec1_EX_I, 48, 4, coeffs192K_10K_LPF_FIR, FIR_dec1_EX_I_state, 2048);
-    arm_fir_decimate_init_f32(&FIR_dec1_EX_Q, 48, 4, coeffs192K_10K_LPF_FIR, FIR_dec1_EX_Q_state, 2048);
-
-    CLEAR_VAR(FIR_dec2_EX_I_state);
-    CLEAR_VAR(FIR_dec2_EX_Q_state);
-    #ifdef FIXED
-    arm_fir_decimate_init_f32(&FIR_dec2_EX_I, 48, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_I_state, 512);
-    arm_fir_decimate_init_f32(&FIR_dec2_EX_Q, 48, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_Q_state, 512);
-    #else
-    arm_fir_decimate_init_f32(&FIR_dec2_EX_I, 24, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_I_state, 512);
-    arm_fir_decimate_init_f32(&FIR_dec2_EX_Q, 24, 2, coeffs48K_8K_LPF_FIR, FIR_dec2_EX_Q_state, 512);    
-    #endif
-
-    //3rd Decimate Excite 2x to 12K SPS
-    CLEAR_VAR(FIR_dec3_EX_I_state);
-    CLEAR_VAR(FIR_dec3_EX_Q_state);
-    #ifdef FIXED
-    arm_fir_decimate_init_f32(&FIR_dec3_EX_I, 48, 2, coeffs12K_8K_LPF_FIR, FIR_dec3_EX_I_state, 256);
-    arm_fir_decimate_init_f32(&FIR_dec3_EX_Q, 48, 2, coeffs12K_8K_LPF_FIR, FIR_dec3_EX_Q_state, 256);
-    #else
-    arm_fir_decimate_init_f32(&FIR_dec3_EX_I, 24, 2, coeffs12K_8K_LPF_FIR, FIR_dec3_EX_I_state, 256);
-    arm_fir_decimate_init_f32(&FIR_dec3_EX_Q, 24, 2, coeffs12K_8K_LPF_FIR, FIR_dec3_EX_Q_state, 256);
-    #endif
-
-    CLEAR_VAR(FIR_Hilbert_state_L);
-    CLEAR_VAR(FIR_Hilbert_state_R);
-    arm_fir_init_f32(&FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, FIR_Hilbert_state_L, 128);
-    arm_fir_init_f32(&FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg_45, FIR_Hilbert_state_R, 128);
-
-    CLEAR_VAR(FIR_int3_EX_I_state);
-    CLEAR_VAR(FIR_int3_EX_Q_state);
-    #ifdef FIXED
-    arm_fir_interpolate_init_f32(&FIR_int3_EX_I, 2, 48, FIR_int3_12ksps_48tap_2k7, FIR_int3_EX_I_state, 128);
-    arm_fir_interpolate_init_f32(&FIR_int3_EX_Q, 2, 48, FIR_int3_12ksps_48tap_2k7, FIR_int3_EX_Q_state, 128);
-    #else
-    arm_fir_interpolate_init_f32(&FIR_int3_EX_I, 2, 48, coeffs12K_8K_LPF_FIR, FIR_int3_EX_I_state, 128);
-    arm_fir_interpolate_init_f32(&FIR_int3_EX_Q, 2, 48, coeffs12K_8K_LPF_FIR, FIR_int3_EX_Q_state, 128);
-    #endif
-
-    CLEAR_VAR(FIR_int1_EX_I_state);
-    CLEAR_VAR(FIR_int1_EX_Q_state);
-    arm_fir_interpolate_init_f32(&FIR_int1_EX_I, 2, 48, coeffs48K_8K_LPF_FIR, FIR_int1_EX_I_state, 256);
-    arm_fir_interpolate_init_f32(&FIR_int1_EX_Q, 2, 48, coeffs48K_8K_LPF_FIR, FIR_int1_EX_Q_state, 256);
-
-    CLEAR_VAR(FIR_int2_EX_I_state);
-    CLEAR_VAR(FIR_int2_EX_Q_state);
-    #ifdef FIXED
-    arm_fir_interpolate_init_f32(&FIR_int2_EX_I, 4, 48, coeffs192K_10K_LPF_FIR, FIR_int2_EX_I_state, 512);
-    arm_fir_interpolate_init_f32(&FIR_int2_EX_Q, 4, 48, coeffs192K_10K_LPF_FIR, FIR_int2_EX_Q_state, 512);
-    #else
-    arm_fir_interpolate_init_f32(&FIR_int2_EX_I, 4, 32, coeffs192K_10K_LPF_FIR, FIR_int2_EX_I_state, 512);
-    arm_fir_interpolate_init_f32(&FIR_int2_EX_Q, 4, 32, coeffs192K_10K_LPF_FIR, FIR_int2_EX_Q_state, 512);
-    #endif
-
+    arm_fir_f32(&TXfilters->FIR_Hilbert_L, data->I, data->I, 128);
+    arm_fir_f32(&TXfilters->FIR_Hilbert_R, data->Q, data->Q, 128);
 }
 
 /**
@@ -907,15 +790,16 @@ void SidebandSelection(DataBlock *data){
 
 /**
  * Decimate transmit signal by factor of 4 (192 kHz -> 48 kHz)
- * @param data Pointer to DataBlock containtin I and Q channel buffers (2048 samples in, 512 out)
+ * @param data Pointer to DataBlock containing I and Q channel buffers (2048 samples in, 512 out)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies FIR decimation filter in-place. Input: 192 kHz, Output: 48 kHz.
  */
-void TXDecimateBy4(DataBlock *data){
+void TXDecimateBy4(DataBlock *data, TransmitFilterConfig *TXfilters){
     // 192KHz effective sample rate here
     // decimation-by-4 in-place!
-    arm_fir_decimate_f32(&FIR_dec1_EX_I, data->I, data->I, BUFFER_SIZE * N_BLOCKS);
-    arm_fir_decimate_f32(&FIR_dec1_EX_Q, data->Q, data->Q, BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_I, data->I, data->I, BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_Q, data->Q, data->Q, BUFFER_SIZE * N_BLOCKS);
     data->N = data->N/4;
     data->sampleRate_Hz = data->sampleRate_Hz/4;
 }
@@ -923,14 +807,15 @@ void TXDecimateBy4(DataBlock *data){
 /**
  * Decimate transmit signal by factor of 2 (48 kHz -> 24 kHz)
  * @param data Pointer to DataBlock containing I and Q channel buffers (512 samples in, 256 out)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies FIR decimation filter in-place. Input: 48 kHz, Output: 24 kHz.
  */
-void TXDecimateBy2(DataBlock *data){
+void TXDecimateBy2(DataBlock *data, TransmitFilterConfig *TXfilters){
     // 48KHz effective sample rate here
     // decimation-by-2 in-place
-    arm_fir_decimate_f32(&FIR_dec2_EX_I, data->I, data->I, 512);
-    arm_fir_decimate_f32(&FIR_dec2_EX_Q, data->Q, data->Q, 512);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec2_EX_I, data->I, data->I, 512);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec2_EX_Q, data->Q, data->Q, 512);
     data->N = data->N/2;
     data->sampleRate_Hz = data->sampleRate_Hz/2;
 }
@@ -938,14 +823,15 @@ void TXDecimateBy2(DataBlock *data){
 /**
  * Decimate transmit signal by factor of 2 again (24 kHz -> 12 kHz)
  * @param data Pointer to DataBlock containing I and Q channel buffers (256 samples in, 128 out)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies FIR decimation filter in-place. Input: 24 kHz, Output: 12 kHz.
  * This is the third decimation stage in the transmit chain.
  */
-void TXDecimateBy2Again(DataBlock *data){
+void TXDecimateBy2Again(DataBlock *data, TransmitFilterConfig *TXfilters){
     //Decimate by 2 to 12K SPS sample rate
-    arm_fir_decimate_f32(&FIR_dec3_EX_I, data->I, data->I, 256);
-    arm_fir_decimate_f32(&FIR_dec3_EX_Q, data->Q, data->Q, 256);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec3_EX_I, data->I, data->I, 256);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec3_EX_Q, data->Q, data->Q, 256);
     data->N = data->N/2;
     data->sampleRate_Hz = data->sampleRate_Hz/2;
 }
@@ -955,15 +841,16 @@ float32_t DMAMEM Qtmp[READ_BUFFER_SIZE];
 /**
  * Interpolate transmit signal by factor of 2 (12 kHz -> 24 kHz)
  * @param data Pointer to DataBlock containing input I & Q channel buffers (128 samples)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies FIR interpolation filter and scales by 2 to compensate for interpolation.
  * First interpolation stage in transmit chain. data.I and data.Q are overwritten.
  */
-void TXInterpolateBy2Again(DataBlock *data){
+void TXInterpolateBy2Again(DataBlock *data, TransmitFilterConfig *TXfilters){
     //Interpolate back to 24K SPS
-    arm_fir_interpolate_f32(&FIR_int3_EX_I, data->I, Itmp, 128);
+    arm_fir_interpolate_f32(&TXfilters->FIR_int3_EX_I, data->I, Itmp, 128);
     arm_scale_f32(Itmp,2,data->I,256);
-    arm_fir_interpolate_f32(&FIR_int3_EX_Q, data->Q, Qtmp, 128);
+    arm_fir_interpolate_f32(&TXfilters->FIR_int3_EX_Q, data->Q, Qtmp, 128);
     arm_scale_f32(Qtmp,2,data->Q,256);
     data->N = data->N*2;
     data->sampleRate_Hz = data->sampleRate_Hz*2;
@@ -972,15 +859,16 @@ void TXInterpolateBy2Again(DataBlock *data){
 /**
  * Interpolate transmit signal by factor of 2 (24 kHz -> 48 kHz)
  * @param data Pointer to DataBlock containing input I & Q channel buffers (256 samples)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies FIR interpolation filter and scales by 2 to compensate for interpolation.
  * Second interpolation stage in transmit chain.
  */
-void TXInterpolateBy2(DataBlock *data){
+void TXInterpolateBy2(DataBlock *data, TransmitFilterConfig *TXfilters){
     //24KHz effective sample rate input, 48 kHz output
-    arm_fir_interpolate_f32(&FIR_int1_EX_I, data->I, Itmp, 256);
+    arm_fir_interpolate_f32(&TXfilters->FIR_int1_EX_I, data->I, Itmp, 256);
     arm_scale_f32(Itmp,2,data->I,512);
-    arm_fir_interpolate_f32(&FIR_int1_EX_Q, data->Q, Qtmp, 256);
+    arm_fir_interpolate_f32(&TXfilters->FIR_int1_EX_Q, data->Q, Qtmp, 256);
     arm_scale_f32(Qtmp,2,data->Q,512);
     data->N = data->N*2;
     data->sampleRate_Hz = data->sampleRate_Hz*2;
@@ -989,15 +877,16 @@ void TXInterpolateBy2(DataBlock *data){
 /**
  * Interpolate transmit signal by factor of 4 (48 kHz -> 192 kHz)
  * @param data Pointer to DataBlock containing input I & Q channel buffers (512 samples)
+ * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
  * Applies FIR interpolation filter and scales by 4 to compensate for interpolation.
  * Final interpolation stage in transmit chain, produces output at DAC sample rate.
  */
-void TXInterpolateBy4(DataBlock *data){
+void TXInterpolateBy4(DataBlock *data, TransmitFilterConfig *TXfilters){
     //48KHz effective sample rate input, 128 kHz output
-    arm_fir_interpolate_f32(&FIR_int2_EX_I, data->I, Itmp, 512);
+    arm_fir_interpolate_f32(&TXfilters->FIR_int2_EX_I, data->I, Itmp, 512);
     arm_scale_f32(Itmp,4,data->I,2048);
-    arm_fir_interpolate_f32(&FIR_int2_EX_Q, data->Q, Qtmp, 512);
+    arm_fir_interpolate_f32(&TXfilters->FIR_int2_EX_Q, data->Q, Qtmp, 512);
     arm_scale_f32(Qtmp,4,data->Q,2048);
     data->N = data->N*4;
     data->sampleRate_Hz = data->sampleRate_Hz*4;

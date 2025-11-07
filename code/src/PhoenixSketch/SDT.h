@@ -468,6 +468,64 @@ struct FilterConfig {
     }
 };
 
+// Definitions of these arrays are in DSP_FIR.cpp
+extern float32_t coeffs192K_10K_LPF_FIR[48]; // transmit decimate-by-4 and interpolate-by-4
+extern float32_t coeffs48K_8K_LPF_FIR[48];   // transmit decimate-by-2 and interpolate-by-2
+extern float32_t coeffs12K_8K_LPF_FIR[48];   // transmit decimate-by-2, again
+extern float32_t FIR_Hilbert_coeffs_45[100];
+extern float32_t FIR_Hilbert_coeffs_neg_45[100];
+extern float32_t FIR_int3_12ksps_48tap_2k7[48]; // transmit interpolate-by-2, again
+
+struct TransmitFilterConfig {
+    // Decimation filters
+    // Decimate by 4
+    arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
+    arm_fir_decimate_instance_f32 FIR_dec1_EX_Q;
+    float32_t FIR_dec1_EX_I_state[2095];
+    float32_t FIR_dec1_EX_Q_state[2095];
+
+    // Decimate by 2
+    arm_fir_decimate_instance_f32 FIR_dec2_EX_I;
+    arm_fir_decimate_instance_f32 FIR_dec2_EX_Q;
+    float32_t FIR_dec2_EX_I_state[559]; // was 535 before being fixed
+    float32_t FIR_dec2_EX_Q_state[559];
+
+    // Decimate by 2, again
+    arm_fir_decimate_instance_f32 FIR_dec3_EX_I;
+    arm_fir_decimate_instance_f32 FIR_dec3_EX_Q;
+    float32_t FIR_dec3_EX_I_state[303];// State vector size should be numtaps+blocksize-1 = 48+256-1 = 303
+    float32_t FIR_dec3_EX_Q_state[303];
+
+    // Hilbert transform
+    arm_fir_instance_f32 FIR_Hilbert_L;
+    arm_fir_instance_f32 FIR_Hilbert_R;
+    float32_t FIR_Hilbert_state_L[100 + 256 - 1];
+    float32_t FIR_Hilbert_state_R[100 + 256 - 1];
+
+    // Interpolate by 2 again
+    arm_fir_interpolate_instance_f32 FIR_int3_EX_I;
+    arm_fir_interpolate_instance_f32 FIR_int3_EX_Q;
+    float32_t FIR_int3_EX_I_state[175]; // was 151 before being fixed
+    float32_t FIR_int3_EX_Q_state[175]; // 48+128-1 = 175
+
+    // Interpolate by 2
+    arm_fir_interpolate_instance_f32 FIR_int1_EX_I;
+    arm_fir_interpolate_instance_f32 FIR_int1_EX_Q;
+    float32_t FIR_int1_EX_I_state[303]; // 256 + 48 - 1 = 303
+    float32_t FIR_int1_EX_Q_state[303]; // 256 + 48 - 1 = 303
+
+    // Interpolate by 4
+    arm_fir_interpolate_instance_f32 FIR_int2_EX_I;
+    arm_fir_interpolate_instance_f32 FIR_int2_EX_Q;
+    float32_t FIR_int2_EX_I_state[559]; // 512+48-1 = 559
+    float32_t FIR_int2_EX_Q_state[559]; // 512+48-1 = 559
+
+    // Steps that are peformed when a FilterConfig object is created
+    TransmitFilterConfig() {}
+    ~TransmitFilterConfig() {}
+};
+
+
 /** Keep all the AGC configuration parameters in a struct. Consider moving this to DSP.cpp
  * as it is used nowhere else.
  */
@@ -567,6 +625,7 @@ extern struct BIT bit_results;
 extern struct band bands[];
 extern const struct SR_Descriptor SR[];
 extern FilterConfig filters;
+extern TransmitFilterConfig TXfilters;
 extern AGCConfig agc;
 extern UISm uiSM;
 extern ModeSm modeSM;
