@@ -355,6 +355,68 @@ void UpdateAudioIOState(void){
 }
 
 /**
+ * Warm up the audio I/O chain by cycling through transmit routing without
+ * changing RF hardware state. This clears initialization issues in the I2S
+ * hardware and SGTL5000 codec that cause anomalous output on first PTT press.
+ *
+ * We cycle twice: once to clear the initial state, and once more to simulate
+ * what happens after a real transmit session.
+ *
+ * Should be called once during radio initialization, after InitializeAudio().
+ */
+void WarmUpAudioIO(void){
+    // Save the current state so we can restore it
+    ModeSm_StateId saved_state = previousAudioIOState;
+
+    // Perform two warm-up cycles to fully initialize the audio hardware
+    for (int cycle = 0; cycle < 2; cycle++) {
+        // Cycle to "transmit" audio routing (but RF stays in receive)
+        // Stop receive input
+        Q_in_L.end();
+        Q_in_R.end();
+
+        // Start microphone input
+        Q_in_L_Ex.begin();
+        Q_in_R_Ex.begin();
+
+        // Configure mixers for transmit
+        SelectMixerChannel(&modeSelectInExL, 0);
+        SelectMixerChannel(&modeSelectInExR, 0);
+        SelectMixerChannel(&modeSelectOutExL, 0);
+        SelectMixerChannel(&modeSelectOutExR, 0);
+        MuteMixerChannels(&modeSelectInL);
+        MuteMixerChannels(&modeSelectInR);
+        MuteMixerChannels(&modeSelectOutL);
+        MuteMixerChannels(&modeSelectOutR);
+
+        // Let the audio system process a few interrupt cycles
+        delay(50);
+
+        // Now cycle back to receive routing
+        Q_in_L_Ex.end();
+        Q_in_R_Ex.end();
+        Q_in_L.begin();
+        Q_in_R.begin();
+
+        // Configure mixers for receive
+        SelectMixerChannel(&modeSelectInL, 0);
+        SelectMixerChannel(&modeSelectInR, 0);
+        SelectMixerChannel(&modeSelectOutL, 0);
+        SelectMixerChannel(&modeSelectOutR, 0);
+        MuteMixerChannels(&modeSelectInExL);
+        MuteMixerChannels(&modeSelectInExR);
+        MuteMixerChannels(&modeSelectOutExL);
+        MuteMixerChannels(&modeSelectOutExR);
+
+        // Short delay between cycles
+        delay(10);
+    }
+
+    // Restore the previous state tracker
+    previousAudioIOState = saved_state;
+}
+
+/**
  * Initialize all audio subsystems and configure hardware codecs.
  *
  * Performs complete initialization sequence for the dual-codec audio architecture:
@@ -425,6 +487,8 @@ void InitializeAudio(void){
     sidetone_oscillator.amplitude(ED.sidetoneVolume / 500);
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
 
+    // Warm up the audio I/O to clear initialization issues
+    WarmUpAudioIO();
 }
 
 /**

@@ -16,5 +16,6 @@ void InitializeAudio(void);
 void UpdateAudioIOState(void);
 ModeSm_StateId GetAudioPreviousState(void);
 void UpdateTransmitAudioGain(void);
+void WarmUpAudioIO(void);
 
 #endif // AUDIOIO_H
