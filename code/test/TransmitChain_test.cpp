@@ -187,27 +187,40 @@ TEST(TransmitChain, DecimateByX){
     add_comb(I,Q,sampleRate_Hz,Nsamples);
     WriteIQFile(I,Q,"TXDecimateBy4_original_IQ.txt",Nsamples);
     TXDecInit();
-    TXDecimateBy4(I,Q);
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    TXDecimateBy4(&data);
     WriteIQFile(I,Q,"TXDecimateBy4_decimated_IQ_pass1.txt",Nsamples/4/2);
-    TXDecimateBy4(&I[2048],&Q[2048]);
+    data.I = &I[2048];
+    data.Q = &Q[2048];
+    TXDecimateBy4(&data);
     WriteIQFile(&I[2048],&Q[2048],"TXDecimateBy4_decimated_IQ_pass2.txt",Nsamples/4/2);
 
     CreateIQTone(I, Q, 1024, sampleRate_Hz/4, tone_Hz);
     add_comb(I,Q,sampleRate_Hz/4,1024);
     TXDecInit();
     WriteIQFile(I,Q,"TXDecimateBy2_original_IQ.txt",1024);
-    TXDecimateBy2(I,Q);
+    data.I = I;
+    data.Q = Q;
+    TXDecimateBy2(&data);
     WriteIQFile(I,Q,"TXDecimateBy2_decimated_IQ_pass1.txt",256);
-    TXDecimateBy2(&I[512],&Q[512]);
+    data.I = &I[512];
+    data.Q = &Q[512];
+    TXDecimateBy2(&data);
     WriteIQFile(&I[512],&Q[512],"TXDecimateBy2_decimated_IQ_pass2.txt",256);
 
     CreateIQTone(I, Q, 512, sampleRate_Hz/8, tone_Hz);
     add_comb(I,Q,sampleRate_Hz/8,512);
     TXDecInit();
     WriteIQFile(I,Q,"TXDecimateBy16_original_IQ.txt",512);
-    TXDecimateBy2(I,Q);
+    data.I = I;
+    data.Q = Q;
+    TXDecimateBy2(&data);
     WriteIQFile(I,Q,"TXDecimateBy16_decimated_IQ_pass1.txt",128);
-    TXDecimateBy2(&I[256],&Q[256]);
+    data.I = &I[256];
+    data.Q = &Q[256];
+    TXDecimateBy2(&data);
     WriteIQFile(&I[256],&Q[256],"TXDecimateBy16_decimated_IQ_pass2.txt",128);
 
     EXPECT_EQ(1,1);
@@ -242,29 +255,43 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
     TXDecInit();
 
     float32_t amp;
+    DataBlock data;
     for (int i = 0; i<Npoints; i++){
         freq[i] = fmin + (float32_t)i*fstep;
 
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz, freq[i]);
 
-        TXDecimateBy4(I,Q);
-        TXDecimateBy4(&I[2048],&Q[2048]);
+        data.I = I;
+        data.Q = Q;
+        TXDecimateBy4(&data);
+        data.I = &I[2048];
+        data.Q = &Q[2048];
+        TXDecimateBy4(&data);
+        
         amp = getmax(&I[2048],Nsamples/4/2);
         gainx4[i] = amp/0.5;
     }
     WriteIQFile(freq,gainx4,"TXDecimateBy4_passband.txt",Npoints);
 
     CreateIQTone(I, Q, 1024, 192000/4, 20000);
-    TXDecimateBy2(I,Q);
-    TXDecimateBy2(&I[512],&Q[512]);
+    data.I = I;
+    data.Q = Q;
+    TXDecimateBy2(&data);
+    data.I = &I[512];
+    data.Q = &Q[512];
+    TXDecimateBy2(&data);
     WriteIQFile(&I[512],&Q[512],"TXDecimateBy2_6000.txt",256);
     for (int i = 0; i<Npoints; i++){
         freq[i] = fmin + (float32_t)i*fstep;
 
         CreateIQTone(I, Q, 1024, 192000/4, freq[i]);
 
-        TXDecimateBy2(I,Q);
-        TXDecimateBy2(&I[512],&Q[512]);
+        data.I = I;
+        data.Q = Q;
+        TXDecimateBy2(&data);
+        data.I = &I[512];
+        data.Q = &Q[512];
+        TXDecimateBy2(&data);
 
         gainx2[i] = getmax(&I[512+128],128)/0.5;
     }
@@ -276,8 +303,12 @@ TEST(TransmitChain, DecimateByXTransmissionResponse){
 
         CreateIQTone(I, Q, 512, 192000/8, freq[i]);
 
-        TXDecimateBy2(I,Q);
-        TXDecimateBy2(&I[256],&Q[256]);
+        data.I = I;
+        data.Q = Q;
+        TXDecimateBy2(&data);
+        data.I = &I[256];
+        data.Q = &Q[256];
+        TXDecimateBy2(&data);
 
         gainx2x2[i] = getmax(&I[256+64],64)/0.5;
     }
@@ -291,6 +322,9 @@ TEST(TransmitChain, HilbertPassband){
     uint32_t sampleRate_Hz = 192000/4/2/2;
     float I[Nsamples];
     float Q[Nsamples];
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
 
     float32_t fmin = 0.0;
     float32_t fmax = 6000.0;
@@ -308,8 +342,12 @@ TEST(TransmitChain, HilbertPassband){
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz, freq[i]);
         arm_copy_f32(I,Q,Nsamples);
 
-        HilbertTransform(I,Q);
-        HilbertTransform(&I[128],&Q[128]);
+        data.I = I;
+        data.Q = Q;
+        HilbertTransform(&data);
+        data.I = &I[128];
+        data.Q = &Q[128];
+        HilbertTransform(&data);
 
         mag[i] = 0;
         for (int j=0; j<Nsamples/2; j++){
@@ -342,21 +380,26 @@ void TXEQ_filter_tone(float32_t toneFreq_Hz, float32_t *gain){
     float I[Nsamples];
     float Q[Nsamples];
     float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
-   
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = Nsamples;
+    data.sampleRate_Hz = sampleRate_Hz;
+    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
     uint32_t phase = 0;
     // Need four iterations for the filter to "warm up" -- i.e., for the IIR filter state vector
     // to reach equilibrium -- at the lowest bands
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    DoExciterEQ(I);
+    BandEQ(&data, &filters, TX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    DoExciterEQ(I);
+    BandEQ(&data, &filters, TX);
 
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    DoExciterEQ(I);
+    BandEQ(&data, &filters, TX);
 
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    DoExciterEQ(I);
+    BandEQ(&data, &filters, TX);
 
     // Find the max value in I
     float32_t amp = -FLT_MAX;
@@ -433,51 +476,80 @@ TEST(TransmitChain, TransmitEQPlotPassbands){
 TEST(TransmitChain, InterpolateByN){
     uint32_t Nsamples = 128*2;
     uint32_t sampleRate_Hz = 192000/16;
-    float I[Nsamples];
-    float Q[Nsamples];
-    float Iout[256];
-    float Qout[256];
+    float I[Nsamples*2];  // Make buffer larger for in-place interpolation
+    float Q[Nsamples*2];
     float tone_Hz;
     tone_Hz = 12000/32;
     tone_Hz = 12000/4;
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = 128;
+    data.sampleRate_Hz = sampleRate_Hz;
 
     TXDecInit();
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
     WriteIQFile(I,Q,"TXInterpolateBy2x2_original_IQ.txt",Nsamples);
-    TXInterpolateBy2Again(I,Q,Iout,Qout);
-    WriteIQFile(Iout,Qout,"TXInterpolateBy2x2_interpolated_IQ_pass1.txt",256);
-    TXInterpolateBy2Again(&I[128],&Q[128],Iout,Qout);
-    WriteIQFile(Iout,Qout,"TXInterpolateBy2x2_interpolated_IQ_pass2.txt",256);
+    TXInterpolateBy2Again(&data);
+    WriteIQFile(data.I,data.Q,"TXInterpolateBy2x2_interpolated_IQ_pass1.txt",256);
+
+    CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
+    data.I = &I[128];
+    data.Q = &Q[128];
+    data.N = 128;  // Reset N before second call
+    data.sampleRate_Hz = sampleRate_Hz;
+    TXInterpolateBy2Again(&data);
+    WriteIQFile(data.I,data.Q,"TXInterpolateBy2x2_interpolated_IQ_pass2.txt",256);
 
 
     Nsamples = 256*2;
     sampleRate_Hz = 192000/8;
-    float I2[Nsamples];
-    float Q2[Nsamples];
+    float I2[Nsamples*2];  // Make buffer larger for in-place interpolation
+    float Q2[Nsamples*2];
     float Iout2[512];
     float Qout2[512];
+    data.I = I2;
+    data.Q = Q2;
+    data.N = 256;
+    data.sampleRate_Hz = sampleRate_Hz;
     tone_Hz = 24000/4;
     CreateIQTone(I2, Q2, Nsamples, sampleRate_Hz, tone_Hz);
     WriteIQFile(I2,Q2,"TXInterpolateBy2_original_IQ.txt",Nsamples);
-    TXInterpolateBy2(I2,Q2,Iout2,Qout2);
-    WriteIQFile(Iout2,Qout2,"TXInterpolateBy2_interpolated_IQ_pass1.txt",512);
-    TXInterpolateBy2(&I2[256],&Q2[256],Iout2,Qout2);
-    WriteIQFile(Iout2,Qout2,"TXInterpolateBy2_interpolated_IQ_pass2.txt",512);
+    TXInterpolateBy2(&data);
+    WriteIQFile(data.I,data.Q,"TXInterpolateBy2_interpolated_IQ_pass1.txt",512);
+
+    CreateIQTone(I2, Q2, Nsamples, sampleRate_Hz, tone_Hz);
+    data.I = &I2[256];
+    data.Q = &Q2[256];
+    data.N = 256;
+    data.sampleRate_Hz = sampleRate_Hz;
+    TXInterpolateBy2(&data);
+    WriteIQFile(data.I,data.Q,"TXInterpolateBy2_interpolated_IQ_pass2.txt",512);
 
 
     Nsamples = 512*2;
     sampleRate_Hz = 192000/4;
-    float I4[Nsamples];
-    float Q4[Nsamples];
-    float Iout4[2048];
-    float Qout4[2048];
+    float I4[Nsamples*2];
+    float Q4[Nsamples*2];
+    //float Iout4[2048];
+    //float Qout4[2048];
     tone_Hz = 24000/4;
     CreateIQTone(I4, Q4, Nsamples, sampleRate_Hz, tone_Hz);
-    WriteIQFile(I4,Q4,"TXInterpolateBy4_original_IQ.txt",Nsamples);
-    TXInterpolateBy4(I4,Q4,Iout4,Qout4);
-    WriteIQFile(Iout4,Qout4,"TXInterpolateBy4_interpolated_IQ_pass1.txt",2048);
-    TXInterpolateBy4(&I4[512],&Q4[512],Iout4,Qout4);
-    WriteIQFile(Iout4,Qout4,"TXInterpolateBy4_interpolated_IQ_pass2.txt",2048);
+    WriteIQFile(I4, Q4,"TXInterpolateBy4_original_IQ.txt",Nsamples);
+    data.I = I4;
+    data.Q = Q4;
+    data.N = 512;
+    data.sampleRate_Hz = sampleRate_Hz;
+    TXInterpolateBy4(&data);
+    WriteIQFile(data.I,data.Q,"TXInterpolateBy4_interpolated_IQ_pass1.txt",2048);
+
+    CreateIQTone(I4, Q4, Nsamples, sampleRate_Hz, tone_Hz);
+    data.I = &I4[512];
+    data.Q = &Q4[512];
+    data.N = 512;
+    data.sampleRate_Hz = sampleRate_Hz;
+    TXInterpolateBy4(&data);
+    WriteIQFile(data.I,data.Q,"TXInterpolateBy4_interpolated_IQ_pass2.txt",2048);
 
     EXPECT_EQ(1,1);
 }
@@ -490,6 +562,11 @@ TEST(TransmitChain, InterpolateByNPassband){
     float Q[Nsamples*2*4];
     float Iout[256*2*4];
     float Qout[256*2*4];
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = 128;
+    data.sampleRate_Hz = sampleRate_Hz;
 
     float32_t fmin = 0.0;
     float32_t fmax = 48000.0;
@@ -506,22 +583,40 @@ TEST(TransmitChain, InterpolateByNPassband){
     for (int i = 0; i<Npoints; i++){
         freq[i] = fmin + (float32_t)i*fstep;
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz, freq[i]);
-        TXInterpolateBy2Again(I,Q,Iout,Qout);
-        TXInterpolateBy2Again(&I[128],&Q[128],Iout,Qout);
-        amp = getmax(Iout,256);
+        data.I = I;
+        data.Q = Q;
+        TXInterpolateBy2Again(&data);
+        CreateIQTone(I, Q, Nsamples, sampleRate_Hz, freq[i]);
+        data.I = &I[128];
+        data.Q = &Q[128];
+        TXInterpolateBy2Again(&data);
+        amp = getmax(data.I,256);
         gainx2x2[i] = amp/0.5;
 
 
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2, freq[i]);
-        TXInterpolateBy2(I,Q,Iout,Qout);
-        TXInterpolateBy2(&I[256],&Q[256],Iout,Qout);
-        amp = getmax(Iout,512);
+        data.I = I;
+        data.Q = Q;
+        TXInterpolateBy2(&data);
+        CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2, freq[i]);
+        data.I = &I[256];
+        data.Q = &Q[256];
+        TXInterpolateBy2(&data);
+        amp = getmax(data.I,512);
         gainx2[i] = amp/0.5;
 
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2*4, freq[i]);
-        TXInterpolateBy4(I,Q,Iout,Qout);
-        TXInterpolateBy4(&I[512],&Q[512],Iout,Qout);
-        amp = getmax(Iout,2048);
+        data.I = I;
+        data.Q = Q;
+        data.N = 512;
+        TXInterpolateBy4(&data);
+
+        CreateIQTone(I, Q, Nsamples, sampleRate_Hz*2*4, freq[i]);
+        data.I = &I[512];
+        data.Q = &Q[512];
+        data.N = 512;
+        TXInterpolateBy4(&data);
+        amp = getmax(data.I,2048);
         gainx4[i] = amp/0.5;
 
     }
@@ -531,17 +626,22 @@ TEST(TransmitChain, InterpolateByNPassband){
     EXPECT_EQ(1,1);
 }
 
-void end2end(float32_t *I, float32_t *Q, float32_t *Io, float32_t *Qo){
-    TXDecimateBy4(I,Q);// 2048 in, 512 out
-    TXDecimateBy2(I,Q);// 512 in, 256 out
-    DoExciterEQ(I); // 256
-    arm_copy_f32(I,Q,256);
-    TXDecimateBy2Again(I,Q); // 256 in, 128 out
-    HilbertTransform(I,Q); // 128
-    TXInterpolateBy2Again(I,Q,Io,Qo); // 128 in, 256 out
-    SidebandSelection(Io, Qo);
-    TXInterpolateBy2(Io,Qo,I,Q); // 256 in, 512 out
-    TXInterpolateBy4(I,Q,Io,Qo); // 512 in, 2048 out
+void end2end(float32_t *I, float32_t *Q){
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = 2048;
+    data.sampleRate_Hz = 192000;
+    TXDecimateBy4(&data); // 2048 in, 512 out
+    TXDecimateBy2(&data);// 512 in, 256 out
+    BandEQ(&data, &filters, TX);
+    arm_copy_f32(data.I,data.Q,256);
+    TXDecimateBy2Again(&data); // 256 in, 128 out
+    HilbertTransform(&data); // 128
+    TXInterpolateBy2Again(&data); // 128 in, 256 out
+    SidebandSelection(&data);
+    TXInterpolateBy2(&data); // 256 in, 512 out
+    TXInterpolateBy4(&data); // 512 in, 2048 out
 }
 
 TEST(TransmitChain, EndToEnd){
@@ -549,8 +649,6 @@ TEST(TransmitChain, EndToEnd){
     uint32_t sampleRate_Hz = 192000;
     float I[Nsamples];
     float Q[Nsamples];
-    float Iout[Nsamples];
-    float Qout[Nsamples];
     int Nreps = 16;
     float IoutS[Nsamples*Nreps];
     float QoutS[Nsamples*Nreps];
@@ -591,11 +689,11 @@ TEST(TransmitChain, EndToEnd){
 
         for (int j=0; j<Nreps; j++){
             phase = CreateIQToneWithPhase(I,Q,2048,sampleRate_Hz,freq[i],phase,0.5);
-            end2end(I, Q, Iout, Qout);
-            arm_copy_f32(Iout,&IoutS[j*2048],2048);
-            arm_copy_f32(Qout,&QoutS[j*2048],2048);
-            data.I = Iout;
-            data.Q = Qout;
+            end2end(I, Q);
+            arm_copy_f32(I,&IoutS[j*2048],2048);
+            arm_copy_f32(Q,&QoutS[j*2048],2048);
+            data.I = I;
+            data.Q = Q;
             ZoomFFTExe(&data,spectrum_zoom,&filters);
         }
 
@@ -613,7 +711,7 @@ TEST(TransmitChain, EndToEnd){
         tone[i] = psdnew[j2]; 
         image[i] = psdnew[j1];
         sbs[i] = tone[i]-image[i];
-        amp = getmax(Iout,2048);
+        amp = getmax(data.I,2048);
         gain[i] = amp/0.5;
     }
     WriteIQFile(freq,gain,"TXEndToEnd_passband_fixed.txt",Npoints);
@@ -628,8 +726,6 @@ TEST(TransmitChain, TwoTone){
     uint32_t sampleRate_Hz = 192000;
     float I[Nsamples];
     float Q[Nsamples];
-    float Iout[Nsamples];
-    float Qout[Nsamples];
     int Nreps = 16;
     float IoutS[Nsamples*Nreps];
     float QoutS[Nsamples*Nreps];
@@ -638,6 +734,9 @@ TEST(TransmitChain, TwoTone){
     float32_t tone2_Hz = 1900.0;
 
     TXDecInit();
+    uint32_t spectrum_zoom = SPECTRUM_ZOOM_16;
+    InitializeFilters(spectrum_zoom, &filters);
+    ZoomFFTPrep(spectrum_zoom, &filters);
 
     uint32_t phase1 = 0;
     uint32_t phase2 = 0;
@@ -645,9 +744,9 @@ TEST(TransmitChain, TwoTone){
     for (int j=0; j<Nreps; j++){
         phase1 = CreateIQToneWithPhase(I,Q,2048,sampleRate_Hz,tone1_Hz,phase1,0.5);
         phase2 = AddIQToneWithPhase(I,Q,2048,sampleRate_Hz,tone2_Hz,phase2,0.5);
-        end2end(I, Q, Iout, Qout);
-        arm_copy_f32(Iout,&IoutS[j*2048],2048);
-        arm_copy_f32(Qout,&QoutS[j*2048],2048);
+        end2end(I, Q);
+        arm_copy_f32(I,&IoutS[j*2048],2048);
+        arm_copy_f32(Q,&QoutS[j*2048],2048);
         // this does not have enough resolution because we're so damned oversampled
         CalcPSD512(&IoutS[j*2048],&QoutS[j*2048]);
     }

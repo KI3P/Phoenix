@@ -30,7 +30,6 @@ void ResetPSD(void);
 void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters);
 errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fname);
 void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX);
-//void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf);
 void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXType TXRX);
 
 // used by unit tests
@@ -39,15 +38,14 @@ float32_t * GetFilteredBufferAddress(void);
 void setdspfirfilename(char *fnm);
 
 void TXDecInit(void);
-void TXDecimateBy4(float32_t *I,float32_t *Q);
-void TXDecimateBy2(float32_t *I,float32_t *Q);
-void DoExciterEQ(float32_t *float_buffer_L_EX);
-void TXDecimateBy2Again(float32_t *I,float32_t *Q);
-void HilbertTransform(float32_t *I,float32_t *Q);
-void TXInterpolateBy2Again(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout);
-void TXInterpolateBy2(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout);
-void TXInterpolateBy4(float32_t *I,float32_t *Q, float32_t *Iout,float32_t *Qout);
-void SidebandSelection(float32_t *I, float32_t *Q);
+void TXDecimateBy4(DataBlock *data);
+void TXDecimateBy2(DataBlock *data);
+void TXDecimateBy2Again(DataBlock *data);
+void HilbertTransform(DataBlock *data);
+void TXInterpolateBy2Again(DataBlock *data);
+void TXInterpolateBy2(DataBlock *data);
+void TXInterpolateBy4(DataBlock *data);
+void SidebandSelection(DataBlock *data);
 
 // The functions that are placed in a stub to enable unit test substitution
 void FFT256Forward(float32_t *buffer);

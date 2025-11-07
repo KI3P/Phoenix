@@ -811,17 +811,16 @@ float32_t DMAMEM FIR_int2_EX_Q_state[519];
 
 /**
  * Apply Hilbert transform to create I/Q signals from audio
- * @param I Pointer to I (real) channel buffer (in/out)
- * @param Q Pointer to Q (imaginary) channel buffer (in/out)
+ * @param data Pointer to DataBlock containing I (real) channel buffer (in/out) and Q (imaginary) channel buffer (in/out)
  *
  * Applies 45-degree and -45-degree phase shift FIR filters to create quadrature
  * signals from real audio input. Operates at 12 kHz sample rate with 128-sample
  * blocks. Used in transmit chain for SSB generation.
  */
-void HilbertTransform(float32_t *I,float32_t *Q){
+void HilbertTransform(DataBlock *data){
     //Hilbert transforms at 12K, with 5KHz bandwidth, buffer size 128
-    arm_fir_f32(&FIR_Hilbert_L, I, I, 128);
-    arm_fir_f32(&FIR_Hilbert_R, Q, Q, 128);
+    arm_fir_f32(&FIR_Hilbert_L, data->I, data->I, 128);
+    arm_fir_f32(&FIR_Hilbert_R, data->Q, data->Q, 128);
 }
 
 /**
@@ -894,230 +893,112 @@ void TXDecInit(void){
 
 /**
  * Select upper or lower sideband by inverting I channel if needed
- * @param I Pointer to I (real) channel buffer
- * @param Q Pointer to Q (imaginary) channel buffer
+ * @param data Pointer to DataBlock with I (real) and Q (imaginary) channel buffers
  *
  * For USB mode, inverts the I channel signal (multiplies by -1).
  * LSB is selected by default (no inversion). Operates on 256-sample blocks.
  */
-void SidebandSelection(float32_t *I, float32_t *Q){
+void SidebandSelection(DataBlock *data){
     // Math works out for selecting LSB by default
     if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
-        arm_scale_f32(I,-1,I,256);
+        arm_scale_f32(data->I,-1,data->I,256);
     }
 }
 
 /**
  * Decimate transmit signal by factor of 4 (192 kHz -> 48 kHz)
- * @param I Pointer to I channel buffer (2048 samples in, 512 out)
- * @param Q Pointer to Q channel buffer (2048 samples in, 512 out)
+ * @param data Pointer to DataBlock containtin I and Q channel buffers (2048 samples in, 512 out)
  *
  * Applies FIR decimation filter in-place. Input: 192 kHz, Output: 48 kHz.
  */
-void TXDecimateBy4(float32_t *I, float32_t *Q){
+void TXDecimateBy4(DataBlock *data){
     // 192KHz effective sample rate here
     // decimation-by-4 in-place!
-    arm_fir_decimate_f32(&FIR_dec1_EX_I, I, I, BUFFER_SIZE * N_BLOCKS);
-    arm_fir_decimate_f32(&FIR_dec1_EX_Q, Q, Q, BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&FIR_dec1_EX_I, data->I, data->I, BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&FIR_dec1_EX_Q, data->Q, data->Q, BUFFER_SIZE * N_BLOCKS);
+    data->N = data->N/4;
+    data->sampleRate_Hz = data->sampleRate_Hz/4;
 }
 
 /**
  * Decimate transmit signal by factor of 2 (48 kHz -> 24 kHz)
- * @param I Pointer to I channel buffer (512 samples in, 256 out)
- * @param Q Pointer to Q channel buffer (512 samples in, 256 out)
+ * @param data Pointer to DataBlock containing I and Q channel buffers (512 samples in, 256 out)
  *
  * Applies FIR decimation filter in-place. Input: 48 kHz, Output: 24 kHz.
  */
-void TXDecimateBy2(float32_t *I, float32_t *Q){
+void TXDecimateBy2(DataBlock *data){
     // 48KHz effective sample rate here
     // decimation-by-2 in-place
-    arm_fir_decimate_f32(&FIR_dec2_EX_I, I, I, 512);
-    arm_fir_decimate_f32(&FIR_dec2_EX_Q, Q, Q, 512);
+    arm_fir_decimate_f32(&FIR_dec2_EX_I, data->I, data->I, 512);
+    arm_fir_decimate_f32(&FIR_dec2_EX_Q, data->Q, data->Q, 512);
+    data->N = data->N/2;
+    data->sampleRate_Hz = data->sampleRate_Hz/2;
 }
 
 /**
  * Decimate transmit signal by factor of 2 again (24 kHz -> 12 kHz)
- * @param I Pointer to I channel buffer (256 samples in, 128 out)
- * @param Q Pointer to Q channel buffer (256 samples in, 128 out)
+ * @param data Pointer to DataBlock containing I and Q channel buffers (256 samples in, 128 out)
  *
  * Applies FIR decimation filter in-place. Input: 24 kHz, Output: 12 kHz.
  * This is the third decimation stage in the transmit chain.
  */
-void TXDecimateBy2Again(float32_t *I, float32_t *Q){
+void TXDecimateBy2Again(DataBlock *data){
     //Decimate by 2 to 12K SPS sample rate
-    arm_fir_decimate_f32(&FIR_dec3_EX_I, I, I, 256);
-    arm_fir_decimate_f32(&FIR_dec3_EX_Q, Q, Q, 256);
+    arm_fir_decimate_f32(&FIR_dec3_EX_I, data->I, data->I, 256);
+    arm_fir_decimate_f32(&FIR_dec3_EX_Q, data->Q, data->Q, 256);
+    data->N = data->N/2;
+    data->sampleRate_Hz = data->sampleRate_Hz/2;
 }
 
+float32_t DMAMEM Itmp[READ_BUFFER_SIZE];
+float32_t DMAMEM Qtmp[READ_BUFFER_SIZE];
 /**
  * Interpolate transmit signal by factor of 2 (12 kHz -> 24 kHz)
- * @param I Pointer to input I channel buffer (128 samples)
- * @param Q Pointer to input Q channel buffer (128 samples)
- * @param Iout Pointer to output I channel buffer (256 samples)
- * @param Qout Pointer to output Q channel buffer (256 samples)
+ * @param data Pointer to DataBlock containing input I & Q channel buffers (128 samples)
  *
  * Applies FIR interpolation filter and scales by 2 to compensate for interpolation.
- * First interpolation stage in transmit chain.
+ * First interpolation stage in transmit chain. data.I and data.Q are overwritten.
  */
-void TXInterpolateBy2Again(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
+void TXInterpolateBy2Again(DataBlock *data){
     //Interpolate back to 24K SPS
-    arm_fir_interpolate_f32(&FIR_int3_EX_I, I, Iout, 128);
-    arm_scale_f32(Iout,2,Iout,256);
-    arm_fir_interpolate_f32(&FIR_int3_EX_Q, Q, Qout, 128);
-    arm_scale_f32(Qout,2,Qout,256);
+    arm_fir_interpolate_f32(&FIR_int3_EX_I, data->I, Itmp, 128);
+    arm_scale_f32(Itmp,2,data->I,256);
+    arm_fir_interpolate_f32(&FIR_int3_EX_Q, data->Q, Qtmp, 128);
+    arm_scale_f32(Qtmp,2,data->Q,256);
+    data->N = data->N*2;
+    data->sampleRate_Hz = data->sampleRate_Hz*2;
 }
 
 /**
  * Interpolate transmit signal by factor of 2 (24 kHz -> 48 kHz)
- * @param I Pointer to input I channel buffer (256 samples)
- * @param Q Pointer to input Q channel buffer (256 samples)
- * @param Iout Pointer to output I channel buffer (512 samples)
- * @param Qout Pointer to output Q channel buffer (512 samples)
+ * @param data Pointer to DataBlock containing input I & Q channel buffers (256 samples)
  *
  * Applies FIR interpolation filter and scales by 2 to compensate for interpolation.
  * Second interpolation stage in transmit chain.
  */
-void TXInterpolateBy2(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
+void TXInterpolateBy2(DataBlock *data){
     //24KHz effective sample rate input, 48 kHz output
-    arm_fir_interpolate_f32(&FIR_int1_EX_I, I, Iout, 256);
-    arm_scale_f32(Iout,2,Iout,512);
-    arm_fir_interpolate_f32(&FIR_int1_EX_Q, Q, Qout, 256);
-    arm_scale_f32(Qout,2,Qout,512);
+    arm_fir_interpolate_f32(&FIR_int1_EX_I, data->I, Itmp, 256);
+    arm_scale_f32(Itmp,2,data->I,512);
+    arm_fir_interpolate_f32(&FIR_int1_EX_Q, data->Q, Qtmp, 256);
+    arm_scale_f32(Qtmp,2,data->Q,512);
+    data->N = data->N*2;
+    data->sampleRate_Hz = data->sampleRate_Hz*2;
 }
 
 /**
  * Interpolate transmit signal by factor of 4 (48 kHz -> 192 kHz)
- * @param I Pointer to input I channel buffer (512 samples)
- * @param Q Pointer to input Q channel buffer (512 samples)
- * @param Iout Pointer to output I channel buffer (2048 samples)
- * @param Qout Pointer to output Q channel buffer (2048 samples)
+ * @param data Pointer to DataBlock containing input I & Q channel buffers (512 samples)
  *
  * Applies FIR interpolation filter and scales by 4 to compensate for interpolation.
  * Final interpolation stage in transmit chain, produces output at DAC sample rate.
  */
-void TXInterpolateBy4(float32_t *I, float32_t *Q, float32_t *Iout, float32_t *Qout){
+void TXInterpolateBy4(DataBlock *data){
     //48KHz effective sample rate input, 128 kHz output
-    arm_fir_interpolate_f32(&FIR_int2_EX_I, I, Iout, 512);
-    arm_scale_f32(Iout,4,Iout,2048);
-    arm_fir_interpolate_f32(&FIR_int2_EX_Q, Q, Qout, 512);
-    arm_scale_f32(Qout,4,Qout,2048);
+    arm_fir_interpolate_f32(&FIR_int2_EX_I, data->I, Itmp, 512);
+    arm_scale_f32(Itmp,4,data->I,2048);
+    arm_fir_interpolate_f32(&FIR_int2_EX_Q, data->Q, Qtmp, 512);
+    arm_scale_f32(Qtmp,4,data->Q,2048);
+    data->N = data->N*4;
+    data->sampleRate_Hz = data->sampleRate_Hz*4;
 }
-
-
-
-#define IIR_NUMSTAGES 4
-extern float32_t EQ_Band1Coeffs[20];
-extern float32_t EQ_Band2Coeffs[20];
-extern float32_t EQ_Band3Coeffs[20];
-extern float32_t EQ_Band4Coeffs[20];
-extern float32_t EQ_Band5Coeffs[20];
-extern float32_t EQ_Band6Coeffs[20];
-extern float32_t EQ_Band7Coeffs[20];
-extern float32_t EQ_Band8Coeffs[20];
-extern float32_t EQ_Band9Coeffs[20];
-extern float32_t EQ_Band10Coeffs[20];
-extern float32_t EQ_Band11Coeffs[20];
-extern float32_t EQ_Band12Coeffs[20];
-extern float32_t EQ_Band13Coeffs[20];
-extern float32_t EQ_Band14Coeffs[20];
-float32_t xmt_EQ_Band1_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };  //declare and zero biquad state variables
-float32_t xmt_EQ_Band2_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band3_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band4_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band5_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band6_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band7_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band8_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band9_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band10_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band11_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band12_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band13_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-float32_t xmt_EQ_Band14_state[IIR_NUMSTAGES * 2] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-arm_biquad_cascade_df2T_instance_f32 S1_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band1_state, EQ_Band1Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S2_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band2_state, EQ_Band2Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S3_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band3_state, EQ_Band3Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S4_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band4_state, EQ_Band4Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S5_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band5_state, EQ_Band5Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S6_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band6_state, EQ_Band6Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S7_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band7_state, EQ_Band7Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S8_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band8_state, EQ_Band8Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S9_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band9_state, EQ_Band9Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S10_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band10_state, EQ_Band10Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S11_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band11_state, EQ_Band11Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S12_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band12_state, EQ_Band12Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S13_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band13_state, EQ_Band13Coeffs };
-arm_biquad_cascade_df2T_instance_f32 S14_Xmt = { IIR_NUMSTAGES, xmt_EQ_Band14_state, EQ_Band14Coeffs };
-float32_t DMAMEM xmt_EQ1_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ2_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ3_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ4_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ5_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ6_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ7_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ8_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ9_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ10_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ11_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ12_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ13_float_buffer_L[256];
-float32_t DMAMEM xmt_EQ14_float_buffer_L[256];
-
-/**
- * Apply 14-band transmit equalizer to audio signal
- * @param float_buffer_L_EX Pointer to audio buffer (256 samples, modified in place)
- *
- * Processes audio through all 14 transmit EQ bands using biquad filters. Each band
- * is scaled by its transmit EQ gain setting and accumulated. Alternating bands have
- * inverted sign. Final equalized audio replaces input buffer contents.
- */
-void DoExciterEQ(float32_t *float_buffer_L_EX)
-{
-  arm_biquad_cascade_df2T_f32(&S1_Xmt, float_buffer_L_EX, xmt_EQ1_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S2_Xmt, float_buffer_L_EX, xmt_EQ2_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S3_Xmt, float_buffer_L_EX, xmt_EQ3_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S4_Xmt, float_buffer_L_EX, xmt_EQ4_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S5_Xmt, float_buffer_L_EX, xmt_EQ5_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S6_Xmt, float_buffer_L_EX, xmt_EQ6_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S7_Xmt, float_buffer_L_EX, xmt_EQ7_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S8_Xmt, float_buffer_L_EX, xmt_EQ8_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S9_Xmt, float_buffer_L_EX, xmt_EQ9_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S10_Xmt, float_buffer_L_EX, xmt_EQ10_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S11_Xmt, float_buffer_L_EX, xmt_EQ11_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S12_Xmt, float_buffer_L_EX, xmt_EQ12_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S13_Xmt, float_buffer_L_EX, xmt_EQ13_float_buffer_L, 256);
-  arm_biquad_cascade_df2T_f32(&S14_Xmt, float_buffer_L_EX, xmt_EQ14_float_buffer_L, 256);
-
-  arm_scale_f32(xmt_EQ1_float_buffer_L, -ED.equalizerXmt[0]/100, xmt_EQ1_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ2_float_buffer_L, ED.equalizerXmt[1]/100, xmt_EQ2_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ3_float_buffer_L, -ED.equalizerXmt[2]/100, xmt_EQ3_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ4_float_buffer_L, ED.equalizerXmt[3]/100, xmt_EQ4_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ5_float_buffer_L, -ED.equalizerXmt[4]/100, xmt_EQ5_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ6_float_buffer_L, ED.equalizerXmt[5]/100, xmt_EQ6_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ7_float_buffer_L, -ED.equalizerXmt[6]/100, xmt_EQ7_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ8_float_buffer_L, ED.equalizerXmt[7]/100, xmt_EQ8_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ9_float_buffer_L, -ED.equalizerXmt[8]/100, xmt_EQ9_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ10_float_buffer_L, ED.equalizerXmt[9]/100, xmt_EQ10_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ11_float_buffer_L, -ED.equalizerXmt[10]/100, xmt_EQ11_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ12_float_buffer_L, ED.equalizerXmt[11]/100, xmt_EQ12_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ13_float_buffer_L, -ED.equalizerXmt[12]/100, xmt_EQ13_float_buffer_L, 256);
-  arm_scale_f32(xmt_EQ14_float_buffer_L, ED.equalizerXmt[13]/100, xmt_EQ14_float_buffer_L, 256);
-
-  arm_add_f32(xmt_EQ1_float_buffer_L, xmt_EQ2_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ3_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ4_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ5_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ6_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ7_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ8_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ9_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ10_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ11_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ12_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ13_float_buffer_L, float_buffer_L_EX, 256);
-  arm_add_f32(float_buffer_L_EX, xmt_EQ14_float_buffer_L, float_buffer_L_EX, 256);
-}
-
-
-
-
