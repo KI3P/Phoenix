@@ -408,7 +408,7 @@ void HandleButtonPress(int32_t button){
             if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
                 ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
             Debug("Zoom is x" + String(1<<ED.spectrum_zoom));
-            ZoomFFTPrep(ED.spectrum_zoom, &filters);
+            ZoomFFTPrep(ED.spectrum_zoom, &RXfilters);
             break;
         }
         case RESET_TUNING:{
@@ -443,7 +443,7 @@ void HandleButtonPress(int32_t button){
             if (newmod > (int8_t)SAM)
                 newmod = (int8_t)USB;
             ED.modulation[ED.activeVFO] = (ModulationType)newmod;
-            UpdateFIRFilterMask(&filters);
+            UpdateFIRFilterMask(&RXfilters);
             Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
             break;
         }

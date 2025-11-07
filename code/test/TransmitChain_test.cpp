@@ -378,27 +378,27 @@ void TXEQ_filter_tone(float32_t toneFreq_Hz, float32_t *gain){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
     DataBlock data;
     data.I = I;
     data.Q = Q;
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     uint32_t phase = 0;
     // Need four iterations for the filter to "warm up" -- i.e., for the IIR filter state vector
     // to reach equilibrium -- at the lowest bands
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data, &filters, TX);
+    BandEQ(&data, &RXfilters, TX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data, &filters, TX);
+    BandEQ(&data, &RXfilters, TX);
 
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data, &filters, TX);
+    BandEQ(&data, &RXfilters, TX);
 
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data, &filters, TX);
+    BandEQ(&data, &RXfilters, TX);
 
     // Find the max value in I
     float32_t amp = -FLT_MAX;
@@ -413,28 +413,28 @@ void TXEQ_filter_tone_new(float32_t toneFreq_Hz, float32_t *gain){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
     DataBlock data;
     data.I = I;
     data.Q = Q;
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
 
     uint32_t phase = 0;
     // Need four iterations for the filter to "warm up" -- i.e., for the IIR filter state vector
     // to reach equilibrium -- at the lowest bands
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data,&filters,TX);
+    BandEQ(&data,&RXfilters,TX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data,&filters,TX);
+    BandEQ(&data,&RXfilters,TX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data,&filters,TX);
+    BandEQ(&data,&RXfilters,TX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    BandEQ(&data,&filters,TX);
+    BandEQ(&data,&RXfilters,TX);
     
     // Find the max value in I
     float32_t amp = -FLT_MAX;
@@ -634,7 +634,7 @@ void end2end(float32_t *I, float32_t *Q){
     data.sampleRate_Hz = 192000;
     TXDecimateBy4(&data,&TXfilters); // 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
-    BandEQ(&data, &filters, TX);
+    BandEQ(&data, &RXfilters, TX);
     arm_copy_f32(data.I,data.Q,256);
     TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
     HilbertTransform(&data,&TXfilters); // 128
@@ -665,8 +665,8 @@ TEST(TransmitChain, EndToEnd){
     InitializeTransmitFilters(&TXfilters);
 
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_16;
-    InitializeFilters(spectrum_zoom, &filters);
-    ZoomFFTPrep(spectrum_zoom, &filters);
+    InitializeFilters(spectrum_zoom, &RXfilters);
+    ZoomFFTPrep(spectrum_zoom, &RXfilters);
     DataBlock data;
     data.sampleRate_Hz = 192000;
     data.N = 2048;
@@ -694,7 +694,7 @@ TEST(TransmitChain, EndToEnd){
             arm_copy_f32(Q,&QoutS[j*2048],2048);
             data.I = I;
             data.Q = Q;
-            ZoomFFTExe(&data,spectrum_zoom,&filters);
+            ZoomFFTExe(&data,spectrum_zoom,&RXfilters);
         }
 
         if (i==15){
@@ -736,8 +736,8 @@ TEST(TransmitChain, TwoTone){
     InitializeTransmitFilters(&TXfilters);
 
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_16;
-    InitializeFilters(spectrum_zoom, &filters);
-    ZoomFFTPrep(spectrum_zoom, &filters);
+    InitializeFilters(spectrum_zoom, &RXfilters);
+    ZoomFFTPrep(spectrum_zoom, &RXfilters);
 
     uint32_t phase1 = 0;
     uint32_t phase2 = 0;

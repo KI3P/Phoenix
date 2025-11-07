@@ -372,7 +372,7 @@ TEST(SignalProcessing, IIRBeforeFIR){
                         1000,33000);
     WriteFile(buf, "data_1k_33k.txt", Nsamples);
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_2;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     char fname[50];
@@ -418,7 +418,7 @@ TEST(SignalProcessing, ZoomFFTCorrectWhenZoomIs1){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
     
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_1;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -456,7 +456,7 @@ TEST(SignalProcessing, ZoomFFTCorrectWhenZoomIs1AndShift){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_1;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -487,7 +487,7 @@ TEST(SignalProcessing, ZoomFFTCorrectWhenZoomIs2){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
     
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_2;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -519,7 +519,7 @@ TEST(SignalProcessing, ZoomFFTCorrectWhenZoomIs4){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_4;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -552,7 +552,7 @@ TEST(SignalProcessing, ZoomFFTCorrectWhenZoomIs8){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_8;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -591,7 +591,7 @@ TEST(SignalProcessing, ZoomFFTCorrectWhenZoomIs16){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_16;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -649,7 +649,7 @@ TEST(SignalProcessing, FrequencyTranslate){
     // Detect it at frequency 2
     int32_t bin = frequency_to_bin(750,512,sampleRate_Hz);
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_1;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -683,7 +683,7 @@ TEST(SignalProcessing, FineTuneTranslate){
     // Detect it at frequency 2
     int32_t bin = frequency_to_bin(tone_Hz+offset_Hz,512,sampleRate_Hz);
 
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_1;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
@@ -731,7 +731,7 @@ TEST(SignalProcessing, FineTunePhaseDiscontinuity){
     // from the peak. So we set a threshold (determined experimentally) of 
     // 80 dB between the peak and the floor
     uint32_t spectrum_zoom = SPECTRUM_ZOOM_8;
-    FilterConfig receiveFilters;
+    ReceiveFilterConfig receiveFilters;
     InitializeFilters(spectrum_zoom, &receiveFilters);
     ZoomFFTPrep(spectrum_zoom, &receiveFilters);
 
@@ -801,8 +801,8 @@ TEST(SignalProcessing, DecimateBy4){
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
     WriteIQFile(I,Q,"DecimateBy4_original_IQ.txt",Nsamples);
 
-    FilterConfig filters;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    ReceiveFilterConfig RXfilters;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
 
     DataBlock data;
     data.I = I;
@@ -810,11 +810,11 @@ TEST(SignalProcessing, DecimateBy4){
     data.N = 2048;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    DecimateBy4(&data,&filters);
+    DecimateBy4(&data,&RXfilters);
     data.I = &I[2048];
     data.Q = &Q[2048];
     data.N = 2048;
-    DecimateBy4(&data,&filters);
+    DecimateBy4(&data,&RXfilters);
     WriteIQFile(&I[2048],&Q[2048],"DecimateBy4_decimated_IQ.txt",Nsamples/4/2);
 
     CalcPSD512(&I[2048],&Q[2048]);
@@ -845,15 +845,15 @@ TEST(SignalProcessing, DecimateBy2){
     data.N = 512;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    FilterConfig filters;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    ReceiveFilterConfig RXfilters;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
 
-    DecimateBy2(&data,&filters);
+    DecimateBy2(&data,&RXfilters);
     //WriteIQFile(I,Q,"DecimateBy2_decimated_IQ.txt",Nsamples/4);
     data.I = &I[512];
     data.Q = &Q[512];
     data.N = 512;
-    DecimateBy2(&data,&filters);
+    DecimateBy2(&data,&RXfilters);
     WriteIQFile(&I[512],&Q[512],"DecimateBy2_decimated_IQ.txt",Nsamples/2/2);
 
     CalcPSD256(&I[512],&Q[512]);
@@ -878,19 +878,19 @@ TEST(SignalProcessing, DecimateBy8){
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
     WriteIQFile(I,Q,"DecimateBy8_original_IQ.txt",Nsamples);
 
-    FilterConfig filters;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    ReceiveFilterConfig RXfilters;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
 
     DataBlock data;
     data.I = I;
     data.Q = Q;
     data.N = 2048;
     data.sampleRate_Hz = sampleRate_Hz;
-    DecimateBy8(&data,&filters);
+    DecimateBy8(&data,&RXfilters);
     data.I = &I[2048];
     data.Q = &Q[2048];
     data.N = 2048;
-    DecimateBy8(&data,&filters);
+    DecimateBy8(&data,&RXfilters);
     WriteIQFile(&I[2048],&Q[2048],"DecimateBy8_decimated_IQ.txt",Nsamples/8/2);
 
     CalcPSD256(I,Q);
@@ -903,11 +903,11 @@ TEST(SignalProcessing, DecimateBy8){
 
 
 TEST(SignalProcessing, InitFIRFilterMask){
-    extern FilterConfig filters;
+    extern ReceiveFilterConfig RXfilters;
     float32_t DMAMEM FIR_filter_mask[FFT_LENGTH * 2] __attribute__((aligned(4)));
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     setdspfirfilename("FIR_filter_samples.txt");
-    InitFilterMask(FIR_filter_mask, &filters);
+    InitFilterMask(FIR_filter_mask, &RXfilters);
     WriteFile(FIR_filter_mask,"FIR_filter_mask.txt",1024);
     // Between frequency bins 460 and 500 we expect the magnitude of the
     // complex frequency mask to be 1
@@ -928,8 +928,8 @@ TEST(SignalProcessing, InitFIRFilterMask){
 
 TEST(SignalProcessing, ConvolutionFilter){
     // we expect signals between -200 and -3000 Hz to pass through, others to be blocked
-    extern FilterConfig filters;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    extern ReceiveFilterConfig RXfilters;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     uint32_t Nsamples = 512+256; // 2048/8;
     uint32_t sampleRate_Hz = 192000/8;
     float I[Nsamples];
@@ -960,12 +960,12 @@ TEST(SignalProcessing, ConvolutionFilter){
     data.Q = Q;
     data.N = 256;
     data.sampleRate_Hz = sampleRate_Hz;
-    ConvolutionFilter(&data, &filters,"ConvolutionFilter_pass1.txt");
+    ConvolutionFilter(&data, &RXfilters,"ConvolutionFilter_pass1.txt");
     WriteIQFile(data.I,data.Q,"ConvolutionFilter_pass1_filtered_IQ.txt",256);
 
     data.I = &I[256];
     data.Q = &Q[256];
-    ConvolutionFilter(&data, &filters, "ConvolutionFilter_pass2.txt");
+    ConvolutionFilter(&data, &RXfilters, "ConvolutionFilter_pass2.txt");
     WriteIQFile(data.I,data.Q,"ConvolutionFilter_pass2_filtered_IQ.txt",256);
     for (unsigned i = 0; i < 256; i++) {
         Iout[i] = data.I[i];
@@ -974,7 +974,7 @@ TEST(SignalProcessing, ConvolutionFilter){
 
     data.I = &I[256*2];
     data.Q = &Q[256*2];
-    ConvolutionFilter(&data, &filters, "ConvolutionFilter_pass3.txt");
+    ConvolutionFilter(&data, &RXfilters, "ConvolutionFilter_pass3.txt");
     WriteIQFile(data.I,data.Q,"ConvolutionFilter_pass3_filtered_IQ.txt",256);
     for (unsigned i = 0; i < 256; i++) {
         Iout[256+i] = data.I[i];
@@ -1000,8 +1000,8 @@ TEST(SignalProcessing, ConvolutionFilter){
 
 TEST(SignalProcessing, ConvolutionFilterChanges){
     // What does the passband look like if we change the filter limits?
-    extern FilterConfig filters;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    extern ReceiveFilterConfig RXfilters;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     uint32_t Nsamples = 512+256; // 2048/8;
     uint32_t sampleRate_Hz = 192000/8;
     float I[Nsamples];
@@ -1030,19 +1030,19 @@ TEST(SignalProcessing, ConvolutionFilterChanges){
     // Change the band limits
     bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -2000;
     bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = -1000;
-    UpdateFIRFilterMask(&filters);
+    UpdateFIRFilterMask(&RXfilters);
 
     DataBlock data;
     data.I = I;
     data.Q = Q;
     data.N = 256;
     data.sampleRate_Hz = sampleRate_Hz;
-    ConvolutionFilter(&data, &filters,"ConvolutionFilterChange_pass1.txt");
+    ConvolutionFilter(&data, &RXfilters,"ConvolutionFilterChange_pass1.txt");
     WriteIQFile(data.I,data.Q,"ConvolutionFilterChange_pass1_filtered_IQ.txt",256);
 
     data.I = &I[256];
     data.Q = &Q[256];
-    ConvolutionFilter(&data, &filters, "ConvolutionFilterChange_pass2.txt");
+    ConvolutionFilter(&data, &RXfilters, "ConvolutionFilterChange_pass2.txt");
     WriteIQFile(data.I,data.Q,"ConvolutionFilterChange_pass2_filtered_IQ.txt",256);
     for (unsigned i = 0; i < 256; i++) {
         Iout[i] = data.I[i];
@@ -1051,7 +1051,7 @@ TEST(SignalProcessing, ConvolutionFilterChanges){
 
     data.I = &I[256*2];
     data.Q = &Q[256*2];
-    ConvolutionFilter(&data, &filters, "ConvolutionFilterChange_pass3.txt");
+    ConvolutionFilter(&data, &RXfilters, "ConvolutionFilterChange_pass3.txt");
     WriteIQFile(data.I,data.Q,"ConvolutionFilterChange_pass3_filtered_IQ.txt",256);
     for (unsigned i = 0; i < 256; i++) {
         Iout[256+i] = data.I[i];
@@ -1105,7 +1105,7 @@ TEST(SignalProcessing, AGCRecoveryTime){
     float I[Nsamples];
     float Q[Nsamples];
     float32_t toneFreq_Hz = -440.0;
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
     
     DataBlock data;
     data.I = I;
@@ -1113,7 +1113,7 @@ TEST(SignalProcessing, AGCRecoveryTime){
     data.N = Nsamples;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    // SR[SampleRate].rate/filters.DF / Nsamples = 94 --> make it 100 
+    // SR[SampleRate].rate/RXfilters.DF / Nsamples = 94 --> make it 100 
     uint16_t Nreps1 = 100; // ~ 1 second
     uint16_t Nreps2 = 10;  // ~ 0.1 seconds
     uint16_t Nreps3 = 300; // ~ 3 seconds
@@ -1140,7 +1140,7 @@ TEST(SignalProcessing, AGCRecoveryTime){
                 ED.agc = AGCFast;
                 break;
         }
-        InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);
+        InitializeAGC(&agc,SR[SampleRate].rate/RXfilters.DF);
 
         char strbuf[50];
         for (size_t i = 0; i < Nreps1; i++){
@@ -1205,7 +1205,7 @@ TEST(SignalProcessing, DemodulateLSB){
     float I[Nsamples];
     float Q[Nsamples];
     float32_t toneFreq_Hz = -440.0;
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
     
     DataBlock data;
     data.I = I;
@@ -1215,9 +1215,9 @@ TEST(SignalProcessing, DemodulateLSB){
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz);
     
     bands[ED.currentBand[ED.activeVFO]].mode = LSB;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     float32_t preI = data.I[Nsamples/2];
-    Demodulate(&data, &filters);
+    Demodulate(&data, &RXfilters);
 
     // LSB and USB just copy I into Q
     EXPECT_FLOAT_EQ( data.I[0], data.Q[0] );
@@ -1232,7 +1232,7 @@ TEST(SignalProcessing, DemodulateUSB){
     float I[Nsamples];
     float Q[Nsamples];
     float32_t toneFreq_Hz = -440.0;
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
     
     DataBlock data;
     data.I = I;
@@ -1242,9 +1242,9 @@ TEST(SignalProcessing, DemodulateUSB){
     CreateIQTone(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz);
     
     bands[ED.currentBand[ED.activeVFO]].mode = USB;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     float32_t preI = data.I[Nsamples/2];
-    Demodulate(&data, &filters);
+    Demodulate(&data, &RXfilters);
 
     // LSB and USB just copy I into Q
     EXPECT_FLOAT_EQ( data.I[0], data.Q[0] );
@@ -1257,8 +1257,8 @@ void AM_IIR_filter_tone(float32_t toneFreq_Hz, DataBlock *dout, float32_t *gain)
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     DataBlock data;
     dout = &data;
     data.I = I;
@@ -1267,9 +1267,9 @@ void AM_IIR_filter_tone(float32_t toneFreq_Hz, DataBlock *dout, float32_t *gain)
     data.sampleRate_Hz = sampleRate_Hz;
     uint32_t phase = 0;
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    arm_biquad_cascade_df1_f32(&filters.biquadAudioLowPass, data.I, data.Q, data.N);
+    arm_biquad_cascade_df1_f32(&RXfilters.biquadAudioLowPass, data.I, data.Q, data.N);
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    arm_biquad_cascade_df1_f32(&filters.biquadAudioLowPass, data.I, data.Q, data.N);
+    arm_biquad_cascade_df1_f32(&RXfilters.biquadAudioLowPass, data.I, data.Q, data.N);
     arm_copy_f32(data.Q, data.I, data.N);
     // Find the max value in data.I
     float32_t amp = 0.0;
@@ -1306,7 +1306,7 @@ TEST(SignalProcessing, DemodulateAM){
     float I[Nsamples];
     float Q[Nsamples];
     float32_t toneFreq_Hz = 440.0;
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
     
     DataBlock data;
     data.I = I;
@@ -1315,7 +1315,7 @@ TEST(SignalProcessing, DemodulateAM){
     data.sampleRate_Hz = sampleRate_Hz;
     uint32_t phase = 0;
 
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     bands[ED.currentBand[ED.activeVFO]].mode = AM;
     char strbuf[50];
     for (size_t i = 0; i<3; i++){
@@ -1327,7 +1327,7 @@ TEST(SignalProcessing, DemodulateAM){
         sprintf(strbuf,"DemodAM_IQ_pass%d.txt",i+1);
         WriteIQFile(I,Q,strbuf,Nsamples);
         // Demodulate it
-        Demodulate(&data, &filters);
+        Demodulate(&data, &RXfilters);
         sprintf(strbuf,"DemodAM_demodded_pass%d.txt",i+1);
         WriteIQFile(I,Q,strbuf,Nsamples);
     }     
@@ -1346,10 +1346,10 @@ void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
    
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
-    memset(filters.eqSumBuffer, 0, sizeof(float32_t)*Nsamples);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
+    memset(RXfilters.eqSumBuffer, 0, sizeof(float32_t)*Nsamples);
     DataBlock data;
     dout = &data;
     data.I = I;
@@ -1360,24 +1360,24 @@ void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32
     // Need four iterations for the filter to "warm up" -- i.e., for the IIR filter state vector
     // to reach equilibrium -- at the lowest bands
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    ApplyEQBandFilter(&data, &filters, bf, RX);
+    ApplyEQBandFilter(&data, &RXfilters, bf, RX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    memset(filters.eqSumBuffer, 0, sizeof(float32_t)*data.N);
-    ApplyEQBandFilter(&data, &filters, bf, RX);
+    memset(RXfilters.eqSumBuffer, 0, sizeof(float32_t)*data.N);
+    ApplyEQBandFilter(&data, &RXfilters, bf, RX);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    memset(filters.eqSumBuffer, 0, sizeof(float32_t)*data.N);
-    ApplyEQBandFilter(&data, &filters, bf, RX);
+    memset(RXfilters.eqSumBuffer, 0, sizeof(float32_t)*data.N);
+    ApplyEQBandFilter(&data, &RXfilters, bf, RX);
 
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    memset(filters.eqSumBuffer, 0, sizeof(float32_t)*data.N);
-    ApplyEQBandFilter(&data, &filters, bf, RX);
+    memset(RXfilters.eqSumBuffer, 0, sizeof(float32_t)*data.N);
+    ApplyEQBandFilter(&data, &RXfilters, bf, RX);
     
     // Find the max value in data.I
     float32_t amp = -100.0;
     for (size_t i=0; i<data.N; i++){
-        if (filters.eqSumBuffer[i] > amp) amp = filters.eqSumBuffer[i];
+        if (RXfilters.eqSumBuffer[i] > amp) amp = RXfilters.eqSumBuffer[i];
     }
     *gain = amp/0.1;
 }
@@ -1433,8 +1433,8 @@ TEST(SignalProcessing, ReceiveEQFiltersCorrectly){
     float Qtn2[Nsamples];
     float Itn3[Nsamples];
     float Qtn3[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;   
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     DataBlock data;
     data.I = I;
     data.Q = Q;
@@ -1449,7 +1449,7 @@ TEST(SignalProcessing, ReceiveEQFiltersCorrectly){
         phase1 = CreateIQToneWithPhase(Itn1, Qtn1, Nsamples, sampleRate_Hz, band_low_Hz, phase1, 0.1);
         data.I = Itn1;
         data.Q = Qtn1;
-        BandEQ(&data, &filters, RX);
+        BandEQ(&data, &RXfilters, RX);
     }
     // Find the max value in data.I
     float32_t amp = -100.0;
@@ -1462,7 +1462,7 @@ TEST(SignalProcessing, ReceiveEQFiltersCorrectly){
         phase2 = CreateIQToneWithPhase(Itn2, Qtn2, Nsamples, sampleRate_Hz, band_mid_Hz, phase2, 0.1);
         data.I = Itn2;
         data.Q = Qtn2;
-        BandEQ(&data, &filters, RX);
+        BandEQ(&data, &RXfilters, RX);
     }
     amp = -100.0;
     for (size_t i=0; i<data.N; i++){
@@ -1474,7 +1474,7 @@ TEST(SignalProcessing, ReceiveEQFiltersCorrectly){
         phase3 = CreateIQToneWithPhase(Itn3, Qtn3, Nsamples, sampleRate_Hz, band_high_Hz, phase3, 0.1);
         data.I = Itn3;
         data.Q = Qtn3;
-        BandEQ(&data, &filters, RX);
+        BandEQ(&data, &RXfilters, RX);
     }
     amp = -100.0;
     for (size_t i=0; i<data.N; i++){
@@ -1487,8 +1487,8 @@ TEST(SignalProcessing, Kim1NR){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;   
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     InitializeKim1NoiseReduction();
     DataBlock data;
     data.I = I;
@@ -1518,8 +1518,8 @@ TEST(SignalProcessing, XanrNoise){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;   
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     InitializeXanrNoiseReduction();
     DataBlock data;
     data.I = I;
@@ -1549,8 +1549,8 @@ TEST(SignalProcessing, XanrNotch){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;   
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     InitializeXanrNoiseReduction();
     DataBlock data;
     data.I = I;
@@ -1580,8 +1580,8 @@ TEST(SignalProcessing, SpectralNoiseReduction){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;   
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     InitializeSpectralNoiseReduction();
     DataBlock data;
     data.I = I;
@@ -1611,9 +1611,9 @@ TEST(SignalProcessing, NoiseReduction){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;   
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;   
     ED.spectrum_zoom = SPECTRUM_ZOOM_1;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     InitializeSignalProcessing();
     DataBlock data;
     data.I = I;
@@ -1664,7 +1664,7 @@ TEST(SignalProcessing, NoiseReduction){
 }
 
 TEST(SignalProcessing, InitializeCWProcessing){
-    float32_t * sinbuf = InitializeCWProcessing(15, &filters);
+    float32_t * sinbuf = InitializeCWProcessing(15, &RXfilters);
     EXPECT_FLOAT_EQ(sinbuf[50],sin(50*2*PI*750.0/24000.0));
 }
 
@@ -1713,8 +1713,8 @@ TEST(SignalProcessing, CWProcessing){
      *     inter-word    = dit * 7
      */
     ED.decoderFlag = 1;
-    InitializeCWProcessing(wpm, &filters);
-    InitializeFilters(ED.spectrum_zoom,&filters);
+    InitializeCWProcessing(wpm, &RXfilters);
+    InitializeFilters(ED.spectrum_zoom,&RXfilters);
     int16_t ddp = 0;
     for (size_t k = 0; k<sizeof(morseMsg); k++){
         switch (morseMsg[k]){
@@ -1752,13 +1752,13 @@ TEST(SignalProcessing, CWProcessing){
     data.I = I;
     data.Q = Q;
     data.N = 256;
-    data.sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    data.sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
 
     uint32_t atomN;
     uint8_t mpoint = 0;
     FILE *file = fopen("CW_decoded_morse.txt", "w");    
     for (size_t k = 0; k<N_frames; k++){
-        phase = CreateIQToneWithPhase(I, Q, 256, SR[SampleRate].rate/filters.DF, 
+        phase = CreateIQToneWithPhase(I, Q, 256, SR[SampleRate].rate/RXfilters.DF, 
             CWToneOffsetsHz[ED.CWToneIndex], phase, 0.1);
         for (size_t j = 0; j<256; j++){
             atomN = (uint32_t)(((float32_t)k*256 + (float32_t)j)/samples_per_atom);
@@ -1766,7 +1766,7 @@ TEST(SignalProcessing, CWProcessing){
         }
         // Set the time so that the millis() function is correct-ish
         SetMillisTime((uint64_t)(100.0+(float32_t)(k+1)*256.0/24000.0*1000.0));
-        DoCWReceiveProcessing(&data, &filters);
+        DoCWReceiveProcessing(&data, &RXfilters);
         if (IsMorseCharacterBufferUpdated()){
             char *buff = GetMorseCharacterBuffer();
             // Find the last non-null character
@@ -1787,9 +1787,9 @@ void CW_filter_tone(float32_t toneFreq_Hz, DataBlock *dout, float32_t *gain){
     uint32_t Nsamples = 256;
     float I[Nsamples];
     float Q[Nsamples];
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
    
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     DataBlock data;
     dout = &data;
     data.I = I;
@@ -1799,16 +1799,16 @@ void CW_filter_tone(float32_t toneFreq_Hz, DataBlock *dout, float32_t *gain){
     uint32_t phase = 0;
     // Use four iterations for the filter to "warm up"
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    CWAudioFilter(&data, &filters);
+    CWAudioFilter(&data, &RXfilters);
     
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    CWAudioFilter(&data, &filters);
+    CWAudioFilter(&data, &RXfilters);
    
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    CWAudioFilter(&data, &filters);
+    CWAudioFilter(&data, &RXfilters);
 
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, toneFreq_Hz, phase, 0.1);
-    CWAudioFilter(&data, &filters);
+    CWAudioFilter(&data, &RXfilters);
     
     // Find the max value in data.I
     float32_t amp = -100.0;
@@ -1860,8 +1860,8 @@ TEST(SignalProcessing, Interpolate){
     float Q[Nsamples];
     CLEAR_VAR(I);
     CLEAR_VAR(Q);
-    float32_t sampleRate_Hz = SR[SampleRate].rate/filters.DF;
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     DataBlock data;
     data.I = I;
     data.Q = Q;
@@ -1871,7 +1871,7 @@ TEST(SignalProcessing, Interpolate){
     // Do a sacrificial run to "warm up" the filters
     uint32_t phase = 0;
     phase = CreateIQToneWithPhase(I, Q, 256, sampleRate_Hz, 440.0, phase, 0.1);
-    InterpolateReceiveData(&data, &filters);
+    InterpolateReceiveData(&data, &RXfilters);
     // Reset the data and run it for real
     CLEAR_VAR(I);
     CLEAR_VAR(Q);
@@ -1879,7 +1879,7 @@ TEST(SignalProcessing, Interpolate){
     data.sampleRate_Hz = sampleRate_Hz;
     phase = CreateIQToneWithPhase(I, Q, 256, sampleRate_Hz, 440.0, phase, 0.1);
     WriteIQFile(I,Q,"Interpolate_pre.txt",READ_BUFFER_SIZE);
-    InterpolateReceiveData(&data, &filters);
+    InterpolateReceiveData(&data, &RXfilters);
     WriteIQFile(I,Q,"Interpolate_post.txt",READ_BUFFER_SIZE);
     EXPECT_EQ(data.N,READ_BUFFER_SIZE);
     EXPECT_EQ(data.sampleRate_Hz, SR[SampleRate].rate);    
@@ -1899,7 +1899,7 @@ TEST(SignalProcessing, AdjustVolume){
     float Q[Nsamples];
     float32_t sampleRate_Hz = SR[SampleRate].rate;
    
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     DataBlock data;
     data.I = I;
     data.Q = Q;
@@ -1908,18 +1908,18 @@ TEST(SignalProcessing, AdjustVolume){
 
     uint32_t phase = 0;
     phase = CreateIQToneWithPhase(I, Q, Nsamples, sampleRate_Hz, 440.0, phase, 0.1);
-    AdjustVolume(&data, &filters);
+    AdjustVolume(&data, &RXfilters);
     float32_t amp = -100.0;
     for (size_t i=0; i<data.N; i++){
         if (data.I[i] > amp) amp = data.I[i];
     }
-    EXPECT_FLOAT_EQ(amp, 0.1*filters.DF*VolumeToAmplification(ED.audioVolume));
+    EXPECT_FLOAT_EQ(amp, 0.1*RXfilters.DF*VolumeToAmplification(ED.audioVolume));
 }
 
 TEST(SignalProcessing, PlayBuffer){
     Q_out_L.setName("PlayBuffer_L.txt");
     Q_out_R.setName("PlayBuffer_R.txt");
-    InitializeFilters(SPECTRUM_ZOOM_1, &filters);
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
     uint32_t Nsamples = 2048;
     float I[Nsamples];
     float Q[Nsamples];
@@ -1960,8 +1960,8 @@ TEST(SignalProcessing, ReceiveProcessing){
 
     ED.agc = AGCOff;
 
-    InitializeFilters(ED.spectrum_zoom,&filters);
-    InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);
+    InitializeFilters(ED.spectrum_zoom,&RXfilters);
+    InitializeAGC(&agc,SR[SampleRate].rate/RXfilters.DF);
 
     DataBlock *data;
     data = ReceiveProcessing("ReceiveProcessing_buffer1.txt");
@@ -1996,8 +1996,8 @@ TEST(SignalProcessing, ReceiveProcessing){
     ED.nrOptionSelect = NROff;
     ED.fineTuneFreq_Hz = -48000.0;
 
-    InitializeFilters(ED.spectrum_zoom,&filters);
-    InitializeAGC(&agc,SR[SampleRate].rate/filters.DF);
+    InitializeFilters(ED.spectrum_zoom,&RXfilters);
+    InitializeAGC(&agc,SR[SampleRate].rate/RXfilters.DF);
 
     DataBlock *data;
     // 100 iterations is roughly 1 second. Run for 175 seconds.

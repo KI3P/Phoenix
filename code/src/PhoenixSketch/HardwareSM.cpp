@@ -34,8 +34,8 @@
  * This module coordinates the following hardware subsystems:
  * - VFOs (RF board Si5351): SSB and CW local oscillators
  * - Attenuators: RX (RF board GPA) and TX (RF board GPB) signal level control
- * - BPF Board: Band-pass filters for RX and TX paths
- * - LPF Board: Low-pass filters for harmonic suppression
+ * - BPF Board: Band-pass RXfilters for RX and TX paths
+ * - LPF Board: Low-pass RXfilters for harmonic suppression
  * - TX/RX Switching: Relay control for antenna routing
  * - Modulation Selection: SSB vs CW modulation routing
  * - Calibration Feedback: IQ calibration signal path
@@ -53,7 +53,7 @@
  * ------------------------------
  * - Called from main Loop: UpdateRFHardwareState() in each iteration
  * - Uses RFBoard.cpp functions for low-level hardware control
- * - Reads ED (EEPROM Data) for band-specific settings (attenuation, filters)
+ * - Reads ED (EEPROM Data) for band-specific settings (attenuation, RXfilters)
  * - Coordinates with Tune.cpp for VFO frequency management
  *
  * REAL-TIME CONSIDERATIONS
@@ -108,8 +108,8 @@ errno_t InitializeRFBoard(void){
  * @brief Initialize all RF hardware subsystems
  *
  * Top-level initialization function that initializes:
- * - LPF Board (low-pass filters)
- * - BPF Board (band-pass filters)
+ * - LPF Board (low-pass RXfilters)
+ * - BPF Board (band-pass RXfilters)
  * - RF Board (VFOs, attenuators, TX/RX switching)
  *
  * This function should be called once during system startup before
@@ -436,7 +436,7 @@ void HandleTuneState(TuneState tuneState){
     SelectLPFBand(ED.currentBand[ED.activeVFO]);
     SelectBPFBand(ED.currentBand[ED.activeVFO]);
     SelectAntenna(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
-    UpdateFIRFilterMask(&filters);
+    UpdateFIRFilterMask(&RXfilters);
     switch (tuneState){
         case TuneReceive:{
             // CW/SSB Receive:  RXfreq = centerFreq_Hz - fineTuneFreq_Hz - SampleRate/4

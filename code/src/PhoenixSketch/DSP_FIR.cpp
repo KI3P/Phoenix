@@ -148,7 +148,7 @@ float32_t CW_Filter_Coeffs[40] = {
 };
 
 //=================== Excite Coefficients ============
-//48 Tap Kaiser 192KHz 8HKZ Fc filters Dec and Interpolation
+//48 Tap Kaiser 192KHz 8HKZ Fc RXfilters Dec and Interpolation
 float32_t coeffs192K_10K_LPF_FIR[48] = {
   -9.489855110236549150E-6,
   162.0562443716462440E-6,
@@ -354,7 +354,7 @@ float32_t FIR_int3_12ksps_48tap_2k7[48] = {
 -2.285169471669272310E-6,
 };
 
-//4 pole Butterworth IIR biQuad filters for EQ  Band 1 thru 14
+//4 pole Butterworth IIR biQuad RXfilters for EQ  Band 1 thru 14
 float32_t EQ_Band1Coeffs[20] = {      //  fc=198.425 BW=60.4, 4 pole Gaussian 1/3 octave
   -0.010740354324803263, 0.000000000000000000, 0.010740354324803263, 1.977760288071182870, -0.980176703912204905,
   -0.010717730957944621, 0.000000000000000000, 0.010717730957944621, 1.975162619174023470, -0.978112070242933007,
@@ -1212,7 +1212,7 @@ void SetIIRCoeffs(float32_t *coefficient_set, float32_t f0, float32_t Q, float32
   /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     Cascaded biquad (notch, peak, lowShelf, highShelf) [DD4WH, april 2016]
     ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-  // DSP Audio-EQ-cookbook for generating the coeffs of the filters on the fly
+  // DSP Audio-EQ-cookbook for generating the coeffs of the RXfilters on the fly
   // www.musicdsp.org/files/Audio-EQ-Cookbook.txt  [by Robert Bristow-Johnson]
   // https://www.w3.org/2011/audio/audio-eq-cookbook.html
   // the ARM algorithm assumes the biquad form
@@ -1298,14 +1298,14 @@ void decimate_f32(float32_t *in_buffer, float32_t *out_buffer, uint16_t M, uint3
 /**
  * Calculate the FFT of the FIR filter coefficients once to produce the FIR filter mask.
  */
-void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
+void InitFilterMask(float32_t *FIR_filter_mask, ReceiveFilterConfig *RXfilters) {
     // the FIR has exactly m_NumTaps = (FFT_length / 2) + 1 coefficients, 
     // so we have to add (FFT_length / 2) -1 zeros before the FFT in order to produce a FFT_length 
     // point input buffer for the FFT
     // copy coefficients into real values of first part of buffer, rest is zero
 
-    float32_t FIR_Coef_I[filters->m_NumTaps];
-    float32_t FIR_Coef_Q[filters->m_NumTaps];
+    float32_t FIR_Coef_I[RXfilters->m_NumTaps];
+    float32_t FIR_Coef_Q[RXfilters->m_NumTaps];
     int32_t high_Hz, low_Hz;
     if (ED.modulation[ED.activeVFO] == bands[ED.currentBand[ED.activeVFO]].mode){
         high_Hz = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
@@ -1330,12 +1330,12 @@ void InitFilterMask(float32_t *FIR_filter_mask, FilterConfig *filters) {
                 break;
         }
     }
-    CalcCplxFIRCoeffs(FIR_Coef_I, FIR_Coef_Q, filters->m_NumTaps, 
+    CalcCplxFIRCoeffs(FIR_Coef_I, FIR_Coef_Q, RXfilters->m_NumTaps, 
         (float32_t)low_Hz, 
         (float32_t)high_Hz, 
-        (float)SR[SampleRate].rate / filters->DF);
+        (float)SR[SampleRate].rate / RXfilters->DF);
 
-    for (size_t i = 0; i < filters->m_NumTaps; i++) {
+    for (size_t i = 0; i < RXfilters->m_NumTaps; i++) {
         FIR_filter_mask[i * 2] = FIR_Coef_I[i];
         FIR_filter_mask[i * 2 + 1] = FIR_Coef_Q[i];
     }

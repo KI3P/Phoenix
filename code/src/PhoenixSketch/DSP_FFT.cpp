@@ -272,72 +272,72 @@ void FreqShiftF2(float32_t *I, float32_t *Q, uint32_t blocksize,
 
 /**
  * Update the FIR filter mask for convolution filtering
- * @param filters Filter configuration structure
+ * @param RXfilters Filter configuration structure
  *
  * Recalculates the frequency-domain filter mask used by ConvolutionFilter().
  * Should be called whenever filter parameters change (e.g., bandwidth adjustments).
  */
-void UpdateFIRFilterMask(FilterConfig *filters){
+void UpdateFIRFilterMask(ReceiveFilterConfig *RXfilters){
     // FIR filter mask
-    InitFilterMask(FIR_filter_mask, filters);
+    InitFilterMask(FIR_filter_mask, RXfilters);
 }
 
 /**
  * Calculate the filter coefficients. This is done once at startup.
  * @param spectrum_zoom The spectrum zoom state 
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  */
-void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
+void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
     // ****************************************************************************************
-	// *  Zoom FFT: Initiate decimation and interpolation FIR filters AND IIR filters
+	// *  Zoom FFT: Initiate decimation and interpolation FIR RXfilters AND IIR RXfilters
 	// ****************************************************************************************
     
-    ZoomFFTPrep(spectrum_zoom, filters);
-    for (unsigned i = 0; i < 4 * filters->IIR_biquad_Zoom_FFT_N_stages; i++) {
-        filters->biquadZoomI.pState[i] = 0.0;  // set state variables to zero
-        filters->biquadZoomQ.pState[i] = 0.0;  // set state variables to zero
+    ZoomFFTPrep(spectrum_zoom, RXfilters);
+    for (unsigned i = 0; i < 4 * RXfilters->IIR_biquad_Zoom_FFT_N_stages; i++) {
+        RXfilters->biquadZoomI.pState[i] = 0.0;  // set state variables to zero
+        RXfilters->biquadZoomQ.pState[i] = 0.0;  // set state variables to zero
     }
 
     // *********************************************
     // * Audio lowpass filter
     // *********************************************
-    for (unsigned i = 0; i < 4 * filters->N_stages_biquad_lowpass1; i++) {
-        filters->biquadAudioLowPass.pState[i] = 0.0;  // set state variables to zero
+    for (unsigned i = 0; i < 4 * RXfilters->N_stages_biquad_lowpass1; i++) {
+        RXfilters->biquadAudioLowPass.pState[i] = 0.0;  // set state variables to zero
     }
     // adjust IIR AM filter
     int32_t LP_F_help = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
     if (LP_F_help < -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz)
         LP_F_help = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
-    SetIIRCoeffs(filters->biquad_lowpass1_coeffs, 
+    SetIIRCoeffs(RXfilters->biquad_lowpass1_coeffs, 
             (float32_t)LP_F_help, 1.3, 
-            (float32_t)SR[SampleRate].rate / filters->DF, Lowpass);
+            (float32_t)SR[SampleRate].rate / RXfilters->DF, Lowpass);
 
     // ****************************************************************************************
-	// *  Decimate: filters involved with decimate by 2 and decimate by 4
+	// *  Decimate: RXfilters involved with decimate by 2 and decimate by 4
 	// ****************************************************************************************
-    InitializeDecimationFilter(&filters->DecimateRxStage1, filters->DF1, (float32_t)SR[SampleRate].rate,
-                                filters->n_att_dB, filters->n_desired_BW_Hz, READ_BUFFER_SIZE);
-    InitializeDecimationFilter(&filters->DecimateRxStage2, filters->DF2, (float32_t)SR[SampleRate].rate / filters->DF1,
-                                filters->n_att_dB, filters->n_desired_BW_Hz, READ_BUFFER_SIZE/filters->DF1);
+    InitializeDecimationFilter(&RXfilters->DecimateRxStage1, RXfilters->DF1, (float32_t)SR[SampleRate].rate,
+                                RXfilters->n_att_dB, RXfilters->n_desired_BW_Hz, READ_BUFFER_SIZE);
+    InitializeDecimationFilter(&RXfilters->DecimateRxStage2, RXfilters->DF2, (float32_t)SR[SampleRate].rate / RXfilters->DF1,
+                                RXfilters->n_att_dB, RXfilters->n_desired_BW_Hz, READ_BUFFER_SIZE/RXfilters->DF1);
 
     // FIR filter mask
-    InitFilterMask(FIR_filter_mask, filters); 
+    InitFilterMask(FIR_filter_mask, RXfilters); 
 
-    // Equalizer filters
+    // Equalizer RXfilters
     for (size_t i = 0; i<14; i++){
-        for (size_t j = 0; j < filters->eqNumStages*2; j++) {
-            filters->S_Rec[i].pState[j] = 0;
-            filters->S_Xmt[i].pState[j] = 0;
+        for (size_t j = 0; j < RXfilters->eqNumStages*2; j++) {
+            RXfilters->S_Rec[i].pState[j] = 0;
+            RXfilters->S_Xmt[i].pState[j] = 0;
         }
         // Set coefficient pointers now that EQ_Coeffs is guaranteed to be initialized
-        filters->S_Rec[i].pCoeffs = *EQ_Coeffs[i];
-        filters->S_Xmt[i].pCoeffs = *EQ_Coeffs[i];
+        RXfilters->S_Rec[i].pCoeffs = *EQ_Coeffs[i];
+        RXfilters->S_Xmt[i].pCoeffs = *EQ_Coeffs[i];
     }
 
-    // Interpolation filters
-    CalcFIRCoeffs(filters->FIR_int1_coeffs, 48, (float32_t)(filters->n_desired_BW_Hz), filters->n_att_dB, 
-                    Lowpass, 0.0, SR[SampleRate].rate / filters->DF1);
-    CalcFIRCoeffs(filters->FIR_int2_coeffs, 32, (float32_t)(filters->n_desired_BW_Hz), filters->n_att_dB, 
+    // Interpolation RXfilters
+    CalcFIRCoeffs(RXfilters->FIR_int1_coeffs, 48, (float32_t)(RXfilters->n_desired_BW_Hz), RXfilters->n_att_dB, 
+                    Lowpass, 0.0, SR[SampleRate].rate / RXfilters->DF1);
+    CalcFIRCoeffs(RXfilters->FIR_int2_coeffs, 32, (float32_t)(RXfilters->n_desired_BW_Hz), RXfilters->n_att_dB, 
                     Lowpass, 0.0, (float32_t)SR[SampleRate].rate);
 
 }
@@ -345,10 +345,10 @@ void InitializeFilters(uint32_t spectrum_zoom, FilterConfig *filters) {
 /**
  * Initialize transmit decimation and interpolation filter structures. This is done once at startup.
  *
- * Sets up the complete transmit DSP chain filters:
- * - Decimation filters (192k->48k, 48k->24k, 24k->12k)
- * - Hilbert transform filters for SSB generation
- * - Interpolation filters (12k->24k, 24k->48k, 48k->192k)
+ * Sets up the complete transmit DSP chain RXfilters:
+ * - Decimation RXfilters (192k->48k, 48k->24k, 24k->12k)
+ * - Hilbert transform RXfilters for SSB generation
+ * - Interpolation RXfilters (12k->24k, 24k->48k, 48k->192k)
  * All filter states are cleared and ARM DSP filter instances are initialized.
  * 
  * @param TXfilters Struct holding the filter variables and objects
@@ -453,7 +453,7 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
             break;
     }
     // Calculate the new FIR filter mask
-    UpdateFIRFilterMask(&filters);
+    UpdateFIRFilterMask(&RXfilters);
 }
 
 /**
@@ -461,16 +461,16 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
  * functions performed during a zoom FFT.
  * 
  * @param spectrum_zoom The zoom selection, ranges from SPECTRUM_ZOOM_MIN to SPECTRUM_ZOOM_MAX
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  */
-void ZoomFFTPrep(uint32_t spectrum_zoom, FilterConfig *filters){ 
+void ZoomFFTPrep(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters){ 
     // take value of spectrum_zoom and initialize IIR lowpass filter for the right values
-    filters->zoom_M = (1 << spectrum_zoom);
+    RXfilters->zoom_M = (1 << spectrum_zoom);
     // this sets the coefficients for the ZoomFFT decimation filter
     // according to the desired magnification mode
     // for 0 the mag_coeffs will a NULL  ptr, since the filter is not going to be used in this mode!
-    filters->biquadZoomI.pCoeffs = mag_coeffs[spectrum_zoom];
-    filters->biquadZoomQ.pCoeffs = mag_coeffs[spectrum_zoom];
+    RXfilters->biquadZoomI.pCoeffs = mag_coeffs[spectrum_zoom];
+    RXfilters->biquadZoomQ.pCoeffs = mag_coeffs[spectrum_zoom];
     zoom_sample_ptr = 0;
 }
 
@@ -493,12 +493,12 @@ void ZoomFFTPrep(uint32_t spectrum_zoom, FilterConfig *filters){
  * 
  * @param data Pointer to the DataBlock to act upon
  * @param spectrum_zoom The zoom factor
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  * @return true if we calculated a PSD, false if we did not
  * 
  * The resulting PSD is written to the psdnew global array. 
  */
-bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, FilterConfig *filters)
+bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters)
 {
     if (spectrum_zoom == SPECTRUM_ZOOM_1) {
         // No decimation required
@@ -508,11 +508,11 @@ bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, FilterConfig *filters)
     float32_t x_buffer[data->N];
     float32_t y_buffer[data->N];
     // We use a biquad to filter first,
-    arm_biquad_cascade_df1_f32 (&(filters->biquadZoomI), data->I, x_buffer, data->N);
-    arm_biquad_cascade_df1_f32 (&(filters->biquadZoomQ), data->Q, y_buffer, data->N);
+    arm_biquad_cascade_df1_f32 (&(RXfilters->biquadZoomI), data->I, x_buffer, data->N);
+    arm_biquad_cascade_df1_f32 (&(RXfilters->biquadZoomQ), data->Q, y_buffer, data->N);
     // then decimate. We don't need a FIR decimate because of the IIR filter
-    decimate_f32(x_buffer,x_buffer,filters->zoom_M,data->N);
-    decimate_f32(y_buffer,y_buffer,filters->zoom_M,data->N);
+    decimate_f32(x_buffer,x_buffer,RXfilters->zoom_M,data->N);
+    decimate_f32(y_buffer,y_buffer,RXfilters->zoom_M,data->N);
     
     // and then copy the decimated samples into the FFT buffer, but no more than SPECTRUM_RES of them
     uint32_t Nsamples = data->N / (1 << spectrum_zoom); // Samples after decimation
@@ -544,17 +544,17 @@ bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, FilterConfig *filters)
  * sampled at SR[SampleRate].rate / 4.
  * 
  * @param data Pointer to the DataBlock to act upon
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  */
-errno_t DecimateBy2(DataBlock *data, FilterConfig *filters){
+errno_t DecimateBy2(DataBlock *data, ReceiveFilterConfig *RXfilters){
     // decimation-by-2 in-place
-    if (data->N != READ_BUFFER_SIZE/filters->DF1){
+    if (data->N != READ_BUFFER_SIZE/RXfilters->DF1){
         return EFAIL;
     }
-    arm_fir_decimate_f32(&(filters->DecimateRxStage2.FIR_dec_I), data->I, data->I, data->N);
-    arm_fir_decimate_f32(&(filters->DecimateRxStage2.FIR_dec_Q), data->Q, data->Q, data->N);
-    data->N = data->N/filters->DF2;
-    data->sampleRate_Hz = data->sampleRate_Hz/filters->DF2;
+    arm_fir_decimate_f32(&(RXfilters->DecimateRxStage2.FIR_dec_I), data->I, data->I, data->N);
+    arm_fir_decimate_f32(&(RXfilters->DecimateRxStage2.FIR_dec_Q), data->Q, data->Q, data->N);
+    data->N = data->N/RXfilters->DF2;
+    data->sampleRate_Hz = data->sampleRate_Hz/RXfilters->DF2;
     return ESUCCESS;
 }
 
@@ -563,17 +563,17 @@ errno_t DecimateBy2(DataBlock *data, FilterConfig *filters){
  * sampled at the original sample rate SR[SampleRate].rate
  * 
  * @param data Pointer to the DataBlock to act upon
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  */
-errno_t DecimateBy4(DataBlock *data, FilterConfig *filters){
+errno_t DecimateBy4(DataBlock *data, ReceiveFilterConfig *RXfilters){
     // decimation-by-4 in-place
     if (data->N != READ_BUFFER_SIZE){
         return EFAIL;
     }
-    arm_fir_decimate_f32(&(filters->DecimateRxStage1.FIR_dec_I), data->I, data->I, data->N);
-    arm_fir_decimate_f32(&(filters->DecimateRxStage1.FIR_dec_Q), data->Q, data->Q, data->N);
-    data->N = data->N/filters->DF1;
-    data->sampleRate_Hz = data->sampleRate_Hz/filters->DF1;
+    arm_fir_decimate_f32(&(RXfilters->DecimateRxStage1.FIR_dec_I), data->I, data->I, data->N);
+    arm_fir_decimate_f32(&(RXfilters->DecimateRxStage1.FIR_dec_Q), data->Q, data->Q, data->N);
+    data->N = data->N/RXfilters->DF1;
+    data->sampleRate_Hz = data->sampleRate_Hz/RXfilters->DF1;
     return ESUCCESS;
 }
 
@@ -584,12 +584,12 @@ errno_t DecimateBy4(DataBlock *data, FilterConfig *filters){
  * original sample rate SR[SampleRate].rate
  * 
  * @param data Pointer to the DataBlock to act upon
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  */
-errno_t DecimateBy8(DataBlock *data, FilterConfig *filters){
+errno_t DecimateBy8(DataBlock *data, ReceiveFilterConfig *RXfilters){
     errno_t err;
-    err = DecimateBy4(data, filters);
-    err += DecimateBy2(data, filters);
+    err = DecimateBy4(data, RXfilters);
+    err += DecimateBy2(data, RXfilters);
     return err;
 }
 
@@ -600,18 +600,18 @@ errno_t DecimateBy8(DataBlock *data, FilterConfig *filters){
  * Method used here: overlap-and-save.
  * 
  * @param data Pointer to the DataBlock to act upon
- * @param filters Struct holding the filter variables and objects
+ * @param RXfilters Struct holding the filter variables and objects
  */
-errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fname){
+errno_t ConvolutionFilter(DataBlock *data, ReceiveFilterConfig *RXfilters, const char *fname){
     // Prepare the audio signal buffers. Filter operates on 512 complex samples. Each 
     // block that is read from the ADC starts as READ_BUFFER_SIZE (2048) samples. 
     // It is then decimated by M (8) so that the buffers I & Q are only blocksize 
     // (256) samples. Note that last_sample_buffer_L,R will start as all zeros 
     // because they are declared as static.
 
-    // block size = READ_BUFFER_SIZE / (uint32_t)(filters->DF) = 256
+    // block size = READ_BUFFER_SIZE / (uint32_t)(RXfilters->DF) = 256
 
-    if (data->N != READ_BUFFER_SIZE / filters->DF){
+    if (data->N != READ_BUFFER_SIZE / RXfilters->DF){
         return EFAIL;
     }
 
@@ -649,7 +649,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
 
     // The filter mask is initialized using InitFilterMask(). Only need to do 
     // this once for each filter setting.Allows efficient real-time variable LP 
-    // and HP audio filters, without the overhead of time-domain convolution 
+    // and HP audio RXfilters, without the overhead of time-domain convolution 
     // filtering. Complex multiply filter mask with the frequency domain audio data.
     arm_cmplx_mult_cmplx_f32(buffer_spec_FFT, FIR_filter_mask, iFFT_buffer, FFT_LENGTH);
     
@@ -696,7 +696,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
 /**
  * Apply a single equalizer band filter to the audio data
  * @param data Data block containing audio samples to filter
- * @param filters Filter configuration structure containing EQ filter instances
+ * @param RXfilters Filter configuration structure containing EQ filter instances
  * @param bf Band filter index (0-13 for 14 EQ bands)
  * @param TXRX RX or TX mode selector
  *
@@ -704,7 +704,7 @@ errno_t ConvolutionFilter(DataBlock *data, FilterConfig *filters, const char *fn
  * gain setting, and accumulates result in eqSumBuffer. Handles NaN detection
  * and recovery in filter state. Alternating bands have inverted sign.
  */
-void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXType TXRX){
+void ApplyEQBandFilter(DataBlock *data, ReceiveFilterConfig *RXfilters, uint8_t bf, TXRXType TXRX){
     int sign = 1;
     if (bf%2 == 0) sign = -1;
     float32_t scale;
@@ -713,29 +713,29 @@ void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXT
 
     // Fix the weird bug where the pState array gets a nan in it upon entering loop
     // after a power cycle
-    for (size_t i = 0; i < 2*filters->eqNumStages; i++){
-        if (isnan(filters->S_Rec[bf].pState[i])){
-            memset(filters->S_Rec[bf].pState,0,sizeof(float32_t)*2*filters->eqNumStages);
+    for (size_t i = 0; i < 2*RXfilters->eqNumStages; i++){
+        if (isnan(RXfilters->S_Rec[bf].pState[i])){
+            memset(RXfilters->S_Rec[bf].pState,0,sizeof(float32_t)*2*RXfilters->eqNumStages);
             break;
         }
     }
 
     // Filter I with this band's biquad
     if (TXRX == RX){
-        arm_biquad_cascade_df2T_f32(&filters->S_Rec[bf], data->I, filters->eqFiltBuffer, data->N);
+        arm_biquad_cascade_df2T_f32(&RXfilters->S_Rec[bf], data->I, RXfilters->eqFiltBuffer, data->N);
     }else{
-        arm_biquad_cascade_df2T_f32(&filters->S_Xmt[bf], data->I, filters->eqFiltBuffer, data->N);
+        arm_biquad_cascade_df2T_f32(&RXfilters->S_Xmt[bf], data->I, RXfilters->eqFiltBuffer, data->N);
     }
     // Scale the amplitude by the overall level scaler
-    arm_scale_f32(filters->eqFiltBuffer, (float32_t)sign*scale, filters->eqFiltBuffer, data->N);
+    arm_scale_f32(RXfilters->eqFiltBuffer, (float32_t)sign*scale, RXfilters->eqFiltBuffer, data->N);
     // Add to the accumulator buffer
-    arm_add_f32(filters->eqSumBuffer, filters->eqFiltBuffer, filters->eqSumBuffer, data->N);
+    arm_add_f32(RXfilters->eqSumBuffer, RXfilters->eqFiltBuffer, RXfilters->eqSumBuffer, data->N);
 }
 
 /**
  * Apply 14-band graphic equalizer to audio signal
  * @param data Data block containing audio samples (I channel only)
- * @param filters Filter configuration structure
+ * @param RXfilters Filter configuration structure
  * @param TXRX RX or TX mode selector
  *
  * Processes audio through all EQUALIZER_CELL_COUNT (14) equalizer bands, 
@@ -743,15 +743,15 @@ void ApplyEQBandFilter(DataBlock *data, FilterConfig *filters, uint8_t bf, TXRXT
  * original data in data->I. Uses either receive or transmit EQ settings 
  * based on TXRX parameter.
  */
-void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX){
-    // Apply 14 successive filters, accumulating in filters->eqSumBuffer as we go
-    memset(filters->eqSumBuffer, 0, sizeof(float32_t) * (READ_BUFFER_SIZE/filters->DF));
+void BandEQ(DataBlock *data, ReceiveFilterConfig *RXfilters, TXRXType TXRX){
+    // Apply 14 successive RXfilters, accumulating in RXfilters->eqSumBuffer as we go
+    memset(RXfilters->eqSumBuffer, 0, sizeof(float32_t) * (READ_BUFFER_SIZE/RXfilters->DF));
     for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ApplyEQBandFilter(data, filters, i, TXRX);
+        ApplyEQBandFilter(data, RXfilters, i, TXRX);
     }
     // Overwrite data->I with the filtered and accumulated data
     for (size_t i =0; i<data->N; i++){
-        data->I[i] = filters->eqSumBuffer[i];
+        data->I[i] = RXfilters->eqSumBuffer[i];
     }
 }
 
@@ -764,7 +764,7 @@ void BandEQ(DataBlock *data, FilterConfig *filters, TXRXType TXRX){
  * @param data Pointer to DataBlock containing I (real) channel buffer (in/out) and Q (imaginary) channel buffer (in/out)
  * @param TXfilters Pointer to TransmitFilterConfig struct containing filter objects
  *
- * Applies 45-degree and -45-degree phase shift FIR filters to create quadrature
+ * Applies 45-degree and -45-degree phase shift FIR RXfilters to create quadrature
  * signals from real audio input. Operates at 12 kHz sample rate with 128-sample
  * blocks. Used in transmit chain for SSB generation.
  */

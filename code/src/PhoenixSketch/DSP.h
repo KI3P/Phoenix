@@ -16,11 +16,11 @@ void ApplyIQCorrection(DataBlock *data, float32_t amp_factor, float32_t phs_fact
 void InitializeAGC(AGCConfig *a, uint32_t sampleRate_Hz);
 void AGC(DataBlock *data, AGCConfig *a);
 void InitializeSignalProcessing(void);
-void Demodulate(DataBlock *data, FilterConfig *filters);
+void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters);
 void NoiseReduction(DataBlock *data);
-void InterpolateReceiveData(DataBlock *data, FilterConfig *filters);
+void InterpolateReceiveData(DataBlock *data, ReceiveFilterConfig *RXfilters);
 float32_t VolumeToAmplification(int32_t volume);
-void AdjustVolume(DataBlock *data, FilterConfig *filters);
+void AdjustVolume(DataBlock *data, ReceiveFilterConfig *RXfilters);
 void PlayBuffer(DataBlock *data);
 
 #endif // SIGNALPROCESSING_H

@@ -35,18 +35,18 @@ char *bigMorseCodeTree = (char *)"-EISH5--4--V---3--UF--------?-2--ARL---------.
 /**
  * Initialize CW processing and decoder
  * @param wpm Words per minute for initial decoder speed
- * @param filters Filter configuration containing decimation factor
+ * @param RXfilters Filter configuration containing decimation factor
  * @return Pointer to sine buffer used for CW tone correlation
  *
  * Generates a reference sine wave at the CW tone frequency for correlation-based
  * detection. Resets decoder histograms and sets initial dit length based on WPM.
  */
-float32_t * InitializeCWProcessing(uint32_t wpm, FilterConfig *filters){
+float32_t * InitializeCWProcessing(uint32_t wpm, ReceiveFilterConfig *RXfilters){
     float32_t theta = 0.0;
     // phs = 2 * PI * freqSideTone / 24000
     float32_t phs = 2.0 * PI * CWToneOffsetsHz[ED.CWToneIndex] 
-            / ((float32_t)SR[SampleRate].rate/(float32_t)filters->DF);
-    for (uint32_t kf = 0; kf < READ_BUFFER_SIZE/filters->DF; kf++) {
+            / ((float32_t)SR[SampleRate].rate/(float32_t)RXfilters->DF);
+    for (uint32_t kf = 0; kf < READ_BUFFER_SIZE/RXfilters->DF; kf++) {
         theta = kf * phs;  
         sinBuffer[kf] = sin(theta);
     }
@@ -58,14 +58,14 @@ float32_t * InitializeCWProcessing(uint32_t wpm, FilterConfig *filters){
 /**
  * Process CW receive signals using correlation and Goertzel detection
  * @param data Data block containing I/Q samples to process
- * @param filters Filter configuration including CW decode FIR filter
+ * @param RXfilters Filter configuration including CW decode FIR filter
  *
  * Applies FIR filtering to incoming signal, then uses both correlation with a
  * reference sine wave and Goertzel magnitude detection to identify CW signals.
  * Combined coefficient determines if signal is present and drives the decoder.
  * Updates CW lock status based on signal strength. Only active when decoder is enabled.
  */
-void DoCWReceiveProcessing(DataBlock *data, FilterConfig *filters) {
+void DoCWReceiveProcessing(DataBlock *data, ReceiveFilterConfig *RXfilters) {
     float32_t goertzelMagnitude;
     uint8_t audioTemp;
     float32_t corrResult;
@@ -74,7 +74,7 @@ void DoCWReceiveProcessing(DataBlock *data, FilterConfig *filters) {
 
     // Park McClellan FIR filter const Group delay
     // Note that data-Q contains duplicate data as this is after demod
-    arm_fir_f32(&filters->FIR_CW_Decode, data->I, float_buffer_CW, 256);
+    arm_fir_f32(&RXfilters->FIR_CW_Decode, data->I, float_buffer_CW, 256);
 
     if (ED.decoderFlag == 1) {
         // Calculate correlation between calc sine and incoming signal
@@ -506,7 +506,7 @@ void ResetHistograms() {
 /**
  * Apply selected CW audio filter to received signal
  * @param data Data block containing I/Q audio samples to filter
- * @param filters Filter configuration containing CW audio filter instances
+ * @param RXfilters Filter configuration containing CW audio filter instances
  *
  * Applies the currently selected CW audio filter based on ED.CWFilterIndex:
  *   0: 0.8 KHz bandwidth
@@ -517,26 +517,26 @@ void ResetHistograms() {
  *   5: Off (no filtering)
  * Data from I channel is filtered. Filtered output is placed in data->I and data->Q 
  */
-void CWAudioFilter(DataBlock *data, FilterConfig *filters){
+void CWAudioFilter(DataBlock *data, ReceiveFilterConfig *RXfilters){
     switch (ED.CWFilterIndex) {
         case 0: // 0.8 KHz
-            arm_biquad_cascade_df2T_f32(&filters->S1_CW_AudioFilter1, data->I, data->Q, data->N);
+            arm_biquad_cascade_df2T_f32(&RXfilters->S1_CW_AudioFilter1, data->I, data->Q, data->N);
             arm_copy_f32(data->Q, data->I, data->N);
             break;
         case 1: // 1.0 KHz
-            arm_biquad_cascade_df2T_f32(&filters->S1_CW_AudioFilter2, data->I, data->Q, data->N);
+            arm_biquad_cascade_df2T_f32(&RXfilters->S1_CW_AudioFilter2, data->I, data->Q, data->N);
             arm_copy_f32(data->Q, data->I, data->N);
             break;
         case 2: // 1.3 KHz
-            arm_biquad_cascade_df2T_f32(&filters->S1_CW_AudioFilter3, data->I, data->Q, data->N);
+            arm_biquad_cascade_df2T_f32(&RXfilters->S1_CW_AudioFilter3, data->I, data->Q, data->N);
             arm_copy_f32(data->Q, data->I, data->N);
             break;
         case 3: // 1.8 KHz
-            arm_biquad_cascade_df2T_f32(&filters->S1_CW_AudioFilter4, data->I, data->Q, data->N);
+            arm_biquad_cascade_df2T_f32(&RXfilters->S1_CW_AudioFilter4, data->I, data->Q, data->N);
             arm_copy_f32(data->Q, data->I, data->N);
             break;
         case 4: // 2.0 KHz
-            arm_biquad_cascade_df2T_f32(&filters->S1_CW_AudioFilter5, data->I, data->Q, data->N);
+            arm_biquad_cascade_df2T_f32(&RXfilters->S1_CW_AudioFilter5, data->I, data->Q, data->N);
             arm_copy_f32(data->Q, data->I, data->N);
             break;
         case 5:  //Off

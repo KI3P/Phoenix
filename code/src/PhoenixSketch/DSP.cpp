@@ -580,7 +580,7 @@ void AMDecodeSAM(DataBlock *data){
  * @param data Pointer to the DataBlock to act upon
  */
 static float32_t wold = 0;
-void Demodulate(DataBlock *data, FilterConfig *filters){
+void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters){
     // Demodulation: our time domain output is a combination of the real part (left channel) 
     // AND the imaginary part (right channel) of the second half of the FFT_buffer
     // The demod mode is accomplished by selecting/combining the real and imaginary parts 
@@ -609,7 +609,7 @@ void Demodulate(DataBlock *data, FilterConfig *filters){
           data->I[i] = w - wold;
           wold = w;
         }
-        arm_biquad_cascade_df1_f32(&filters->biquadAudioLowPass, data->I, data->Q, data->N);
+        arm_biquad_cascade_df1_f32(&RXfilters->biquadAudioLowPass, data->I, data->Q, data->N);
         arm_copy_f32(data->Q, data->I, data->N);
         break;
       case SAM:
@@ -648,15 +648,15 @@ void NoiseReduction(DataBlock *data){
 /**
  * Interpolate the data back to the original sample rate
  */
-void InterpolateReceiveData(DataBlock *data, FilterConfig *filters){
+void InterpolateReceiveData(DataBlock *data, ReceiveFilterConfig *RXfilters){
     // ======================================Interpolation  ================
     // You only need to interpolate one because they contain the same data
-    arm_fir_interpolate_f32(&filters->FIR_int1, data->I, data->Q, READ_BUFFER_SIZE / filters->DF);
-    data->N = data->N * filters->DF2;
-    data->sampleRate_Hz = data->sampleRate_Hz * filters->DF2;
-    arm_fir_interpolate_f32(&filters->FIR_int2, data->Q, data->I, READ_BUFFER_SIZE / filters->DF1);
-    data->N = data->N * filters->DF1;
-    data->sampleRate_Hz = data->sampleRate_Hz * filters->DF1;
+    arm_fir_interpolate_f32(&RXfilters->FIR_int1, data->I, data->Q, READ_BUFFER_SIZE / RXfilters->DF);
+    data->N = data->N * RXfilters->DF2;
+    data->sampleRate_Hz = data->sampleRate_Hz * RXfilters->DF2;
+    arm_fir_interpolate_f32(&RXfilters->FIR_int2, data->Q, data->I, READ_BUFFER_SIZE / RXfilters->DF1);
+    data->N = data->N * RXfilters->DF1;
+    data->sampleRate_Hz = data->sampleRate_Hz * RXfilters->DF1;
     arm_copy_f32(data->I,data->Q,data->N);
 }
 
@@ -672,8 +672,8 @@ float32_t VolumeToAmplification(int32_t volume) {
 /**
  * Adjust the volume
  */
-void AdjustVolume(DataBlock *data, FilterConfig *filters){
-    arm_scale_f32(data->I, filters->DF * VolumeToAmplification(ED.audioVolume), data->I, data->N);
+void AdjustVolume(DataBlock *data, ReceiveFilterConfig *RXfilters){
+    arm_scale_f32(data->I, RXfilters->DF * VolumeToAmplification(ED.audioVolume), data->I, data->N);
 }
 
 /**
@@ -692,18 +692,18 @@ void PlayBuffer(DataBlock *data){
 
 /**
  * Initialize the global variables to their default startup values
- * 1) Configure the filters
+ * 1) Configure the RXfilters
  * 2) Configure the AGC
  * 3) Configure the noise reduction
  */
 void InitializeSignalProcessing(void){
-    InitializeFilters(ED.spectrum_zoom,&filters);
+    InitializeFilters(ED.spectrum_zoom,&RXfilters);
     InitializeTransmitFilters(&TXfilters);
-    InitializeAGC(&agc, SR[SampleRate].rate/filters.DF);
+    InitializeAGC(&agc, SR[SampleRate].rate/RXfilters.DF);
     InitializeKim1NoiseReduction();
     InitializeXanrNoiseReduction();
     InitializeSpectralNoiseReduction();
-    InitializeCWProcessing(ED.currentWPM, &filters);
+    InitializeCWProcessing(ED.currentWPM, &RXfilters);
 }
 
 /**
@@ -760,7 +760,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Perform FFT of full spectrum for spectral display at this point if no zoom
     if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
-        ZoomFFTExe(&data, ED.spectrum_zoom, &filters);
+        ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
         displayFFTUpdated = true;
     }
 
@@ -774,7 +774,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) {
-        if(ZoomFFTExe(&data, ED.spectrum_zoom, &filters)) {
+        if(ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters)) {
             // at high zoom levels, multiple calls to ZoomFFTExe might be needed to fill
             // the buffers before the FFT is actually calculated. ZoomFFTExe returns true
             // if it actually performed the FFT during this call.
@@ -798,7 +798,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Decimate by 8. Reduce the sampled band to -12,000 Hz to +12,000 Hz.
     // The 3dB bandwidth is approximately -6,000 to +6,000 Hz
-    DecimateBy8(&data, &filters);
+    DecimateBy8(&data, &RXfilters);
 
     SaveData(&data, 3); // used by the unit tests
 
@@ -807,7 +807,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Apply convolution filter. Restrict signals to those between 
     // bands[currentBand].FLoCut_Hz and bands[currentBand].FHiCut_Hz
-    ConvolutionFilter(&data, &filters, filename);
+    ConvolutionFilter(&data, &RXfilters, filename);
 
     SaveData(&data, 4); // used by the unit tests
 
@@ -815,12 +815,12 @@ DataBlock * ReceiveProcessing(const char *fname){
     AGC(&data, &agc);
 
     // Demodulate
-    Demodulate(&data, &filters);
+    Demodulate(&data, &RXfilters);
 
     SaveData(&data, 5); // used by the unit tests
 
     // Receive EQ
-    BandEQ(&data, &filters, RX);
+    BandEQ(&data, &RXfilters, RX);
 
     // Noise reduction
     NoiseReduction(&data);
@@ -833,17 +833,17 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE){
         // CW receive processing
-        DoCWReceiveProcessing(&data, &filters);
+        DoCWReceiveProcessing(&data, &RXfilters);
         // CW audio bandpass
-        CWAudioFilter(&data, &filters);
+        CWAudioFilter(&data, &RXfilters);
     }
 
     // Interpolate
-    InterpolateReceiveData(&data, &filters);
+    InterpolateReceiveData(&data, &RXfilters);
 
     // Volume adjust for audio volume setting. I and Q contain duplicate data, don't 
     // need to scale both
-    AdjustVolume(&data, &filters);
+    AdjustVolume(&data, &RXfilters);
 
     SaveData(&data, 6); // used by the unit tests
 
@@ -920,7 +920,7 @@ DataBlock * TransmitProcessing(const char *fname){
 
     TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
-    BandEQ(&data, &filters, TX);
+    BandEQ(&data, &RXfilters, TX);
     arm_copy_f32(data.I,data.Q,256);
     TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
     HilbertTransform(&data,&TXfilters); // 128

@@ -347,7 +347,7 @@ extern float32_t CW_AudioFilterCoeffs4[30];
 extern float32_t CW_AudioFilterCoeffs5[30];
 
 /** Contains the filter structs and parameters */
-struct FilterConfig {
+struct ReceiveFilterConfig {
     // Receive decimation filters
     struct DecimationFilter DecimateRxStage1;
     struct DecimationFilter DecimateRxStage2;
@@ -402,8 +402,8 @@ struct FilterConfig {
     float32_t FIR_int2_coeffs[32];
     float32_t *FIR_int2_state;
 
-    // Steps that are peformed when a FilterConfig object is created
-    FilterConfig() {
+    // Steps that are peformed when a ReceiveFilterConfig object is created
+    ReceiveFilterConfig() {
         // Receive decimation filters
         DF = DF1 * DF2;        // decimation factor
         
@@ -451,9 +451,9 @@ struct FilterConfig {
         FIR_int2_state = (float32_t *)calloc(INT2_STATE_SIZE, sizeof(float32_t));
         arm_fir_interpolate_init_f32(&FIR_int2, DF1, 32, FIR_int2_coeffs, FIR_int2_state, READ_BUFFER_SIZE/DF1);
     }
-    // Steps that are performed when FilterConfig object is destroyed. This only happens
+    // Steps that are performed when ReceiveFilterConfig object is destroyed. This only happens
     // when radio is turned off, so isn't really necessary.
-    ~FilterConfig() {
+    ~ReceiveFilterConfig() {
         free(biquadZoomI.pState);
         free(biquadZoomQ.pState);
         free(biquadAudioLowPass.pState);
@@ -520,7 +520,7 @@ struct TransmitFilterConfig {
     float32_t FIR_int2_EX_I_state[559]; // 512+48-1 = 559
     float32_t FIR_int2_EX_Q_state[559]; // 512+48-1 = 559
 
-    // Steps that are peformed when a FilterConfig object is created
+    // Steps that are peformed when a ReceiveFilterConfig object is created
     TransmitFilterConfig() {}
     ~TransmitFilterConfig() {}
 };
@@ -624,7 +624,7 @@ struct AGCConfig {
 extern struct BIT bit_results;
 extern struct band bands[];
 extern const struct SR_Descriptor SR[];
-extern FilterConfig filters;
+extern ReceiveFilterConfig RXfilters;
 extern TransmitFilterConfig TXfilters;
 extern AGCConfig agc;
 extern UISm uiSM;

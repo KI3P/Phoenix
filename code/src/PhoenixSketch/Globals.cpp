@@ -76,7 +76,7 @@ const struct SR_Descriptor SR[18] = {
   { SAMPLE_RATE_353K, 352800, "353k"}   // NOT OK
 };
 
-FilterConfig filters;
+ReceiveFilterConfig RXfilters;
 TransmitFilterConfig TXfilters;
 AGCConfig agc;
 uint8_t SampleRate = SAMPLE_RATE_192K;
