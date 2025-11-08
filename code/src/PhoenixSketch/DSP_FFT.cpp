@@ -783,7 +783,7 @@ void HilbertTransform(DataBlock *data, TransmitFilterConfig *TXfilters){
  */
 void SidebandSelection(DataBlock *data){
     // Math works out for selecting LSB by default
-    if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
+    if (ED.modulation[ED.activeVFO] == USB){
         arm_scale_f32(data->I,-1,data->I,256);
     }
 }
