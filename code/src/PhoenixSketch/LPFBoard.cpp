@@ -32,7 +32,7 @@
  */
 
 #include "SDT.h"
-#include "AD7991.h"
+#include "LPFBoard_AD7991.h"
 
 // LPF_Register bit map:
 // Bit   Pin    Description     Receive            Transmit

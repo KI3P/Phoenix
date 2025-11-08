@@ -31,7 +31,7 @@
 
 #include "Arduino.h"
 #include "Wire.h"
-#include "si5351.h"
+#include "RFBoard_si5351.h"
 
 
 /********************/

@@ -390,7 +390,7 @@ void WarmUpAudioIO(void){
         MuteMixerChannels(&modeSelectOutR);
 
         // Let the audio system process a few interrupt cycles
-        delay(50);
+        MyDelay(50);
 
         // Now cycle back to receive routing
         Q_in_L_Ex.end();
@@ -409,7 +409,7 @@ void WarmUpAudioIO(void){
         MuteMixerChannels(&modeSelectOutExR);
 
         // Short delay between cycles
-        delay(10);
+        MyDelay(10);
     }
 
     // Restore the previous state tracker

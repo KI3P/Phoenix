@@ -1,5 +1,5 @@
 #include "SDT.h"
-#include "si5351.h"
+#include "RFBoard_si5351.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Variables that are only visible from within this file

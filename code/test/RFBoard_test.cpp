@@ -2,7 +2,7 @@
 
 //extern "C" {
 #include "../src/PhoenixSketch/SDT.h"
-#include "../src/PhoenixSketch/si5351.h"
+#include "../src/PhoenixSketch/RFBoard_si5351.h"
 //}
 
 extern int32_t EvenDivisor(int64_t freq2_Hz);

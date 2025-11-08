@@ -2,7 +2,7 @@
   Arduino library for AD7991, a 4-Channel, 12-Bit ADC with I2C Compatible Interface in 8-Lead SOT-23 
  */
 
-#include "AD7991.h"
+#include "LPFBoard_AD7991.h"
 #include "Arduino.h"
 
 /**

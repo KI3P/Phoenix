@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 #include "../src/PhoenixSketch/SDT.h"
-#include "../src/PhoenixSketch/si5351.h"
+#include "../src/PhoenixSketch/RFBoard_si5351.h"
 
 extern Si5351 si5351;
 
