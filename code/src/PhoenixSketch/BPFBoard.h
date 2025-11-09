@@ -1,5 +1,5 @@
-#ifndef BPF_CONTROL_h
-#define BPF_CONTROL_h
+#ifndef BPF_CONTROL_H
+#define BPF_CONTROL_H
 
 // BPF control macros
 #define SET_BPF_BAND(val) (hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)val & 0x0000000F) << BPFBAND0BIT));buffer_add()
@@ -33,8 +33,26 @@ Therefore, to get which bit to make high in the control word (i.e., get the BPF 
     (swapped == 0x0080) ? (swapped >> 4) : swapped; \
 })
 
+/**
+ * @brief Initialize the BPF board hardware and GPIO control
+ * @return ESUCCESS on success, ENOI2C if I2C communication fails
+ * @note Configures MCP23017 GPIO expander for band-pass filter relay control
+ */
 errno_t InitializeBPFBoard(void);
+
+/**
+ * @brief Select band-pass filter for specified amateur radio band
+ * @param band Band number (0-10, 15): 60M, 160M, 80M, 40M, 30M, 20M, 17M, 15M, 12M, 10M, 6M, or 15=BYPASS
+ * @note Switches appropriate BPF relay for optimal filtering on selected band
+ * @note Band selection uses byte-swapped encoding per BPF_WORD macro
+ */
 void SelectBPFBand(int32_t band);
+
+/**
+ * @brief Get the current MCP23017 GPIO register state for testing
+ * @return 16-bit register value combining GPIOA and GPIOB
+ * @note This function is intended for unit testing only
+ */
 uint16_t GetBPFMCPRegisters(void);
 
-#endif // BPF_CONTROL_h
+#endif // BPF_CONTROL_H

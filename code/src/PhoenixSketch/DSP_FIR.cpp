@@ -1,3 +1,9 @@
+/**
+ * @file DSP_FIR.cpp
+ * @brief This file contains the definitions for DSP coefficients and some functions that calculate coefficients
+ * 
+ */
+
 #include "SDT.h"
 
 static char *dspfirfilename = nullptr;

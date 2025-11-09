@@ -315,19 +315,34 @@ struct SecondaryMenuOption CWOptions[6] = {
     "Sidetone volume", variableOption, &stv, NULL, NULL,
 };
 
-// AGC Options
+// Audio Options
 void SelectAGCOff(void){ ED.agc = AGCOff; }
 void SelectAGCLong(void){ ED.agc = AGCLong; }
 void SelectAGCSlow(void){ ED.agc = AGCSlow; }
 void SelectAGCMedium(void){ ED.agc = AGCMed; }
 void SelectAGCFast(void){ ED.agc = AGCFast; }
+void ToggleAutonotch(void){
+    if (ED.ANR_notchOn)
+        ED.ANR_notchOn = 0;
+    else 
+        ED.ANR_notchOn = 1;
+}
+void SelectNROff(void){ ED.nrOptionSelect = NROff; }
+void SelectNRKim(void){ ED.nrOptionSelect = NRKim; }
+void SelectNRSpectral(void){ ED.nrOptionSelect = NRSpectral; }
+void SelectNRLMS(void){ ED.nrOptionSelect = NRLMS; }
 
-struct SecondaryMenuOption AGCOptions[5] = {
-    "Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
-    "Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
-    "Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
-    "Medium", functionOption, NULL, (void *)SelectAGCMedium, NULL,
-    "Fast", functionOption, NULL, (void *)SelectAGCFast, NULL,
+struct SecondaryMenuOption AudioOptions[10] = {
+    "AGC Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
+    "AGC Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
+    "AGC Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
+    "AGC Medium", functionOption, NULL, (void *)SelectAGCMedium, NULL,
+    "AGC Fast", functionOption, NULL, (void *)SelectAGCFast, NULL,
+    "Toggle Autonotch", functionOption, NULL, (void *)ToggleAutonotch, NULL,
+    "Noise Reduction Off", functionOption, NULL, (void *)SelectNROff, NULL,
+    "Kim Noise Reduction", functionOption, NULL, (void *)SelectNRKim, NULL,
+    "Spectral Noise Reduc.", functionOption, NULL, (void *)SelectNRSpectral, NULL,
+    "LMS Noise Reduction", functionOption, NULL, (void *)SelectNRLMS, NULL,
 };
 
 // Microphone Options
@@ -380,7 +395,7 @@ struct PrimaryMenuOption primaryMenu[6] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
-    "AGC Setting", AGCOptions, sizeof(AGCOptions)/sizeof(AGCOptions[0]),
+    "Audio Options", AudioOptions, sizeof(AudioOptions)/sizeof(AudioOptions[0]),
     "Display", DisplayOptions, sizeof(DisplayOptions)/sizeof(DisplayOptions[0]),
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
 };
@@ -508,6 +523,12 @@ void PrintMainMenuOptions(bool foreground){
         }
         y += delta;
     }
+    // Show the git commit
+    tft.setFontScale(0);
+    String msg = String("Git: ") + GIT_COMMIT_HASH;
+    tft.setCursor(x, 460 - delta);
+    tft.setTextColor(RA8875_WHITE);
+    tft.print(msg);
 }
 
 void PrintSecondaryMenuOptions(bool foreground){

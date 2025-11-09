@@ -421,13 +421,13 @@ void HandleButtonPress(int32_t button){
         case TOGGLE_MODE:{
             switch(modeSM.state_id){
                 case ModeSm_StateId_SSB_RECEIVE:{
-    				ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
                     UpdateRFHardwareState();
                     break;
                 }
                 case ModeSm_StateId_CW_RECEIVE:{
-    				ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
-	    			UpdateRFHardwareState();
+                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+                    UpdateRFHardwareState();
                     break;
                 }
                 default:{

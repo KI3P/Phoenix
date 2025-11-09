@@ -5,8 +5,6 @@
 // Constants
 #define WINDOW_WIDTH    800
 #define WINDOW_HEIGHT   480
-#define NUMBER_OF_PANES 12
-#define SPECTRUM_REFRESH_MS 200
 
 // Forward declarations and structures
 struct Pane {
@@ -34,17 +32,26 @@ struct dispSc {
 };
 
 // Helper function declarations
+
+/**
+ * @brief Calculate bounding rectangle for text at given position
+ * @param x0 Starting X coordinate (top-left)
+ * @param y0 Starting Y coordinate (top-left)
+ * @param rect Output rectangle structure to fill
+ * @param Nchars Number of characters in text string
+ * @param charWidth Width of each character in pixels
+ * @param charHeight Height of characters in pixels
+ * @note Used to determine erase region before redrawing text
+ */
 void CalculateTextCorners(int16_t x0,int16_t y0,Rectangle *rect,int16_t Nchars,
                         uint16_t charWidth,uint16_t charHeight);
+
+/**
+ * @brief Erase rectangular area by filling with background color
+ * @param rect Pointer to Rectangle defining area to blank
+ * @note Clears display region before redrawing updated content
+ */
 void BlankBox(Rectangle *rect);
-void FormatFrequency(long freq, char *freqBuffer);
-void UpdateSetting(uint16_t charWidth, uint16_t charHeight, uint16_t xoffset,
-                   char *labelText, uint8_t NLabelChars,
-                   char *valueText, uint8_t NValueChars,
-                   uint16_t yoffset, bool redrawFunction, bool redrawValue);
-int64_t GetCenterFreq_Hz();
-int64_t GetLowerFreq_Hz();
-int64_t GetUpperFreq_Hz();
 
 // The variable being changed will have a type
 enum VarType {
@@ -71,8 +78,29 @@ struct VariableParameter {
         struct { bool min; bool max; int8_t step;} b;
     } limits;
 };
+
+/**
+ * @brief Increment a variable according to its type and limits
+ * @param bv Pointer to VariableParameter structure defining variable and constraints
+ * @note Automatically handles type casting and limit checking
+ * @note Wraps around from max to min value
+ */
 void IncrementVariable(const VariableParameter *bv);
+
+/**
+ * @brief Decrement a variable according to its type and limits
+ * @param bv Pointer to VariableParameter structure defining variable and constraints
+ * @note Automatically handles type casting and limit checking
+ * @note Wraps around from min to max value
+ */
 void DecrementVariable(const VariableParameter *bv);
+
+/**
+ * @brief Convert variable value to displayable string
+ * @param vp Pointer to VariableParameter containing variable to format
+ * @return Arduino String containing formatted value
+ * @note Handles different variable types (int8_t, int32_t, float, bool, etc.)
+ */
 String GetVariableValueAsString(const VariableParameter *vp);
 
 // Menu option types
@@ -98,29 +126,112 @@ struct PrimaryMenuOption {
 };
 
 // Core display functions (MainBoard_Display.cpp)
+
+/**
+ * @brief Main display update function called from main loop
+ * @note Checks stale flags for all panes and redraws only those needing updates
+ * @note Implements selective update for efficient display refresh
+ */
 void DrawDisplay(void);
+
+/**
+ * @brief Initialize display hardware and draw initial screen
+ * @note Configures RA8875 display controller, initializes all panes
+ * @note Displays splash screen then transitions to home screen
+ */
 void InitializeDisplay(void);
 
 // Home screen functions (MainBoard_DisplayHome.cpp)
+
+/**
+ * @brief Draw the main home/operating screen
+ * @note Displays VFO frequencies, spectrum, S-meter, SWR, and all operating parameters
+ * @note This is the primary screen shown during normal radio operation
+ */
 void DrawHome(void);
+
+/**
+ * @brief Draw startup splash screen with logo and version
+ * @note Displayed briefly during system initialization
+ * @note Shows Phoenix SDR branding and firmware version
+ */
 void DrawSplash(void);
+
+/**
+ * @brief Draw parameter update overlay screen
+ * @note Displays current parameter being adjusted (volume, filter, etc.)
+ * @note Shown temporarily when user changes settings
+ */
 void DrawParameter(void);
 
 // Menu system functions (MainBoard_DisplayMenus.cpp)
+
+/**
+ * @brief Draw primary (top-level) menu
+ * @note Displays main menu categories (RF Settings, CW Options, Display, etc.)
+ * @note Highlights currently selected menu item
+ */
 void DrawMainMenu(void);
+
+/**
+ * @brief Draw secondary (sub-menu) options
+ * @note Displays detailed options within selected primary menu
+ * @note Highlights currently selected menu item
+ */
 void DrawSecondaryMenu(void);
+
+/**
+ * @brief Move selection to next primary menu item
+ * @note Cycles through top-level menu categories
+ * @note Wraps around from last to first item
+ */
 void IncrementPrimaryMenu(void);
+
+/**
+ * @brief Move selection to next secondary menu item
+ * @note Cycles through options within current submenu
+ * @note Wraps around from last to first option
+ */
 void IncrementSecondaryMenu(void);
+
+/**
+ * @brief Move selection to previous primary menu item
+ * @note Cycles backward through top-level menu categories
+ * @note Wraps around from first to last item
+ */
 void DecrementPrimaryMenu(void);
+
+/**
+ * @brief Move selection to previous secondary menu item
+ * @note Cycles backward through options within current submenu
+ * @note Wraps around from first to last option
+ */
 void DecrementSecondaryMenu(void);
+
+/**
+ * @brief Increase value of currently selected menu parameter
+ * @note Respects min/max limits and step size for each parameter type
+ * @note Called when user rotates encoder clockwise
+ */
 void IncrementValue(void);
+
+/**
+ * @brief Decrease value of currently selected menu parameter
+ * @note Respects min/max limits and step size for each parameter type
+ * @note Called when user rotates encoder counter-clockwise
+ */
 void DecrementValue(void);
+
+/**
+ * @brief Update menu variable pointers after configuration changes
+ * @note Refreshes references when band or mode changes affect menu options
+ * @note Ensures menu displays current band-specific settings
+ */
 void UpdateArrayVariables(void);
 
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;
 extern struct PrimaryMenuOption primaryMenu[6];
-extern Pane* WindowPanes[NUMBER_OF_PANES];
 
 #endif

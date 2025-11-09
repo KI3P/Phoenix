@@ -1,3 +1,11 @@
+/**
+ * @file Globals.cpp
+ * @brief This file contains the definitions for globally-visible variables and functions
+ * 
+ * The declarations for these variables and functions can be found in SDT.h. We try
+ * to keep the number of global variables to a minimum.
+ */
+
 #include "SDT.h"
 
 struct config_t ED;

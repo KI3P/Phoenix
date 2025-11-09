@@ -4,6 +4,8 @@
 #define RIGNAME "T41-EP SDT"
 #define VERSION "Phx Alpha"
 
+#include "BuildInfo.h"
+
 #define Debug(x) Serial.println(x)
 
 #include <Arduino.h>
@@ -602,7 +604,7 @@ struct AGCConfig {
 #include "Mode.h"
 #include "ModeSm.h"
 #include "UISm.h"
-#include "HardwareSM.h"
+#include "HardwareSm.h"
 // Others
 #include "Loop.h"
 #include "Tune.h"

@@ -289,8 +289,8 @@ void UpdateFIRFilterMask(ReceiveFilterConfig *RXfilters){
  */
 void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
     // ****************************************************************************************
-	// *  Zoom FFT: Initiate decimation and interpolation FIR RXfilters AND IIR RXfilters
-	// ****************************************************************************************
+    // *  Zoom FFT: Initiate decimation and interpolation FIR RXfilters AND IIR RXfilters
+    // ****************************************************************************************
     
     ZoomFFTPrep(spectrum_zoom, RXfilters);
     for (unsigned i = 0; i < 4 * RXfilters->IIR_biquad_Zoom_FFT_N_stages; i++) {
@@ -313,8 +313,8 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
             (float32_t)SR[SampleRate].rate / RXfilters->DF, Lowpass);
 
     // ****************************************************************************************
-	// *  Decimate: RXfilters involved with decimate by 2 and decimate by 4
-	// ****************************************************************************************
+    // *  Decimate: RXfilters involved with decimate by 2 and decimate by 4
+    // ****************************************************************************************
     InitializeDecimationFilter(&RXfilters->DecimateRxStage1, RXfilters->DF1, (float32_t)SR[SampleRate].rate,
                                 RXfilters->n_att_dB, RXfilters->n_desired_BW_Hz, READ_BUFFER_SIZE);
     InitializeDecimationFilter(&RXfilters->DecimateRxStage2, RXfilters->DF2, (float32_t)SR[SampleRate].rate / RXfilters->DF1,
@@ -355,56 +355,56 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
  */
 void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
     // ****************************************************************************************
-	// *  Decimate by 4: 192K to 48K SPS
-	// ****************************************************************************************
+    // *  Decimate by 4: 192K to 48K SPS
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_dec1_EX_I_state);
     CLEAR_VAR(TXfilters->FIR_dec1_EX_Q_state);
     arm_fir_decimate_init_f32(&TXfilters->FIR_dec1_EX_I, 48, 4, coeffs192K_10K_LPF_FIR, TXfilters->FIR_dec1_EX_I_state, 2048);
     arm_fir_decimate_init_f32(&TXfilters->FIR_dec1_EX_Q, 48, 4, coeffs192K_10K_LPF_FIR, TXfilters->FIR_dec1_EX_Q_state, 2048);
     
     // ****************************************************************************************
-	// *  Decimate by 2: 48K to 24K SPS
-	// ****************************************************************************************
+    // *  Decimate by 2: 48K to 24K SPS
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_dec2_EX_I_state);
     CLEAR_VAR(TXfilters->FIR_dec2_EX_Q_state);
     arm_fir_decimate_init_f32(&TXfilters->FIR_dec2_EX_I, 48, 2, coeffs48K_8K_LPF_FIR, TXfilters->FIR_dec2_EX_I_state, 512);
     arm_fir_decimate_init_f32(&TXfilters->FIR_dec2_EX_Q, 48, 2, coeffs48K_8K_LPF_FIR, TXfilters->FIR_dec2_EX_Q_state, 512);
 
     // ****************************************************************************************
-	// *  Decimate by 2, again: 24K to 12K SPS
-	// ****************************************************************************************
+    // *  Decimate by 2, again: 24K to 12K SPS
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_dec3_EX_I_state);
     CLEAR_VAR(TXfilters->FIR_dec3_EX_Q_state);
     arm_fir_decimate_init_f32(&TXfilters->FIR_dec3_EX_I, 48, 2, coeffs12K_8K_LPF_FIR, TXfilters->FIR_dec3_EX_I_state, 256);
     arm_fir_decimate_init_f32(&TXfilters->FIR_dec3_EX_Q, 48, 2, coeffs12K_8K_LPF_FIR, TXfilters->FIR_dec3_EX_Q_state, 256);
 
     // ****************************************************************************************
-	// *  Hilbert transform
-	// ****************************************************************************************
+    // *  Hilbert transform
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_Hilbert_state_L);
     CLEAR_VAR(TXfilters->FIR_Hilbert_state_R);
     arm_fir_init_f32(&TXfilters->FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, TXfilters->FIR_Hilbert_state_L, 128);
     arm_fir_init_f32(&TXfilters->FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg_45, TXfilters->FIR_Hilbert_state_R, 128);
 
     // ****************************************************************************************
-	// *  Interpolate by 2, again: 12K to 24K SPS
-	// ****************************************************************************************
+    // *  Interpolate by 2, again: 12K to 24K SPS
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_int3_EX_I_state);
     CLEAR_VAR(TXfilters->FIR_int3_EX_Q_state);
     arm_fir_interpolate_init_f32(&TXfilters->FIR_int3_EX_I, 2, 48, FIR_int3_12ksps_48tap_2k7, TXfilters->FIR_int3_EX_I_state, 128);
     arm_fir_interpolate_init_f32(&TXfilters->FIR_int3_EX_Q, 2, 48, FIR_int3_12ksps_48tap_2k7, TXfilters->FIR_int3_EX_Q_state, 128);
 
     // ****************************************************************************************
-	// *  Interpolate by 2: 24K to 48K SPS
-	// ****************************************************************************************
+    // *  Interpolate by 2: 24K to 48K SPS
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_int1_EX_I_state);
     CLEAR_VAR(TXfilters->FIR_int1_EX_Q_state);
     arm_fir_interpolate_init_f32(&TXfilters->FIR_int1_EX_I, 2, 48, coeffs48K_8K_LPF_FIR, TXfilters->FIR_int1_EX_I_state, 256);
     arm_fir_interpolate_init_f32(&TXfilters->FIR_int1_EX_Q, 2, 48, coeffs48K_8K_LPF_FIR, TXfilters->FIR_int1_EX_Q_state, 256);
 
     // ****************************************************************************************
-	// *  Interpolate by 4: 48K to 192K SPS
-	// ****************************************************************************************
+    // *  Interpolate by 4: 48K to 192K SPS
+    // ****************************************************************************************
     CLEAR_VAR(TXfilters->FIR_int2_EX_I_state);
     CLEAR_VAR(TXfilters->FIR_int2_EX_Q_state);
     arm_fir_interpolate_init_f32(&TXfilters->FIR_int2_EX_I, 4, 48, coeffs192K_10K_LPF_FIR, TXfilters->FIR_int2_EX_I_state, 512);
