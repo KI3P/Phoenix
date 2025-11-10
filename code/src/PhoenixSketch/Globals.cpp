@@ -118,6 +118,7 @@ void UpdateDitLength(void){
 
 //////////////////////////////////////////////////
 // Related to temperate and load monitoring
+//////////////////////////////////////////////////
 
 int64_t elapsed_micros_idx_t = 0;
 int64_t elapsed_micros_sum = 0;
@@ -179,6 +180,13 @@ float32_t TGetTemp() {
     return tmeas;
 }
 
+//////////////////////////////////////////////////
+// Functions to convert power spectral values to dBm
+//////////////////////////////////////////////////
+// The value of the constants used in these conversions (RECEIVE_POWER_OFFSET and 
+// RECEIVE_SMETER_PSD_DELTA) were determined experimentally. Radio- and band-specific 
+// receive power calibration is stored in the ED.dbm_calibration parameter.
+
 /**
  * Convert a PSD value from the psdnew array to dBm units.
  * @param psdval The PSD value from psdnew array
@@ -210,6 +218,7 @@ float32_t AudioToDBM(float32_t audioVal){
 
 //////////////////////////////////////////////////
 // Functions related to the rolling buffer of hardware state events. Used by the unit tests.
+//////////////////////////////////////////////////
 
 RollingBuffer buffer = {0};
 
