@@ -358,7 +358,7 @@ struct SecondaryMenuOption MicOptions[1] = {
 
 // Calibration Menu
 VariableParameter rflevelcal = {
-    .variable = &ED.dbm_calibration,
+    .variable = NULL, // will be set to &ED.dbm_calibration[ED.currentBand[ED.activeVFO]]
     .type = TYPE_F32,
     .limits = {.f32 = {.min = -20.0F, .max=50.0F, .step=0.5F}}
 };
@@ -411,6 +411,7 @@ void UpdateArrayVariables(void){
     txAttenSSB.variable = &ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
+    rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
 }
 
 ///////////////////////////////////////////////////////////////////////////////

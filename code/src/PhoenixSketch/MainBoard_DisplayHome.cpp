@@ -540,24 +540,23 @@ void DrawFrequencyBarValue(void) {
 
 // State tracking for S-meter display
 static float32_t audioMaxSquaredAve = 0;
-extern uint64_t counter;
+
 /**
  * Calculate and display the S-meter reading with dBm value.
  */
 void DisplaydbM() {
     char buff[10];
     int16_t smeterPad;
-    const float32_t slope = 10.0;
-    const float32_t cons = -92;
     float32_t dbm;
 
     tft.fillRect(SMETER_X + 1, SMETER_Y + 1, SMETER_BAR_LENGTH, SMETER_BAR_HEIGHT, RA8875_BLACK);
-    dbm = ED.dbm_calibration + bands[ED.currentBand[ED.activeVFO]].gainCorrection
-            + slope * log10f_fast(audioMaxSquaredAve) + cons
-            - (float32_t)bands[ED.currentBand[ED.activeVFO]].RFgain_dB * 1.5
-            - ED.rfGainAllBands_dB;
-    dbm = dbm + ED.RAtten[ED.currentBand[ED.activeVFO]] - 31.0;
-
+    //dbm = 10.0 * log10f_fast(audioMaxSquaredAve) 
+    //        + ED.RAtten[ED.currentBand[ED.activeVFO]]
+    //        - ED.rfGainAllBands_dB
+    //        + RECEIVE_POWER_OFFSET     // the notional scaling factor for the receive chain
+    //        + RECEIVE_SMETER_PSD_DELTA // the level difference between the PSD and audio chains
+    //        + ED.dbm_calibration[ED.currentBand[ED.activeVFO]]; // correction factor
+    dbm = AudioToDBM(audioMaxSquaredAve);
     smeterPad = map(dbm, -73.0 - 9 * 6.0 /*S1*/, -73.0 /*S9*/, 0, 9 * pixels_per_s);
     smeterPad = max(0, smeterPad);
     smeterPad = min(SMETER_BAR_LENGTH, smeterPad);
@@ -570,15 +569,6 @@ void DisplaydbM() {
     sprintf(buff,"%2.1fdBm",dbm);
     tft.setCursor(SMETER_X + 184, SMETER_Y);
     tft.print(buff);
-
-    if (counter % 100 == 0){
-        char buff[50];
-        // What is the S meter value?
-        sprintf(buff,"audioPowerMax = %5.4f",audioMaxSquaredAve);
-        sprintf(buff,"S meter dbm = %5.4f",dbm);        
-        Debug(buff);
-    }
-
 }
 
 // State tracking for spectrum line rendering
@@ -629,21 +619,6 @@ FASTRUN void ShowSpectrum(void){
         if (test1 > 117)
             test1 = 117;
         waterfall[x1] = gradient[test1];
-    }
-    if (counter % 100 == 0){
-        int16_t ypeak = 1000;
-        int16_t audiopeak = -1000;
-        for (int j = 0; j < MAX_WATERFALL_WIDTH; j++){
-            if (ypeak > pixelold[j]) ypeak = pixelold[j];
-            if (j < 128){
-                if (audiopeak > audioYPixel[j]) audiopeak = audioYPixel[j];
-            }
-        }
-        char buff[50];
-        sprintf(buff,"psd peak = %d",ypeak);
-        Debug(buff);
-        sprintf(buff,"audio peak = %d",audiopeak);
-        Debug(buff);
     }
 
     if (x1 >= MAX_WATERFALL_WIDTH){

@@ -713,10 +713,6 @@ void setfilename(char *fnm){
     filename = fnm;
 }
 
-static float32_t Irms[10] = {0.0f};
-static float32_t Qrms[10] = {0.0f};
-extern uint64_t counter;
-char buff[100];
 /**
  * Used by the unit tests. Saves data to a file for offline examination.
  */
@@ -725,28 +721,6 @@ void SaveData(DataBlock *data, uint32_t suffix){
         char fn2[100];
         sprintf(fn2,"%s-%02lu.txt",filename, suffix);
         WriteIQFile(data, fn2);
-    }
-    float32_t Ir = 0;
-    float32_t Qr = 0;
-    float32_t Imn = 0;
-    float32_t Qmn = 0;
-    for (size_t k=0;k<data->N;k++){
-        Imn += data->I[k];
-        Qmn += data->Q[k];
-    }
-    Imn /= (float32_t)data->N;
-    Qmn /= (float32_t)data->N;
-    for (size_t k=0;k<data->N;k++){
-        Ir += pow((data->I[k]-Imn),2);
-        Qr += pow((data->Q[k]-Qmn),2);
-    }
-    Ir /= (float32_t)data->N;
-    Qr /= (float32_t)data->N;
-    Irms[suffix] = 0.6*Irms[suffix] + 0.4*Ir;
-    Qrms[suffix] = 0.6*Qrms[suffix] + 0.4*Qr;
-    if (counter % 100 == 0){
-        sprintf(buff,"%d,%5.4f,%5.4f",suffix,Irms[suffix],Qrms[suffix]);
-        Debug(buff);
     }
 }
 
@@ -762,7 +736,6 @@ DataBlock * ReceiveProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    counter++;
     //Flag(1);
     // Clear overfull buffers is not needed
     //ClearAudioBuffers();

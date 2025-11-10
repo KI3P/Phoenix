@@ -146,6 +146,12 @@ extern uint32_t hardwareRegister;
 #define SAMPLE_RATE_353K 17
 #define SAMPLE_RATE_MAX  15
 
+// These constants are used to calibrate the S-meter and receive PSD to dBm
+#define RECEIVE_POWER_OFFSET    -93.15
+#define RECEIVE_SMETER_PSD_DELTA -8.35
+float32_t PSDToDBM(float32_t psdval);
+float32_t AudioToDBM(float32_t audioVal);
+
 #define BUFFER_SIZE                             128
 #define N_BLOCKS                                16 // receive: IQ input
 #define N_BLOCKS_EX                             16 // transmit: mic input
@@ -255,7 +261,7 @@ extern struct config_t {
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
     int32_t currentMicGain = -10;   /** Gain of the mic used for SSB */
-    float32_t dbm_calibration = 17.5; /** Calibrates the S-meter scale on the display */
+    float32_t dbm_calibration[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Calibrates the S-meter scale on the display */
     float32_t powerOutCW[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
@@ -294,7 +300,6 @@ struct BIT {
 /** Contains the parameters that define a band */
 struct band {
     int64_t freqVFO1_Hz;    /** Frequency of VFO1 in Hz (hardware mixer) */
-    float32_t freqVFO2_Hz;  /** UNUSED Frequency of VFO2 in Hz (DSP mixer) */
     int64_t fBandLow_Hz;    /** Lower band edge */
     int64_t fBandHigh_Hz;   /** Upper band edge */
     const char *name;       /** Name of band */
@@ -303,7 +308,6 @@ struct band {
     int32_t FLoCut_Hz;      /** Audio bandpass filter edge */
     float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
     uint8_t band_type;      /** UNUSED */
-    float32_t gainCorrection; /** (CANDIDATE FOR REPLACEMENT BY BAND-DEPENDENT dbm_calibration) is hardware dependent and has to be calibrated ONCE and hardcoded in the table below */
     int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
     int16_t pixel_offset;   /** Offset the spectrum in display plot */
 };

@@ -137,58 +137,50 @@ static void interrupt2() {
             case 8:
                 e1.updateA(state);
                 change = e1.process();
-                if (change!=0) {
-                    SetInterrupt(iVOLUME_DECREASE);
-                }
+                if (change>0) SetInterrupt(iVOLUME_INCREASE);
+                if (change<0) SetInterrupt(iVOLUME_DECREASE);
                 break;
             case 9:
                 e1.updateB(state);
                 change = e1.process();
-                if (change!=0) {
-                    SetInterrupt(iVOLUME_INCREASE);
-                }
+                if (change>0) SetInterrupt(iVOLUME_INCREASE);
+                if (change<0) SetInterrupt(iVOLUME_DECREASE);
                 break;
             case 10:
                 e2.updateA(state);
                 change = e2.process();
-                if (change!=0) {
-                    SetInterrupt(iFILTER_DECREASE);
-                }
+                if (change>0) SetInterrupt(iFILTER_INCREASE);
+                if (change<0) SetInterrupt(iFILTER_DECREASE);
                 break;
             case 11:
                 e2.updateB(state);
                 change = e2.process();
-                if (change!=0) {
-                    SetInterrupt(iFILTER_INCREASE);
-                }
+                if (change>0) SetInterrupt(iFILTER_INCREASE);
+                if (change<0) SetInterrupt(iFILTER_DECREASE);
                 break;
             case 12:
                 e3.updateA(state);
                 change = e3.process();
-                if (change!=0) {
-                    SetInterrupt(iCENTERTUNE_DECREASE);
-                }
+                if (change>0) SetInterrupt(iCENTERTUNE_INCREASE);
+                if (change<0) SetInterrupt(iCENTERTUNE_DECREASE);
                 break;
             case 13:
                 e3.updateB(state);
                 change = e3.process();
-                if (change!=0) {
-                    SetInterrupt(iCENTERTUNE_INCREASE);
-                }
+                if (change>0) SetInterrupt(iCENTERTUNE_INCREASE);
+                if (change<0) SetInterrupt(iCENTERTUNE_DECREASE);
                 break;
             case 14:
                 e4.updateA(state);
                 change = e4.process();
-                if (change!=0) {
-                    SetInterrupt(iFINETUNE_DECREASE);
-                }
+                if (change>0) SetInterrupt(iFINETUNE_INCREASE);
+                if (change<0) SetInterrupt(iFINETUNE_DECREASE);
                 break;
             case 15:
                 e4.updateB(state);
                 change = e4.process();
-                if (change!=0) {
-                    SetInterrupt(iFINETUNE_INCREASE);
-                }
+                if (change>0) SetInterrupt(iFINETUNE_INCREASE);
+                if (change<0) SetInterrupt(iFINETUNE_DECREASE);
                 break;
             case 0:
             case 1:

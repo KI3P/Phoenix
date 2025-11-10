@@ -72,10 +72,10 @@ void SaveDataToStorage(void){
     }
 
     doc["currentMicGain"] = ED.currentMicGain;
-    doc["dbm_calibration"] = ED.dbm_calibration;
 
     // Band-specific arrays
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        doc["dbm_calibration"][i] = ED.dbm_calibration[i];
         doc["powerOutCW"][i] = ED.powerOutCW[i];
         doc["powerOutSSB"][i] = ED.powerOutSSB[i];
         doc["IQAmpCorrectionFactor"][i] = ED.IQAmpCorrectionFactor[i];
@@ -278,7 +278,12 @@ void RestoreDataFromStorage(void){
     }
 
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
-    ED.dbm_calibration = doc["dbm_calibration"] | ED.dbm_calibration;
+
+    if (doc["dbm_calibration"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.dbm_calibration[i] = doc["dbm_calibration"][i] | ED.dbm_calibration[i];
+        }
+    }
 
     // Restore band-specific arrays
     if (doc["powerOutCW"].is<JsonArray>()) {

@@ -21,35 +21,35 @@ VolumeFunction volumeFunction = AudioVolume;
 //#define MISC_BAND 2
 struct band bands[NUMBER_OF_BANDS] = 
   {
-  //freqVFO1 freqVFO2 band low   band hi   name    mode      Hi    Low  Gain_dB  type    gain  AGC   pixel
-  //                                                       filter filter                correct     offset
-    1850000, 0, 1800000, 2000000, "160M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,    // 160M
+  //freqVFO1 freqVFO2 band low   band hi   name    mode      Hi    Low  Gain_dB  type  AGC   pixel
+  //                                                       filter filter                     offset
+    1850000, 1800000, 2000000, "160M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,    // 160M
 #if defined(ITU_REGION) && ITU_REGION == 1
-    3700000, 0,3500000, 3800000, "80M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,
-    5351500, 0,5351500, 5366600, "60M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,  // 60M
-    7150000, 0,7000000, 7200000, "40M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,
+    3700000, 3500000, 3800000, "80M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,
+    5351500, 5351500, 5366600, "60M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,  // 60M
+    7150000, 7000000, 7200000, "40M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,
 #elif defined(ITU_REGION) && ITU_REGION == 2
-    3700000, 0,3500000, 4000000, "80M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,
-    5351500, 0,5351500, 5366600, "60M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,  // 60M
-    7150000, 0,7000000, 7300000, "40M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,
+    3700000, 3500000, 4000000, "80M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,
+    5351500, 5351500, 5366600, "60M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,  // 60M
+    7150000, 7000000, 7300000, "40M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,
 #elif defined(ITU_REGION) && ITU_REGION == 3
-    3700000, 0,3500000, 3900000, "80M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,
-    5351500, 0,5351500, 5366600, "60M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,  // 60M
-    7150000, 0,7000000, 7200000, "40M", LSB, -200, -3000, 0, HAM_BAND, -2.0, 20, 20,
+    3700000, 3500000, 3900000, "80M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,
+    5351500, 5351500, 5366600, "60M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,  // 60M
+    7150000, 7000000, 7200000, "40M", LSB, -200, -3000, 0, HAM_BAND, 20, 20,
 #endif
-    10125000, 0,10100000, 10150000, "30M", USB, 3000, 200, 0, HAM_BAND, 2.0, 20, 20,  // 30M
-    14200000, 0,14000000, 14350000, "20M", USB, 3000, 200, 0, HAM_BAND, 2.0, 20, 20,
-    18100000, 0,18068000, 18168000, "17M", USB, 3000, 200, 0, HAM_BAND, 2.0, 20, 20,
-    21200000, 0,21000000, 21450000, "15M", USB, 3000, 200, 0, HAM_BAND, 5.0, 20, 20,
-    24920000, 0,24890000, 24990000, "12M", USB, 3000, 200, 0, HAM_BAND, 6.0, 20, 20,
-    28350000, 0,28000000, 29700000, "10M", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,
-    50100000, 0,50000000, 54000000, "6M", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,  // 6M
-    70300000, 0,70000000, 72800000, "4M", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,   // 4M
-    //142000000, 0,144000000, 148000000, "2M", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,   // 2M
-    //	222500000, 0,220000000, 225000000, "125CM", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,   // 125CM
-    //435000000, 0,420000000, 450000000, "70CM",  USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,   // 70CM
-    //915000000, 0,902000000, 928000000, "33CM",  USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20,   // 33CM
-    //1270000000, 0,1240000000, 1300000000, "23CM", USB, 3000, 200, 0, HAM_BAND, 8.5, 20, 20  // 23CM
+    10125000, 10100000, 10150000, "30M", USB, 3000, 200, 0, HAM_BAND, 20, 20,  // 30M
+    14200000, 14000000, 14350000, "20M", USB, 3000, 200, 0, HAM_BAND, 20, 20,
+    18100000, 18068000, 18168000, "17M", USB, 3000, 200, 0, HAM_BAND, 20, 20,
+    21200000, 21000000, 21450000, "15M", USB, 3000, 200, 0, HAM_BAND, 20, 20,
+    24920000, 24890000, 24990000, "12M", USB, 3000, 200, 0, HAM_BAND, 20, 20,
+    28350000, 28000000, 29700000, "10M", USB, 3000, 200, 0, HAM_BAND, 20, 20,
+    50100000, 50000000, 54000000, "6M", USB, 3000, 200, 0, HAM_BAND, 20, 20,  // 6M
+    70300000, 70000000, 72800000, "4M", USB, 3000, 200, 0, HAM_BAND, 20, 20,   // 4M
+    //142000000, 144000000, 148000000, "2M", USB, 3000, 200, 0, HAM_BAND, 20, 20,   // 2M
+    //222500000, 220000000, 225000000, "125CM", USB, 3000, 200, 0, HAM_BAND, 20, 20,   // 125CM
+    //435000000, 420000000, 450000000, "70CM",  USB, 3000, 200, 0, HAM_BAND, 20, 20,   // 70CM
+    //915000000, 902000000, 928000000, "33CM",  USB, 3000, 200, 0, HAM_BAND, 20, 20,   // 33CM
+    //1270000000, 1240000000, 1300000000, "23CM", USB, 3000, 200, 0, HAM_BAND, 20, 20  // 23CM
 };
 
 struct BIT bit_results = {
@@ -177,6 +177,35 @@ float32_t TGetTemp() {
     nmeas = (TEMPMON_TEMPSENSE0 & 0xFFF00U) >> 8U;
     tmeas = s_hotTemp - (float)((nmeas - s_hotCount) * s_hotT_ROOM / s_roomC_hotC);  // Calculate temperature
     return tmeas;
+}
+
+/**
+ * Convert a PSD value from the psdnew array to dBm units.
+ * @param psdval The PSD value from psdnew array
+ * @return The power in the PSD bin in units of dBm
+ */
+float32_t PSDToDBM(float32_t psdval){
+    float32_t dbmval = 10*psdval
+                        +ED.RAtten[ED.currentBand[ED.activeVFO]]
+                        -ED.rfGainAllBands_dB
+                        +RECEIVE_POWER_OFFSET
+                        +ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
+    return dbmval;
+}
+
+/**
+ * Convert a value from the audio power spectrum to dBm units.
+ * @param psdval The PSD value from audio spectrum
+ * @return The power in units of dBm
+ */
+float32_t AudioToDBM(float32_t audioVal){
+    float32_t dbmval = 10.0 * log10f_fast(audioVal) 
+            + ED.RAtten[ED.currentBand[ED.activeVFO]]
+            - ED.rfGainAllBands_dB
+            + RECEIVE_POWER_OFFSET     // the notional scaling factor for the receive chain
+            + RECEIVE_SMETER_PSD_DELTA // the level difference between the PSD and audio chains
+            + ED.dbm_calibration[ED.currentBand[ED.activeVFO]]; // correction factor
+    return dbmval;
 }
 
 //////////////////////////////////////////////////

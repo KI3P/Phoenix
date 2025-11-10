@@ -148,8 +148,8 @@ char *BD_write( char* cmd ){
  * @return Empty string
  */
 char *DB_write( char* cmd  ){
-    ED.dbm_calibration = ( float32_t ) atof( &cmd[2] );
-    Debug(ED.dbm_calibration);
+    ED.dbm_calibration[ED.currentBand[ED.activeVFO]] = ( float32_t ) atof( &cmd[2] );
+    Debug(ED.dbm_calibration[ED.currentBand[ED.activeVFO]]);
     return empty_string_p;
 }
 
@@ -660,6 +660,11 @@ char *ED_read(  char* cmd  ){
     Serial.print("fineTuneFreq_Hz[0]: "); Serial.println(ED.fineTuneFreq_Hz[0]);
     Serial.print("fineTuneFreq_Hz[1]: "); Serial.println(ED.fineTuneFreq_Hz[1]);
     Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
+    Serial.print("dbm_calibration:");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.dbm_calibration[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
     Serial.print("keyerFlip:         "); Serial.println(ED.keyerFlip);
 
     Serial.print("equalizerRec: ");
