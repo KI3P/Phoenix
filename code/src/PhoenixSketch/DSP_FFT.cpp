@@ -75,6 +75,7 @@ void ResetPSD(void){
     }
 }
 
+extern uint64_t counter;
 /**
  * Calculate a 512-point power spectrum from the complex data stored in real 
  * and imag arrays. A Hanning window is applied to the data. The result is
@@ -124,6 +125,18 @@ void CalcPSD512(float32_t *I, float32_t *Q)
     // TODO: figure out why
     psdnew[170] = (psdnew[170-1]+psdnew[170+1])/2; 
     psdupdated = true;
+
+    if (counter % 100 == 0){
+        char buff[50];
+        // What is the largest value in the PSD?
+        float32_t fftmax = -500000.0;
+        for (size_t x = 0; x < SPECTRUM_RES; x++) {
+            if (psdnew[x] > fftmax) fftmax = psdnew[x];
+        }
+        sprintf(buff,"psdnew max = %5.4f",fftmax);
+        Debug(buff);
+    }
+
 }
 
 /**

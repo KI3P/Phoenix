@@ -172,6 +172,8 @@
 
 #include "SDT.h"
 
+uint64_t counter;
+
 // Create an IntervalTimer object for driving the state machines
 IntervalTimer timer1ms;
 
@@ -236,4 +238,5 @@ void setup(void){
     timer1ms.begin(tick1ms, 1000);  // run tick1ms every 1ms
     
     Serial.println("...Setup done!");
+    counter = 0;
 }

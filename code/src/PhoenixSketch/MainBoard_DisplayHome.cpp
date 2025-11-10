@@ -540,7 +540,7 @@ void DrawFrequencyBarValue(void) {
 
 // State tracking for S-meter display
 static float32_t audioMaxSquaredAve = 0;
-
+extern uint64_t counter;
 /**
  * Calculate and display the S-meter reading with dBm value.
  */
@@ -570,6 +570,15 @@ void DisplaydbM() {
     sprintf(buff,"%2.1fdBm",dbm);
     tft.setCursor(SMETER_X + 184, SMETER_Y);
     tft.print(buff);
+
+    if (counter % 100 == 0){
+        char buff[50];
+        // What is the S meter value?
+        sprintf(buff,"audioPowerMax = %5.4f",audioMaxSquaredAve);
+        sprintf(buff,"S meter dbm = %5.4f",dbm);        
+        Debug(buff);
+    }
+
 }
 
 // State tracking for spectrum line rendering
@@ -621,6 +630,22 @@ FASTRUN void ShowSpectrum(void){
             test1 = 117;
         waterfall[x1] = gradient[test1];
     }
+    if (counter % 100 == 0){
+        int16_t ypeak = 1000;
+        int16_t audiopeak = -1000;
+        for (int j = 0; j < MAX_WATERFALL_WIDTH; j++){
+            if (ypeak > pixelold[j]) ypeak = pixelold[j];
+            if (j < 128){
+                if (audiopeak > audioYPixel[j]) audiopeak = audioYPixel[j];
+            }
+        }
+        char buff[50];
+        sprintf(buff,"psd peak = %d",ypeak);
+        Debug(buff);
+        sprintf(buff,"audio peak = %d",audiopeak);
+        Debug(buff);
+    }
+
     if (x1 >= MAX_WATERFALL_WIDTH){
         x1 = 0;
         y_prev = pixelold[0];
