@@ -26,22 +26,42 @@ void DrawCalibrateFrequency(void){
     tft.print("Frequency calibration");
 }
 
+
+static const int8_t NUMBER_OF_PANES = 5;
+// Forward declaration of the pane drawing functions
+static void DrawDeltaPane(void);
+static void DrawAdjustPane(void);
+static void DrawTablePane(void);
+static void DrawInstructionsPane(void);
+static void DrawSpectrumPane(void);
+
+// Pane instances
+static Pane PaneDelta =    {270,45,160,40,DrawDeltaPane,1};
+static Pane PaneAdjust =   {3,267,300,210,DrawAdjustPane,1};
+static Pane PaneTable =    {320,267,200,210,DrawTablePane,1};
+static Pane PaneInstructions = {537,7,260,470,DrawInstructionsPane,1};
+static Pane PaneSpectrum = {3,95,517,150,DrawSpectrumPane,1};
+
+// Array of all panes for iteration
+static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneDelta,&PaneAdjust,&PaneTable,
+                                    &PaneSpectrum,&PaneInstructions};
+
 extern struct dispSc displayScale[];
 
 /**
  * Calculate vertical pixel position for a spectrum FFT bin.
  */
 FASTRUN int16_t pixeln(uint32_t i){
-    int16_t result = displayScale[0].baseOffset +
+    int16_t result = displayScale[0].baseOffset + // 20dB scale
                     20 + // pixeloffset
-                    (int16_t)(displayScale[0].dBScale * psdnew[i]);
+                    (int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
     return result;
 }
 
 static const uint16_t MAX_WATERFALL_WIDTH = SPECTRUM_RES;
-static const uint16_t SPECTRUM_LEFT_X = 5;
-static const uint16_t SPECTRUM_TOP_Y  = 95;
-static const uint16_t SPECTRUM_HEIGHT = 150;
+static const uint16_t SPECTRUM_LEFT_X = PaneSpectrum.x0+2; 
+static const uint16_t SPECTRUM_TOP_Y  = PaneSpectrum.y0;
+static const uint16_t SPECTRUM_HEIGHT = PaneSpectrum.height;
 
 static uint16_t pixelold[MAX_WATERFALL_WIDTH];
 static int16_t x1 = 0;
@@ -101,12 +121,119 @@ FASTRUN void PlotSpectrum(void){
         sideband_separation = (upperSBmax - lowerSBmax)*10;
     else
         sideband_separation = (lowerSBmax - upperSBmax)*10;
-    sprintf(buff,"%2.1fdB",sideband_separation);
-    tft.setCursor(centerLine - 50,  SPECTRUM_TOP_Y+SPECTRUM_HEIGHT/2);
-    tft.fillRect(centerLine - 50,  SPECTRUM_TOP_Y+SPECTRUM_HEIGHT/2, 6*tft.getFontWidth(),tft.getFontHeight(),RA8875_BLACK);
-    tft.print(buff);
 
     psdupdated = false;
+}
+
+static float32_t increment = 0.1;
+
+static float32_t oldsep = 0.0;
+static void DrawDeltaPane(void){
+    if (oldsep != sideband_separation)
+        PaneDelta.stale = true;
+    oldsep = sideband_separation;
+
+    if (!PaneDelta.stale) return;
+    tft.fillRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_BLACK);
+    tft.drawRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_YELLOW);
+    
+    sprintf(buff,"%2.1fdB",sideband_separation);
+    tft.setCursor(PaneDelta.x0, PaneDelta.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print(buff);
+
+    PaneDelta.stale = false;
+}
+
+static void DrawAdjustPane(void){
+    //if (stalecondition)
+    //    PaneAdjust.stale = true;
+    //update stalecondition
+
+    if (!PaneAdjust.stale) return;
+    tft.fillRect(PaneAdjust.x0, PaneAdjust.y0, PaneAdjust.width, PaneAdjust.height, RA8875_BLACK);
+    tft.drawRect(PaneAdjust.x0, PaneAdjust.y0, PaneAdjust.width, PaneAdjust.height, RA8875_YELLOW);
+    
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3);
+    tft.print("Current Band");
+    
+    tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40);
+    tft.print("Band:");
+    tft.setCursor(PaneAdjust.x0+3+120,PaneAdjust.y0+3+40);
+    tft.print(bands[ED.currentBand[ED.activeVFO]].name);
+    
+    tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*2);
+    tft.print("Amp:");
+    tft.setCursor(PaneAdjust.x0+3+120,PaneAdjust.y0+3+40*2);
+    tft.print(ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+
+    tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*3);
+    tft.print("Phase:");
+    tft.setCursor(PaneAdjust.x0+3+120,PaneAdjust.y0+3+40*3);
+    tft.print(ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    
+    tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*4);
+    tft.print("Increment:");
+    tft.setCursor(PaneAdjust.x0+3+180,PaneAdjust.y0+3+40*4);
+    tft.print(increment);
+
+    PaneAdjust.stale = false;
+}
+
+static void DrawTablePane(void){
+    //if (stalecondition)
+    //    PaneTable.stale = true;
+    //update stalecondition
+
+    if (!PaneTable.stale) return;
+    tft.fillRect(PaneTable.x0, PaneTable.y0, PaneTable.width, PaneTable.height, RA8875_BLACK);
+    tft.drawRect(PaneTable.x0, PaneTable.y0, PaneTable.width, PaneTable.height, RA8875_YELLOW);
+    
+    tft.setCursor(PaneTable.x0, PaneTable.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print("Table of prior results");
+
+    PaneTable.stale = false;
+}
+
+static void DrawInstructionsPane(void){
+    //if (stalecondition)
+    //    PaneInstructions.stale = true;
+    //update stalecondition
+
+    if (!PaneInstructions.stale) return;
+    tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
+    tft.drawRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_YELLOW);
+    
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print("Instructions");
+
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)0);
+    int16_t delta = 40;
+    int16_t lineD = 20;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("* Turn the volume knob to adjust amp");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("* Turn the filter knob to adjust phase");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("* Press button 15 to change the increment");
+
+    PaneInstructions.stale = false;
+}
+
+static void DrawSpectrumPane(void){
+    if (psdupdated){
+        PlotSpectrum();
+    }
 }
 
 void DrawCalibrateRXIQ(void){
@@ -118,16 +245,23 @@ void DrawCalibrateRXIQ(void){
         tft.fillWindow();
         uiSM.vars.clearScreen = false;
         tft.setCursor(10,10);
+        tft.setFontDefault();
+        tft.setFontScale((enum RA8875tsize)1);
         tft.print("Receive IQ calibration");
-        tft.drawRect(5-2,95,MAX_WATERFALL_WIDTH+5,SPECTRUM_HEIGHT,RA8875_YELLOW);
-
-        tft.setCursor(centerLine - 50,  SPECTRUM_TOP_Y+SPECTRUM_HEIGHT/2-40);
+        tft.drawRect(PaneSpectrum.x0,PaneSpectrum.y0,PaneSpectrum.width,PaneSpectrum.height,RA8875_YELLOW);
+        tft.setCursor(120,  50);
         tft.print("Delta:");
 
+        for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+            WindowPanes[i]->stale = true;
+        }
+
     }
-    if (psdupdated){
-        PlotSpectrum();
+
+    for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+        WindowPanes[i]->DrawFunction();
     }
+   
 }
 
 void DrawCalibrateTXIQ(void){

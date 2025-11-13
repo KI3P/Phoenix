@@ -41,7 +41,7 @@ int64_t GetUpperFreq_Hz();
 // PANE DEFINITIONS (HOME SCREEN SPECIFIC)
 ///////////////////////////////////////////////////////////////////////////////
 
-#define NUMBER_OF_PANES 12
+static const int8_t NUMBER_OF_PANES = 12;
 
 // Forward declarations for pane drawing functions (implemented below in this file)
 void DrawVFOPanes(void);

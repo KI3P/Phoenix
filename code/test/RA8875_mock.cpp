@@ -113,6 +113,15 @@ uint16_t RA8875::Color24To565(uint32_t color24) {
     return (r5 << 11) | (g6 << 5) | b5;
 }
 
+uint16_t RA8875::Color565(uint8_t r, uint8_t g, uint8_t b) {
+    // Convert 8-bit RGB values to 16-bit RGB565 format
+    uint16_t r5 = (r >> 3) & 0x1F;
+    uint16_t g6 = (g >> 2) & 0x3F;
+    uint16_t b5 = (b >> 3) & 0x1F;
+
+    return (r5 << 11) | (g6 << 5) | b5;
+}
+
 void RA8875::drawPixels(uint16_t* pixels, uint16_t count, uint16_t x, uint16_t y) {
     // Mock implementation - could log the pixel drawing if needed for testing
 }

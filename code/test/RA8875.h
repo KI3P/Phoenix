@@ -76,6 +76,7 @@ public:
 
     // Graphics operations
     uint16_t Color24To565(uint32_t color24);
+    uint16_t Color565(uint8_t r, uint8_t g, uint8_t b);
     void drawPixels(uint16_t* pixels, uint16_t count, uint16_t x, uint16_t y);
 
     // Layer operations

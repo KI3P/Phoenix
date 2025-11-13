@@ -13,7 +13,7 @@
 #include <RA8875.h>
 
 
-#define NUMBER_OF_PANES 4
+static const int8_t NUMBER_OF_PANES = 4;
 
 // Forward declaration of the pane drawing functions
 void DrawFreqLabelPane(void);
