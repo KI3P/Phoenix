@@ -128,7 +128,8 @@ void DrawDisplay(void){
             break;
         }
         case (UISm_StateId_CALIBRATE_RX_IQ):{
-            DrawCalibrateRXIQ();
+            //DrawCalibrateRXIQ();
+            DrawHome(); // temporarily so we can see the data
             break;
         }
         case (UISm_StateId_CALIBRATE_TX_IQ):{

@@ -8,7 +8,9 @@ enum RFHardwareState {
     RFCWSpace,
     RFReceive,
     RFTransmit,
-    RFCalIQ,
+    RFCalReceiveIQ,
+    RFCalTransmitIQ,
+    RFCalPower,
     RFInvalid
 };
 
@@ -16,6 +18,7 @@ enum TuneState {
     TuneReceive,
     TuneSSBTX,
     TuneCWTX,
+    TuneCalReceiveIQ,
     TuneInvalid
 };
 

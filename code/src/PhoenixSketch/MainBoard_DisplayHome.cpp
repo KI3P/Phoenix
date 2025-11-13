@@ -1411,7 +1411,8 @@ static uint32_t timerDisplay_ms = 0;
  * Render the main operating screen with all 12 display panes.
  */
 void DrawHome(){
-    if (!((uiSM.state_id == UISm_StateId_HOME) || (uiSM.state_id == UISm_StateId_UPDATE)))
+    if (!((uiSM.state_id == UISm_StateId_HOME) || (uiSM.state_id == UISm_StateId_UPDATE)
+        || (uiSM.state_id == UISm_StateId_CALIBRATE_RX_IQ))) // temporary case
         return;
     tft.writeTo(L1);
     if (uiSM.vars.clearScreen){

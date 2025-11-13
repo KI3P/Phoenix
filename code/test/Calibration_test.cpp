@@ -15,6 +15,7 @@
 // Timer variables for interrupt simulation
 static std::atomic<bool> timer_running{false};
 static std::thread timer_thread;
+#define GETHWRBITS(LSB,len) ((hardwareRegister >> LSB) & ((1 << len) - 1))
 
 /**
  * Timer interrupt function that runs every 1ms
@@ -262,3 +263,58 @@ TEST_F(CalibrationTest, SelectCalibratePowerAndExit) {
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 }
+
+
+void CheckThatHardwareRegisterMatchesActualHardware(){
+    // LPF
+    uint16_t gpioab = GetLPFMCPRegisters(); // a is upper half, b is lower half
+    EXPECT_EQ((uint8_t)(gpioab & 0x00FF), (uint8_t)(hardwareRegister & 0x000000FF)); // gpiob
+    EXPECT_EQ((uint8_t)((gpioab >> 8) & 0x0003), (uint8_t)((hardwareRegister >> 8) & 0x00000003));
+    // RF
+    gpioab = GetRFMCPRegisters();
+    EXPECT_EQ((uint8_t)(gpioab & 0x003F), (uint8_t)((hardwareRegister >> TXATTLSB) & 0x0000003F)); // tx atten
+    EXPECT_EQ((uint8_t)((gpioab >> 8) & 0x003F), (uint8_t)((hardwareRegister >> RXATTLSB) & 0x0000003F));
+    // BPF
+    gpioab = GetBPFMCPRegisters();
+    EXPECT_EQ(gpioab, BPF_WORD);
+    // Teensy
+    EXPECT_EQ(digitalRead(RXTX),GET_BIT(hardwareRegister,RXTXBIT));
+    EXPECT_EQ(digitalRead(CW_ON_OFF),GET_BIT(hardwareRegister,CWBIT));
+    EXPECT_EQ(digitalRead(XMIT_MODE),GET_BIT(hardwareRegister,MODEBIT));
+    EXPECT_EQ(digitalRead(CAL),GET_BIT(hardwareRegister,CALBIT));
+}
+
+void CheckThatStateIsCalReceiveIQ(){
+    // Check that the hardware register contains the expected bits
+    int32_t band = ED.currentBand[ED.activeVFO];
+    EXPECT_EQ(GETHWRBITS(LPFBAND0BIT,4), BandToBCD(band)); // LPF filter
+    EXPECT_EQ(GETHWRBITS(ANT0BIT,2), ED.antennaSelection[band]); // antenna
+    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 0);   // transverter should be LO (in path) for receive
+    EXPECT_EQ(GET_BIT(hardwareRegister,PA100WBIT), 0); // PA should always be LO (bypassed)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 0);  // TX path should bypass BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXBPFBIT), 1);  // RX path should include BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 0);   // RXTX bit should be RX (0)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 1);     // CW bit should be 1 (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT), 0);   // MODE should be LO (CW)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*31.5));  // RX attenuation
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*31.5));  // TX attenuation
+    EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    // Now check that the GPIO registers match the hardware register
+    CheckThatHardwareRegisterMatchesActualHardware();
+}
+
+TEST_F(CalibrationTest, CalibrateReceiveIQState) {
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    ScrollAndSelectCalibrateReceiveIQ();
+    
+    for (int k=0; k<50; k++){
+        loop(); MyDelay(10); 
+    }
+
+    // Now, check to ensure that we are in the receive IQ state
+    CheckThatStateIsCalReceiveIQ();
+}
+

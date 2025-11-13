@@ -310,19 +310,42 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             CWoff();
             break;
         }
-        case RFCalIQ:{
-            // Set GPA state to appropriate value
-            // Set GPB state to appropriate value
-            // Set frequencySSB_Hz to appropriate value
-            // Set driveCurrentSSB_mA to appropriate value
-            // Set clockEnableSSB to HI
-            // Set frequencyCW_Hz to appropriate value
-            // Set driveCurrentCW_mA to appropriate value
-            // Set clockEnableCW to HI
+        case RFCalReceiveIQ:{
+            
+            // Turn these off just in case we somehow entered from CW Transmit Mode
             // Set cwState to LO
-            // Set rxtxState to LO
-            // Set modulationState to LO
-            // Set calFeedbackState to LO
+            CWoff();
+            // Set clockEnableCW to LO
+            DisableCWVFOOutput();
+            SetTXAttenuation(31.5);
+            TXBypassBPF(); // BPF out of TX path
+            SelectXVTR();  // Shunt the TX path to nothing
+            Bypass100WPA(); // always bypassed
+            MyDelay(50);
+
+            // Now, switch in the receive path hardware
+            // Set frequency
+            RXSelectBPF(); // BPF in to RX path
+            UpdateTuneState();
+            // Set GPA state to appropriate value
+            SetRXAttenuation( 31.5 );
+            // Set driveCurrentSSB_mA to appropriate value
+            // > This does not change after initialization, so do nothing
+            // Set clockEnableSSB to HI (SSB)
+            EnableSSBVFOOutput();
+            SelectTXCWModulation();
+            // Make sure calFeedbackState is HI
+            EnableCalFeedback();
+            // Wait to make sure all these changes have happened
+            MyDelay(50);
+            // Set rxtxState to LO (RX)
+            SelectRXMode();
+            
+            // Set clockEnableCW to HI
+            EnableCWVFOOutput();
+            // Set cwState to HI
+            CWon();
+
             break;
         }
         case RFInvalid:{
@@ -390,6 +413,7 @@ void UpdateRFHardwareState(void){
             break;
         }
         case (ModeSm_StateId_CALIBRATE_RX_IQ):{
+            rfHardwareState = RFCalReceiveIQ;
             Debug("Entered hardware cal RXIQ state");
             break;
         }
@@ -416,6 +440,20 @@ void UpdateRFHardwareState(void){
     previousRadioState = modeSM.state_id;
 }
 
+// Functions we need to invoke when tuning for calibration
+void TuneForReceiveIQCalibration(void){
+    int64_t band_center = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz + 
+                            bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2;
+    SetSSBVFOFrequency( band_center*100 );
+    // Set the CW signal to be on the opposite side of the LO from the
+    // nominal tune frequency and minimize the leakage of that signal
+    // into the nominal tune frequency bins
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
+        SetCWVFOFrequency( (band_center + SR[SampleRate].rate/4)*100 );
+    } else {
+        SetCWVFOFrequency( (band_center - SR[SampleRate].rate/4)*100 );
+    }
+}
 
 /**
  * @brief Execute VFO frequency changes for a new tune state
@@ -466,6 +504,10 @@ void HandleTuneState(TuneState tuneState){
             SetCWVFOFrequency( newFreq );
             break;
         }
+        case (TuneCalReceiveIQ):{
+            TuneForReceiveIQCalibration();
+            break;
+        }
         default:
             break;
     }
@@ -510,9 +552,12 @@ void UpdateTuneState(void){
             tuneState = TuneCWTX;
             break;
         }
-
+        case (ModeSm_StateId_CALIBRATE_RX_IQ):{
+            tuneState = TuneCalReceiveIQ;
+            break;
+        }
+        
         //case (ModeSm_StateId_CALIBRATE_FREQUENCY):
-        //case (ModeSm_StateId_CALIBRATE_RX_IQ):
         //case (ModeSm_StateId_CALIBRATE_TX_IQ):
         //case (ModeSm_StateId_CALIBRATE_CW_PA):
         //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
