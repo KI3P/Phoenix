@@ -1180,6 +1180,7 @@ TEST(Loop, FifoBufferAllInterruptTypes) {
 
 TEST(Loop, ZoomButtonCyclesThroughLevels) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set initial zoom level
@@ -1215,6 +1216,7 @@ TEST(Loop, ZoomButtonCyclesThroughLevels) {
 
 TEST(Loop, ZoomButtonWrapsAroundAtMaximum) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start at maximum zoom level
@@ -1229,6 +1231,7 @@ TEST(Loop, ZoomButtonWrapsAroundAtMaximum) {
 
 TEST(Loop, ZoomButtonViaInterruptHandling) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set initial zoom level
@@ -1245,6 +1248,7 @@ TEST(Loop, ZoomButtonViaInterruptHandling) {
 
 TEST(Loop, ResetTuningButtonCallsResetFunction) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set up initial state with non-zero fine tune
@@ -1269,6 +1273,7 @@ TEST(Loop, ResetTuningButtonCallsResetFunction) {
 
 TEST(Loop, ResetTuningButtonViaInterruptHandling) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set up initial state with non-zero fine tune
@@ -1285,6 +1290,7 @@ TEST(Loop, ResetTuningButtonViaInterruptHandling) {
 
 TEST(Loop, DemodulationButtonCyclesThroughModes) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test cycling through modulation modes: USB->LSB->AM->SAM->USB
@@ -1315,6 +1321,7 @@ TEST(Loop, DemodulationButtonCyclesThroughModes) {
 
 TEST(Loop, DemodulationButtonWrapsAroundFromSAM) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start at maximum modulation type (SAM = 3)
@@ -1329,6 +1336,7 @@ TEST(Loop, DemodulationButtonWrapsAroundFromSAM) {
 
 TEST(Loop, DemodulationButtonWorksWithDifferentVFO) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test with VFO B (activeVFO = 1)
@@ -1346,6 +1354,7 @@ TEST(Loop, DemodulationButtonWorksWithDifferentVFO) {
 
 TEST(Loop, DemodulationButtonViaInterruptHandling) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set initial modulation mode
@@ -1364,6 +1373,7 @@ TEST(Loop, DemodulationButtonViaInterruptHandling) {
 
 TEST(Loop, MainTuneIncrementButtonCyclesThroughValues) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test cycling through all frequency increment values: 10, 50, 100, 250, 1000, 10000, 100000, 1000000
@@ -1394,6 +1404,7 @@ TEST(Loop, MainTuneIncrementButtonCyclesThroughValues) {
 
 TEST(Loop, MainTuneIncrementButtonFullSequence) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test complete sequence starting from 10 Hz
@@ -1443,6 +1454,7 @@ TEST(Loop, MainTuneIncrementButtonFullSequence) {
 
 TEST(Loop, MainTuneIncrementButtonWrapsFromMaximum) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start at maximum increment value
@@ -1457,6 +1469,7 @@ TEST(Loop, MainTuneIncrementButtonWrapsFromMaximum) {
 
 TEST(Loop, MainTuneIncrementButtonWithNonStandardStartValue) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test behavior when starting with a value not in the standard array
@@ -1471,6 +1484,7 @@ TEST(Loop, MainTuneIncrementButtonWithNonStandardStartValue) {
 
 TEST(Loop, MainTuneIncrementButtonWithInvalidStartValue) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test behavior when starting with a value not in the array
@@ -1485,6 +1499,7 @@ TEST(Loop, MainTuneIncrementButtonWithInvalidStartValue) {
 
 TEST(Loop, MainTuneIncrementButtonViaInterruptHandling) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set initial increment value
@@ -1501,6 +1516,7 @@ TEST(Loop, MainTuneIncrementButtonViaInterruptHandling) {
 
 TEST(Loop, MainTuneIncrementButtonDoesNotAffectOtherValues) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set up initial state with various ED values
@@ -1528,6 +1544,7 @@ TEST(Loop, MainTuneIncrementButtonDoesNotAffectOtherValues) {
 
 TEST(Loop, MainTuneIncrementButtonMultipleRapidPresses) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test multiple rapid button presses
@@ -1556,6 +1573,7 @@ TEST(Loop, MainTuneIncrementButtonMultipleRapidPresses) {
 
 TEST(Loop, NoiseReductionButtonCyclesThroughTypes) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test cycling through all noise reduction types: NROff(0), NRKim(1), NRSpectral(2), NRLMS(3)
@@ -1586,6 +1604,7 @@ TEST(Loop, NoiseReductionButtonCyclesThroughTypes) {
 
 TEST(Loop, NoiseReductionButtonFullSequence) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test complete sequence starting from NROff
@@ -1621,6 +1640,7 @@ TEST(Loop, NoiseReductionButtonFullSequence) {
 
 TEST(Loop, NoiseReductionButtonWrapsFromMaximum) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start at maximum noise reduction type
@@ -1635,6 +1655,7 @@ TEST(Loop, NoiseReductionButtonWrapsFromMaximum) {
 
 TEST(Loop, NoiseReductionButtonWithKimStart) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start with NRKim and test progression
@@ -1658,6 +1679,7 @@ TEST(Loop, NoiseReductionButtonWithKimStart) {
 
 TEST(Loop, NoiseReductionButtonWithSpectralStart) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start with NRSpectral and test progression
@@ -1681,6 +1703,7 @@ TEST(Loop, NoiseReductionButtonWithSpectralStart) {
 
 TEST(Loop, NoiseReductionButtonViaInterruptHandling) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set initial noise reduction type
@@ -1697,6 +1720,7 @@ TEST(Loop, NoiseReductionButtonViaInterruptHandling) {
 
 TEST(Loop, NoiseReductionButtonDoesNotAffectOtherValues) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set up initial state with various ED values
@@ -1726,6 +1750,7 @@ TEST(Loop, NoiseReductionButtonDoesNotAffectOtherValues) {
 
 TEST(Loop, NoiseReductionButtonMultipleRapidPresses) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test multiple rapid button presses
@@ -1757,6 +1782,7 @@ TEST(Loop, NoiseReductionButtonMultipleRapidPresses) {
 
 TEST(Loop, NoiseReductionButtonEnumValueVerification) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Verify the enum values are as expected
@@ -1794,6 +1820,7 @@ TEST(Loop, NoiseReductionButtonEnumValueVerification) {
 
 TEST(Loop, FineTuneIncrementButtonCyclesThroughValues) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test cycling through all fine tune increment values: 10, 50, 250, 500
@@ -1824,6 +1851,7 @@ TEST(Loop, FineTuneIncrementButtonCyclesThroughValues) {
 
 TEST(Loop, FineTuneIncrementButtonFullSequence) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test complete sequence starting from 10 Hz
@@ -1859,6 +1887,7 @@ TEST(Loop, FineTuneIncrementButtonFullSequence) {
 
 TEST(Loop, FineTuneIncrementButtonWrapsFromMaximum) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start at maximum fine tune increment value
@@ -1873,6 +1902,7 @@ TEST(Loop, FineTuneIncrementButtonWrapsFromMaximum) {
 
 TEST(Loop, FineTuneIncrementButtonWith50Start) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start with 50 Hz and test progression
@@ -1896,6 +1926,7 @@ TEST(Loop, FineTuneIncrementButtonWith50Start) {
 
 TEST(Loop, FineTuneIncrementButtonWith250Start) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Start with 250 Hz and test progression
@@ -1919,6 +1950,7 @@ TEST(Loop, FineTuneIncrementButtonWith250Start) {
 
 TEST(Loop, FineTuneIncrementButtonWithInvalidStartValue) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test behavior when starting with a value not in the array
@@ -1933,6 +1965,7 @@ TEST(Loop, FineTuneIncrementButtonWithInvalidStartValue) {
 
 TEST(Loop, FineTuneIncrementButtonViaInterruptHandling) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set initial fine tune increment value
@@ -1949,6 +1982,7 @@ TEST(Loop, FineTuneIncrementButtonViaInterruptHandling) {
 
 TEST(Loop, FineTuneIncrementButtonDoesNotAffectOtherValues) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Set up initial state with various ED values
@@ -1980,6 +2014,7 @@ TEST(Loop, FineTuneIncrementButtonDoesNotAffectOtherValues) {
 
 TEST(Loop, FineTuneIncrementButtonMultipleRapidPresses) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test multiple rapid button presses
@@ -2011,6 +2046,7 @@ TEST(Loop, FineTuneIncrementButtonMultipleRapidPresses) {
 
 TEST(Loop, FineTuneIncrementButtonArrayValueVerification) {
     UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
     ModeSm_start(&modeSM);
 
     // Test cycling through all expected values to verify the array is correct

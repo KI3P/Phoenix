@@ -1103,6 +1103,10 @@ TEST_F(LPFBoardTest, BufferWrapsAroundWhenFull) {
 }
 
 TEST_F(LPFBoardTest, BufferTracksTimestampsAccurately) {
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Initialize timing and buffer
     StartMillis();
     buffer.head = 0;

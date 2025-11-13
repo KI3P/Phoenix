@@ -3,13 +3,14 @@ modified by Jack Purdum, W8TEE, and Al Peter, AC8GY
 https://github.com/DD4WH/Teensy-ConvolutionSDR
 
 Known contributors to the code:
-* AFP: Al Peter, AC8GY
-* JJP: Jack Purdum, W8TEE
-* KF5N: Greg Raven, KF5N
-* GO0RX: John Melton, GO0RX
-* KF6VB: Jerry Kaidor, KF6VB
+* Al Peter, AC8GY
+* Jack Purdum, W8TEE
+* Greg Raven, KF5N
+* John Melton, GO0RX
+* Jerry Kaidor, KF6VB
 * WMXZ
-* DD4WH: Frank Dziock, DD4WH
+* Frank Dziock, DD4WH
 * Michael Wild
-* VK3KQT: David Martin, VK3KQT
-* DB2OO: Joerg Uthoff, DB2OO
+* David Martin, VK3KQT
+* Joerg Uthoff, DB2OO
+* Harry Brash, GM3RVL

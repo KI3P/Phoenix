@@ -53,6 +53,7 @@ TEST(FrontPanel, VolumeIncrease){
     //setfilename("VolumeIncrease");
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
     InitializeSignalProcessing();
@@ -88,6 +89,7 @@ TEST(FrontPanel, VolumeDecrease){
     Q_out_R.setName(nullptr);
 
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
     InitializeSignalProcessing();
@@ -210,6 +212,7 @@ TEST(FrontPanel, CenterTuneIncrease){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
         loop();
@@ -229,6 +232,7 @@ TEST(FrontPanel, CenterTuneDecrease){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
         loop();
@@ -247,6 +251,7 @@ TEST(FrontPanel, FineTuneIncrease){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
         loop();
@@ -265,6 +270,7 @@ TEST(FrontPanel, FineTuneDecrease){
     Q_in_L.clear();
     Q_in_R.clear();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    uiSM.state_id = UISm_StateId_HOME;
     InitializeSignalProcessing();
     for (size_t k = 0; k < 4; k++){
         loop();

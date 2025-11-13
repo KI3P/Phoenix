@@ -5,6 +5,7 @@
 // Constants
 #define WINDOW_WIDTH    800
 #define WINDOW_HEIGHT   480
+#define DARKGREY 0x7BEF
 
 // Forward declarations and structures
 struct Pane {

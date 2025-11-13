@@ -47,9 +47,13 @@ extern uint8_t SampleRate;
 extern struct band bands[];
 
 TEST(CAT, ChangeBandUp){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Save the initial band
     int32_t initialBand = ED.currentBand[ED.activeVFO];
-    
+
     // Simulate pressing the BAND_UP button
     SetButton(BAND_UP);
     SetInterrupt(iBUTTON_PRESSED);
@@ -64,9 +68,13 @@ TEST(CAT, ChangeBandUp){
 }
 
 TEST(CAT, ChangeBandUpLimit){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Set the current band to the last band to test rollover behavior
     ED.currentBand[ED.activeVFO] = LAST_BAND;
-    
+
     // Simulate pressing the BAND_UP button
     SetButton(BAND_UP);
     SetInterrupt(iBUTTON_PRESSED);
@@ -77,9 +85,13 @@ TEST(CAT, ChangeBandUpLimit){
 }
 
 TEST(CAT, ChangeBandUDown){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Save the initial band
     int32_t initialBand = ED.currentBand[ED.activeVFO];
-    
+
     // Simulate pressing the BAND_DN button
     SetButton(BAND_DN);
     SetInterrupt(iBUTTON_PRESSED);
@@ -94,9 +106,13 @@ TEST(CAT, ChangeBandUDown){
 }
 
 TEST(CAT, ChangeBandDownLimit){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Set the current band to the first band to test rollover behavior
     ED.currentBand[ED.activeVFO] = FIRST_BAND;
-    
+
     // Simulate pressing the BAND_DN button
     SetButton(BAND_DN);
     SetInterrupt(iBUTTON_PRESSED);
@@ -125,9 +141,13 @@ TEST(CAT, CATChangeVolume){
 }
 
 TEST(CAT, CATBandUp){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Save the initial band
     int32_t initialBand = ED.currentBand[ED.activeVFO];
-    
+
     // Call the CAT BU command function directly
     BU_write(nullptr);
     ConsumeInterrupt();
@@ -141,9 +161,13 @@ TEST(CAT, CATBandUp){
 }
 
 TEST(CAT, CATBandDown){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Save the initial band
     int32_t initialBand = ED.currentBand[ED.activeVFO];
-    
+
     // Call the CAT BD command function directly
     BD_write(nullptr);
     ConsumeInterrupt();
@@ -158,9 +182,13 @@ TEST(CAT, CATBandDown){
 
 
 TEST(CAT, CATCommandParserBU){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Save the initial band
     int32_t initialBand = ED.currentBand[ED.activeVFO];
-    
+
     // Test that command_parser correctly processes "BU;" command and calls BU_write
     char command[] = "BU;";
     char* result = command_parser(command);
@@ -179,9 +207,13 @@ TEST(CAT, CATCommandParserBU){
 
 
 TEST(CAT, CheckForCATSerialEvents){
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_HOME;
+    ModeSm_start(&modeSM);
+
     // Save initial state
     int32_t initialBand = ED.currentBand[ED.activeVFO];
-    
+
     // Clear any existing data in the serial buffer
     SerialUSB1.clearBuffer();
     

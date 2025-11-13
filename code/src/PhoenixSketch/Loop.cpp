@@ -361,185 +361,254 @@ void TimerInterrupt(void){
  * @param button Button ID from the front panel (defined in button constants)
  */
 void HandleButtonPress(int32_t button){
-    switch (button){
-        case MENU_OPTION_SELECT:{
-            // Issue SELECT interrupt to UI
-            UISm_dispatch_event(&uiSM,UISm_EventId_SELECT);
-            break;
-        }
-        case MAIN_MENU_UP:{
-            // Bring up the main menu
-            UISm_dispatch_event(&uiSM,UISm_EventId_MENU);
-            break;
-        }
-        case HOME_SCREEN:{
-            // Go back to the home screen
-            UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
-            break;
-        }
-        case BAND_UP:{
-            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
-            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
-            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2] = ED.modulation[ED.activeVFO];
-            if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
-                ED.currentBand[ED.activeVFO] = FIRST_BAND;
-            ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
-            ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-            ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
-            UpdateRFHardwareState();
-            Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
-            break;
-        }
-        case BAND_DN:{
-            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
-            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
-            ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2] = ED.modulation[ED.activeVFO];
-            if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
-                ED.currentBand[ED.activeVFO] = LAST_BAND;
-            ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
-            ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-            ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
-            UpdateRFHardwareState();
-            Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
-            break;
-        }
-        case ZOOM:{
-            ED.spectrum_zoom++;
-            if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
-                ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
-            Debug("Zoom is x" + String(1<<ED.spectrum_zoom));
-            ZoomFFTPrep(ED.spectrum_zoom, &RXfilters);
-            break;
-        }
-        case RESET_TUNING:{
-            ResetTuning();
-            UpdateRFHardwareState();
-            Debug("Center freq = " + String(ED.centerFreq_Hz[ED.activeVFO]));
-            Debug("Fine tune freq = " + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
-            break;
-        }
-        case TOGGLE_MODE:{
-            switch(modeSM.state_id){
-                case ModeSm_StateId_SSB_RECEIVE:{
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+
+    switch (uiSM.state_id){
+        case (UISm_StateId_UPDATE):
+        case (UISm_StateId_HOME):{
+            switch (button){
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case MENU_OPTION_SELECT:{
+                    // Issue SELECT interrupt to UI
+                    UISm_dispatch_event(&uiSM,UISm_EventId_SELECT);
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case MAIN_MENU_UP:{
+                    // Bring up the main menu
+                    UISm_dispatch_event(&uiSM,UISm_EventId_MENU);
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case HOME_SCREEN:{
+                    // Go back to the home screen
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case BAND_UP:{
+                    ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
+                    ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
+                    ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2] = ED.modulation[ED.activeVFO];
+                    if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
+                        ED.currentBand[ED.activeVFO] = FIRST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+                    ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
+                    UpdateRFHardwareState();
+                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case BAND_DN:{
+                    ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0] = ED.centerFreq_Hz[ED.activeVFO];
+                    ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1] = ED.fineTuneFreq_Hz[ED.activeVFO];
+                    ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2] = ED.modulation[ED.activeVFO];
+                    if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
+                        ED.currentBand[ED.activeVFO] = LAST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+                    ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
+                    UpdateRFHardwareState();
+                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case ZOOM:{
+                    ED.spectrum_zoom++;
+                    if (ED.spectrum_zoom > SPECTRUM_ZOOM_MAX)
+                        ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
+                    Debug("Zoom is x" + String(1<<ED.spectrum_zoom));
+                    ZoomFFTPrep(ED.spectrum_zoom, &RXfilters);
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case RESET_TUNING:{
+                    ResetTuning();
+                    UpdateRFHardwareState();
+                    Debug("Center freq = " + String(ED.centerFreq_Hz[ED.activeVFO]));
+                    Debug("Fine tune freq = " + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case TOGGLE_MODE:{
+                    switch(modeSM.state_id){
+                        case ModeSm_StateId_SSB_RECEIVE:{
+                            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+                            UpdateRFHardwareState();
+                            break;
+                        }
+                        case ModeSm_StateId_CW_RECEIVE:{
+                            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+                            UpdateRFHardwareState();
+                            break;
+                        }
+                        default:{
+                            break;
+                        }
+                    }
+                    Debug("Mode is " + String(modeSM.state_id));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case DEMODULATION:{
+                    // Rotate through the modulation types USB(0), LSB(1), AM(2), and SAM(3)
+                    int8_t newmod = (int8_t)ED.modulation[ED.activeVFO] + 1;
+                    if (newmod > (int8_t)SAM)
+                        newmod = (int8_t)USB;
+                    ED.modulation[ED.activeVFO] = (ModulationType)newmod;
+                    UpdateFIRFilterMask(&RXfilters);
+                    Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case MAIN_TUNE_INCREMENT:{
+                    int32_t incrementValues[] = { 10, 50, 100, 250, 1000, 10000, 100000, 1000000 };
+                    // find the index of the current increment
+                    size_t i = 0;
+                    for (i = 0; i < sizeof(incrementValues)/sizeof(int32_t); i++)
+                        if (incrementValues[i] == ED.freqIncrement) break;
+                    i++; // increase it
+                    if (i >= sizeof(incrementValues)/sizeof(int32_t)) // check for end of array
+                        i = 0;
+                    ED.freqIncrement = incrementValues[i];
+                    Debug("Main tune increment is " + String(ED.freqIncrement));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case FINE_TUNE_INCREMENT:{
+                    int32_t selectFT[] = { 10, 50, 250, 500 };
+                    size_t i = 0;
+                    for (i = 0; i < sizeof(selectFT)/sizeof(int32_t); i++)
+                        if (ED.stepFineTune == selectFT[i]) break;
+                    i++;
+                    if (i >= sizeof(selectFT)/sizeof(int32_t))
+                        i = 0;
+                    ED.stepFineTune = selectFT[i];
+                    Debug("Fine tune increment is " + String(ED.stepFineTune));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case NOISE_REDUCTION:{
+                    // Rotate through the noise reduction types
+                    int8_t newnr = (int8_t)ED.nrOptionSelect + 1;
+                    if (newnr > (int8_t)NRLMS)
+                        newnr = (int8_t)NROff;
+                    ED.nrOptionSelect = (NoiseReductionType)newnr;
+                    Debug("Noise reduction is " + String(ED.nrOptionSelect));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case NOTCH_FILTER:{
+                    if (ED.ANR_notchOn == 0)
+                        ED.ANR_notchOn = 1;
+                    else
+                        ED.ANR_notchOn = 0;
+                    Debug("Notch filter is " + String(ED.ANR_notchOn));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case FILTER:{
+                    // I am not sure what the point of this button is, so ignore for now
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case DECODER_TOGGLE:{
+                    if (ED.decoderFlag == 0)
+                        ED.decoderFlag = 1;
+                    else
+                        ED.decoderFlag = 0;
+                    Debug("Decoder is " + String(ED.decoderFlag));
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case DDE:{
+                    // Add this later
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case BEARING:{
+                    // Add this later
+                    break;
+                }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case VFO_TOGGLE:{
+                    if (ED.activeVFO == 0)
+                        ED.activeVFO = 1;
+                    else
+                        ED.activeVFO = 0;
                     UpdateRFHardwareState();
                     break;
                 }
-                case ModeSm_StateId_CW_RECEIVE:{
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
-                    UpdateRFHardwareState();
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case VOLUME_BUTTON:{
+                    // Rotate through the parameters controlled by the volume knob
+                    int8_t newvol = (int8_t)volumeFunction + 1;
+                    if (newvol > (int8_t)SidetoneVolume)
+                        newvol = (int8_t)AudioVolume;
+                    volumeFunction = (VolumeFunction)newvol;
+                    Debug("Volume knob function is " + String(volumeFunction));
                     break;
                 }
-                default:{
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case FINETUNE_BUTTON:{
                     break;
                 }
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case FILTER_BUTTON:{
+                    if (changeFilterHiCut)
+                        changeFilterHiCut = 0;
+                    else
+                        changeFilterHiCut = 1;
+                    break;
+                    Debug("changeFilterHiCut is " + String(changeFilterHiCut));
+                }
+                default:
+                    break;
             }
-            Debug("Mode is " + String(modeSM.state_id));
             break;
+        } // end of switch (button) for HOME and UPDATE states
+        case (UISm_StateId_MAIN_MENU):
+        case (UISm_StateId_SECONDARY_MENU):{
+            switch(button){
+                // You are in UISm_StateId_[MAIN,SECONDARY]_MENU states
+                case MENU_OPTION_SELECT:{
+                    // Issue SELECT interrupt to UI
+                    UISm_dispatch_event(&uiSM,UISm_EventId_SELECT);
+                    break;
+                }
+                // You are in UISm_StateId_[MAIN,SECONDARY]_MENU states
+                case MAIN_MENU_UP:{
+                    // Bring up the main menu
+                    UISm_dispatch_event(&uiSM,UISm_EventId_MENU);
+                    break;
+                }
+                // You are in UISm_StateId_[MAIN,SECONDARY]_MENU states
+                case HOME_SCREEN:{
+                    // Go back to the home screen
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                    break;
+                }
+                default: // ignore all the other buttons
+                    break;
+            }
+            break;
+        } // end of MAIN and SECONDARY MENU states
+        case (UISm_StateId_FREQ_ENTRY):{
+            // Interpret buttons as number pad presses
+            switch (button){
+                // You are in UISm_StateId_FREQ_ENTRY state
+                case (0):{
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of FREQ_ENTRY state
+        default:{
+            break; // ignore button presses
         }
-        case DEMODULATION:{
-            // Rotate through the modulation types USB(0), LSB(1), AM(2), and SAM(3)
-            int8_t newmod = (int8_t)ED.modulation[ED.activeVFO] + 1;
-            if (newmod > (int8_t)SAM)
-                newmod = (int8_t)USB;
-            ED.modulation[ED.activeVFO] = (ModulationType)newmod;
-            UpdateFIRFilterMask(&RXfilters);
-            Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
-            break;
-        }
-        case MAIN_TUNE_INCREMENT:{
-            int32_t incrementValues[] = { 10, 50, 100, 250, 1000, 10000, 100000, 1000000 };
-            // find the index of the current increment
-            size_t i = 0;
-            for (i = 0; i < sizeof(incrementValues)/sizeof(int32_t); i++)
-                if (incrementValues[i] == ED.freqIncrement) break;
-            i++; // increase it
-            if (i >= sizeof(incrementValues)/sizeof(int32_t)) // check for end of array
-                i = 0;
-            ED.freqIncrement = incrementValues[i];
-            Debug("Main tune increment is " + String(ED.freqIncrement));
-            break;
-        }
-        case FINE_TUNE_INCREMENT:{
-            int32_t selectFT[] = { 10, 50, 250, 500 };
-            size_t i = 0;
-            for (i = 0; i < sizeof(selectFT)/sizeof(int32_t); i++)
-                if (ED.stepFineTune == selectFT[i]) break;
-            i++;
-            if (i >= sizeof(selectFT)/sizeof(int32_t))
-                i = 0;
-            ED.stepFineTune = selectFT[i];
-            Debug("Fine tune increment is " + String(ED.stepFineTune));
-            break;
-        }
-        case NOISE_REDUCTION:{
-            // Rotate through the noise reduction types
-            int8_t newnr = (int8_t)ED.nrOptionSelect + 1;
-            if (newnr > (int8_t)NRLMS)
-                newnr = (int8_t)NROff;
-            ED.nrOptionSelect = (NoiseReductionType)newnr;
-            Debug("Noise reduction is " + String(ED.nrOptionSelect));
-            break;
-        }
-        case NOTCH_FILTER:{
-            if (ED.ANR_notchOn == 0)
-                ED.ANR_notchOn = 1;
-            else
-                ED.ANR_notchOn = 0;
-            Debug("Notch filter is " + String(ED.ANR_notchOn));
-            break;
-        }
-        case FILTER:{
-            // I am not sure what the point of this button is, so ignore for now
-            break;
-        }
-        case DECODER_TOGGLE:{
-            if (ED.decoderFlag == 0)
-                ED.decoderFlag = 1;
-            else
-                ED.decoderFlag = 0;
-            Debug("Decoder is " + String(ED.decoderFlag));
-            break;
-        }
-        case DDE:{
-            // Add this later
-            break;
-        }
-        case BEARING:{
-            // Add this later
-            break;
-        }
-        case VFO_TOGGLE:{
-            if (ED.activeVFO == 0)
-                ED.activeVFO = 1;
-            else
-                ED.activeVFO = 0;
-            UpdateRFHardwareState();
-            break;
-        }
-        case VOLUME_BUTTON:{
-            // Rotate through the parameters controlled by the volume knob
-            int8_t newvol = (int8_t)volumeFunction + 1;
-            if (newvol > (int8_t)SidetoneVolume)
-                newvol = (int8_t)AudioVolume;
-            volumeFunction = (VolumeFunction)newvol;
-            Debug("Volume knob function is " + String(volumeFunction));
-            break;
-        }
-        case FINETUNE_BUTTON:{
-            break;
-        }
-        case FILTER_BUTTON:{
-            if (changeFilterHiCut)
-                changeFilterHiCut = 0;
-            else
-                changeFilterHiCut = 1;
-            break;
-            Debug("changeFilterHiCut is " + String(changeFilterHiCut));
-        }
-        default:
-            break;
-    }
+    } // end of UI state machine cases
 }
 
 /**
@@ -625,213 +694,227 @@ void AdjustBand(void){
  */
 void ConsumeInterrupt(void){
     InterruptType interrupt = GetInterrupt();
-    if ( interrupt != iNONE ){
-        switch (interrupt){
-            case (iNONE):{
-                break;
-            }
-            case (iPTT_PRESSED):{
-                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
-                break;
-            }
-            case (iPTT_RELEASED):{
-                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
-                break;
-            }
-            case (iMODE):{
-                // mode has changed, recalc filters, change frequencies, etc
-                UpdateRFHardwareState();
-                break;
-            }
-            case (iKEY1_PRESSED):{
-                if (ED.keyType == KeyTypeId_Straight){
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
-                } else {
-                    HandleKeyer(interrupt);
-                }
-                break;
-            }
-            case (iKEY1_RELEASED):{
-                if (ED.keyType == KeyTypeId_Straight){
-                    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
-                }
-                break;
-            }
-            case (iKEY2_PRESSED):{
-                if (ED.keyType == KeyTypeId_Keyer)
-                    HandleKeyer(interrupt);
-                break;
-            }
-            case (iVOLUME_INCREASE):{
-                // Triggered by the encoder turning. Update depending on what
-                // the state of the volumeFunction variable is. This variable is
-                // changed by pressing the button on the volume encoder
-                switch (volumeFunction) {
-                    case AudioVolume:{
-                        ED.audioVolume++;
-                        if (ED.audioVolume > 100) ED.audioVolume = 100;
-                        break;
-                    }
-                    case AGCGain:{
-                        bands[ED.currentBand[ED.activeVFO]].AGC_thresh++;
-                        break;
-                    }
-                    case MicGain:{
-                        ED.currentMicGain++;
-                        break;
-                    }
-                    case SidetoneVolume:{
-                        ED.sidetoneVolume += 1.0;
-                        if (ED.sidetoneVolume > 500) 
-                            ED.sidetoneVolume = 500; // 0 to 500 range
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                break;
-            }
-            case (iVOLUME_DECREASE):{
-                switch (volumeFunction) {
-                    case AudioVolume:{
-                        ED.audioVolume--;
-                        if (ED.audioVolume < 0) ED.audioVolume = 0;
-                        break;
-                    }
-                    case AGCGain:{
-                        bands[ED.currentBand[ED.activeVFO]].AGC_thresh--;
-                        break;
-                    }
-                    case MicGain:{
-                        ED.currentMicGain--;
-                        // peg to zero if it goes too low, unsigned int expected
-                        if (ED.currentMicGain < 0) 
-                            ED.currentMicGain = 0;
-                        break;
-                    }
-                    case SidetoneVolume:{
-                        ED.sidetoneVolume -= 1.0;
-                        if (ED.sidetoneVolume < 0) 
-                            ED.sidetoneVolume = 0; // 0 to 500 range
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                break;
-            }
-            case (iFILTER_INCREASE):{
-                switch (uiSM.state_id){
-                    case (UISm_StateId_HOME):{
-                        FilterSetSSB(5,changeFilterHiCut);
-                        Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                                + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
-                        break;
-                    }
-                    case (UISm_StateId_MAIN_MENU):{
-                        IncrementPrimaryMenu();
-                        break;
-                    }
-                    case (UISm_StateId_SECONDARY_MENU):{
-                        IncrementSecondaryMenu();
-                        break;
-                    }
-                    case (UISm_StateId_UPDATE):{
-                        IncrementValue();
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                break;
-            }
-            case (iFILTER_DECREASE):{
-                switch (uiSM.state_id){
-                    case (UISm_StateId_HOME):{
-                        FilterSetSSB(-5,changeFilterHiCut);
-                        Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                                + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
-                        break;
-                    }
-                    case (UISm_StateId_MAIN_MENU):{
-                        DecrementPrimaryMenu();
-                        break;
-                    }
-                    case (UISm_StateId_SECONDARY_MENU):{
-                        DecrementSecondaryMenu();
-                        break;
-                    }
-                    case (UISm_StateId_UPDATE):{
-                        DecrementValue();
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                break;
+    if ( interrupt == iNONE ) return;
 
-
-            }
-            case (iCENTERTUNE_INCREASE):{
-                ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
-                // Change the band if we tune out of the current band. However,
-                // if we tune to a frequency outside the ham bands, keep the last
-                // valid band setting to keep demodulation working.
-                //AdjustBand();
-                UpdateRFHardwareState();
-                //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
-                break;
-            }
-            case (iCENTERTUNE_DECREASE):{
-                ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
-                if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
-                    ED.centerFreq_Hz[ED.activeVFO] = 250000;
-                //AdjustBand();                
-                UpdateRFHardwareState();
-                //Debug(String("Center tune = ") + String(ED.centerFreq_Hz[ED.activeVFO]));
-                break;
-            }
-            case (iFINETUNE_INCREASE):{
-                AdjustFineTune(+1);
-                //AdjustBand();
-                //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
-                break;
-            }
-            case (iFINETUNE_DECREASE):{
-                AdjustFineTune(-1);
-                //AdjustBand();
-                //Debug(String("Fine tune = ") + String(ED.fineTuneFreq_Hz[ED.activeVFO]));
-                break;
-            }
-            case (iBUTTON_PRESSED):{
-                int32_t button = GetButton();
-                Debug(String("Pressed button:") + String(button));
-                HandleButtonPress(button);
-                break;
-            }
-            case (iVFO_CHANGE):{
-                // The VFO has been updated. We might have selected a different active VFO,
-                // we might have changed frequency.
-                if (ED.activeVFO == 0){
-                    ED.activeVFO = 1;
-                }else{
-                    ED.activeVFO = 0;
+    // Handle the interrupts created by the encoders slightly differently. The outcome
+    // of these events depends on the UI state. All other interrupts are ignored by this
+    // switch block and are handled by the switch block below.
+    switch (uiSM.state_id){
+        case (UISm_StateId_HOME):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    FilterSetSSB(5,changeFilterHiCut);
+                    Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                            + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
+                    break;
                 }
-                UpdateRFHardwareState();
-                break;
+                case (iFILTER_DECREASE):{
+                    FilterSetSSB(-5,changeFilterHiCut);
+                    Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
+                            + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
+                    break;
+                }
+                case (iVOLUME_INCREASE):{
+                    // Triggered by the encoder turning. Update depending on what
+                    // the state of the volumeFunction variable is. This variable is
+                    // changed by pressing the button on the volume encoder
+                    switch (volumeFunction) {
+                        case AudioVolume:{
+                            ED.audioVolume++;
+                            if (ED.audioVolume > 100) ED.audioVolume = 100;
+                            break;
+                        }
+                        case AGCGain:{
+                            bands[ED.currentBand[ED.activeVFO]].AGC_thresh++;
+                            break;
+                        }
+                        case MicGain:{
+                            ED.currentMicGain++;
+                            break;
+                        }
+                        case SidetoneVolume:{
+                            ED.sidetoneVolume += 1.0;
+                            if (ED.sidetoneVolume > 500) 
+                                ED.sidetoneVolume = 500; // 0 to 500 range
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                    break;
+                } // end of VOLUME_INCREASE, HOME state
+                case (iVOLUME_DECREASE):{
+                    switch (volumeFunction) {
+                        case AudioVolume:{
+                            ED.audioVolume--;
+                            if (ED.audioVolume < 0) ED.audioVolume = 0;
+                            break;
+                        }
+                        case AGCGain:{
+                            bands[ED.currentBand[ED.activeVFO]].AGC_thresh--;
+                            break;
+                        }
+                        case MicGain:{
+                            ED.currentMicGain--;
+                            // peg to zero if it goes too low, unsigned int expected
+                            if (ED.currentMicGain < 0) 
+                                ED.currentMicGain = 0;
+                            break;
+                        }
+                        case SidetoneVolume:{
+                            ED.sidetoneVolume -= 1.0;
+                            if (ED.sidetoneVolume < 0) 
+                                ED.sidetoneVolume = 0; // 0 to 500 range
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                    break;
+                } // end of VOLUME_DECREASE, HOME state
+                case (iCENTERTUNE_INCREASE):{
+                    ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
+                    // Change the band if we tune out of the current band. However,
+                    // if we tune to a frequency outside the ham bands, keep the last
+                    // valid band setting to keep demodulation working.
+                    UpdateRFHardwareState();
+                    break;
+                }
+                case (iCENTERTUNE_DECREASE):{
+                    ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
+                    if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
+                        ED.centerFreq_Hz[ED.activeVFO] = 250000;
+                    UpdateRFHardwareState();
+                    break;
+                }
+                case (iFINETUNE_INCREASE):{
+                    AdjustFineTune(+1);
+                    break;
+                }
+                case (iFINETUNE_DECREASE):{
+                    AdjustFineTune(-1);
+                    break;
+                }
+                default: // do nothing and handle these below
+                    break;
             }
-            case (iUPDATE_TUNE):{
-                UpdateRFHardwareState();
-                break;
-            }
-            case (iPOWER_CHANGE):{
-                // Nothing here yet
-                break;
-            }
-            default:
-                break;
+            break;
         }
+        case (UISm_StateId_UPDATE):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncrementValue();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecrementValue();
+                    break;
+                }
+                default: // handle them later
+                    break;
+            }
+            break;
+        } // end of UPDATE state, encoder interrupts
+        case (UISm_StateId_MAIN_MENU):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncrementPrimaryMenu();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecrementPrimaryMenu();
+                    break;
+                }
+                default: // handle them later
+                    break;
+            }
+            break;
+        } // end of MAIN_MENU state, encoder interrupts
+        case (UISm_StateId_SECONDARY_MENU):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncrementSecondaryMenu();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecrementSecondaryMenu();
+                    break;
+                }
+                default: // handle them later
+                    break;
+            }
+            break;
+        }// end of SECONDARY_MENU state, encoder interrupts
+        default:
+            break;
     }
+
+    // now handle all the other interrupt types that do not depend on the UI state
+    switch (interrupt){
+        case (iNONE):{
+            break;
+        }
+        case (iBUTTON_PRESSED):{
+            int32_t button = GetButton();
+            Debug(String("Pressed button:") + String(button));
+            HandleButtonPress(button);
+            break;
+        }
+        case (iVFO_CHANGE):{
+            // The VFO has been updated. We might have selected a different active VFO,
+            // we might have changed frequency.
+            if (ED.activeVFO == 0){
+                ED.activeVFO = 1;
+            }else{
+                ED.activeVFO = 0;
+            }
+            UpdateRFHardwareState();
+            break;
+        }
+        case (iUPDATE_TUNE):{
+            UpdateRFHardwareState();
+            break;
+        }
+        case (iPOWER_CHANGE):{
+            // Nothing here yet
+            break;
+        }
+        case (iPTT_PRESSED):{
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+            break;
+        }
+        case (iPTT_RELEASED):{
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+            break;
+        }
+        case (iMODE):{
+            // mode has changed, recalc filters, change frequencies, etc
+            UpdateRFHardwareState();
+            break;
+        }
+        case (iKEY1_PRESSED):{
+            if (ED.keyType == KeyTypeId_Straight){
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
+            } else {
+                HandleKeyer(interrupt);
+            }
+            break;
+        }
+        case (iKEY1_RELEASED):{
+            if (ED.keyType == KeyTypeId_Straight){
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_RELEASED);
+            }
+            break;
+        }
+        case (iKEY2_PRESSED):{
+            if (ED.keyType == KeyTypeId_Keyer)
+                HandleKeyer(interrupt);
+            break;
+        }
+        default:
+            break;
+    }
+    
 }
 
 ///////////////////////////////////////////////////////////////////////////////
