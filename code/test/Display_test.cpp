@@ -1663,7 +1663,7 @@ TEST_F(DisplayTest, FreqEntryPad) {
     // Expect to be back in the home state at 78 MHz
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
     EXPECT_NE(ED.centerFreq_Hz[ED.activeVFO],oldf);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],78000000);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],78000000+48000);
     EXPECT_EQ(ED.currentBand[ED.activeVFO],oldb); // band should not have changed
 }
 
@@ -1726,7 +1726,7 @@ TEST_F(DisplayTest, FreqEntry_OneDigitMHz) {
 
     // Should return to home with 7 MHz
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 7000000);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 7000000+48000);
 }
 
 /**
@@ -1798,7 +1798,7 @@ TEST_F(DisplayTest, FreqEntry_FourDigitKHz) {
 
     // Should return to home with 7150 kHz = 7.15 MHz
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 7150000);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 7150000+48000);
 }
 
 /**
@@ -1874,7 +1874,7 @@ TEST_F(DisplayTest, FreqEntry_FiveDigitKHz) {
 
     // Should return to home with 14250 kHz = 14.25 MHz
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14250000);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14250000+48000);
 }
 
 /**
@@ -2004,7 +2004,7 @@ TEST_F(DisplayTest, FreqEntry_MaxValidFreq) {
 
     // Should return to HOME with 99 MHz
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 99000000);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 99000000+48000);
 }
 
 /**
@@ -2072,7 +2072,7 @@ TEST_F(DisplayTest, FreqEntry_MinValidKHz) {
 
     // Should return to HOME with 1000 kHz = 1 MHz
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 1000000);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 1000000+48000);
 }
 
 /**
