@@ -346,6 +346,9 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set cwState to HI
             CWon();
 
+            // Set the zoom for the FFT to 1:
+            ED.spectrum_zoom = 0;
+            ZoomFFTPrep(ED.spectrum_zoom, &RXfilters);
             break;
         }
         case RFInvalid:{
@@ -442,6 +445,7 @@ void UpdateRFHardwareState(void){
 
 // Functions we need to invoke when tuning for calibration
 void TuneForReceiveIQCalibration(void){
+    ED.fineTuneFreq_Hz[ED.currentBand[ED.activeVFO]] = 0;
     int64_t band_center = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz + 
                             bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2;
     SetSSBVFOFrequency( band_center*100 );
