@@ -37,8 +37,8 @@ static void DrawSpectrumPane(void);
 
 // Pane instances
 static Pane PaneDelta =    {250,45,160,40,DrawDeltaPane,1};
-static Pane PaneAdjust =   {3,267,300,210,DrawAdjustPane,1};
-static Pane PaneTable =    {320,267,200,210,DrawTablePane,1};
+static Pane PaneAdjust =   {3,250,300,230,DrawAdjustPane,1};
+static Pane PaneTable =    {320,250,200,230,DrawTablePane,1};
 static Pane PaneInstructions = {537,7,260,470,DrawInstructionsPane,1};
 static Pane PaneSpectrum = {3,95,517,150,DrawSpectrumPane,1};
 
