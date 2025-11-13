@@ -36,7 +36,7 @@ static void DrawInstructionsPane(void);
 static void DrawSpectrumPane(void);
 
 // Pane instances
-static Pane PaneDelta =    {270,45,160,40,DrawDeltaPane,1};
+static Pane PaneDelta =    {250,45,160,40,DrawDeltaPane,1};
 static Pane PaneAdjust =   {3,267,300,210,DrawAdjustPane,1};
 static Pane PaneTable =    {320,267,200,210,DrawTablePane,1};
 static Pane PaneInstructions = {537,7,260,470,DrawInstructionsPane,1};
@@ -125,7 +125,17 @@ FASTRUN void PlotSpectrum(void){
     psdupdated = false;
 }
 
-static float32_t increment = 0.1;
+static uint8_t incindex = 1;
+const float32_t incvals[] = {0.1, 0.01, 0.001};
+static float32_t increment = incvals[incindex];
+void ChangeRXIQIncrement(void){
+    incindex++;
+    if (incindex > 2) 
+        incindex = 0;
+    increment = incvals[incindex];
+    Debug(String("Change increment to ") + String(increment));
+}
+
 
 static float32_t oldsep = 0.0;
 static void DrawDeltaPane(void){
@@ -135,7 +145,6 @@ static void DrawDeltaPane(void){
 
     if (!PaneDelta.stale) return;
     tft.fillRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_BLACK);
-    tft.drawRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_YELLOW);
     
     sprintf(buff,"%2.1fdB",sideband_separation);
     tft.setCursor(PaneDelta.x0, PaneDelta.y0);
@@ -146,10 +155,39 @@ static void DrawDeltaPane(void){
     PaneDelta.stale = false;
 }
 
+
+void IncrementRXIQPhase(void){
+    ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
+    if (ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] > 0.5)
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.5;
+}
+void DecrementRXIQPhase(void){
+    ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] -= increment;
+    if (ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] < -0.5)
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = -0.5;
+}
+void IncrementRXIQAmp(void){
+    ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
+    if (ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] > 2.0)
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 2.0;
+}
+void DecrementRXIQAmp(void){
+    ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] -= increment;
+    if (ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] < 0.5)
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.5;
+}
+
+int8_t oldincind = 5;
+float32_t oldamp = -5.0;
+float32_t oldphase = -5.0;
 static void DrawAdjustPane(void){
-    //if (stalecondition)
-    //    PaneAdjust.stale = true;
-    //update stalecondition
+    if ((oldincind != incindex) || 
+        (oldamp != ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]) || 
+        (oldphase != ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]))
+        PaneAdjust.stale = true;
+    oldincind = incindex;
+    oldamp = ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]];
+    oldphase = ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]];
 
     if (!PaneAdjust.stale) return;
     tft.fillRect(PaneAdjust.x0, PaneAdjust.y0, PaneAdjust.width, PaneAdjust.height, RA8875_BLACK);
@@ -178,7 +216,8 @@ static void DrawAdjustPane(void){
     tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*4);
     tft.print("Increment:");
     tft.setCursor(PaneAdjust.x0+3+180,PaneAdjust.y0+3+40*4);
-    tft.print(increment);
+    sprintf(buff,"%4.3f",increment);
+    tft.print(buff);
 
     PaneAdjust.stale = false;
 }
@@ -194,7 +233,7 @@ static void DrawTablePane(void){
     
     tft.setCursor(PaneTable.x0, PaneTable.y0);
     tft.setFontDefault();
-    tft.setFontScale((enum RA8875tsize)1);
+    tft.setFontScale((enum RA8875tsize)0);
     tft.print("Table of prior results");
 
     PaneTable.stale = false;
@@ -207,7 +246,6 @@ static void DrawInstructionsPane(void){
 
     if (!PaneInstructions.stale) return;
     tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
-    tft.drawRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_YELLOW);
     
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0);
     tft.setFontDefault();
@@ -219,13 +257,25 @@ static void DrawInstructionsPane(void){
     int16_t delta = 40;
     int16_t lineD = 20;
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
-    tft.print("* Turn the volume knob to adjust amp");
+    tft.print("* Turn the volume knob to");
     delta += lineD;
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
-    tft.print("* Turn the filter knob to adjust phase");
+    tft.print("    adjust amp");
     delta += lineD;
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
-    tft.print("* Press button 15 to change the increment");
+    tft.print("* Turn the filter knob to");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("    adjust phase");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("* Press button 15 to change");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("    the increment");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print(" * Adjust until Delta > 60 dB");
 
     PaneInstructions.stale = false;
 }
@@ -249,7 +299,7 @@ void DrawCalibrateRXIQ(void){
         tft.setFontScale((enum RA8875tsize)1);
         tft.print("Receive IQ calibration");
         tft.drawRect(PaneSpectrum.x0,PaneSpectrum.y0,PaneSpectrum.width,PaneSpectrum.height,RA8875_YELLOW);
-        tft.setCursor(120,  50);
+        tft.setCursor(120,  PaneDelta.y0);
         tft.print("Delta:");
 
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
