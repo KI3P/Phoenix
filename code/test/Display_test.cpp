@@ -1558,3 +1558,115 @@ TEST_F(DisplayTest, CWOptionsMenu_SidetoneVolume_IncrementDecrement) {
     DecrementVariable(&stv);
     EXPECT_FLOAT_EQ(ED.sidetoneVolume, 0.0f);
 }
+
+/**
+ * Test the frequency entry pad
+ */
+TEST_F(DisplayTest, FreqEntryPad) {
+    // Set up the queues so we get some simulated data through and start the "clock"
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    //-------------------------------------------------------------
+    // Radio startup code
+    //-------------------------------------------------------------
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();  // Initialize DSP before starting audio
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware(); // RF board, LPF board, and BPF board
+    
+    // Start the mode state machines
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = SPLASH_DURATION_MS;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    // Now, start the 1ms timer interrupt to simulate hardware timer
+    start_timer1ms();
+
+    //-------------------------------------------------------------
+    
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    // Check the state before loop is invoked and then again after
+    loop();MyDelay(10);
+    for (int k = 0; k < 200; k++){
+        loop();MyDelay(10);
+    }
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME );
+
+    // Do we enter the freq entry screen?
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Can we exit the freq entry screen?
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+
+    loop(); MyDelay(10);
+
+    // Re-enter
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Try applying the frequency after entering nothing
+    int64_t oldf = ED.centerFreq_Hz[ED.activeVFO];
+    int64_t oldb = ED.currentBand[ED.activeVFO];
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    //  Nothing should happen
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],oldf);
+    EXPECT_EQ(DFEGetNumDigits(),0);
+
+    // Enter three digits
+    SetButton(3);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(4);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(5);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    // Expect "789"
+    EXPECT_EQ(DFEGetNumDigits(),3);
+    EXPECT_EQ(DFEGetFString()[0],'7');
+    EXPECT_EQ(DFEGetFString()[1],'8');
+    EXPECT_EQ(DFEGetFString()[2],'9');
+
+    // Delete a digit
+    SetButton(13);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    // Expect "78"
+    EXPECT_EQ(DFEGetNumDigits(),2);
+    EXPECT_EQ(DFEGetFString()[0],'7');
+    EXPECT_EQ(DFEGetFString()[1],'8');
+
+    // Select this frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    // Expect to be back in the home state at 78 MHz
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_NE(ED.centerFreq_Hz[ED.activeVFO],oldf);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],78000000);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO],oldb); // band should not have changed
+}

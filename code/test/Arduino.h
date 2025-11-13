@@ -233,6 +233,8 @@ public:
     // Member functions
     size_t length() const;
     const char* c_str() const;
+    void toCharArray(char* buffer, unsigned int bufferSize) const;
+    int toInt() const;
 
     // Operator overloads
     String& operator=(const String& other);

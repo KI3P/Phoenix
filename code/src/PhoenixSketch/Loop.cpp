@@ -521,8 +521,9 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
-                case DDE:{
-                    // Add this later
+                case DFE:{
+                    // Go to direct frequency entry state
+                    UISm_dispatch_event(&uiSM,UISm_EventId_DFE);
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
@@ -596,11 +597,13 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_FREQ_ENTRY):{
             // Interpret buttons as number pad presses
             switch (button){
-                // You are in UISm_StateId_FREQ_ENTRY state
-                case (0):{
+                case HOME_SCREEN:{
+                    // Go back to the home screen without changing frequency
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
                     break;
                 }
                 default:
+                    InterpretFrequencyEntryButtonPress(button);
                     break;
             }
             break;
@@ -699,19 +702,17 @@ void ConsumeInterrupt(void){
     // Handle the interrupts created by the encoders slightly differently. The outcome
     // of these events depends on the UI state. All other interrupts are ignored by this
     // switch block and are handled by the switch block below.
+
+    // Define what happens with encoder interrupt events in this switch block
     switch (uiSM.state_id){
         case (UISm_StateId_HOME):{
             switch (interrupt){
                 case (iFILTER_INCREASE):{
                     FilterSetSSB(5,changeFilterHiCut);
-                    Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                            + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
                     break;
                 }
                 case (iFILTER_DECREASE):{
                     FilterSetSSB(-5,changeFilterHiCut);
-                    Debug(String("Filter = ") + String(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz) 
-                            + String(" to ") + String(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) );
                     break;
                 }
                 case (iVOLUME_INCREASE):{
@@ -782,6 +783,7 @@ void ConsumeInterrupt(void){
                 }
                 case (iCENTERTUNE_DECREASE):{
                     ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
+                    // check for minimum frequency supported by Si5351 quadrature signal generator
                     if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
                         ED.centerFreq_Hz[ED.activeVFO] = 250000;
                     UpdateRFHardwareState();
@@ -844,16 +846,14 @@ void ConsumeInterrupt(void){
                     break;
             }
             break;
-        }// end of SECONDARY_MENU state, encoder interrupts
+        } // end of SECONDARY_MENU state, encoder interrupts
         default:
             break;
     }
+    // end of encoder interrupt events switch block
 
-    // now handle all the other interrupt types that do not depend on the UI state
+    // Handle all the other non-encoder interrupts
     switch (interrupt){
-        case (iNONE):{
-            break;
-        }
         case (iBUTTON_PRESSED):{
             int32_t button = GetButton();
             Debug(String("Pressed button:") + String(button));
@@ -914,7 +914,7 @@ void ConsumeInterrupt(void){
         default:
             break;
     }
-    
+    // end of non-encoder interrupt events switch block
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -58,7 +58,7 @@
 #define FINE_TUNE_INCREMENT 11
 #define FILTER              12
 #define DECODER_TOGGLE      13
-#define DDE                 14
+#define DFE                 14
 #define BEARING             15
 #define HOME_SCREEN         17
 #define VOLUME_BUTTON       18

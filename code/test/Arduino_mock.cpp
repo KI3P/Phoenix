@@ -517,4 +517,25 @@ String String::substring(unsigned int from, unsigned int to) const {
     return result;
 }
 
+// Convert String to char array
+void String::toCharArray(char* buffer, unsigned int bufferSize) const {
+    if (buffer == nullptr || bufferSize == 0) {
+        return;
+    }
+
+    size_t len = length();
+    size_t copyLen = (len < bufferSize - 1) ? len : (bufferSize - 1);
+
+    strncpy(buffer, _data, copyLen);
+    buffer[copyLen] = '\0';
+}
+
+// Convert String to integer
+int String::toInt() const {
+    if (_data == nullptr) {
+        return 0;
+    }
+    return atoi(_data);
+}
+
 void flush(void){}

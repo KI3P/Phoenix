@@ -230,6 +230,18 @@ void DecrementValue(void);
  */
 void UpdateArrayVariables(void);
 
+/**
+ * @brief Turn button presses into a new frequency selection
+ * @note Runs when in the FREQ_ENTRY state
+ * @note Called by Loop.cpp
+ */
+void InterpretFrequencyEntryButtonPress(int32_t button);
+
+void DrawFrequencyEntryPad(void);
+// Used for unit tests
+int8_t DFEGetNumDigits(void);
+char * DFEGetFString(void);
+
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;

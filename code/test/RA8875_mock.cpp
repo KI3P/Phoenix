@@ -56,6 +56,10 @@ void RA8875::drawCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
     // Mock implementation - could log the action if needed for testing
 }
 
+void RA8875::fillCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
+    // Mock implementation - could log the action if needed for testing
+}
+
 void RA8875::setFont(const void* font) {
     // Mock implementation - store font pointer if needed
 }
