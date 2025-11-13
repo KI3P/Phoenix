@@ -123,6 +123,22 @@ void DrawDisplay(void){
             DrawFrequencyEntryPad();
             break;
         }
+        case (UISm_StateId_CALIBRATE_FREQUENCY):{
+            DrawCalibrateFrequency();
+            break;
+        }
+        case (UISm_StateId_CALIBRATE_RX_IQ):{
+            DrawCalibrateRXIQ();
+            break;
+        }
+        case (UISm_StateId_CALIBRATE_TX_IQ):{
+            DrawCalibrateTXIQ();
+            break;
+        }
+        case (UISm_StateId_CALIBRATE_POWER):{
+            DrawCalibratePower();
+            break;
+        }
         default:
             break;
     }

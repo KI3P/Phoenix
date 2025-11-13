@@ -242,6 +242,11 @@ void DrawFrequencyEntryPad(void);
 int8_t DFEGetNumDigits(void);
 char * DFEGetFString(void);
 
+void DrawCalibrateFrequency(void);
+void DrawCalibrateRXIQ(void);
+void DrawCalibrateTXIQ(void);
+void DrawCalibratePower(void);
+
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;

@@ -385,15 +385,25 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFCWSpace;
             break;
         }
-
-        //case (ModeSm_StateId_CALIBRATE_FREQUENCY):
-        //case (ModeSm_StateId_CALIBRATE_RX_IQ):
-        //case (ModeSm_StateId_CALIBRATE_TX_IQ):
-        //case (ModeSm_StateId_CALIBRATE_CW_PA):
+        case (ModeSm_StateId_CALIBRATE_FREQUENCY):{
+            Debug("Entered hardware cal freq state");
+            break;
+        }
+        case (ModeSm_StateId_CALIBRATE_RX_IQ):{
+            Debug("Entered hardware cal RXIQ state");
+            break;
+        }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ):{
+            Debug("Entered hardware cal TXIQ state");
+            break;
+        }
+        case (ModeSm_StateId_CALIBRATE_CW_PA):{
+            Debug("Entered hardware cal power state");
+            break;
+        }
         //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
         //    break;
         //}
-
         default:{
             Debug("Unhandled modeSM.state_id state in UpdateRFHardwareState!");
             char strbuf[10];

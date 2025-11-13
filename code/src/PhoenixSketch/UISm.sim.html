@@ -246,11 +246,11 @@ SECONDARY_MENU : SECONDARY_MENU
 
 SECONDARY_MENU : enter / #123; clearScreen = true#59; #125;
 
-CALIBRATION
+CALIBRATE_RX_IQ
 
-CALIBRATION : CALIBRATION
+CALIBRATE_RX_IQ : CALIBRATE_RX_IQ
 
-CALIBRATION : enter / #123; clearScreen = true#59; #125;
+CALIBRATE_RX_IQ : enter / #123; clearScreen = true#59; #125;
 
 UPDATE
 
@@ -264,13 +264,39 @@ FREQ_ENTRY : FREQ_ENTRY
 
 FREQ_ENTRY : enter / #123; clearScreen = true#59; #125;
 
+CALIBRATE_TX_IQ
+
+CALIBRATE_TX_IQ : CALIBRATE_TX_IQ
+
+CALIBRATE_TX_IQ : enter / #123; clearScreen = true#59; #125;
+
+CALIBRATE_FREQUENCY
+
+CALIBRATE_FREQUENCY : CALIBRATE_FREQUENCY
+
+CALIBRATE_FREQUENCY : enter / #123; clearScreen = true#59; #125;
+
+CALIBRATE_POWER
+
+CALIBRATE_POWER : CALIBRATE_POWER
+
+CALIBRATE_POWER : enter / #123; clearScreen = true#59; #125;
+
 ROOT.(InitialState) --> SPLASH
 
 SPLASH --> HOME : do [splashCount_ms >= splashDuration_ms]
 
 HOME --> MAIN_MENU : MENU
 
+HOME --> CALIBRATE_RX_IQ : CALIBRATE_RX_IQ
+
 HOME --> FREQ_ENTRY : DFE
+
+HOME --> CALIBRATE_TX_IQ : CALIBRATE_TX_IQ
+
+HOME --> CALIBRATE_FREQUENCY : CALIBRATE_FREQUENCY
+
+HOME --> CALIBRATE_POWER : CALIBRATE_POWER
 
 MAIN_MENU --> HOME : HOME
 
@@ -280,15 +306,19 @@ SECONDARY_MENU --> HOME : HOME
 
 SECONDARY_MENU --> UPDATE : SELECT
 
-CALIBRATION --> HOME : HOME
-
-UPDATE --> CALIBRATION : CAL
+CALIBRATE_RX_IQ --> HOME : HOME
 
 UPDATE --> HOME : HOME
 
 UPDATE --> HOME : SELECT
 
 FREQ_ENTRY --> HOME : HOME
+
+CALIBRATE_TX_IQ --> HOME : HOME
+
+CALIBRATE_FREQUENCY --> HOME : HOME
+
+CALIBRATE_POWER --> HOME : HOME
 
 
 
@@ -334,31 +364,37 @@ evaluateGuard = null;
     static EventId = 
     {
         DO : 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
-        CAL : 1,
-        DFE : 2,
-        HOME : 3,
-        MENU : 4,
-        SELECT : 5,
+        CALIBRATE_FREQUENCY : 1,
+        CALIBRATE_POWER : 2,
+        CALIBRATE_RX_IQ : 3,
+        CALIBRATE_TX_IQ : 4,
+        DFE : 5,
+        HOME : 6,
+        MENU : 7,
+        SELECT : 8,
     }
     static { Object.freeze(this.EventId); }
     
-    static EventIdCount = 6;
+    static EventIdCount = 9;
     static { Object.freeze(this.EventIdCount); }
     
     static StateId = 
     {
         ROOT : 0,
-        CALIBRATION : 1,
-        FREQ_ENTRY : 2,
-        HOME : 3,
-        MAIN_MENU : 4,
-        SECONDARY_MENU : 5,
-        SPLASH : 6,
-        UPDATE : 7,
+        CALIBRATE_FREQUENCY : 1,
+        CALIBRATE_POWER : 2,
+        CALIBRATE_RX_IQ : 3,
+        CALIBRATE_TX_IQ : 4,
+        FREQ_ENTRY : 5,
+        HOME : 6,
+        MAIN_MENU : 7,
+        SECONDARY_MENU : 8,
+        SPLASH : 9,
+        UPDATE : 10,
     }
     static { Object.freeze(this.StateId); }
     
-    static StateIdCount = 8;
+    static StateIdCount = 11;
     static { Object.freeze(this.StateIdCount); }
     
     // Used internally by state machine. Feel free to inspect, but don't modify.
@@ -406,11 +442,35 @@ evaluateGuard = null;
                 // No events handled by this state (or its ancestors).
                 break;
             
-            // STATE: CALIBRATION
-            case UISm.StateId.CALIBRATION:
+            // STATE: CALIBRATE_FREQUENCY
+            case UISm.StateId.CALIBRATE_FREQUENCY:
                 switch (eventId)
                 {
-                    case UISm.EventId.HOME: this.#CALIBRATION_home(); break;
+                    case UISm.EventId.HOME: this.#CALIBRATE_FREQUENCY_home(); break;
+                }
+                break;
+            
+            // STATE: CALIBRATE_POWER
+            case UISm.StateId.CALIBRATE_POWER:
+                switch (eventId)
+                {
+                    case UISm.EventId.HOME: this.#CALIBRATE_POWER_home(); break;
+                }
+                break;
+            
+            // STATE: CALIBRATE_RX_IQ
+            case UISm.StateId.CALIBRATE_RX_IQ:
+                switch (eventId)
+                {
+                    case UISm.EventId.HOME: this.#CALIBRATE_RX_IQ_home(); break;
+                }
+                break;
+            
+            // STATE: CALIBRATE_TX_IQ
+            case UISm.StateId.CALIBRATE_TX_IQ:
+                switch (eventId)
+                {
+                    case UISm.EventId.HOME: this.#CALIBRATE_TX_IQ_home(); break;
                 }
                 break;
             
@@ -427,7 +487,11 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case UISm.EventId.MENU: this.#HOME_menu(); break;
+                    case UISm.EventId.CALIBRATE_RX_IQ: this.#HOME_calibrate_rx_iq(); break;
                     case UISm.EventId.DFE: this.#HOME_dfe(); break;
+                    case UISm.EventId.CALIBRATE_TX_IQ: this.#HOME_calibrate_tx_iq(); break;
+                    case UISm.EventId.CALIBRATE_FREQUENCY: this.#HOME_calibrate_frequency(); break;
+                    case UISm.EventId.CALIBRATE_POWER: this.#HOME_calibrate_power(); break;
                 }
                 break;
             
@@ -461,7 +525,6 @@ evaluateGuard = null;
             case UISm.StateId.UPDATE:
                 switch (eventId)
                 {
-                    case UISm.EventId.CAL: this.#UPDATE_cal(); break;
                     case UISm.EventId.HOME: this.#UPDATE_home(); break;
                     case UISm.EventId.SELECT: this.#UPDATE_select(); break;
                 }
@@ -478,7 +541,13 @@ evaluateGuard = null;
         {
             switch (this.stateId)
             {
-                case UISm.StateId.CALIBRATION: this.#CALIBRATION_exit(); break;
+                case UISm.StateId.CALIBRATE_FREQUENCY: this.#CALIBRATE_FREQUENCY_exit(); break;
+                
+                case UISm.StateId.CALIBRATE_POWER: this.#CALIBRATE_POWER_exit(); break;
+                
+                case UISm.StateId.CALIBRATE_RX_IQ: this.#CALIBRATE_RX_IQ_exit(); break;
+                
+                case UISm.StateId.CALIBRATE_TX_IQ: this.#CALIBRATE_TX_IQ_exit(); break;
                 
                 case UISm.StateId.FREQ_ENTRY: this.#FREQ_ENTRY_exit(); break;
                 
@@ -509,57 +578,228 @@ evaluateGuard = null;
     
     
     ////////////////////////////////////////////////////////////////////////////////
-    // event handlers for state CALIBRATION
+    // event handlers for state CALIBRATE_FREQUENCY
     ////////////////////////////////////////////////////////////////////////////////
     
-    #CALIBRATION_enter()
+    #CALIBRATE_FREQUENCY_enter()
     {
-        this.stateId = UISm.StateId.CALIBRATION;
+        this.stateId = UISm.StateId.CALIBRATE_FREQUENCY;
         
-        // CALIBRATION behavior
-        // uml: enter / { this.tracer?.enterState('CALIBRATION'); }
+        // CALIBRATE_FREQUENCY behavior
+        // uml: enter / { this.tracer?.enterState('CALIBRATE_FREQUENCY'); }
         {
-            // Step 1: execute action `this.tracer?.enterState('CALIBRATION');`
-            this.tracer?.enterState('CALIBRATION');
-        } // end of behavior for CALIBRATION
+            // Step 1: execute action `this.tracer?.enterState('CALIBRATE_FREQUENCY');`
+            this.tracer?.enterState('CALIBRATE_FREQUENCY');
+        } // end of behavior for CALIBRATE_FREQUENCY
         
-        // CALIBRATION behavior
+        // CALIBRATE_FREQUENCY behavior
         // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;"); }
         {
             // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");`
             this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");
-        } // end of behavior for CALIBRATION
+        } // end of behavior for CALIBRATE_FREQUENCY
     }
     
-    #CALIBRATION_exit()
+    #CALIBRATE_FREQUENCY_exit()
     {
-        // CALIBRATION behavior
-        // uml: exit / { this.tracer?.exitState('CALIBRATION'); }
+        // CALIBRATE_FREQUENCY behavior
+        // uml: exit / { this.tracer?.exitState('CALIBRATE_FREQUENCY'); }
         {
-            // Step 1: execute action `this.tracer?.exitState('CALIBRATION');`
-            this.tracer?.exitState('CALIBRATION');
-        } // end of behavior for CALIBRATION
+            // Step 1: execute action `this.tracer?.exitState('CALIBRATE_FREQUENCY');`
+            this.tracer?.exitState('CALIBRATE_FREQUENCY');
+        } // end of behavior for CALIBRATE_FREQUENCY
         
         this.stateId = UISm.StateId.ROOT;
     }
     
-    #CALIBRATION_home()
+    #CALIBRATE_FREQUENCY_home()
     {
-        // CALIBRATION behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge8"); } TransitionTo(HOME)
+        // CALIBRATE_FREQUENCY behavior
+        // uml: HOME / { this.tracer?.edgeTransition("edge17"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#CALIBRATION_exit();
+            this.#CALIBRATE_FREQUENCY_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge8");`.
-            this.tracer?.edgeTransition("edge8");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
+            this.tracer?.edgeTransition("edge17");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
             
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
-        } // end of behavior for CALIBRATION
+        } // end of behavior for CALIBRATE_FREQUENCY
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state CALIBRATE_POWER
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #CALIBRATE_POWER_enter()
+    {
+        this.stateId = UISm.StateId.CALIBRATE_POWER;
+        
+        // CALIBRATE_POWER behavior
+        // uml: enter / { this.tracer?.enterState('CALIBRATE_POWER'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('CALIBRATE_POWER');`
+            this.tracer?.enterState('CALIBRATE_POWER');
+        } // end of behavior for CALIBRATE_POWER
+        
+        // CALIBRATE_POWER behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");
+        } // end of behavior for CALIBRATE_POWER
+    }
+    
+    #CALIBRATE_POWER_exit()
+    {
+        // CALIBRATE_POWER behavior
+        // uml: exit / { this.tracer?.exitState('CALIBRATE_POWER'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('CALIBRATE_POWER');`
+            this.tracer?.exitState('CALIBRATE_POWER');
+        } // end of behavior for CALIBRATE_POWER
+        
+        this.stateId = UISm.StateId.ROOT;
+    }
+    
+    #CALIBRATE_POWER_home()
+    {
+        // CALIBRATE_POWER behavior
+        // uml: HOME / { this.tracer?.edgeTransition("edge18"); } TransitionTo(HOME)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#CALIBRATE_POWER_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
+            this.tracer?.edgeTransition("edge18");
+            
+            // Step 3: Enter/move towards transition target `HOME`.
+            this.#HOME_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for CALIBRATE_POWER
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state CALIBRATE_RX_IQ
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #CALIBRATE_RX_IQ_enter()
+    {
+        this.stateId = UISm.StateId.CALIBRATE_RX_IQ;
+        
+        // CALIBRATE_RX_IQ behavior
+        // uml: enter / { this.tracer?.enterState('CALIBRATE_RX_IQ'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('CALIBRATE_RX_IQ');`
+            this.tracer?.enterState('CALIBRATE_RX_IQ');
+        } // end of behavior for CALIBRATE_RX_IQ
+        
+        // CALIBRATE_RX_IQ behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");
+        } // end of behavior for CALIBRATE_RX_IQ
+    }
+    
+    #CALIBRATE_RX_IQ_exit()
+    {
+        // CALIBRATE_RX_IQ behavior
+        // uml: exit / { this.tracer?.exitState('CALIBRATE_RX_IQ'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('CALIBRATE_RX_IQ');`
+            this.tracer?.exitState('CALIBRATE_RX_IQ');
+        } // end of behavior for CALIBRATE_RX_IQ
+        
+        this.stateId = UISm.StateId.ROOT;
+    }
+    
+    #CALIBRATE_RX_IQ_home()
+    {
+        // CALIBRATE_RX_IQ behavior
+        // uml: HOME / { this.tracer?.edgeTransition("edge12"); } TransitionTo(HOME)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#CALIBRATE_RX_IQ_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
+            this.tracer?.edgeTransition("edge12");
+            
+            // Step 3: Enter/move towards transition target `HOME`.
+            this.#HOME_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for CALIBRATE_RX_IQ
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state CALIBRATE_TX_IQ
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #CALIBRATE_TX_IQ_enter()
+    {
+        this.stateId = UISm.StateId.CALIBRATE_TX_IQ;
+        
+        // CALIBRATE_TX_IQ behavior
+        // uml: enter / { this.tracer?.enterState('CALIBRATE_TX_IQ'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('CALIBRATE_TX_IQ');`
+            this.tracer?.enterState('CALIBRATE_TX_IQ');
+        } // end of behavior for CALIBRATE_TX_IQ
+        
+        // CALIBRATE_TX_IQ behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "clearScreen = true;");
+        } // end of behavior for CALIBRATE_TX_IQ
+    }
+    
+    #CALIBRATE_TX_IQ_exit()
+    {
+        // CALIBRATE_TX_IQ behavior
+        // uml: exit / { this.tracer?.exitState('CALIBRATE_TX_IQ'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('CALIBRATE_TX_IQ');`
+            this.tracer?.exitState('CALIBRATE_TX_IQ');
+        } // end of behavior for CALIBRATE_TX_IQ
+        
+        this.stateId = UISm.StateId.ROOT;
+    }
+    
+    #CALIBRATE_TX_IQ_home()
+    {
+        // CALIBRATE_TX_IQ behavior
+        // uml: HOME / { this.tracer?.edgeTransition("edge16"); } TransitionTo(HOME)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#CALIBRATE_TX_IQ_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
+            this.tracer?.edgeTransition("edge16");
+            
+            // Step 3: Enter/move towards transition target `HOME`.
+            this.#HOME_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for CALIBRATE_TX_IQ
         
         // No ancestor handles this event.
     }
@@ -603,13 +843,13 @@ evaluateGuard = null;
     #FREQ_ENTRY_home()
     {
         // FREQ_ENTRY behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge12"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge15"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#FREQ_ENTRY_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
-            this.tracer?.edgeTransition("edge12");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge15");`.
+            this.tracer?.edgeTransition("edge15");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -657,16 +897,100 @@ evaluateGuard = null;
         this.stateId = UISm.StateId.ROOT;
     }
     
-    #HOME_dfe()
+    #HOME_calibrate_frequency()
     {
         // HOME behavior
-        // uml: DFE / { this.tracer?.edgeTransition("edge3"); } TransitionTo(FREQ_ENTRY)
+        // uml: CALIBRATE_FREQUENCY / { this.tracer?.edgeTransition("edge6"); } TransitionTo(CALIBRATE_FREQUENCY)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#HOME_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
+            this.tracer?.edgeTransition("edge6");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATE_FREQUENCY`.
+            this.#CALIBRATE_FREQUENCY_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for HOME
+        
+        // No ancestor handles this event.
+    }
+    
+    #HOME_calibrate_power()
+    {
+        // HOME behavior
+        // uml: CALIBRATE_POWER / { this.tracer?.edgeTransition("edge7"); } TransitionTo(CALIBRATE_POWER)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#HOME_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge7");`.
+            this.tracer?.edgeTransition("edge7");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATE_POWER`.
+            this.#CALIBRATE_POWER_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for HOME
+        
+        // No ancestor handles this event.
+    }
+    
+    #HOME_calibrate_rx_iq()
+    {
+        // HOME behavior
+        // uml: CALIBRATE_RX_IQ / { this.tracer?.edgeTransition("edge3"); } TransitionTo(CALIBRATE_RX_IQ)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#HOME_exit();
             
             // Step 2: Transition action: `this.tracer?.edgeTransition("edge3");`.
             this.tracer?.edgeTransition("edge3");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATE_RX_IQ`.
+            this.#CALIBRATE_RX_IQ_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for HOME
+        
+        // No ancestor handles this event.
+    }
+    
+    #HOME_calibrate_tx_iq()
+    {
+        // HOME behavior
+        // uml: CALIBRATE_TX_IQ / { this.tracer?.edgeTransition("edge5"); } TransitionTo(CALIBRATE_TX_IQ)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#HOME_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge5");`.
+            this.tracer?.edgeTransition("edge5");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ`.
+            this.#CALIBRATE_TX_IQ_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for HOME
+        
+        // No ancestor handles this event.
+    }
+    
+    #HOME_dfe()
+    {
+        // HOME behavior
+        // uml: DFE / { this.tracer?.edgeTransition("edge4"); } TransitionTo(FREQ_ENTRY)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#HOME_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge4");`.
+            this.tracer?.edgeTransition("edge4");
             
             // Step 3: Enter/move towards transition target `FREQ_ENTRY`.
             this.#FREQ_ENTRY_enter();
@@ -738,13 +1062,13 @@ evaluateGuard = null;
     #MAIN_MENU_home()
     {
         // MAIN_MENU behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge4"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge8"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#MAIN_MENU_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge4");`.
-            this.tracer?.edgeTransition("edge4");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge8");`.
+            this.tracer?.edgeTransition("edge8");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -759,13 +1083,13 @@ evaluateGuard = null;
     #MAIN_MENU_select()
     {
         // MAIN_MENU behavior
-        // uml: SELECT / { this.tracer?.edgeTransition("edge5"); } TransitionTo(SECONDARY_MENU)
+        // uml: SELECT / { this.tracer?.edgeTransition("edge9"); } TransitionTo(SECONDARY_MENU)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#MAIN_MENU_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge5");`.
-            this.tracer?.edgeTransition("edge5");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
+            this.tracer?.edgeTransition("edge9");
             
             // Step 3: Enter/move towards transition target `SECONDARY_MENU`.
             this.#SECONDARY_MENU_enter();
@@ -816,13 +1140,13 @@ evaluateGuard = null;
     #SECONDARY_MENU_home()
     {
         // SECONDARY_MENU behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge6"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge10"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#SECONDARY_MENU_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
-            this.tracer?.edgeTransition("edge6");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
+            this.tracer?.edgeTransition("edge10");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -837,13 +1161,13 @@ evaluateGuard = null;
     #SECONDARY_MENU_select()
     {
         // SECONDARY_MENU behavior
-        // uml: SELECT / { this.tracer?.edgeTransition("edge7"); } TransitionTo(UPDATE)
+        // uml: SELECT / { this.tracer?.edgeTransition("edge11"); } TransitionTo(UPDATE)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#SECONDARY_MENU_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge7");`.
-            this.tracer?.edgeTransition("edge7");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
+            this.tracer?.edgeTransition("edge11");
             
             // Step 3: Enter/move towards transition target `UPDATE`.
             this.#UPDATE_enter();
@@ -956,37 +1280,16 @@ evaluateGuard = null;
         this.stateId = UISm.StateId.ROOT;
     }
     
-    #UPDATE_cal()
-    {
-        // UPDATE behavior
-        // uml: CAL / { this.tracer?.edgeTransition("edge9"); } TransitionTo(CALIBRATION)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#UPDATE_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
-            this.tracer?.edgeTransition("edge9");
-            
-            // Step 3: Enter/move towards transition target `CALIBRATION`.
-            this.#CALIBRATION_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for UPDATE
-        
-        // No ancestor handles this event.
-    }
-    
     #UPDATE_home()
     {
         // UPDATE behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge10"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge13"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#UPDATE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
-            this.tracer?.edgeTransition("edge10");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
+            this.tracer?.edgeTransition("edge13");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -1001,13 +1304,13 @@ evaluateGuard = null;
     #UPDATE_select()
     {
         // UPDATE behavior
-        // uml: SELECT / { this.tracer?.edgeTransition("edge11"); } TransitionTo(HOME)
+        // uml: SELECT / { this.tracer?.edgeTransition("edge14"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#UPDATE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
-            this.tracer?.edgeTransition("edge11");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
+            this.tracer?.edgeTransition("edge14");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -1025,7 +1328,10 @@ evaluateGuard = null;
         switch (id)
         {
             case UISm.StateId.ROOT: return "ROOT";
-            case UISm.StateId.CALIBRATION: return "CALIBRATION";
+            case UISm.StateId.CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
+            case UISm.StateId.CALIBRATE_POWER: return "CALIBRATE_POWER";
+            case UISm.StateId.CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
+            case UISm.StateId.CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
             case UISm.StateId.FREQ_ENTRY: return "FREQ_ENTRY";
             case UISm.StateId.HOME: return "HOME";
             case UISm.StateId.MAIN_MENU: return "MAIN_MENU";
@@ -1041,7 +1347,10 @@ evaluateGuard = null;
     {
         switch (id)
         {
-            case UISm.EventId.CAL: return "CAL";
+            case UISm.EventId.CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
+            case UISm.EventId.CALIBRATE_POWER: return "CALIBRATE_POWER";
+            case UISm.EventId.CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
+            case UISm.EventId.CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
             case UISm.EventId.DFE: return "DFE";
             case UISm.EventId.DO: return "DO";
             case UISm.EventId.HOME: return "HOME";
@@ -1085,7 +1394,7 @@ evaluateGuard = null;
             center: true
         });
 
-        const diagramEventNamesArray = ['do', 'CAL', 'DFE', 'HOME', 'MENU', 'SELECT', ];
+        const diagramEventNamesArray = ['do', 'CALIBRATE_FREQUENCY', 'CALIBRATE_POWER', 'CALIBRATE_RX_IQ', 'CALIBRATE_TX_IQ', 'DFE', 'HOME', 'MENU', 'SELECT', ];
 
         const leftPane = document.querySelector(".main");
         const rightPane = document.querySelector(".sidebar");

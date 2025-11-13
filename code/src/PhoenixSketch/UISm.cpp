@@ -15,11 +15,29 @@ static void exit_up_to_state_handler(UISm* sm, UISm_StateId desired_state);
 
 static void ROOT_enter(UISm* sm);
 
-static void CALIBRATION_enter(UISm* sm);
+static void CALIBRATE_FREQUENCY_enter(UISm* sm);
 
-static void CALIBRATION_exit(UISm* sm);
+static void CALIBRATE_FREQUENCY_exit(UISm* sm);
 
-static void CALIBRATION_home(UISm* sm);
+static void CALIBRATE_FREQUENCY_home(UISm* sm);
+
+static void CALIBRATE_POWER_enter(UISm* sm);
+
+static void CALIBRATE_POWER_exit(UISm* sm);
+
+static void CALIBRATE_POWER_home(UISm* sm);
+
+static void CALIBRATE_RX_IQ_enter(UISm* sm);
+
+static void CALIBRATE_RX_IQ_exit(UISm* sm);
+
+static void CALIBRATE_RX_IQ_home(UISm* sm);
+
+static void CALIBRATE_TX_IQ_enter(UISm* sm);
+
+static void CALIBRATE_TX_IQ_exit(UISm* sm);
+
+static void CALIBRATE_TX_IQ_home(UISm* sm);
 
 static void FREQ_ENTRY_enter(UISm* sm);
 
@@ -30,6 +48,14 @@ static void FREQ_ENTRY_home(UISm* sm);
 static void HOME_enter(UISm* sm);
 
 static void HOME_exit(UISm* sm);
+
+static void HOME_calibrate_frequency(UISm* sm);
+
+static void HOME_calibrate_power(UISm* sm);
+
+static void HOME_calibrate_rx_iq(UISm* sm);
+
+static void HOME_calibrate_tx_iq(UISm* sm);
 
 static void HOME_dfe(UISm* sm);
 
@@ -60,8 +86,6 @@ static void SPLASH_do(UISm* sm);
 static void UPDATE_enter(UISm* sm);
 
 static void UPDATE_exit(UISm* sm);
-
-static void UPDATE_cal(UISm* sm);
 
 static void UPDATE_home(UISm* sm);
 
@@ -115,11 +139,41 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
             // No events handled by this state (or its ancestors).
             break;
         
-        // STATE: CALIBRATION
-        case UISm_StateId_CALIBRATION:
+        // STATE: CALIBRATE_FREQUENCY
+        case UISm_StateId_CALIBRATE_FREQUENCY:
             switch (event_id)
             {
-                case UISm_EventId_HOME: CALIBRATION_home(sm); break;
+                case UISm_EventId_HOME: CALIBRATE_FREQUENCY_home(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: CALIBRATE_POWER
+        case UISm_StateId_CALIBRATE_POWER:
+            switch (event_id)
+            {
+                case UISm_EventId_HOME: CALIBRATE_POWER_home(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: CALIBRATE_RX_IQ
+        case UISm_StateId_CALIBRATE_RX_IQ:
+            switch (event_id)
+            {
+                case UISm_EventId_HOME: CALIBRATE_RX_IQ_home(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: CALIBRATE_TX_IQ
+        case UISm_StateId_CALIBRATE_TX_IQ:
+            switch (event_id)
+            {
+                case UISm_EventId_HOME: CALIBRATE_TX_IQ_home(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -140,7 +194,11 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
             switch (event_id)
             {
                 case UISm_EventId_MENU: HOME_menu(sm); break;
+                case UISm_EventId_CALIBRATE_RX_IQ: HOME_calibrate_rx_iq(sm); break;
                 case UISm_EventId_DFE: HOME_dfe(sm); break;
+                case UISm_EventId_CALIBRATE_TX_IQ: HOME_calibrate_tx_iq(sm); break;
+                case UISm_EventId_CALIBRATE_FREQUENCY: HOME_calibrate_frequency(sm); break;
+                case UISm_EventId_CALIBRATE_POWER: HOME_calibrate_power(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -182,7 +240,6 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
         case UISm_StateId_UPDATE:
             switch (event_id)
             {
-                case UISm_EventId_CAL: UPDATE_cal(sm); break;
                 case UISm_EventId_HOME: UPDATE_home(sm); break;
                 case UISm_EventId_SELECT: UPDATE_select(sm); break;
                 
@@ -201,7 +258,13 @@ static void exit_up_to_state_handler(UISm* sm, UISm_StateId desired_state)
     {
         switch (sm->state_id)
         {
-            case UISm_StateId_CALIBRATION: CALIBRATION_exit(sm); break;
+            case UISm_StateId_CALIBRATE_FREQUENCY: CALIBRATE_FREQUENCY_exit(sm); break;
+            
+            case UISm_StateId_CALIBRATE_POWER: CALIBRATE_POWER_exit(sm); break;
+            
+            case UISm_StateId_CALIBRATE_RX_IQ: CALIBRATE_RX_IQ_exit(sm); break;
+            
+            case UISm_StateId_CALIBRATE_TX_IQ: CALIBRATE_TX_IQ_exit(sm); break;
             
             case UISm_StateId_FREQ_ENTRY: FREQ_ENTRY_exit(sm); break;
             
@@ -232,33 +295,33 @@ static void ROOT_enter(UISm* sm)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// event handlers for state CALIBRATION
+// event handlers for state CALIBRATE_FREQUENCY
 ////////////////////////////////////////////////////////////////////////////////
 
-static void CALIBRATION_enter(UISm* sm)
+static void CALIBRATE_FREQUENCY_enter(UISm* sm)
 {
-    sm->state_id = UISm_StateId_CALIBRATION;
+    sm->state_id = UISm_StateId_CALIBRATE_FREQUENCY;
     
-    // CALIBRATION behavior
+    // CALIBRATE_FREQUENCY behavior
     // uml: enter / { clearScreen = true; }
     {
         // Step 1: execute action `clearScreen = true;`
         sm->vars.clearScreen = true;
-    } // end of behavior for CALIBRATION
+    } // end of behavior for CALIBRATE_FREQUENCY
 }
 
-static void CALIBRATION_exit(UISm* sm)
+static void CALIBRATE_FREQUENCY_exit(UISm* sm)
 {
     sm->state_id = UISm_StateId_ROOT;
 }
 
-static void CALIBRATION_home(UISm* sm)
+static void CALIBRATE_FREQUENCY_home(UISm* sm)
 {
-    // CALIBRATION behavior
+    // CALIBRATE_FREQUENCY behavior
     // uml: HOME TransitionTo(HOME)
     {
         // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-        CALIBRATION_exit(sm);
+        CALIBRATE_FREQUENCY_exit(sm);
         
         // Step 2: Transition action: ``.
         
@@ -267,7 +330,133 @@ static void CALIBRATION_home(UISm* sm)
         
         // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
         return;
-    } // end of behavior for CALIBRATION
+    } // end of behavior for CALIBRATE_FREQUENCY
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state CALIBRATE_POWER
+////////////////////////////////////////////////////////////////////////////////
+
+static void CALIBRATE_POWER_enter(UISm* sm)
+{
+    sm->state_id = UISm_StateId_CALIBRATE_POWER;
+    
+    // CALIBRATE_POWER behavior
+    // uml: enter / { clearScreen = true; }
+    {
+        // Step 1: execute action `clearScreen = true;`
+        sm->vars.clearScreen = true;
+    } // end of behavior for CALIBRATE_POWER
+}
+
+static void CALIBRATE_POWER_exit(UISm* sm)
+{
+    sm->state_id = UISm_StateId_ROOT;
+}
+
+static void CALIBRATE_POWER_home(UISm* sm)
+{
+    // CALIBRATE_POWER behavior
+    // uml: HOME TransitionTo(HOME)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        CALIBRATE_POWER_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `HOME`.
+        HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_POWER
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state CALIBRATE_RX_IQ
+////////////////////////////////////////////////////////////////////////////////
+
+static void CALIBRATE_RX_IQ_enter(UISm* sm)
+{
+    sm->state_id = UISm_StateId_CALIBRATE_RX_IQ;
+    
+    // CALIBRATE_RX_IQ behavior
+    // uml: enter / { clearScreen = true; }
+    {
+        // Step 1: execute action `clearScreen = true;`
+        sm->vars.clearScreen = true;
+    } // end of behavior for CALIBRATE_RX_IQ
+}
+
+static void CALIBRATE_RX_IQ_exit(UISm* sm)
+{
+    sm->state_id = UISm_StateId_ROOT;
+}
+
+static void CALIBRATE_RX_IQ_home(UISm* sm)
+{
+    // CALIBRATE_RX_IQ behavior
+    // uml: HOME TransitionTo(HOME)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        CALIBRATE_RX_IQ_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `HOME`.
+        HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_RX_IQ
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state CALIBRATE_TX_IQ
+////////////////////////////////////////////////////////////////////////////////
+
+static void CALIBRATE_TX_IQ_enter(UISm* sm)
+{
+    sm->state_id = UISm_StateId_CALIBRATE_TX_IQ;
+    
+    // CALIBRATE_TX_IQ behavior
+    // uml: enter / { clearScreen = true; }
+    {
+        // Step 1: execute action `clearScreen = true;`
+        sm->vars.clearScreen = true;
+    } // end of behavior for CALIBRATE_TX_IQ
+}
+
+static void CALIBRATE_TX_IQ_exit(UISm* sm)
+{
+    sm->state_id = UISm_StateId_ROOT;
+}
+
+static void CALIBRATE_TX_IQ_home(UISm* sm)
+{
+    // CALIBRATE_TX_IQ behavior
+    // uml: HOME TransitionTo(HOME)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        CALIBRATE_TX_IQ_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `HOME`.
+        HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_TX_IQ
     
     // No ancestor handles this event.
 }
@@ -334,6 +523,86 @@ static void HOME_enter(UISm* sm)
 static void HOME_exit(UISm* sm)
 {
     sm->state_id = UISm_StateId_ROOT;
+}
+
+static void HOME_calibrate_frequency(UISm* sm)
+{
+    // HOME behavior
+    // uml: CALIBRATE_FREQUENCY TransitionTo(CALIBRATE_FREQUENCY)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        HOME_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_FREQUENCY`.
+        CALIBRATE_FREQUENCY_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for HOME
+    
+    // No ancestor handles this event.
+}
+
+static void HOME_calibrate_power(UISm* sm)
+{
+    // HOME behavior
+    // uml: CALIBRATE_POWER TransitionTo(CALIBRATE_POWER)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        HOME_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_POWER`.
+        CALIBRATE_POWER_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for HOME
+    
+    // No ancestor handles this event.
+}
+
+static void HOME_calibrate_rx_iq(UISm* sm)
+{
+    // HOME behavior
+    // uml: CALIBRATE_RX_IQ TransitionTo(CALIBRATE_RX_IQ)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        HOME_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_RX_IQ`.
+        CALIBRATE_RX_IQ_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for HOME
+    
+    // No ancestor handles this event.
+}
+
+static void HOME_calibrate_tx_iq(UISm* sm)
+{
+    // HOME behavior
+    // uml: CALIBRATE_TX_IQ TransitionTo(CALIBRATE_TX_IQ)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        HOME_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ`.
+        CALIBRATE_TX_IQ_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for HOME
+    
+    // No ancestor handles this event.
 }
 
 static void HOME_dfe(UISm* sm)
@@ -572,26 +841,6 @@ static void UPDATE_exit(UISm* sm)
     sm->state_id = UISm_StateId_ROOT;
 }
 
-static void UPDATE_cal(UISm* sm)
-{
-    // UPDATE behavior
-    // uml: CAL TransitionTo(CALIBRATION)
-    {
-        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-        UPDATE_exit(sm);
-        
-        // Step 2: Transition action: ``.
-        
-        // Step 3: Enter/move towards transition target `CALIBRATION`.
-        CALIBRATION_enter(sm);
-        
-        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-        return;
-    } // end of behavior for UPDATE
-    
-    // No ancestor handles this event.
-}
-
 static void UPDATE_home(UISm* sm)
 {
     // UPDATE behavior
@@ -638,7 +887,10 @@ char const * UISm_state_id_to_string(UISm_StateId id)
     switch (id)
     {
         case UISm_StateId_ROOT: return "ROOT";
-        case UISm_StateId_CALIBRATION: return "CALIBRATION";
+        case UISm_StateId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
+        case UISm_StateId_CALIBRATE_POWER: return "CALIBRATE_POWER";
+        case UISm_StateId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
+        case UISm_StateId_CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
         case UISm_StateId_FREQ_ENTRY: return "FREQ_ENTRY";
         case UISm_StateId_HOME: return "HOME";
         case UISm_StateId_MAIN_MENU: return "MAIN_MENU";
@@ -654,7 +906,10 @@ char const * UISm_event_id_to_string(UISm_EventId id)
 {
     switch (id)
     {
-        case UISm_EventId_CAL: return "CAL";
+        case UISm_EventId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
+        case UISm_EventId_CALIBRATE_POWER: return "CALIBRATE_POWER";
+        case UISm_EventId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
+        case UISm_EventId_CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
         case UISm_EventId_DFE: return "DFE";
         case UISm_EventId_DO: return "DO";
         case UISm_EventId_HOME: return "HOME";

@@ -361,8 +361,28 @@ VariableParameter rflevelcal = {
     .limits = {.f32 = {.min = -20.0F, .max=50.0F, .step=0.5F}}
 };
 
-struct SecondaryMenuOption CalOptions[1] = {
+void StartFreqCal(void){
+    SetInterrupt(iCALIBRATE_FREQUENCY);
+}
+
+void StartRXIQCal(void){
+    SetInterrupt(iCALIBRATE_RX_IQ);  
+}
+
+void StartTXIQCal(void){
+    SetInterrupt(iCALIBRATE_TX_IQ);      
+}
+
+void StartPowerCal(void){
+    SetInterrupt(iCALIBRATE_CW_PA);   
+}
+
+struct SecondaryMenuOption CalOptions[5] = {
     "S meter level", variableOption, &rflevelcal, NULL, NULL,
+    "Frequency", functionOption, NULL, (void *)StartFreqCal, NULL,
+    "Receive IQ", functionOption, NULL, (void *)StartRXIQCal, NULL,
+    "Transmit IQ", functionOption, NULL, (void *)StartTXIQCal, NULL,
+    "Power", functionOption, NULL, (void *)StartPowerCal, NULL,
 };
 
 // Display menu

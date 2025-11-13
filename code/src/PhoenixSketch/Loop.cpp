@@ -608,6 +608,50 @@ void HandleButtonPress(int32_t button){
             }
             break;
         } // end of FREQ_ENTRY state
+        case (UISm_StateId_CALIBRATE_FREQUENCY):{
+            switch (button){
+                case HOME_SCREEN:{
+                    SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of CALIBRATE_FREQUENCY
+        case (UISm_StateId_CALIBRATE_RX_IQ):{
+            switch (button){
+                case HOME_SCREEN:{
+                    SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of CALIBRATE_RX_IQ
+        case (UISm_StateId_CALIBRATE_TX_IQ):{
+            switch (button){
+                case HOME_SCREEN:{
+                    SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of CALIBRATE_TX_IQ
+        case (UISm_StateId_CALIBRATE_POWER):{
+            switch (button){
+                case HOME_SCREEN:{
+                    SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of CALIBRATE_POWER
         default:{
             break; // ignore button presses
         }
@@ -910,6 +954,32 @@ void ConsumeInterrupt(void){
             if (ED.keyType == KeyTypeId_Keyer)
                 HandleKeyer(interrupt);
             break;
+        }
+        case (iCALIBRATE_FREQUENCY):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_FREQUENCY);
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_FREQUENCY);
+            break;
+        }
+        case (iCALIBRATE_RX_IQ):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_RX_IQ);
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);  
+            break;
+        }
+        case (iCALIBRATE_TX_IQ):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_TX_IQ);
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);  
+            break;
+        }
+        case (iCALIBRATE_CW_PA):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_POWER);
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_CW_PA);     
+            break;
+        }
+        case (iCALIBRATE_EXIT):{
+            // Go back to the home screen
+            UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+            // Exit the calibration mode
+            ModeSm_dispatch_event(&modeSM,ModeSm_EventId_CALIBRATE_EXIT);
         }
         default:
             break;

@@ -15,33 +15,39 @@
 typedef enum UISm_EventId
 {
     UISm_EventId_DO = 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
-    UISm_EventId_CAL = 1,
-    UISm_EventId_DFE = 2,
-    UISm_EventId_HOME = 3,
-    UISm_EventId_MENU = 4,
-    UISm_EventId_SELECT = 5
+    UISm_EventId_CALIBRATE_FREQUENCY = 1,
+    UISm_EventId_CALIBRATE_POWER = 2,
+    UISm_EventId_CALIBRATE_RX_IQ = 3,
+    UISm_EventId_CALIBRATE_TX_IQ = 4,
+    UISm_EventId_DFE = 5,
+    UISm_EventId_HOME = 6,
+    UISm_EventId_MENU = 7,
+    UISm_EventId_SELECT = 8
 } UISm_EventId;
 
 enum
 {
-    UISm_EventIdCount = 6
+    UISm_EventIdCount = 9
 };
 
 typedef enum UISm_StateId
 {
     UISm_StateId_ROOT = 0,
-    UISm_StateId_CALIBRATION = 1,
-    UISm_StateId_FREQ_ENTRY = 2,
-    UISm_StateId_HOME = 3,
-    UISm_StateId_MAIN_MENU = 4,
-    UISm_StateId_SECONDARY_MENU = 5,
-    UISm_StateId_SPLASH = 6,
-    UISm_StateId_UPDATE = 7
+    UISm_StateId_CALIBRATE_FREQUENCY = 1,
+    UISm_StateId_CALIBRATE_POWER = 2,
+    UISm_StateId_CALIBRATE_RX_IQ = 3,
+    UISm_StateId_CALIBRATE_TX_IQ = 4,
+    UISm_StateId_FREQ_ENTRY = 5,
+    UISm_StateId_HOME = 6,
+    UISm_StateId_MAIN_MENU = 7,
+    UISm_StateId_SECONDARY_MENU = 8,
+    UISm_StateId_SPLASH = 9,
+    UISm_StateId_UPDATE = 10
 } UISm_StateId;
 
 enum
 {
-    UISm_StateIdCount = 8
+    UISm_StateIdCount = 11
 };
 
 
