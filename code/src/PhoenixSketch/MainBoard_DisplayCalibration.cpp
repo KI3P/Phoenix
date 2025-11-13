@@ -74,6 +74,7 @@ static int16_t y_current = offset;
 static float32_t sideband_separation = 0.0;
 char buff[10];
 int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+static float32_t deltaVals[NUMBER_OF_BANDS];
 
 FASTRUN void PlotSpectrum(void){
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
@@ -122,6 +123,7 @@ FASTRUN void PlotSpectrum(void){
     else
         sideband_separation = (lowerSBmax - upperSBmax)*10;
 
+    deltaVals[ED.currentBand[ED.activeVFO]] = sideband_separation;
     psdupdated = false;
 }
 
@@ -139,14 +141,14 @@ void ChangeRXIQIncrement(void){
 
 static float32_t oldsep = 0.0;
 static void DrawDeltaPane(void){
-    if (oldsep != sideband_separation)
+    if (oldsep != deltaVals[ED.currentBand[ED.activeVFO]])
         PaneDelta.stale = true;
-    oldsep = sideband_separation;
+    oldsep = deltaVals[ED.currentBand[ED.activeVFO]];
 
     if (!PaneDelta.stale) return;
     tft.fillRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_BLACK);
     
-    sprintf(buff,"%2.1fdB",sideband_separation);
+    sprintf(buff,"%2.1fdB",deltaVals[ED.currentBand[ED.activeVFO]]);
     tft.setCursor(PaneDelta.x0, PaneDelta.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
@@ -222,20 +224,60 @@ static void DrawAdjustPane(void){
     PaneAdjust.stale = false;
 }
 
-static void DrawTablePane(void){
-    //if (stalecondition)
-    //    PaneTable.stale = true;
-    //update stalecondition
+float32_t GetAmpSum(void){
+    float32_t ampsum = 0;
+    for (size_t k=0; k<NUMBER_OF_BANDS; k++){
+        ampsum += ED.IQAmpCorrectionFactor[k];
+    }
+    return ampsum;
+}
 
+float32_t GetPhsSum(void){
+    float32_t phssum = 0;
+    for (size_t k=0; k<NUMBER_OF_BANDS; k++){
+        phssum += ED.IQPhaseCorrectionFactor[k];
+    }
+    return phssum;
+}
+
+static float32_t oldampsums = 0;
+static float32_t oldphssums = -10;
+static void DrawTablePane(void){
+    float32_t nas = GetAmpSum();
+    float32_t nps = GetPhsSum();
+    if ((oldampsums != nas) || (oldphssums != nps))
+        PaneTable.stale = true;
+    oldampsums = nas;
+    oldphssums = nps;
     if (!PaneTable.stale) return;
+
     tft.fillRect(PaneTable.x0, PaneTable.y0, PaneTable.width, PaneTable.height, RA8875_BLACK);
     tft.drawRect(PaneTable.x0, PaneTable.y0, PaneTable.width, PaneTable.height, RA8875_YELLOW);
     
-    tft.setCursor(PaneTable.x0, PaneTable.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
-    tft.print("Table of prior results");
 
+    tft.setCursor(PaneTable.x0+5, PaneTable.y0+3);
+    tft.print("Band");
+    tft.setCursor(PaneTable.x0+55, PaneTable.y0+3);
+    tft.print("Amp");
+    tft.setCursor(PaneTable.x0+105, PaneTable.y0+3);
+    tft.print("Phs");
+    tft.setCursor(PaneTable.x0+155, PaneTable.y0+3);
+    tft.print("Val");
+
+    for (size_t k=0; k<NUMBER_OF_BANDS; k++){
+        tft.setCursor(PaneTable.x0+5, PaneTable.y0+20+k*17);
+        tft.print(bands[k].name);
+        tft.setCursor(PaneTable.x0+55, PaneTable.y0+20+k*17);
+        tft.print(ED.IQAmpCorrectionFactor[k]);
+        tft.setCursor(PaneTable.x0+105, PaneTable.y0+20+k*17);
+        tft.print(ED.IQPhaseCorrectionFactor[k]);
+        if (deltaVals[k] != 0.0){
+            tft.setCursor(PaneTable.x0+155, PaneTable.y0+20+k*17);
+            tft.print(deltaVals[k]);
+        }
+    }
     PaneTable.stale = false;
 }
 
