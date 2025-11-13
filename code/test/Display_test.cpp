@@ -101,7 +101,7 @@ TEST_F(DisplayTest, MenuRedrawn) {
     ModeSm_start(&modeSM);
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
-    uiSM.vars.splashDuration_ms = SPLASH_DURATION_MS;
+    uiSM.vars.splashDuration_ms = 1;
     UISm_start(&uiSM);
     UpdateAudioIOState();
 
@@ -114,9 +114,7 @@ TEST_F(DisplayTest, MenuRedrawn) {
 
     // Check the state before loop is invoked and then again after
     loop();MyDelay(10);
-    for (int k = 0; k < 200; k++){
-        loop();MyDelay(10);
-    }
+    
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME );
     SetButton(MAIN_MENU_UP);
     SetInterrupt(iBUTTON_PRESSED);
@@ -1587,7 +1585,7 @@ TEST_F(DisplayTest, FreqEntryPad) {
     ModeSm_start(&modeSM);
     ED.agc = AGCOff;
     ED.nrOptionSelect = NROff;
-    uiSM.vars.splashDuration_ms = SPLASH_DURATION_MS;
+    uiSM.vars.splashDuration_ms = 1;
     UISm_start(&uiSM);
     UpdateAudioIOState();
 
@@ -1599,9 +1597,7 @@ TEST_F(DisplayTest, FreqEntryPad) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     // Check the state before loop is invoked and then again after
     loop();MyDelay(10);
-    for (int k = 0; k < 200; k++){
-        loop();MyDelay(10);
-    }
+    
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME );
 
     // Do we enter the freq entry screen?
@@ -1669,4 +1665,768 @@ TEST_F(DisplayTest, FreqEntryPad) {
     EXPECT_NE(ED.centerFreq_Hz[ED.activeVFO],oldf);
     EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],78000000);
     EXPECT_EQ(ED.currentBand[ED.activeVFO],oldb); // band should not have changed
+}
+
+/**
+ * Test direct frequency entry with 1 digit (MHz)
+ * Tests entering a single digit and verifying it's interpreted as MHz
+ */
+TEST_F(DisplayTest, FreqEntry_OneDigitMHz) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    // Set up initial state
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    int64_t oldFreq = ED.centerFreq_Hz[ED.activeVFO];
+
+    // Enter single digit "7"
+    SetButton(3);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(DFEGetNumDigits(), 1);
+    EXPECT_EQ(DFEGetFString()[0], '7');
+
+    // Apply frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should return to home with 7 MHz
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 7000000);
+}
+
+/**
+ * Test direct frequency entry with 4 digits (kHz)
+ * Tests entering 4 digits and verifying it's interpreted as kHz
+ */
+TEST_F(DisplayTest, FreqEntry_FourDigitKHz) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Enter "7150" (7.15 MHz)
+    SetButton(3);  // 7
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(9);  // 1
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(7);  // 5
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(12);  // 0
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(DFEGetNumDigits(), 4);
+    EXPECT_EQ(DFEGetFString()[0], '7');
+    EXPECT_EQ(DFEGetFString()[1], '1');
+    EXPECT_EQ(DFEGetFString()[2], '5');
+    EXPECT_EQ(DFEGetFString()[3], '0');
+
+    // Apply frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should return to home with 7150 kHz = 7.15 MHz
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 7150000);
+}
+
+/**
+ * Test direct frequency entry with 5 digits (kHz)
+ * Tests entering 5 digits and verifying it's interpreted as kHz
+ */
+TEST_F(DisplayTest, FreqEntry_FiveDigitKHz) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Enter "14250" (14.25 MHz)
+    SetButton(9);  // 1
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(6);  // 4
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(10);  // 2
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(7);  // 5
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(12);  // 0
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(DFEGetNumDigits(), 5);
+    EXPECT_EQ(DFEGetFString()[0], '1');
+    EXPECT_EQ(DFEGetFString()[1], '4');
+    EXPECT_EQ(DFEGetFString()[2], '2');
+    EXPECT_EQ(DFEGetFString()[3], '5');
+    EXPECT_EQ(DFEGetFString()[4], '0');
+
+    // Apply frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should return to home with 14250 kHz = 14.25 MHz
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14250000);
+}
+
+/**
+ * Test direct frequency entry with 3 digits (invalid)
+ * Tests that 3-digit entries are rejected as invalid
+ */
+TEST_F(DisplayTest, FreqEntry_ThreeDigitInvalid) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    int64_t oldFreq = ED.centerFreq_Hz[ED.activeVFO];
+
+    // Enter "123" (3 digits - invalid)
+    SetButton(9);  // 1
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(10);  // 2
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(11);  // 3
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(DFEGetNumDigits(), 3);
+
+    // Try to apply frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should stay in FREQ_ENTRY mode and frequency should be cleared
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], oldFreq);
+}
+
+/**
+ * Test maximum valid frequency (99 MHz)
+ * Tests that 99 MHz (near upper limit) is accepted
+ */
+TEST_F(DisplayTest, FreqEntry_MaxValidFreq) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Enter "99" (99 MHz - valid, near upper limit)
+    SetButton(5);  // 9
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(5);  // 9
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(DFEGetNumDigits(), 2);
+
+    // Apply frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should return to HOME with 99 MHz
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 99000000);
+}
+
+/**
+ * Test minimum valid kHz frequency (1000 kHz = 1 MHz)
+ * Tests that 1000 kHz is accepted as a valid frequency
+ */
+TEST_F(DisplayTest, FreqEntry_MinValidKHz) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Enter "1000" (1000 kHz = 1 MHz - minimum practical kHz entry)
+    SetButton(9);  // 1
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(12);  // 0
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(12);  // 0
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(12);  // 0
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(DFEGetNumDigits(), 4);
+
+    // Apply frequency
+    SetButton(0);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should return to HOME with 1000 kHz = 1 MHz
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 1000000);
+}
+
+/**
+ * Test entering more than 5 digits (should be rejected)
+ * Tests that the 6th digit is not accepted
+ */
+TEST_F(DisplayTest, FreqEntry_MoreThanFiveDigits) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Enter 5 digits
+    for (int i = 0; i < 5; i++) {
+        SetButton(9);  // "1"
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+    }
+
+    EXPECT_EQ(DFEGetNumDigits(), 5);
+
+    // Try to enter a 6th digit
+    SetButton(9);  // "1"
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should still be 5 digits
+    EXPECT_EQ(DFEGetNumDigits(), 5);
+}
+
+/**
+ * Test starting with 0 (should be rejected)
+ * Tests that entering 0 as first digit is not accepted
+ */
+TEST_F(DisplayTest, FreqEntry_StartingWithZero) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    // Try to enter "0" as first digit
+    SetButton(12);  // "0"
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should not accept the 0
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    // But 0 should be accepted as a second digit
+    SetButton(9);  // "1"
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(DFEGetNumDigits(), 1);
+
+    SetButton(12);  // "0"
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(DFEGetNumDigits(), 2);
+    EXPECT_EQ(DFEGetFString()[0], '1');
+    EXPECT_EQ(DFEGetFString()[1], '0');
+}
+
+/**
+ * Test exit button 'X' without changing frequency
+ * Tests that pressing X returns to home without changing frequency
+ */
+TEST_F(DisplayTest, FreqEntry_ExitButton) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    int64_t oldFreq = ED.centerFreq_Hz[ED.activeVFO];
+
+    // Enter some digits
+    SetButton(3);  // "7"
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    SetButton(4);  // "8"
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(DFEGetNumDigits(), 2);
+
+    // Press 'X' button (button 17, key 0x99)
+    SetButton(17);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should return to home without changing frequency
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], oldFreq);
+}
+
+/**
+ * Test deleting when no digits entered
+ * Tests that delete button does nothing when digit count is 0
+ */
+TEST_F(DisplayTest, FreqEntry_DeleteWhenEmpty) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+    extern char * DFEGetFString(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    // Press delete button (button 13, key 0x58)
+    SetButton(13);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should still be 0 digits
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+}
+
+/**
+ * Test invalid button numbers
+ * Tests that button numbers outside valid range are ignored
+ */
+TEST_F(DisplayTest, FreqEntry_InvalidButtonNumber) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    // Test negative button number
+    InterpretFrequencyEntryButtonPress(-1);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    // Test button number > 17
+    InterpretFrequencyEntryButtonPress(18);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    InterpretFrequencyEntryButtonPress(100);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+}
+
+/**
+ * Test empty button presses (0x7F keys)
+ * Tests that buttons mapped to 0x7F are ignored
+ */
+TEST_F(DisplayTest, FreqEntry_EmptyButtons) {
+    extern void InterpretFrequencyEntryButtonPress(int32_t button);
+    extern int8_t DFEGetNumDigits(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop();MyDelay(10);
+    
+
+    // Enter frequency entry mode
+    SetButton(DFE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_FREQ_ENTRY);
+
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    // Try empty buttons (1, 2, 11, 12, 14, 15, 16 are mapped to 0x7F)
+    SetButton(1);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    SetButton(2);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
+
+    SetButton(14);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(DFEGetNumDigits(), 0);
 }
