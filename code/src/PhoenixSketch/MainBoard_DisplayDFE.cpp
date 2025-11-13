@@ -22,10 +22,10 @@ void DrawNumberPadPane(void);
 void DrawInstructionsPane(void);
 
 // Pane instances
-Pane PaneFreqLabel =    {60,40,190,30,DrawFreqLabelPane,1};
-Pane PaneFreqEntry =    {290,40,90,30,DrawFreqEntryPane,1};
+Pane PaneFreqLabel =    {60,40,480,30,DrawFreqLabelPane,1};
+Pane PaneFreqEntry =    {550,40,90,30,DrawFreqEntryPane,1};
 Pane PaneNumberPad =    {60,80,210,360,DrawNumberPadPane,1};
-Pane PaneInstructions = {290,80,300,360,DrawInstructionsPane,1};
+Pane PaneInstructions = {290,80,320,360,DrawInstructionsPane,1};
 
 // Array of all panes for iteration
 static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneFreqLabel,&PaneFreqEntry,
@@ -66,8 +66,8 @@ static int8_t numdigits = 0;  // number of digits entered
 
 #define TEXT_OFFSET      -8
 #define BUTTONS_SPACE    60
-#define BUTTONS_OFFSET_X 20
-#define BUTTONS_OFFSET_Y 10
+#define BUTTONS_OFFSET_X 40
+#define BUTTONS_OFFSET_Y 30
 #define BUTTONS_RADIUS   20
 #define BUTTONS_LEFT (PaneNumberPad.x0 + BUTTONS_OFFSET_X)
 #define BUTTONS_TOP  (PaneNumberPad.y0 + BUTTONS_OFFSET_Y)
@@ -79,6 +79,9 @@ void DrawFrequencyEntryPad(void){
     if (uiSM.vars.clearScreen){
         Debug("Clearing the screen upon entry to Frequency Entry state");
         tft.fillWindow();
+        tft.writeTo(L2);
+        tft.fillWindow();
+        tft.writeTo(L1);
         uiSM.vars.clearScreen = false;
         
         // clear the freq entry, if any
@@ -97,7 +100,7 @@ void DrawFrequencyEntryPad(void){
 
 void DrawNumberPadPane(void) {
     if (!PaneNumberPad.stale) return;
-
+    PaneNumberPad.stale = false;
     tft.fillRect(PaneNumberPad.x0, PaneNumberPad.y0, PaneNumberPad.width, PaneNumberPad.height, DARKGREY);
     tft.drawRect(PaneNumberPad.x0, PaneNumberPad.y0, PaneNumberPad.width, PaneNumberPad.height, RA8875_YELLOW);
 
@@ -115,9 +118,9 @@ void DrawNumberPadPane(void) {
 
 void DrawFreqLabelPane(void) {
     if (!PaneFreqLabel.stale) return;
-
+    PaneFreqLabel.stale = false;
     tft.fillRect(PaneFreqLabel.x0, PaneFreqLabel.y0, PaneFreqLabel.width, PaneFreqLabel.height, RA8875_BLACK);
-    tft.drawRect(PaneFreqLabel.x0, PaneFreqLabel.y0, PaneFreqLabel.width, PaneFreqLabel.height, RA8875_YELLOW);
+    //tft.drawRect(PaneFreqLabel.x0, PaneFreqLabel.y0, PaneFreqLabel.width, PaneFreqLabel.height, RA8875_YELLOW);
 
     tft.setFontScale((enum RA8875tsize)1);
     tft.setTextColor(RA8875_WHITE);
@@ -127,7 +130,7 @@ void DrawFreqLabelPane(void) {
     
 void DrawInstructionsPane(void) {
     if (!PaneInstructions.stale) return;
-
+    PaneInstructions.stale = false;
     tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
     tft.drawRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_YELLOW);
 
@@ -145,9 +148,9 @@ void DrawInstructionsPane(void) {
 
 void DrawFreqEntryPane(void) {
     if (!PaneFreqEntry.stale) return;
-
+    PaneFreqEntry.stale = false;
     tft.fillRect(PaneFreqEntry.x0, PaneFreqEntry.y0, PaneFreqEntry.width, PaneFreqEntry.height, RA8875_BLACK);
-    tft.drawRect(PaneFreqEntry.x0, PaneFreqEntry.y0, PaneFreqEntry.width, PaneFreqEntry.height, RA8875_YELLOW);
+    //tft.drawRect(PaneFreqEntry.x0, PaneFreqEntry.y0, PaneFreqEntry.width, PaneFreqEntry.height, RA8875_YELLOW);
 
     tft.setTextColor(RA8875_WHITE);
     tft.setFontScale((enum RA8875tsize)1);
@@ -187,7 +190,8 @@ void InterpretFrequencyEntryButtonPress(int32_t button){
                 numdigits = 0;
             } else {
                 // Tune to this new frequency!
-                ED.centerFreq_Hz[ED.activeVFO] = (int64_t)enteredF;
+                ED.centerFreq_Hz[ED.activeVFO] = (int64_t)enteredF + SR[SampleRate].rate/4;
+                ED.fineTuneFreq_Hz[ED.activeVFO] = 0.0;
                 UpdateRFHardwareState();
 
                 // Go back to the home screen
