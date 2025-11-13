@@ -1,0 +1,218 @@
+/**
+ * @file MainBoard_DisplayDFE.cpp
+ * @brief Direct frequency entry rendering
+ *
+ * This module displays the number pad to allow direct frequency entry
+ *
+ * @see MainBoard_Display.cpp for core display infrastructure
+ * @see MainBoard_DisplayMenus.cpp for menu system
+ */
+
+#include "SDT.h"
+#include "MainBoard_Display.h"
+#include <RA8875.h>
+
+
+#define NUMBER_OF_PANES 4
+
+// Forward declaration of the pane drawing functions
+void DrawFreqLabelPane(void);
+void DrawFreqEntryPane(void);
+void DrawNumberPadPane(void);
+void DrawInstructionsPane(void);
+
+// Pane instances
+Pane PaneFreqLabel =    {60,40,190,30,DrawFreqLabelPane,1};
+Pane PaneFreqEntry =    {290,40,90,30,DrawFreqEntryPane,1};
+Pane PaneNumberPad =    {60,80,210,360,DrawNumberPadPane,1};
+Pane PaneInstructions = {290,80,300,360,DrawInstructionsPane,1};
+
+// Array of all panes for iteration
+static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneFreqLabel,&PaneFreqEntry,
+                                    &PaneNumberPad,&PaneInstructions};
+
+extern RA8875 tft;
+
+
+int32_t numKeys[] = { 0x0D, 0x7F, 0x7F,  // values to be allocated to each key push
+                0x37, 0x38, 0x39,
+                0x34, 0x35, 0x36,
+                0x31, 0x32, 0x33,
+                0x30, 0x58, 0x7F,
+                0x7F, 0x7F, 0x99 };
+int32_t keyCol[] = {RA8875_YELLOW, RA8875_RED,  RA8875_RED,
+                RA8875_BLUE,   RA8875_GREEN,RA8875_GREEN,
+                RA8875_BLUE,   RA8875_BLUE, RA8875_BLUE,
+                RA8875_RED,    RA8875_RED,  RA8875_RED,
+                RA8875_RED,    RA8875_BLACK,RA8875_BLACK,
+                RA8875_YELLOW, RA8875_YELLOW,RA8875_BLACK };
+int32_t textCol[] = { RA8875_BLACK, RA8875_WHITE, RA8875_WHITE,
+                RA8875_WHITE, RA8875_BLACK, RA8875_BLACK,
+                RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
+                RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
+                RA8875_WHITE, RA8875_WHITE, RA8875_WHITE,
+                RA8875_BLACK, RA8875_BLACK, RA8875_WHITE };
+const char *key_labels[] = { "<", "", "",
+                            "7", "8", "9",
+                            "4", "5", "6",
+                            "1", "2", "3",
+                            "0", "D", "",
+                            "",  "",  "X" };
+
+char strF[6] = { ' ', ' ', ' ', ' ', ' ' };  // container for frequency string during entry
+String stringF;
+static long enteredF = 0L;    // desired frequency
+static int8_t numdigits = 0;  // number of digits entered
+
+#define TEXT_OFFSET      -8
+#define BUTTONS_SPACE    60
+#define BUTTONS_OFFSET_X 20
+#define BUTTONS_OFFSET_Y 10
+#define BUTTONS_RADIUS   20
+#define BUTTONS_LEFT (PaneNumberPad.x0 + BUTTONS_OFFSET_X)
+#define BUTTONS_TOP  (PaneNumberPad.y0 + BUTTONS_OFFSET_Y)
+
+void DrawFrequencyEntryPad(void){
+    if (!(uiSM.state_id == UISm_StateId_FREQ_ENTRY) )
+        return;
+    tft.writeTo(L1);
+    if (uiSM.vars.clearScreen){
+        Debug("Clearing the screen upon entry to Frequency Entry state");
+        tft.fillWindow();
+        uiSM.vars.clearScreen = false;
+        
+        // clear the freq entry, if any
+        stringF = "     ";  // 5 spaces
+        stringF.toCharArray(strF, stringF.length());
+        numdigits = 0;
+        
+        for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+            WindowPanes[i]->stale = true;
+        }
+    }
+    for (size_t i = 0; i < NUMBER_OF_PANES; i++){
+        WindowPanes[i]->DrawFunction();
+    }
+}
+
+void DrawNumberPadPane(void) {
+    if (!PaneNumberPad.stale) return;
+
+    tft.fillRect(PaneNumberPad.x0, PaneNumberPad.y0, PaneNumberPad.width, PaneNumberPad.height, DARKGREY);
+    tft.drawRect(PaneNumberPad.x0, PaneNumberPad.y0, PaneNumberPad.width, PaneNumberPad.height, RA8875_YELLOW);
+
+    // Draw the labeled circles
+    tft.setFontScale((enum RA8875tsize)1);
+    for (unsigned i = 0; i < 6; i++) {
+        for (unsigned j = 0; j < 3; j++) {
+            tft.fillCircle(BUTTONS_LEFT + j * BUTTONS_SPACE, BUTTONS_TOP + i * BUTTONS_SPACE, BUTTONS_RADIUS, keyCol[j + 3 * i]);
+            tft.setCursor(BUTTONS_LEFT + j * BUTTONS_SPACE + TEXT_OFFSET, BUTTONS_TOP + i * BUTTONS_SPACE - 18);
+            tft.setTextColor(textCol[j + 3 * i]);
+            tft.print(key_labels[j + 3 * i]);
+        }
+    }
+}
+
+void DrawFreqLabelPane(void) {
+    if (!PaneFreqLabel.stale) return;
+
+    tft.fillRect(PaneFreqLabel.x0, PaneFreqLabel.y0, PaneFreqLabel.width, PaneFreqLabel.height, RA8875_BLACK);
+    tft.drawRect(PaneFreqLabel.x0, PaneFreqLabel.y0, PaneFreqLabel.width, PaneFreqLabel.height, RA8875_YELLOW);
+
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
+    tft.setCursor(PaneFreqLabel.x0, PaneFreqLabel.y0);
+    tft.print("Enter Frequency (kHz or MHz):");
+}
+    
+void DrawInstructionsPane(void) {
+    if (!PaneInstructions.stale) return;
+
+    tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
+    tft.drawRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_YELLOW);
+
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setCursor(PaneInstructions.x0 + 20,PaneInstructions.y0 + 50);
+    tft.setTextColor(RA8875_WHITE);
+    tft.print("Direct Frequency Entry");
+    tft.setCursor(PaneInstructions.x0 + 20, PaneInstructions.y0 + 100);
+    tft.print("<   Apply entered frequency");
+    tft.setCursor(PaneInstructions.x0 + 20, PaneInstructions.y0 + 130);
+    tft.print("X   Exit without changing frequency");
+    tft.setCursor(PaneInstructions.x0 + 20, PaneInstructions.y0 + 160);
+    tft.print("D   Delete last digit");
+}
+
+void DrawFreqEntryPane(void) {
+    if (!PaneFreqEntry.stale) return;
+
+    tft.fillRect(PaneFreqEntry.x0, PaneFreqEntry.y0, PaneFreqEntry.width, PaneFreqEntry.height, RA8875_BLACK);
+    tft.drawRect(PaneFreqEntry.x0, PaneFreqEntry.y0, PaneFreqEntry.width, PaneFreqEntry.height, RA8875_YELLOW);
+
+    tft.setTextColor(RA8875_WHITE);
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setCursor(PaneFreqEntry.x0, PaneFreqEntry.y0);
+    tft.print(strF);
+}
+
+void InterpretFrequencyEntryButtonPress(int32_t button){
+    if ((button > 17) || (button < 0)) return;
+
+    int32_t key = 0;
+    key = numKeys[button];
+    switch (key) {
+        case 0x7F:{ // ignore button press
+            break;
+        }
+        case 0x58:{  // delete last digit
+            if (numdigits != 0) {
+                numdigits--;
+                strF[numdigits] = ' ';
+            }
+            break;
+        }
+        case 0x0D:{  // Apply the entered frequency (if valid) =13
+            stringF = String(strF);
+            enteredF = stringF.toInt();
+            if ((numdigits == 1) || (numdigits == 2)) {
+                enteredF = enteredF * 1000000; // entered MHz
+            }
+            if ((numdigits == 4) || (numdigits == 5)) {
+                enteredF = enteredF * 1000; // entered kHz
+            }
+            if ((enteredF > 125000000) || (enteredF < 250000)) {
+                // invalid frequency
+                stringF = "     ";  // 5 spaces
+                stringF.toCharArray(strF, stringF.length());
+                numdigits = 0;
+            } else {
+                // Tune to this new frequency!
+                ED.centerFreq_Hz[ED.activeVFO] = (int64_t)enteredF;
+                UpdateRFHardwareState();
+
+                // Go back to the home screen
+                UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+            }
+            break;
+        }
+        default:{
+            if ((numdigits == 5) || ((key == 0x30) & (numdigits == 0))) {
+            } else {
+                strF[numdigits] = char(key);
+                numdigits++;
+            }
+            PaneFreqEntry.stale = true;
+            break;
+        }
+    }
+
+}
+
+// Used for unit tests
+int8_t DFEGetNumDigits(void){
+    return numdigits;
+}
+char * DFEGetFString(void){
+    return strF;
+}
+
