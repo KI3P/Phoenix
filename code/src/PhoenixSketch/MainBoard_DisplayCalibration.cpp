@@ -88,7 +88,6 @@ FASTRUN void PlotSpectrum(void){
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
     else
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
-    float32_t lowerSBmax = -1000.0;
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);
@@ -98,12 +97,10 @@ FASTRUN void PlotSpectrum(void){
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
         y_prev = pixelold[x1];
         pixelold[x1] = y_current;
-        if (psdnew[x1] > lowerSBmax) lowerSBmax = psdnew[x1]; 
         x1++;
     }
 
     x1 = MAX_WATERFALL_WIDTH*3/4-WIN_WIDTH/2;
-    float32_t upperSBmax = -1000.0;
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
     else
@@ -118,7 +115,6 @@ FASTRUN void PlotSpectrum(void){
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
         y_prev = pixelold[x1];
         pixelold[x1] = y_current;
-        if (psdnew[x1] > upperSBmax) upperSBmax = psdnew[x1]; 
         x1++;
     }
 
@@ -127,16 +123,11 @@ FASTRUN void PlotSpectrum(void){
     // in bin 3/4*512 = 384, lower will be in bin 1/4*512 = 128
     float32_t upper = psdnew[384]; 
     float32_t lower = psdnew[128]; 
-    float32_t sbs;
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-        sideband_separation = (upperSBmax - lowerSBmax)*10;
-        sbs = (upper-lower)*10;
+        sideband_separation = (upper-lower)*10;
     } else {
-        sideband_separation = (lowerSBmax - upperSBmax)*10;
-        sbs = (lower-upper)*10;
+        sideband_separation = (lower-upper)*10;
     }
-    if (abs(sbs - sideband_separation)>0.01)
-        Debug("bin wrong");
     deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
     Nreadings++;
     psdupdated = false;
