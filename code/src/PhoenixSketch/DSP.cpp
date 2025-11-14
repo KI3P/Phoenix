@@ -4,8 +4,6 @@ float32_t DMAMEM float_buffer_L[READ_BUFFER_SIZE];
 float32_t DMAMEM float_buffer_R[READ_BUFFER_SIZE];
 
 DataBlock data;
-float32_t SAM_carrier_freq_offset = 0;
-float32_t SAM_carrier_freq_offsetOld = 0;
 
 static int16_t *sp_L1; // used by receive chain
 static int16_t *sp_R1;
@@ -488,6 +486,9 @@ float ApproxAtan2(float y, float x) {
   return 0.0f;  // x,y = 0. Could return NaN instead.
 }
 
+static float32_t SAM_carrier_freq_offset = 0;
+static float32_t SAM_carrier_freq_offsetOld = 0;
+
 /**
  * Synchronous AM detection. Determines the carrier frequency, adjusts freq and replaces 
  * the received carrier with a steady signal to prevent fading. This alogorithm works best 
@@ -503,11 +504,13 @@ void AMDecodeSAM(DataBlock *data){
     uint8_t fade_leveler = 1;
 
     float32_t tauR = 0.02;
-    float32_t mtauR = exp(-1 / data->sampleRate_Hz * tauR);
+    if (data->sampleRate_Hz != 24000)
+        Debug("SAM error: expected 24ksps rate!");
+    float32_t mtauR = exp(-1.0f / (float32_t)data->sampleRate_Hz * tauR);
     float32_t onem_mtauR = 1.0 - mtauR;
 
     float32_t tauI = 1.4;
-    float32_t mtauI = exp(-1 / data->sampleRate_Hz * tauI);
+    float32_t mtauI = exp(-1.0f / (float32_t)data->sampleRate_Hz * tauI);
     float32_t onem_mtauI = 1.0 - mtauI;
 
     float32_t dc = 0.0;
@@ -526,11 +529,13 @@ void AMDecodeSAM(DataBlock *data){
     int zeta_help = 65;
     float32_t zeta = (float32_t)zeta_help / 100.0;  // PLL step response: smaller, slower response 1.0 - 0.1
     float32_t omegaN = 200.0;                       // PLL bandwidth 50.0 - 1000.0
-    float32_t omega_min = TWO_PI * -pll_fmax * 1 / data->sampleRate_Hz;
-    float32_t omega_max = TWO_PI * pll_fmax * 1 / data->sampleRate_Hz;
-    float32_t g1 = 1.0 - exp(-2.0 * omegaN * zeta * 1 / data->sampleRate_Hz);
-    float32_t g2 = -g1 + 2.0 * (1 - exp(-omegaN * zeta * 1 / data->sampleRate_Hz) * cosf(omegaN * 1 / data->sampleRate_Hz * sqrtf(1.0 - zeta * zeta)));
+    float32_t omega_min = TWO_PI * -pll_fmax * 1.0f / (float32_t)data->sampleRate_Hz;
+    float32_t omega_max = TWO_PI * pll_fmax * 1.0f / (float32_t)data->sampleRate_Hz;
+    float32_t g1 = 1.0 - exp(-2.0 * omegaN * zeta * 1.0f / (float32_t)data->sampleRate_Hz);
+    float32_t g2 = -g1 + 2.0 * (1 - exp(-omegaN * zeta * 1.0f / (float32_t)data->sampleRate_Hz) * cosf(omegaN * 1.0f / (float32_t)data->sampleRate_Hz * sqrtf(1.0 - zeta * zeta)));
 
+    if (data->N != 256)
+        Debug("SAM decode error! Expect 256 samples");
     for (unsigned i = 0; i < data->N; i++) {
         Sin = arm_sin_f32(phzerror);
         Cos = arm_cos_f32(phzerror);
@@ -549,6 +554,7 @@ void AMDecodeSAM(DataBlock *data){
             audio = audio + dc_insert - dc;
         }
         data->I[i] = audio;
+        // data->Q is not used, so don't do this
         // I am not sure why audiou is uninitialized. Mistake?
         //if (fade_leveler) {
         //    dcu = mtauR * dcu + onem_mtauR * audiou;
@@ -569,10 +575,11 @@ void AMDecodeSAM(DataBlock *data){
         while (phzerror >= TWO_PI) phzerror -= TWO_PI;
         while (phzerror < 0.0) phzerror += TWO_PI;
     }
-    SAM_carrier =  (omega2 * 24000) / (2 * TWO_PI);
-    SAM_carrier_freq_offset = (int)10 * SAM_carrier;
+    SAM_carrier =  (omega2 * (float32_t)data->sampleRate_Hz) / (2 * TWO_PI);
+    SAM_carrier_freq_offset = 10 * SAM_carrier;
     SAM_carrier_freq_offset = 0.95 * SAM_carrier_freq_offsetOld + 0.05 * SAM_carrier_freq_offset;   
     SAM_carrier_freq_offsetOld = SAM_carrier_freq_offset;
+    Debug("SAM carrier offset = " + String(SAM_carrier_freq_offset));
 }
 
 /**
