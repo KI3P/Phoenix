@@ -622,6 +622,7 @@ char *TX_write( char* cmd ){
     return obuf;
 }
 
+static char buff[30];
 /**
  * CAT command ED - Dump EEPROM data structure to Serial (non-standard Kenwood command)
  * @param cmd CAT command string
@@ -660,11 +661,12 @@ char *ED_read(  char* cmd  ){
     Serial.print("fineTuneFreq_Hz[0]: "); Serial.println(ED.fineTuneFreq_Hz[0]);
     Serial.print("fineTuneFreq_Hz[1]: "); Serial.println(ED.fineTuneFreq_Hz[1]);
     Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
-    Serial.print("dbm_calibration:");
+    Serial.print("dbm_calibration: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.dbm_calibration[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
+    Serial.println();
     Serial.print("keyerFlip:         "); Serial.println(ED.keyerFlip);
 
     Serial.print("equalizerRec: ");
@@ -697,14 +699,16 @@ char *ED_read(  char* cmd  ){
 
     Serial.print("IQAmpCorrectionFactor: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.IQAmpCorrectionFactor[i]);
+        sprintf(buff,"%4.3f",ED.IQAmpCorrectionFactor[i]);
+        Serial.print(buff);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
 
     Serial.print("IQPhaseCorrectionFactor: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.IQPhaseCorrectionFactor[i]);
+        sprintf(buff,"%4.3f",ED.IQPhaseCorrectionFactor[i]);
+        Serial.print(buff);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
