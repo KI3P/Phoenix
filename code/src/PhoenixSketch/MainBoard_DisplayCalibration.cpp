@@ -75,7 +75,7 @@ static int16_t y_current = offset;
 #define WIN_WIDTH 20
 #define DARK_RED tft.Color565(64, 0, 0)
 static float32_t sideband_separation = 0.0;
-char buff[10];
+char buff[100];
 int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
 static float32_t deltaVals[NUMBER_OF_BANDS];
 static int32_t Nreadings = 0;
@@ -213,12 +213,14 @@ static void DrawAdjustPane(void){
     tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*2);
     tft.print("Amp:");
     tft.setCursor(PaneAdjust.x0+3+120,PaneAdjust.y0+3+40*2);
-    tft.print(ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    sprintf(buff,"%4.3f",ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    tft.print(buff);
 
     tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*3);
     tft.print("Phase:");
     tft.setCursor(PaneAdjust.x0+3+120,PaneAdjust.y0+3+40*3);
-    tft.print(ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    sprintf(buff,"%4.3f",ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    tft.print(buff);
     
     tft.setCursor(PaneAdjust.x0+3,PaneAdjust.y0+3+40*4);
     tft.print("Increment:");
@@ -265,11 +267,11 @@ static void DrawTablePane(void){
 
     tft.setCursor(PaneTable.x0+5, PaneTable.y0+3);
     tft.print("Band");
-    tft.setCursor(PaneTable.x0+55, PaneTable.y0+3);
+    tft.setCursor(PaneTable.x0+50, PaneTable.y0+3);
     tft.print("Amp");
-    tft.setCursor(PaneTable.x0+105, PaneTable.y0+3);
+    tft.setCursor(PaneTable.x0+100, PaneTable.y0+3);
     tft.print("Phs");
-    tft.setCursor(PaneTable.x0+155, PaneTable.y0+3);
+    tft.setCursor(PaneTable.x0+160, PaneTable.y0+3);
     tft.print("Val");
 
     for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
@@ -277,15 +279,18 @@ static void DrawTablePane(void){
         tft.setCursor(PaneTable.x0+5, y);
         tft.print(bands[k].name);
 
-        tft.setCursor(PaneTable.x0+55, y);
-        tft.print(ED.IQAmpCorrectionFactor[k]);
+        tft.setCursor(PaneTable.x0+50, y);
+        sprintf(buff,"%4.3f",ED.IQAmpCorrectionFactor[k]);
+        tft.print(buff);
         
-        tft.setCursor(PaneTable.x0+105, y);
-        tft.print(ED.IQPhaseCorrectionFactor[k]);
-        
+        tft.setCursor(PaneTable.x0+100, y);
+        sprintf(buff,"%4.3f",ED.IQPhaseCorrectionFactor[k]);
+        tft.print(buff);        
+
         if (deltaVals[k] != 0.0){
-            tft.setCursor(PaneTable.x0+155, y);
-            tft.print(deltaVals[k]);
+            tft.setCursor(PaneTable.x0+160, y);
+            sprintf(buff,"%2.1f",deltaVals[k]);
+            tft.print(buff);
         }
     }
     PaneTable.stale = false;
@@ -363,7 +368,7 @@ void EngageRXIQAutotune(void){
 // Pass 3
 //  Gain in 0.001 steps 10 steps below to 10 steps above   (iteration 5)
 //  Phase in 0.001 steps 10 steps below to 10 steps above  (iteration 6)
-float32_t center[] ={1.0,                  0.0,                  NULL,NULL,NULL,NULL};
+float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0};
 int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
 float32_t Delta[] = {0.01,                 0.01,                 0.01,0.01,0.001,0.001};
 float32_t maxSBS = 0.0;
@@ -380,16 +385,14 @@ float32_t GetNewVal(int8_t iter, int8_t stp){
 
 void SetAmpPhase(int8_t iter, int8_t stp){
     float32_t newval = GetNewVal(iter, stp);
-    sprintf(buff,"Iteration %d, step %d: %4.3f",iter, stp, newval);
     Nreadings = 0;
-    Debug(buff);
-    if (iter%2 == 0)
+    if (iter%2 == 0){
         ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
-    else
+    } else {
         ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
-    maxSBS = 0.0;
+    }
 }
-
+float32_t maxSBS_save;
 void TuneIQValues(void){
     // Catch the initial entry condition:
     if (initialEntry){
@@ -398,12 +401,12 @@ void TuneIQValues(void){
             bandCompleted[k] = false;
         }
         Nreadings = 0;
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0;
         SetAmpPhase(iteration,step);
         initialEntry = false;
+        return;
     }
-
     if (bandCompleted[ED.currentBand[ED.activeVFO]]){
-        Debug("Incrementing the band");
         ED.currentBand[ED.activeVFO]++;
         if (ED.currentBand[ED.activeVFO] > LAST_BAND){
             ED.currentBand[ED.activeVFO] = LAST_BAND;
@@ -421,12 +424,13 @@ void TuneIQValues(void){
         iteration = 0;
         step = 0;
         Nreadings = 0;
+        maxSBS = 0.0;
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0;
         SetAmpPhase(iteration,step);
     }
 
     // Once Nreadings reaches 6 the new reading is ready
     if (Nreadings > 6){
-        Debug("Reading complete");
         // Save this parameter if the sideband separation is the largest so far
         if (deltaVals[ED.currentBand[ED.activeVFO]] > maxSBS){
             // The value of the sideband separation
@@ -441,27 +445,32 @@ void TuneIQValues(void){
             // Set the parameter we were changing to the minimum value
             if (iteration%2 == 0){
                 ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-                sprintf(buff,"Iteration %d: Set amp to %4.3f => SBS = %2.1f",iteration, maxSBS_parameter, maxSBS);
             } else {
                 ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-                sprintf(buff,"Iteration %d: Set phs to %4.3f => SBS = %2.1f",iteration, maxSBS_parameter, maxSBS);
             }
             // The next time we step around the amplitude or phase, use this as our starting point
             int8_t nextIndex = iteration + 2;
             if (nextIndex < 6)
                 center[nextIndex] = maxSBS_parameter;
-            Debug(buff);
 
             // Go to the next iteration
             step = 0;
             iteration++;
-            Debug("New iteration" + String(iteration));
+            maxSBS_save = maxSBS;
+            maxSBS = 0.0;
         }
         if (iteration > 5){
-            Debug("Band complete");
+            // Go to next band
             bandCompleted[ED.currentBand[ED.activeVFO]] = true;
+            // Set the parameter we were changing to the minimum value
+            if ((iteration-1)%2 == 0){
+                ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+            } else {
+                ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+            }
+            deltaVals[ED.currentBand[ED.activeVFO]] = maxSBS_save;
             return;
-        }
+        } 
         // Change the appropriate parameter
         SetAmpPhase(iteration,step);
         Nreadings = 0;

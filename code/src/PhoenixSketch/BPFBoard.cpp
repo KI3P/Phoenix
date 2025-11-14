@@ -46,7 +46,6 @@ void SelectBPFBand(int32_t band) {
         // Only write I2C traffic if the band has changed from its previous state
         BPF_GPAB_state = BPF_WORD;
         mcpBPF.writeGPIOAB(BPF_GPAB_state);
-        Debug("Set BPF state: "+String(BPF_GPAB_state,HEX));
     }
 }
 
