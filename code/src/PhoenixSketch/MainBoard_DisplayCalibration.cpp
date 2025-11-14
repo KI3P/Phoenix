@@ -26,7 +26,10 @@ void DrawCalibrateFrequency(void){
     tft.print("Frequency calibration");
 }
 
-
+///////////////////////////////////////////////////////////////////////////////
+// Receive IQ calibration section
+///////////////////////////////////////////////////////////////////////////////
+static bool autotune = false;
 static const int8_t NUMBER_OF_PANES = 5;
 // Forward declaration of the pane drawing functions
 static void DrawDeltaPane(void);
@@ -75,6 +78,7 @@ static float32_t sideband_separation = 0.0;
 char buff[10];
 int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
 static float32_t deltaVals[NUMBER_OF_BANDS];
+static int32_t Nreadings = 0;
 
 FASTRUN void PlotSpectrum(void){
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
@@ -118,24 +122,34 @@ FASTRUN void PlotSpectrum(void){
         x1++;
     }
 
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
+    // Because we set the CW tone to be 48 kHz above or below the LO, the upper
+    // and lower sideband products will be in very specific bins. Upper will be
+    // in bin 3/4*512 = 384, lower will be in bin 1/4*512 = 128
+    float32_t upper = psdnew[384]; 
+    float32_t lower = psdnew[128]; 
+    float32_t sbs;
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
         sideband_separation = (upperSBmax - lowerSBmax)*10;
-    else
+        sbs = (upper-lower)*10;
+    } else {
         sideband_separation = (lowerSBmax - upperSBmax)*10;
-
-    deltaVals[ED.currentBand[ED.activeVFO]] = sideband_separation;
+        sbs = (lower-upper)*10;
+    }
+    if (abs(sbs - sideband_separation)>0.01)
+        Debug("bin wrong");
+    deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
+    Nreadings++;
     psdupdated = false;
 }
 
 static uint8_t incindex = 1;
-const float32_t incvals[] = {0.1, 0.01, 0.001};
+const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
 void ChangeRXIQIncrement(void){
     incindex++;
-    if (incindex > 2) 
+    if (incindex > sizeof(incvals)/sizeof(incvals[0])) 
         incindex = 0;
     increment = incvals[incindex];
-    Debug(String("Change increment to ") + String(increment));
 }
 
 
@@ -224,10 +238,11 @@ static void DrawAdjustPane(void){
     PaneAdjust.stale = false;
 }
 
+// Used to detect a change in any of the parameters to know whether the table should be updated
 float32_t GetAmpSum(void){
     float32_t ampsum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){
-        ampsum += ED.IQAmpCorrectionFactor[k];
+        ampsum += abs(ED.IQAmpCorrectionFactor[k]);
     }
     return ampsum;
 }
@@ -235,7 +250,7 @@ float32_t GetAmpSum(void){
 float32_t GetPhsSum(void){
     float32_t phssum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){
-        phssum += ED.IQPhaseCorrectionFactor[k];
+        phssum += abs(ED.IQPhaseCorrectionFactor[k]);
     }
     return phssum;
 }
@@ -266,15 +281,19 @@ static void DrawTablePane(void){
     tft.setCursor(PaneTable.x0+155, PaneTable.y0+3);
     tft.print("Val");
 
-    for (size_t k=0; k<NUMBER_OF_BANDS; k++){
-        tft.setCursor(PaneTable.x0+5, PaneTable.y0+20+k*17);
+    for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
+        int16_t y = PaneTable.y0 + 20 + (k - FIRST_BAND)*17;
+        tft.setCursor(PaneTable.x0+5, y);
         tft.print(bands[k].name);
-        tft.setCursor(PaneTable.x0+55, PaneTable.y0+20+k*17);
+
+        tft.setCursor(PaneTable.x0+55, y);
         tft.print(ED.IQAmpCorrectionFactor[k]);
-        tft.setCursor(PaneTable.x0+105, PaneTable.y0+20+k*17);
+        
+        tft.setCursor(PaneTable.x0+105, y);
         tft.print(ED.IQPhaseCorrectionFactor[k]);
+        
         if (deltaVals[k] != 0.0){
-            tft.setCursor(PaneTable.x0+155, PaneTable.y0+20+k*17);
+            tft.setCursor(PaneTable.x0+155, y);
             tft.print(deltaVals[k]);
         }
     }
@@ -299,6 +318,9 @@ static void DrawInstructionsPane(void){
     int16_t delta = 40;
     int16_t lineD = 20;
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("* Press button 16 for auto.");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
     tft.print("* Turn the volume knob to");
     delta += lineD;
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
@@ -318,6 +340,15 @@ static void DrawInstructionsPane(void){
     delta += lineD;
     tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
     tft.print(" * Adjust until Delta > 60 dB");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print(" * Press Band Up or Band Down");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print("    to change to the next band.");
+    delta += lineD;
+    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.print(" * Press Home to save and exit.");
 
     PaneInstructions.stale = false;
 }
@@ -326,6 +357,122 @@ static void DrawSpectrumPane(void){
     if (psdupdated){
         PlotSpectrum();
     }
+}
+
+void EngageRXIQAutotune(void){
+    autotune = true;
+}
+
+// Pass 1
+//  Gain in 0.01 steps from 0.5 to 1.5            (iteration 1)
+//  Phase changes in 0.01 steps from -0.2 to 0.2  (iteration 2)
+// Pass 2
+//  Gain in 0.01 steps from 4 steps below previous minimum to 4 steps above   (iteration 3)
+//  phase in 0.01 steps from 4 steps below previous minimum to 4 steps above  (iteration 4)
+// Pass 3
+//  Gain in 0.001 steps 10 steps below to 10 steps above   (iteration 5)
+//  Phase in 0.001 steps 10 steps below to 10 steps above  (iteration 6)
+float32_t center[] ={1.0,                  0.0,                  NULL,NULL,NULL,NULL};
+int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
+float32_t Delta[] = {0.01,                 0.01,                 0.01,0.01,0.001,0.001};
+float32_t maxSBS = 0.0;
+float32_t maxSBS_parameter = 0.0;
+static int8_t iteration = 0;
+static int8_t step = 0;
+static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
+
+float32_t GetNewVal(int8_t iter, int8_t stp){
+    float32_t newval = center[iter]-(NSteps[iter]*Delta[iter])/2.0+stp*Delta[iter];
+    return newval;
+}
+
+void SetAmpPhase(int8_t iter, int8_t stp){
+    float32_t newval = GetNewVal(iter, stp);
+    sprintf(buff,"Iteration %d, step %d: %4.3f",iter, stp, newval);
+    Nreadings = 0;
+    Debug(buff);
+    if (iter%2 == 0)
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
+    else
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
+}
+
+void TuneIQValues(void){
+    // Catch the initial entry condition:
+    if ((ED.currentBand[ED.activeVFO]==FIRST_BAND) && (iteration==0) && (step==0)){
+        Debug("Initial entry to tuning IQ. Setting initial point");
+        for (size_t k=0; k<NUMBER_OF_BANDS; k++){
+            bandCompleted[k] = false;
+        }
+        Nreadings = 0;
+        SetAmpPhase(iteration,step);
+    }
+
+    if (bandCompleted[ED.currentBand[ED.activeVFO]]){
+        Debug("Incrementing the band");
+        ED.currentBand[ED.activeVFO]++;
+        if (ED.currentBand[ED.activeVFO] > LAST_BAND){
+            ED.currentBand[ED.activeVFO] = LAST_BAND;
+            autotune = false;
+            Debug("Autotune complete!");
+            return;
+        }
+        // Change the band
+        ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+        ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+        ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
+        UpdateRFHardwareState();
+
+        // Start the first iteration for this new band
+        iteration = 0;
+        step = 0;
+        Nreadings = 0;
+        SetAmpPhase(iteration,step);
+    }
+
+    // Once Nreadings reaches 6 the new reading is ready
+    if (Nreadings > 6){
+        Debug("Reading complete");
+        // Save this parameter if the sideband separation is the largest so far
+        if (deltaVals[ED.currentBand[ED.activeVFO]] > maxSBS){
+            // The value of the sideband separation
+            maxSBS = deltaVals[ED.currentBand[ED.activeVFO]];
+            // The amp/phase parameter that delivered this sideband separation
+            maxSBS_parameter = GetNewVal(iteration, step);
+        }
+
+        // Proceed to the next step in this iteration
+        step++;
+        if (step >= NSteps[iteration]){
+            // Set the parameter we were changing to the minimum value
+            if (iteration%2 == 0){
+                ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+                sprintf(buff,"Iteration %d: Set amp to %4.3f => SBS = %2.1f",iteration, maxSBS_parameter, maxSBS);
+            } else {
+                ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+                sprintf(buff,"Iteration %d: Set phs to %4.3f => SBS = %2.1f",iteration, maxSBS_parameter, maxSBS);
+            }
+            // The next time we step around the amplitude or phase, use this as our starting point
+            int8_t nextIndex = iteration + 2;
+            if (nextIndex < 6)
+                center[nextIndex] = maxSBS_parameter;
+            Debug(buff);
+
+            // Go to the next iteration
+            step = 0;
+            iteration++;
+            Debug("New iteration" + String(iteration));
+        }
+        if (iteration > 5){
+            Debug("Band complete");
+            bandCompleted[ED.currentBand[ED.activeVFO]] = true;
+            return;
+        }
+        // Change the appropriate parameter
+        SetAmpPhase(iteration,step);
+        Nreadings = 0;
+    }
+
 }
 
 void DrawCalibrateRXIQ(void){
@@ -343,18 +490,23 @@ void DrawCalibrateRXIQ(void){
         tft.drawRect(PaneSpectrum.x0,PaneSpectrum.y0,PaneSpectrum.width,PaneSpectrum.height,RA8875_YELLOW);
         tft.setCursor(120,  PaneDelta.y0);
         tft.print("Delta:");
-
+        // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
             WindowPanes[i]->stale = true;
         }
-
     }
+
+    // If we are in autotune mode, engage the algorithm!
+    if (autotune)
+        TuneIQValues();
 
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
         WindowPanes[i]->DrawFunction();
     }
    
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 void DrawCalibrateTXIQ(void){
     if (uiSM.vars.clearScreen){

@@ -623,11 +623,24 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_RX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Force a save here
+                    SaveDataToStorage();
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
                 case 15:{
                     ChangeRXIQIncrement();
+                    break;
+                }
+                case 16:{
+                    // Change to the first band
+                    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+                    ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
+                    UpdateRFHardwareState();
+                    // Engage autotune
+                    EngageRXIQAutotune();
                     break;
                 }
                 case BAND_UP:{

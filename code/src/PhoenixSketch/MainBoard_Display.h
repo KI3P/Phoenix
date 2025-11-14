@@ -246,6 +246,7 @@ void DrawCalibrateFrequency(void);
 void DrawCalibrateRXIQ(void);
 void DrawCalibrateTXIQ(void);
 void DrawCalibratePower(void);
+void EngageRXIQAutotune(void);
 
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
