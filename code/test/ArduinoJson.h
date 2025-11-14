@@ -6,6 +6,7 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <type_traits>
 
 // Forward declarations
 class JsonDocument;
@@ -134,6 +135,8 @@ private:
     friend class JsonDocument;
     friend class JsonObject;
     friend class JsonArray;
+    friend size_t serializeJson(const JsonDocument& doc, std::ostream& output);
+    friend size_t serializeJsonPretty(const JsonDocument& doc, std::ostream& output);
 };
 
 // Mock JsonArray class
@@ -260,25 +263,30 @@ inline bool JsonVariant::is<JsonArray>() const {
     return !_array_value.empty();
 }
 
-// Function declarations
+// Function declarations (implemented in ArduinoJson.cpp)
 
 size_t serializeJson(const JsonDocument& doc, std::ostream& output);
 size_t serializeJsonPretty(const JsonDocument& doc, std::ostream& output);
 
 // File interface compatibility
+// This template is for File-like objects (not std::ostream derivatives)
 template<typename FileType>
-size_t serializeJson(const JsonDocument& doc, FileType& file) {
+typename std::enable_if<!std::is_base_of<std::ostream, FileType>::value, size_t>::type
+serializeJson(const JsonDocument& doc, FileType& file) {
     std::ostringstream oss;
-    size_t bytes = serializeJson(doc, oss);
+    // Explicitly call the ostream version to avoid template recursion
+    size_t bytes = serializeJson(doc, static_cast<std::ostream&>(oss));
     std::string str = oss.str();
     file.write(str.c_str(), str.length());
     return bytes;
 }
 
 template<typename FileType>
-size_t serializeJsonPretty(const JsonDocument& doc, FileType& file) {
+typename std::enable_if<!std::is_base_of<std::ostream, FileType>::value, size_t>::type
+serializeJsonPretty(const JsonDocument& doc, FileType& file) {
     std::ostringstream oss;
-    size_t bytes = serializeJsonPretty(doc, oss);
+    // Explicitly call the ostream version to avoid template recursion
+    size_t bytes = serializeJsonPretty(doc, static_cast<std::ostream&>(oss));
     std::string str = oss.str();
     file.write(str.c_str(), str.length());
     return bytes;

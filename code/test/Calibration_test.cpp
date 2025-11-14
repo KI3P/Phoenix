@@ -318,3 +318,21 @@ TEST_F(CalibrationTest, CalibrateReceiveIQState) {
     CheckThatStateIsCalReceiveIQ();
 }
 
+/*TEST_F(CalibrationTest, CalibrateReceiveIQAutotuneSteps) {
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    ScrollAndSelectCalibrateReceiveIQ();
+    
+    for (int k=0; k<50; k++){
+        loop(); MyDelay(10); 
+    }
+
+    // Now, check to ensure that we are in the receive IQ state
+    CheckThatStateIsCalReceiveIQ();
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<5000; k++){
+        loop(); MyDelay(10); 
+    }
+}*/
+

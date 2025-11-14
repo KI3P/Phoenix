@@ -371,6 +371,7 @@ float32_t maxSBS_parameter = 0.0;
 static int8_t iteration = 0;
 static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
+static bool initialEntry = false;
 
 float32_t GetNewVal(int8_t iter, int8_t stp){
     float32_t newval = center[iter]-(NSteps[iter]*Delta[iter])/2.0+stp*Delta[iter];
@@ -386,17 +387,19 @@ void SetAmpPhase(int8_t iter, int8_t stp){
         ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
     else
         ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
+    maxSBS = 0.0;
 }
 
 void TuneIQValues(void){
     // Catch the initial entry condition:
-    if ((ED.currentBand[ED.activeVFO]==FIRST_BAND) && (iteration==0) && (step==0)){
+    if (initialEntry){
         Debug("Initial entry to tuning IQ. Setting initial point");
         for (size_t k=0; k<NUMBER_OF_BANDS; k++){
             bandCompleted[k] = false;
         }
         Nreadings = 0;
         SetAmpPhase(iteration,step);
+        initialEntry = false;
     }
 
     if (bandCompleted[ED.currentBand[ED.activeVFO]]){
@@ -485,6 +488,7 @@ void DrawCalibrateRXIQ(void){
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
             WindowPanes[i]->stale = true;
         }
+        initialEntry = true;
     }
 
     // If we are in autotune mode, engage the algorithm!

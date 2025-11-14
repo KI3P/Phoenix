@@ -1049,6 +1049,7 @@ void ConsumeInterrupt(void){
             UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
             // Exit the calibration mode
             ModeSm_dispatch_event(&modeSM,ModeSm_EventId_CALIBRATE_EXIT);
+            break;
         }
         default:
             break;
