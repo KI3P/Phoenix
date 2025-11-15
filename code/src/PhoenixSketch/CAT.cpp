@@ -713,6 +713,22 @@ char *ED_read(  char* cmd  ){
     }
     Serial.println();
 
+    Serial.print("IQXAmpCorrectionFactor: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        sprintf(buff,"%4.3f",ED.IQXAmpCorrectionFactor[i]);
+        Serial.print(buff);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("IQXPhaseCorrectionFactor: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        sprintf(buff,"%4.3f",ED.IQXPhaseCorrectionFactor[i]);
+        Serial.print(buff);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
     Serial.print("antennaSelection: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.antennaSelection[i]);

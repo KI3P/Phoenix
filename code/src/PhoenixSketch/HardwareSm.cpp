@@ -398,6 +398,8 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFReceive;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ):
+            Debug("Entered hardware cal TXIQ state");
         case (ModeSm_StateId_SSB_TRANSMIT):{
             rfHardwareState = RFTransmit;
             break;
@@ -417,10 +419,6 @@ void UpdateRFHardwareState(void){
         case (ModeSm_StateId_CALIBRATE_RX_IQ):{
             rfHardwareState = RFCalReceiveIQ;
             Debug("Entered hardware cal RXIQ state");
-            break;
-        }
-        case (ModeSm_StateId_CALIBRATE_TX_IQ):{
-            Debug("Entered hardware cal TXIQ state");
             break;
         }
         case (ModeSm_StateId_CALIBRATE_CW_PA):{

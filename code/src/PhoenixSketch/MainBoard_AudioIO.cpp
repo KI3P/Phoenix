@@ -100,46 +100,49 @@
 
 // Generated using this tool: https://www.pjrc.com/teensy/gui/index.html
 // GUItool: begin automatically generated code
-AudioInputI2SQuad        i2s_quadIn;     //xy=288.75,387
-AudioMixer4              modeSelectInR;  //xy=593.75,482
-AudioMixer4              modeSelectInL;  //xy=596.75,389
-AudioMixer4              modeSelectInExR; //xy=597.75,300
-AudioMixer4              modeSelectInExL; //xy=598.75,194
-AudioRecordQueue         Q_in_L_Ex;      //xy=789.75,198
-AudioRecordQueue         Q_in_R_Ex;      //xy=792.75,301
-AudioRecordQueue         Q_in_L;         //xy=797.75,394
-AudioRecordQueue         Q_in_R;         //xy=798.75,483
-AudioSynthWaveformSine   sidetone_oscillator; //xy=1087.75,485
-AudioPlayQueue           Q_out_L_Ex;     //xy=1089.75,182
-AudioPlayQueue           Q_out_R_Ex;     //xy=1090.75,240
-AudioPlayQueue           Q_out_R;        //xy=1094.75,373
-AudioPlayQueue           Q_out_L;        //xy=1096.75,302
-AudioMixer4              modeSelectOutExL; //xy=1436.75,192
-AudioMixer4              modeSelectOutL; //xy=1437.75,346
-AudioMixer4              modeSelectOutExR; //xy=1439.75,265
-AudioMixer4              modeSelectOutR; //xy=1444.75,453
-AudioOutputI2SQuad       i2s_quadOut;    //xy=1681.75,300
+AudioInputI2SQuad        i2s_quadIn;     //xy=576.75,225
+AudioSynthWaveformSine   transmitIQcal_oscillator;          //xy=583.25,55.75
+AudioMixer4              modeSelectInR;  //xy=881.75,320
+AudioMixer4              modeSelectInL;  //xy=884.75,227
+AudioMixer4              modeSelectInExR; //xy=885.75,138
+AudioMixer4              modeSelectInExL; //xy=886.75,32
+AudioRecordQueue         Q_in_L_Ex;      //xy=1077.75,36
+AudioRecordQueue         Q_in_R_Ex;      //xy=1080.75,139
+AudioRecordQueue         Q_in_L;         //xy=1085.75,232
+AudioRecordQueue         Q_in_R;         //xy=1086.75,321
+AudioSynthWaveformSine   sidetone_oscillator; //xy=1375.75,323
+AudioPlayQueue           Q_out_L_Ex;     //xy=1377.75,20
+AudioPlayQueue           Q_out_R_Ex;     //xy=1378.75,78
+AudioPlayQueue           Q_out_R;        //xy=1382.75,211
+AudioPlayQueue           Q_out_L;        //xy=1384.75,140
+AudioMixer4              modeSelectOutExL; //xy=1724.75,30
+AudioMixer4              modeSelectOutL; //xy=1725.75,184
+AudioMixer4              modeSelectOutExR; //xy=1727.75,103
+AudioMixer4              modeSelectOutR; //xy=1732.75,291
+AudioOutputI2SQuad       i2s_quadOut;    //xy=1969.75,138
 AudioConnection          patchCord1(i2s_quadIn, 0, modeSelectInExL, 0);
 AudioConnection          patchCord2(i2s_quadIn, 1, modeSelectInExR, 0);
 AudioConnection          patchCord3(i2s_quadIn, 2, modeSelectInL, 0);
 AudioConnection          patchCord4(i2s_quadIn, 3, modeSelectInR, 0);
-AudioConnection          patchCord5(modeSelectInR, Q_in_R);
-AudioConnection          patchCord6(modeSelectInL, Q_in_L);
-AudioConnection          patchCord7(modeSelectInExR, Q_in_R_Ex);
-AudioConnection          patchCord8(modeSelectInExL, Q_in_L_Ex);
-AudioConnection          patchCord9(sidetone_oscillator, 0, modeSelectOutL, 2);
-AudioConnection          patchCord10(sidetone_oscillator, 0, modeSelectOutR, 2);
-AudioConnection          patchCord11(Q_out_L_Ex, 0, modeSelectOutExL, 0);
-AudioConnection          patchCord12(Q_out_L_Ex, 0, modeSelectOutL, 1);
-AudioConnection          patchCord13(Q_out_R_Ex, 0, modeSelectOutExR, 0);
-AudioConnection          patchCord14(Q_out_R_Ex, 0, modeSelectOutR, 1);
-AudioConnection          patchCord15(Q_out_R, 0, modeSelectOutR, 0);
-AudioConnection          patchCord16(Q_out_L, 0, modeSelectOutL, 0);
-AudioConnection          patchCord17(modeSelectOutExL, 0, i2s_quadOut, 0);
-AudioConnection          patchCord18(modeSelectOutL, 0, i2s_quadOut, 2);
-AudioConnection          patchCord19(modeSelectOutExR, 0, i2s_quadOut, 1);
-AudioConnection          patchCord20(modeSelectOutR, 0, i2s_quadOut, 3);
-AudioControlSGTL5000     pcm5102_mainBoard;     //xy=586.75,611
+AudioConnection          patchCord5(transmitIQcal_oscillator, 0, modeSelectInExL, 1);
+AudioConnection          patchCord6(transmitIQcal_oscillator, 0, modeSelectInExR, 1);
+AudioConnection          patchCord7(modeSelectInR, Q_in_R);
+AudioConnection          patchCord8(modeSelectInL, Q_in_L);
+AudioConnection          patchCord9(modeSelectInExR, Q_in_R_Ex);
+AudioConnection          patchCord10(modeSelectInExL, Q_in_L_Ex);
+AudioConnection          patchCord11(sidetone_oscillator, 0, modeSelectOutL, 2);
+AudioConnection          patchCord12(sidetone_oscillator, 0, modeSelectOutR, 2);
+AudioConnection          patchCord13(Q_out_L_Ex, 0, modeSelectOutExL, 0);
+AudioConnection          patchCord14(Q_out_L_Ex, 0, modeSelectOutL, 1);
+AudioConnection          patchCord15(Q_out_R_Ex, 0, modeSelectOutExR, 0);
+AudioConnection          patchCord16(Q_out_R_Ex, 0, modeSelectOutR, 1);
+AudioConnection          patchCord17(Q_out_R, 0, modeSelectOutR, 0);
+AudioConnection          patchCord18(Q_out_L, 0, modeSelectOutL, 0);
+AudioConnection          patchCord19(modeSelectOutExL, 0, i2s_quadOut, 0);
+AudioConnection          patchCord20(modeSelectOutL, 0, i2s_quadOut, 2);
+AudioConnection          patchCord21(modeSelectOutExR, 0, i2s_quadOut, 1);
+AudioConnection          patchCord22(modeSelectOutR, 0, i2s_quadOut, 3);
+AudioControlSGTL5000     pcm5102_mainBoard; //xy=874.75,449
 // GUItool: end automatically generated code
 
 // Controller for the Teensy Audio Board. The web tool doesn't recognize the class
@@ -299,6 +302,28 @@ void UpdateAudioIOState(void){
             // Input is microphone
             SelectMixerChannel(&modeSelectInExL,0);
             SelectMixerChannel(&modeSelectInExR,0);
+            // Output is samples to RF transmit
+            SelectMixerChannel(&modeSelectOutExL,0);
+            SelectMixerChannel(&modeSelectOutExR,0);
+            // Mute IQ samples from the receive board
+            MuteMixerChannels(&modeSelectInL);
+            MuteMixerChannels(&modeSelectInR);
+            // Mute speaker audio
+            MuteMixerChannels(&modeSelectOutL);
+            MuteMixerChannels(&modeSelectOutR);
+            break;
+        }            
+        case (ModeSm_StateId_CALIBRATE_TX_IQ):{
+            // IQ from receive stops
+            Q_in_L.end(); 
+            Q_in_R.end();
+            // Microphone stops
+            Q_in_L_Ex.end();
+            Q_in_R_Ex.end();
+
+            // Input is calibration oscillator
+            SelectMixerChannel(&modeSelectInExL,1);
+            SelectMixerChannel(&modeSelectInExR,1);
             // Output is samples to RF transmit
             SelectMixerChannel(&modeSelectOutExL,0);
             SelectMixerChannel(&modeSelectOutExR,0);
@@ -488,6 +513,10 @@ void InitializeAudio(void){
     MuteMixerChannels(&modeSelectOutR); // sidetone
     sidetone_oscillator.amplitude(ED.sidetoneVolume / 500);
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
+
+    // The transmit IQ cal oscillator. Only used during the TXIQ calibration state
+    transmitIQcal_oscillator.amplitude(0.5);
+    transmitIQcal_oscillator.frequency(750);
 
     // Warm up the audio I/O to clear initialization issues
     WarmUpAudioIO();

@@ -342,6 +342,7 @@ void TimerInterrupt(void){
 // Code for handling button presses and state changes
 ///////////////////////////////////////////////////////////////////////////////
 void ChangeRXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ChangeTXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 
 /**
  * Process button press events from the front panel.
@@ -686,7 +687,33 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Force a save here
+                    SaveDataToStorage();
                     SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                case 15:{
+                    ChangeTXIQIncrement();
+                    break;
+                }
+                case BAND_UP:{
+                    if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
+                        ED.currentBand[ED.activeVFO] = FIRST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+                    ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
+                    UpdateRFHardwareState();
+                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
+                    break;
+                }
+                case BAND_DN:{
+                    if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
+                        ED.currentBand[ED.activeVFO] = LAST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
+                    ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
+                    UpdateRFHardwareState();
+                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 default:
@@ -792,6 +819,12 @@ void IncrementRXIQPhase(void);
 void DecrementRXIQPhase(void);
 void IncrementRXIQAmp(void);
 void DecrementRXIQAmp(void);
+void IncrementTXIQPhase(void);
+void DecrementTXIQPhase(void);
+void IncrementTXIQAmp(void);
+void DecrementTXIQAmp(void);
+void IncrementTransmitAtt(void);
+void DecrementTransmitAtt(void);
 
 /**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
@@ -974,6 +1007,39 @@ void ConsumeInterrupt(void){
             }
             break;
         } // end of calibrate RX IQ encoder interrupts
+
+        case (UISm_StateId_CALIBRATE_TX_IQ):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncrementTXIQPhase();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecrementTXIQPhase();
+                    break;
+                }
+                case (iVOLUME_INCREASE):{
+                    IncrementTXIQAmp();
+                    break;
+                }
+                case (iVOLUME_DECREASE):{
+                    DecrementTXIQAmp();
+                    break;
+                }
+                case (iFINETUNE_INCREASE):{
+                    IncrementTransmitAtt();
+                    break;
+                }
+                case (iFINETUNE_DECREASE):{
+                    DecrementTransmitAtt();
+                    break;
+                }
+
+                default: // handle them later
+                    break;
+            }
+            break;
+        } // end of calibrate TX IQ encoder interrupts
 
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (interrupt){

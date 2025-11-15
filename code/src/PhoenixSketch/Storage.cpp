@@ -80,6 +80,8 @@ void SaveDataToStorage(void){
         doc["powerOutSSB"][i] = ED.powerOutSSB[i];
         doc["IQAmpCorrectionFactor"][i] = ED.IQAmpCorrectionFactor[i];
         doc["IQPhaseCorrectionFactor"][i] = ED.IQPhaseCorrectionFactor[i];
+        doc["IQXAmpCorrectionFactor"][i] = ED.IQXAmpCorrectionFactor[i];
+        doc["IQXPhaseCorrectionFactor"][i] = ED.IQXPhaseCorrectionFactor[i];
         doc["XAttenCW"][i] = ED.XAttenCW[i];
         doc["XAttenSSB"][i] = ED.XAttenSSB[i];
         doc["RAtten"][i] = ED.RAtten[i];
@@ -304,6 +306,16 @@ void RestoreDataFromStorage(void){
     if (doc["IQPhaseCorrectionFactor"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.IQPhaseCorrectionFactor[i] = doc["IQPhaseCorrectionFactor"][i] | ED.IQPhaseCorrectionFactor[i];
+        }
+    }
+    if (doc["IQXAmpCorrectionFactor"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.IQXAmpCorrectionFactor[i] = doc["IQXAmpCorrectionFactor"][i] | ED.IQXAmpCorrectionFactor[i];
+        }
+    }
+    if (doc["IQXPhaseCorrectionFactor"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.IQXPhaseCorrectionFactor[i] = doc["IQXPhaseCorrectionFactor"][i] | ED.IQXPhaseCorrectionFactor[i];
         }
     }
     if (doc["XAttenCW"].is<JsonArray>()) {

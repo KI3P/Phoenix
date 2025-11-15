@@ -918,6 +918,10 @@ DataBlock * TransmitProcessing(const char *fname){
     TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
     HilbertTransform(&data,&TXfilters); // 128
     TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+    // Perform IQ correction
+    ApplyIQCorrection(&data,
+        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
     SidebandSelection(&data);
     TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
     TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
