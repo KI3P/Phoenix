@@ -1336,10 +1336,34 @@ TEST(SignalProcessing, DemodulateAM){
     //EXPECT_EQ(1,0);
 }
 
-/*TEST(SignalProcessing, DemodulateSAM){
-    EXPECT_EQ(1,0);
-}*/
+TEST(SignalProcessing, DemodulateSAM){
+    // The mock data files and expected carrier offset are generate by 
+    // the file generate_test_waveform.ipynb
 
+    #include "mock_L_data_SAM.c"
+    #include "mock_R_data_SAM.c"
+    uint32_t Nsamples = sizeof(L_mock_SAM)/sizeof(L_mock_SAM[0]);
+    float32_t sampleRate_Hz = SR[SampleRate].rate/RXfilters.DF;
+
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
+    ED.modulation[ED.activeVFO] = SAM;
+
+    DataBlock data;
+    char strbuf[50];
+    
+    uint32_t Nreps = Nsamples / 256;
+
+    for (size_t i = 0; i<Nreps; i++){
+        data.I = &L_mock_SAM[i*256];
+        data.Q = &R_mock_SAM[i*256];
+        data.N = 256;
+        data.sampleRate_Hz = 24000;
+        // Demodulate it
+        Demodulate(&data, &RXfilters);
+    }
+    EXPECT_NEAR(GetSAMCarrierOffset(),57.7342,0.0002);
+
+}
 
 void EQ_filter_tone(float32_t toneFreq_Hz, uint16_t bf, DataBlock *dout, float32_t *gain){
    

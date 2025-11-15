@@ -119,6 +119,8 @@ void InitializeSignalProcessing(void);
  */
 void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters);
 
+float32_t GetSAMCarrierOffset(void);
+
 /**
  * @brief Apply noise reduction to received audio
  * @param data Pointer to DataBlock containing demodulated audio
