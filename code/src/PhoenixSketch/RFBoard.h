@@ -61,6 +61,8 @@ uint16_t GetRFMCPRegisters(void);
 
 // SSB VFO Control Functions
 
+void SetFrequencyCorrectionFactor(int32_t corr);
+
 /**
  * @brief Get the current SSB VFO frequency setting
  * @return Frequency in decihertz (Hz × 10)

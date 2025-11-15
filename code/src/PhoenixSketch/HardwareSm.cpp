@@ -390,6 +390,9 @@ void UpdateRFHardwareState(void){
     // Several transceiver states map to the same RF board state. Handle this mapping
     // and call the function to handle the new RF board state.
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_FREQUENCY):{
+            Debug("Entered hardware cal freq state");
+        }
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
             rfHardwareState = RFReceive;
@@ -409,10 +412,6 @@ void UpdateRFHardwareState(void){
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT):{
             rfHardwareState = RFCWSpace;
-            break;
-        }
-        case (ModeSm_StateId_CALIBRATE_FREQUENCY):{
-            Debug("Entered hardware cal freq state");
             break;
         }
         case (ModeSm_StateId_CALIBRATE_RX_IQ):{
@@ -538,6 +537,7 @@ void HandleTuneState(TuneState tuneState){
  */
 void UpdateTuneState(void){
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
             tuneState = TuneReceive;
@@ -560,8 +560,6 @@ void UpdateTuneState(void){
             tuneState = TuneCalReceiveIQ;
             break;
         }
-        
-        //case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         //case (ModeSm_StateId_CALIBRATE_TX_IQ):
         //case (ModeSm_StateId_CALIBRATE_CW_PA):
         //case (ModeSm_StateId_CALIBRATE_SSB_PA):{

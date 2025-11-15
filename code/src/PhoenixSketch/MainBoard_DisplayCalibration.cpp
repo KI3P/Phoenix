@@ -17,6 +17,184 @@ extern RA8875 tft;
 // Frequency calibration section
 ///////////////////////////////////////////////////////////////////////////////
 
+static const int8_t NUMBER_OF_FREQ_PANES = 6;
+// Forward declaration of the pane drawing functions
+static void DrawFreqPlotPane(void);
+static void DrawFreqFactorPane(void);
+static void DrawFreqFactorIncrPane(void);
+static void DrawFreqErrorPane(void);
+static void DrawFreqInstructionsPane(void);
+static void DrawFreqModulationPane(void);
+
+// Pane instances
+static Pane PaneFreqPlot =   {3,95,517,150,DrawFreqPlotPane,1};
+static Pane PaneFreqFactor = {140,270,120,40,DrawFreqFactorPane,1};
+static Pane PaneFreqFactorIncr = {140,330,120,40,DrawFreqFactorIncrPane,1};
+static Pane PaneFreqError =  {390,270,120,40,DrawFreqErrorPane,1};
+static Pane PaneFreqMod =    {390,270,120,40,DrawFreqModulationPane,1};
+static Pane PaneFreqInstructions = {537,7,260,470,DrawFreqInstructionsPane,1};
+
+// Array of all panes for iteration
+static Pane* FreqWindowPanes[NUMBER_OF_FREQ_PANES] = {&PaneFreqPlot,&PaneFreqFactor,&PaneFreqFactorIncr,
+                                    &PaneFreqError,&PaneFreqInstructions,&PaneFreqMod};
+
+
+static void DrawFreqPlotPane(void){
+    // blank for now
+}
+
+static int32_t ofcf = -100000;
+static void DrawFreqFactorPane(void){
+    if (ofcf != ED.freqCorrectionFactor)
+        PaneFreqFactor.stale = true;
+    ofcf = ED.freqCorrectionFactor;
+
+    if (!PaneFreqFactor.stale) return;
+    tft.fillRect(PaneFreqFactor.x0, PaneFreqFactor.y0, PaneFreqFactor.width, PaneFreqFactor.height, RA8875_BLACK);
+    
+    tft.setCursor(PaneFreqFactor.x0, PaneFreqFactor.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print(ED.freqCorrectionFactor);
+
+    PaneFreqFactor.stale = false;
+}
+
+const int32_t freqIncrements[] = {1,10,100,1000,10000};
+static uint8_t freqIncrementIndex = 1;
+
+void ChangeFrequencyCorrectionFactorIncrement(void){
+    freqIncrementIndex++;
+    if (freqIncrementIndex > sizeof(freqIncrements)/sizeof(freqIncrements[0]))
+        freqIncrementIndex = 0;
+}
+
+void IncreaseFrequencyCorrectionFactor(void){
+    ED.freqCorrectionFactor += freqIncrements[freqIncrementIndex];
+    SetFrequencyCorrectionFactor(ED.freqCorrectionFactor);
+}
+
+void DecreaseFrequencyCorrectionFactor(void){
+    ED.freqCorrectionFactor -= freqIncrements[freqIncrementIndex];
+    SetFrequencyCorrectionFactor(ED.freqCorrectionFactor);
+}
+
+static int32_t offi = -100000;
+static void DrawFreqFactorIncrPane(void){
+    if (offi != freqIncrements[freqIncrementIndex])
+        PaneFreqFactorIncr.stale = true;
+    offi = freqIncrements[freqIncrementIndex];
+
+    if (!PaneFreqFactorIncr.stale) return;
+    tft.fillRect(PaneFreqFactorIncr.x0, PaneFreqFactorIncr.y0, PaneFreqFactorIncr.width, PaneFreqFactorIncr.height, RA8875_BLACK);
+    
+    tft.setCursor(PaneFreqFactorIncr.x0, PaneFreqFactorIncr.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print(freqIncrements[freqIncrementIndex]);
+
+    PaneFreqFactorIncr.stale = false;
+}
+
+static ModulationType omod = DCF77;
+static void DrawFreqModulationPane(void){
+    if (omod != ED.modulation[ED.activeVFO])
+        PaneFreqMod.stale = true;
+    omod = ED.modulation[ED.activeVFO];
+
+    if (!PaneFreqMod.stale) return;
+    tft.fillRect(PaneFreqMod.x0, PaneFreqMod.y0, PaneFreqMod.width, PaneFreqMod.height, RA8875_BLACK);
+    
+    tft.setCursor(PaneFreqMod.x0, PaneFreqMod.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    switch (ED.modulation[ED.activeVFO]){
+        case LSB:
+            tft.setTextColor(RA8875_RED);
+            tft.print("LSB");
+            break;
+        case USB:
+            tft.setTextColor(RA8875_RED);
+            tft.print("USB");
+            break;
+        case AM:
+            tft.setTextColor(RA8875_RED);
+            tft.print("AM");
+            break;
+        case SAM:
+            tft.setTextColor(RA8875_GREEN);
+            tft.print("SAM");
+            break;
+        default:
+            break;
+    }
+    PaneFreqMod.stale = false;
+}
+
+static float32_t ofe = -100000.0;
+static void DrawFreqErrorPane(void){
+    float32_t SAMOffset = GetSAMCarrierOffset();
+    if (ofe != SAMOffset)
+        PaneFreqError.stale = true;
+    ofe = SAMOffset;
+
+    if (!PaneFreqError.stale) return;
+    tft.fillRect(PaneFreqError.x0, PaneFreqError.y0, PaneFreqError.width, PaneFreqError.height, RA8875_BLACK);
+    char buff[20];
+    sprintf(buff,"%2.1f",SAMOffset);
+    tft.setCursor(PaneFreqError.x0, PaneFreqError.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print(buff);
+
+    PaneFreqError.stale = false;
+}
+
+static void DrawFreqInstructionsPane(void){
+    if (!PaneFreqInstructions.stale) return;
+    tft.fillRect(PaneFreqInstructions.x0, PaneFreqInstructions.y0, PaneFreqInstructions.width, PaneFreqInstructions.height, RA8875_BLACK);
+    int16_t x0 = PaneFreqInstructions.x0;
+    int16_t y0 = PaneFreqInstructions.y0;
+    
+    tft.setCursor(x0, y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print("Instructions");
+
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)0);
+    int16_t delta = 40;
+    int16_t lineD = 20;
+    tft.setCursor(x0, y0+delta);
+    tft.print("* Tune to reference signal before");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("    engaging frequency calibration.");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("* Make sure modulation is SAM.");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("* Turn filter encoder to adjust");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("    the correction factor.");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("* Press button 15 to change");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("    the increment if needed.");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print(" * Adjust until error < 1.");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print(" * Press Home to save and exit.");
+
+    PaneFreqInstructions.stale = false;
+}
+
 void DrawCalibrateFrequency(void){
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_FREQUENCY state");
@@ -24,10 +202,30 @@ void DrawCalibrateFrequency(void){
         tft.fillWindow();
         tft.writeTo(L1);
         tft.fillWindow();
+        
+        tft.setCursor(10,10);
+        tft.setFontDefault();
+        tft.setFontScale((enum RA8875tsize)1);
+        tft.print("Frequency calibration");
+
+        tft.setCursor(PaneFreqFactor.x0-tft.getFontWidth()*8,  PaneFreqFactor.y0);
+        tft.print("Factor:");
+
+        tft.setCursor(PaneFreqError.x0-tft.getFontWidth()*7,  PaneFreqError.y0);
+        tft.print("Error:");
+
+        // Mark all the panes stale to force a screen refresh
+        for (size_t i = 0; i < NUMBER_OF_FREQ_PANES; i++){
+            FreqWindowPanes[i]->stale = true;
+        }
+        
         uiSM.vars.clearScreen = false;
     }
-    tft.setCursor(10,10);
-    tft.print("Frequency calibration");
+
+    for (size_t i = 0; i < NUMBER_OF_FREQ_PANES; i++){
+        FreqWindowPanes[i]->DrawFunction();
+    }
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -303,8 +501,10 @@ static void DrawTablePane(void){
 static void DrawInstructionsPane(void){
     if (!PaneInstructions.stale) return;
     tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
-    
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0);
+    int16_t x0 = PaneInstructions.x0;
+    int16_t y0 = PaneInstructions.y0;
+
+    tft.setCursor(x0, y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
     tft.print("Instructions");
@@ -313,37 +513,37 @@ static void DrawInstructionsPane(void){
     tft.setFontScale((enum RA8875tsize)0);
     int16_t delta = 40;
     int16_t lineD = 20;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("* Press button 16 for auto.");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("* Turn the volume knob to");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("    adjust amp");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("* Turn the filter knob to");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("    adjust phase");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("* Press button 15 to change");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("    the increment");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print(" * Adjust until Delta > 60 dB");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print(" * Press Band Up or Band Down");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print("    to change to the next band.");
     delta += lineD;
-    tft.setCursor(PaneInstructions.x0, PaneInstructions.y0+delta);
+    tft.setCursor(x0, y0+delta);
     tft.print(" * Press Home to save and exit.");
 
     PaneInstructions.stale = false;

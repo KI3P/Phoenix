@@ -190,6 +190,11 @@ errno_t TXAttenuatorCreate(float32_t txAttenuation_dB){
 // Functions that are globally visible
 ///////////////////////////////////////////////////////////////////////////////
 
+void SetFrequencyCorrectionFactor(int32_t corr){
+    si5351.set_correction(corr, SI5351_PLL_INPUT_XO);
+    si5351.reset();
+}
+
 /**
  * Initialize the RX and TX attenuators. Sets up the I2C connection to the I2C
  * to GPIO chip that controls the attenuators.

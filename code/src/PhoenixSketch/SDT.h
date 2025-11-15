@@ -252,7 +252,7 @@ extern struct config_t {
     int32_t currentWPM = DEFAULT_KEYER_WPM; /** CW words per minute for keyer + decoder */
     float32_t sidetoneVolume = 20.0;/** CW transmit sidetone volume */
     int32_t freqIncrement = DEFAULTFREQINCREMENT; /** Increment value for center tune */
-    float32_t freqCorrectionFactor = 0; /** Correction value for Si5351 VFO */
+    int32_t freqCorrectionFactor = 0; /** Correction value for Si5351 VFO */
     uint8_t activeVFO = 0;          /** Which VFO is currently active (0 or 1) */
     ModulationType modulation[2] = {LSB, LSB}; /** Modulation type for each VFO */
     int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND}; /** Band for each VFO */

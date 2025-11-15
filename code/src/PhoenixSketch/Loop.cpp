@@ -960,6 +960,22 @@ void ConsumeInterrupt(void){
             break;
         } // end of calibrate RX IQ encoder interrupts
 
+        case (UISm_StateId_CALIBRATE_FREQUENCY):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncreaseFrequencyCorrectionFactor();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecreaseFrequencyCorrectionFactor();
+                    break;
+                }
+                default: // handle them later
+                    break;
+            }
+            break;
+        } // end of calibrate frequency encoder interrupts
+
         default:
             break;
     }
