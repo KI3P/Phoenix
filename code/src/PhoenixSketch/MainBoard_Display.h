@@ -250,6 +250,7 @@ void EngageRXIQAutotune(void);
 
 void IncreaseFrequencyCorrectionFactor(void);
 void DecreaseFrequencyCorrectionFactor(void);
+void ChangeFrequencyCorrectionFactorIncrement(void);
 
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;

@@ -262,6 +262,7 @@ void UpdateAudioIOState(void){
         return;
     }
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CALIBRATE_RX_IQ):
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{

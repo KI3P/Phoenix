@@ -191,8 +191,21 @@ errno_t TXAttenuatorCreate(float32_t txAttenuation_dB){
 ///////////////////////////////////////////////////////////////////////////////
 
 void SetFrequencyCorrectionFactor(int32_t corr){
-    si5351.set_correction(corr, SI5351_PLL_INPUT_XO);
+    int64_t freq = GetSSBVFOFrequency();
+    SSBVFOFreq_dHz = 0;
+
     si5351.reset();
+    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);  // KI3P July 27 2024, updated to mirror Setup()                                                                                               // MyDelay(100L);                                                                           // KI3P July 27 2024, updated to mirror Setup()
+    si5351.drive_strength(SI5351_CLK0, SI5351_DRIVE_CURRENT);                                // KI3P July 27 2024, updated to mirror Setup()
+    si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_CURRENT);                                // KI3P July 27 2024, updated to mirror Setup()
+    si5351.drive_strength(SI5351_CLK2, SI5351_DRIVE_CURRENT);                                // KF5N July 10 2023
+    si5351.set_ms_source(SI5351_CLK0, SI5351_PLLA);                                          // KI3P July 27 2024, updated to mirror Setup()
+    si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
+    si5351.output_enable(SI5351_CLK2, 0);  // KI3P July 27 2024, updated to mirror Setup()
+    SetSSBVFOFrequency(freq*100);
+    SetSSBVFOFrequency((freq+5000000)*100);
+    SetSSBVFOFrequency(freq*100);
+    
 }
 
 /**
@@ -406,7 +419,6 @@ int32_t EvenDivisor(int64_t freq2_Hz) {
 void SetSSBVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == SSBVFOFreq_dHz) return;
-
     SSBVFOFreq_dHz = frequency_dHz;
     int64_t Clk1SetFreq = frequency_dHz;
     multiple = EvenDivisor(Clk1SetFreq / SI5351_FREQ_MULT);

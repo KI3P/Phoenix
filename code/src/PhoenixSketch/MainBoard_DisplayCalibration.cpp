@@ -31,7 +31,7 @@ static Pane PaneFreqPlot =   {3,95,517,150,DrawFreqPlotPane,1};
 static Pane PaneFreqFactor = {140,270,120,40,DrawFreqFactorPane,1};
 static Pane PaneFreqFactorIncr = {140,330,120,40,DrawFreqFactorIncrPane,1};
 static Pane PaneFreqError =  {390,270,120,40,DrawFreqErrorPane,1};
-static Pane PaneFreqMod =    {390,270,120,40,DrawFreqModulationPane,1};
+static Pane PaneFreqMod =    {390,330,120,40,DrawFreqModulationPane,1};
 static Pane PaneFreqInstructions = {537,7,260,470,DrawFreqInstructionsPane,1};
 
 // Array of all panes for iteration
@@ -55,6 +55,7 @@ static void DrawFreqFactorPane(void){
     tft.setCursor(PaneFreqFactor.x0, PaneFreqFactor.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
     tft.print(ED.freqCorrectionFactor);
 
     PaneFreqFactor.stale = false;
@@ -91,6 +92,7 @@ static void DrawFreqFactorIncrPane(void){
     tft.setCursor(PaneFreqFactorIncr.x0, PaneFreqFactorIncr.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
     tft.print(freqIncrements[freqIncrementIndex]);
 
     PaneFreqFactorIncr.stale = false;
@@ -145,6 +147,7 @@ static void DrawFreqErrorPane(void){
     tft.setCursor(PaneFreqError.x0, PaneFreqError.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
     tft.print(buff);
 
     PaneFreqError.stale = false;
@@ -159,6 +162,7 @@ static void DrawFreqInstructionsPane(void){
     tft.setCursor(x0, y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
     tft.print("Instructions");
 
     tft.setFontDefault();
@@ -169,7 +173,7 @@ static void DrawFreqInstructionsPane(void){
     tft.print("* Tune to reference signal before");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    engaging frequency calibration.");
+    tft.print("    engaging this calibration.");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     tft.print("* Make sure modulation is SAM.");
@@ -211,8 +215,12 @@ void DrawCalibrateFrequency(void){
         tft.setCursor(PaneFreqFactor.x0-tft.getFontWidth()*8,  PaneFreqFactor.y0);
         tft.print("Factor:");
 
+        tft.setCursor(PaneFreqFactorIncr.x0-tft.getFontWidth()*7,  PaneFreqFactorIncr.y0);
+        tft.print("Incr.:");
+
         tft.setCursor(PaneFreqError.x0-tft.getFontWidth()*7,  PaneFreqError.y0);
         tft.print("Error:");
+
 
         // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_FREQ_PANES; i++){

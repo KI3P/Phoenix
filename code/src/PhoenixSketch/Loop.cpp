@@ -612,7 +612,22 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (button){
                 case HOME_SCREEN:{
+                    SaveDataToStorage();
                     SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                case DEMODULATION:{
+                    // Rotate through the modulation types USB(0), LSB(1), AM(2), and SAM(3)
+                    int8_t newmod = (int8_t)ED.modulation[ED.activeVFO] + 1;
+                    if (newmod > (int8_t)SAM)
+                        newmod = (int8_t)USB;
+                    ED.modulation[ED.activeVFO] = (ModulationType)newmod;
+                    UpdateFIRFilterMask(&RXfilters);
+                    Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
+                    break;
+                }
+                case 15:{
+                    ChangeFrequencyCorrectionFactorIncrement();
                     break;
                 }
                 default:

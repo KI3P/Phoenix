@@ -384,7 +384,7 @@ void DrawSAMOffsetPane(void){
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
     tft.setCursor(PaneSAMOffset.x0,PaneSAMOffset.y0);
-    tft.print("SAM: ");
+    tft.print("Err: ");
     tft.setTextColor(RA8875_LIGHT_ORANGE);
     char buff[10];
     sprintf(buff,"%2.1f",SAMoff);
