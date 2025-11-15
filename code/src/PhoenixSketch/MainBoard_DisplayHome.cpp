@@ -41,41 +41,43 @@ int64_t GetUpperFreq_Hz();
 // PANE DEFINITIONS (HOME SCREEN SPECIFIC)
 ///////////////////////////////////////////////////////////////////////////////
 
-static const int8_t NUMBER_OF_PANES = 12;
+static const int8_t NUMBER_OF_PANES = 13;
 
 // Forward declarations for pane drawing functions (implemented below in this file)
-void DrawVFOPanes(void);
-void DrawFreqBandModPane(void);
-void DrawSpectrumPane(void);
-void DrawStateOfHealthPane(void);
-void DrawTimePane(void);
-void DrawSWRPane(void);
-void DrawTXRXStatusPane(void);
-void DrawSMeterPane(void);
-void DrawAudioSpectrumPane(void);
-void DrawSettingsPane(void);
-void DrawNameBadgePane(void);
+static void DrawVFOPanes(void);
+static void DrawFreqBandModPane(void);
+static void DrawSpectrumPane(void);
+static void DrawStateOfHealthPane(void);
+static void DrawTimePane(void);
+static void DrawSWRPane(void);
+static void DrawTXRXStatusPane(void);
+static void DrawSMeterPane(void);
+static void DrawAudioSpectrumPane(void);
+static void DrawSettingsPane(void);
+static void DrawNameBadgePane(void);
+static void DrawSAMOffsetPane(void);
 
 // Pane instances
-Pane PaneVFOA =        {5,5,280,50,DrawVFOPanes,1};
-Pane PaneVFOB =        {300,5,220,40,DrawVFOPanes,1};
-Pane PaneFreqBandMod = {5,60,310,30,DrawFreqBandModPane,1};
-Pane PaneSpectrum =    {5,95,520,345,DrawSpectrumPane,1};
-Pane PaneStateOfHealth={5,445,260,30,DrawStateOfHealthPane,1};
-Pane PaneTime =        {270,445,260,30,DrawTimePane,1};
-Pane PaneSWR =         {535,15,150,40,DrawSWRPane,1};
-Pane PaneTXRXStatus =  {710,20,60,30,DrawTXRXStatusPane,1};
-Pane PaneSMeter =      {515,60,260,50,DrawSMeterPane,1};
-Pane PaneAudioSpectrum={535,115,260,150,DrawAudioSpectrumPane,1};
-Pane PaneSettings =    {535,270,260,170,DrawSettingsPane,1};
-Pane PaneNameBadge =   {535,445,260,30,DrawNameBadgePane,1};
+static Pane PaneVFOA =        {5,5,280,50,DrawVFOPanes,1};
+static Pane PaneVFOB =        {300,5,220,40,DrawVFOPanes,1};
+static Pane PaneFreqBandMod = {5,60,310,30,DrawFreqBandModPane,1};
+Pane PaneSpectrum =    {5,95,520,345,DrawSpectrumPane,1}; // this one is updated by menus
+static Pane PaneStateOfHealth={5,445,260,30,DrawStateOfHealthPane,1};
+static Pane PaneTime =        {270,445,260,30,DrawTimePane,1};
+static Pane PaneSWR =         {535,15,150,40,DrawSWRPane,1};
+static Pane PaneTXRXStatus =  {710,20,60,30,DrawTXRXStatusPane,1};
+static Pane PaneSMeter =      {515,60,260,50,DrawSMeterPane,1};
+static Pane PaneAudioSpectrum={535,115,260,150,DrawAudioSpectrumPane,1};
+static Pane PaneSettings =    {535,270,260,170,DrawSettingsPane,1};
+static Pane PaneNameBadge =   {535,445,260,30,DrawNameBadgePane,1};
+static Pane PaneSAMOffset =   {320,60,180,30,DrawSAMOffsetPane,1};
 
 // Array of all panes for iteration
-Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMod,
+static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMod,
                                     &PaneSpectrum,&PaneStateOfHealth,
                                     &PaneTime,&PaneSWR,&PaneTXRXStatus,
                                     &PaneSMeter,&PaneAudioSpectrum,&PaneSettings,
-                                    &PaneNameBadge};
+                                    &PaneNameBadge, &PaneSAMOffset};
 
 ///////////////////////////////////////////////////////////////////////////////
 // DISPLAY SCALE AND COLOR STRUCTURES (HOME SCREEN SPECIFIC)
@@ -359,6 +361,36 @@ void DrawFreqBandModPane(void) {
     }
 
     PaneFreqBandMod.stale = false;
+}
+
+static float32_t ooff = 0.0;
+
+void DrawSAMOffsetPane(void){
+    if (ED.modulation[ED.activeVFO] != SAM){
+        tft.fillRect(PaneSAMOffset.x0, PaneSAMOffset.y0, PaneSAMOffset.width, PaneSAMOffset.height, RA8875_BLACK);
+        return;
+    }
+    float32_t SAMoff = GetSAMCarrierOffset();
+    if (ooff != SAMoff){
+        PaneSAMOffset.stale = true;
+    }
+    if (!PaneSAMOffset.stale) return;
+
+    ooff = SAMoff;
+
+    tft.setFontDefault();
+    tft.fillRect(PaneSAMOffset.x0, PaneSAMOffset.y0, PaneSAMOffset.width, PaneSAMOffset.height, RA8875_BLACK);
+
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(RA8875_WHITE);
+    tft.setCursor(PaneSAMOffset.x0,PaneSAMOffset.y0);
+    tft.print("SAM: ");
+    tft.setTextColor(RA8875_LIGHT_ORANGE);
+    char buff[10];
+    sprintf(buff,"%2.1f",SAMoff);
+    tft.print(SAMoff);
+
+    PaneSAMOffset.stale = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

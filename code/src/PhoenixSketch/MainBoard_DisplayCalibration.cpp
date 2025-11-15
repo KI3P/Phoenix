@@ -13,6 +13,10 @@
 // External references to objects defined in MainBoard_Display.cpp
 extern RA8875 tft;
 
+///////////////////////////////////////////////////////////////////////////////
+// Frequency calibration section
+///////////////////////////////////////////////////////////////////////////////
+
 void DrawCalibrateFrequency(void){
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_FREQUENCY state");
@@ -297,10 +301,6 @@ static void DrawTablePane(void){
 }
 
 static void DrawInstructionsPane(void){
-    //if (stalecondition)
-    //    PaneInstructions.stale = true;
-    //update stalecondition
-
     if (!PaneInstructions.stale) return;
     tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
     
@@ -511,6 +511,8 @@ void DrawCalibrateRXIQ(void){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Transmit IQ calibration section
+///////////////////////////////////////////////////////////////////////////////
 
 void DrawCalibrateTXIQ(void){
     if (uiSM.vars.clearScreen){
@@ -524,6 +526,10 @@ void DrawCalibrateTXIQ(void){
     tft.setCursor(10,10);
     tft.print("Transmit IQ calibration");
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Power calibration section
+///////////////////////////////////////////////////////////////////////////////
 
 void DrawCalibratePower(void){
     if (uiSM.vars.clearScreen){
