@@ -266,6 +266,7 @@ void UpdateAudioIOState(void){
     }
     switch (modeSM.state_id){
         case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
+            Debug("Audio TX IQ SPACE");
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CALIBRATE_RX_IQ):
         case (ModeSm_StateId_CW_RECEIVE):
@@ -315,6 +316,7 @@ void UpdateAudioIOState(void){
             break;
         }            
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
+            Debug("Audio TX IQ MARK");
             // IQ from receive stops
             Q_in_L.end(); 
             Q_in_R.end();
@@ -516,8 +518,8 @@ void InitializeAudio(void){
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
 
     // The transmit IQ cal oscillator. Only used during the TXIQ calibration state
-    transmitIQcal_oscillator.amplitude(0.5);
-    transmitIQcal_oscillator.frequency(750);
+    transmitIQcal_oscillator.amplitude(20.0/500);
+    transmitIQcal_oscillator.frequency(200); // 800 Hz
 
     // Warm up the audio I/O to clear initialization issues
     WarmUpAudioIO();

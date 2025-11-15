@@ -785,7 +785,7 @@ static void DrawTXIQStatus(void){
             break;
     }
     tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneTXIQStatus.x0-tft.getFontWidth()*1,PaneTXIQStatus.y0);
+    tft.setCursor(PaneTXIQStatus.x0-tft.getFontWidth()*10,PaneTXIQStatus.y0);
     tft.print("Transmit:");
 
     PaneTXIQStatus.stale = false;

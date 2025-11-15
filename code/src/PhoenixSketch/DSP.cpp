@@ -18,6 +18,7 @@ void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
  */
 void PerformSignalProcessing(void){
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CALIBRATE_RX_IQ):
         case (ModeSm_StateId_SSB_RECEIVE):
@@ -25,6 +26,7 @@ void PerformSignalProcessing(void){
             ReceiveProcessing(nullptr);
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
             break;
@@ -862,6 +864,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 errno_t ReadMicrophoneBuffer(DataBlock *data){
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
+        Debug('r');
         // get audio samples from the audio  buffers and convert them to float
         // read in 32 blocks á 128 samples in I and Q
         for (unsigned i = 0; i < N_BLOCKS_EX; i++) {

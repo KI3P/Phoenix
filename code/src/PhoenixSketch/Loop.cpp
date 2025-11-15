@@ -421,6 +421,8 @@ void HandleButtonPress(int32_t button){
                         ED.spectrum_zoom = SPECTRUM_ZOOM_MIN;
                     Debug("Zoom is x" + String(1<<ED.spectrum_zoom));
                     ZoomFFTPrep(ED.spectrum_zoom, &RXfilters);
+                    ResetTuning();
+                    UpdateRFHardwareState();
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
