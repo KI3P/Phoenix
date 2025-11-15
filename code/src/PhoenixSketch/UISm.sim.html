@@ -264,12 +264,6 @@ FREQ_ENTRY : FREQ_ENTRY
 
 FREQ_ENTRY : enter / #123; clearScreen = true#59; #125;
 
-CALIBRATE_TX_IQ
-
-CALIBRATE_TX_IQ : CALIBRATE_TX_IQ
-
-CALIBRATE_TX_IQ : enter / #123; clearScreen = true#59; #125;
-
 CALIBRATE_FREQUENCY
 
 CALIBRATE_FREQUENCY : CALIBRATE_FREQUENCY
@@ -281,6 +275,12 @@ CALIBRATE_POWER
 CALIBRATE_POWER : CALIBRATE_POWER
 
 CALIBRATE_POWER : enter / #123; clearScreen = true#59; #125;
+
+CALIBRATE_TX_IQ
+
+CALIBRATE_TX_IQ : CALIBRATE_TX_IQ
+
+CALIBRATE_TX_IQ : enter / #123; clearScreen = true#59; #125;
 
 ROOT.(InitialState) --> SPLASH
 
@@ -314,11 +314,11 @@ UPDATE --> HOME : SELECT
 
 FREQ_ENTRY --> HOME : HOME
 
-CALIBRATE_TX_IQ --> HOME : HOME
-
 CALIBRATE_FREQUENCY --> HOME : HOME
 
 CALIBRATE_POWER --> HOME : HOME
+
+CALIBRATE_TX_IQ --> HOME : HOME
 
 
 
@@ -615,13 +615,13 @@ evaluateGuard = null;
     #CALIBRATE_FREQUENCY_home()
     {
         // CALIBRATE_FREQUENCY behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge17"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge16"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#CALIBRATE_FREQUENCY_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
-            this.tracer?.edgeTransition("edge17");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
+            this.tracer?.edgeTransition("edge16");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -672,13 +672,13 @@ evaluateGuard = null;
     #CALIBRATE_POWER_home()
     {
         // CALIBRATE_POWER behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge18"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge17"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#CALIBRATE_POWER_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
-            this.tracer?.edgeTransition("edge18");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
+            this.tracer?.edgeTransition("edge17");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();
@@ -786,13 +786,13 @@ evaluateGuard = null;
     #CALIBRATE_TX_IQ_home()
     {
         // CALIBRATE_TX_IQ behavior
-        // uml: HOME / { this.tracer?.edgeTransition("edge16"); } TransitionTo(HOME)
+        // uml: HOME / { this.tracer?.edgeTransition("edge18"); } TransitionTo(HOME)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#CALIBRATE_TX_IQ_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
-            this.tracer?.edgeTransition("edge16");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
+            this.tracer?.edgeTransition("edge18");
             
             // Step 3: Enter/move towards transition target `HOME`.
             this.#HOME_enter();

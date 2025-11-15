@@ -330,7 +330,19 @@
           <mxGeometry x="319" y="57.5" width="102" height="30" as="geometry" />
         </mxCell>
         <mxCell id="-2MgG9_aXoin8dcswRTu-2" value="PaneAtt: 310,50,120,40" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" vertex="1" parent="veVaUOBJOEzrP6U5T5R9-1">
-          <mxGeometry x="400" y="92.5" width="110" height="50" as="geometry" />
+          <mxGeometry x="415" y="75" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="-2MgG9_aXoin8dcswRTu-3" value="Transmit:" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Courier New;fontSize=27;fontStyle=1;align=left;dashed=1;" vertex="1" parent="veVaUOBJOEzrP6U5T5R9-1">
+          <mxGeometry x="160" y="130" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="-2MgG9_aXoin8dcswRTu-4" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="veVaUOBJOEzrP6U5T5R9-1">
+          <mxGeometry x="310" y="125" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="-2MgG9_aXoin8dcswRTu-5" value="Off" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Courier New;fontSize=27;fontStyle=1;align=left;dashed=1;" vertex="1" parent="veVaUOBJOEzrP6U5T5R9-1">
+          <mxGeometry x="318" y="130" width="102" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="-2MgG9_aXoin8dcswRTu-6" value="PaneStatus: 310,130,120,40" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" vertex="1" parent="veVaUOBJOEzrP6U5T5R9-1">
+          <mxGeometry x="415" y="140" width="110" height="50" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

@@ -370,7 +370,7 @@ void StartRXIQCal(void){
 }
 
 void StartTXIQCal(void){
-    SetInterrupt(iCALIBRATE_TX_IQ);      
+    SetInterrupt(iCALIBRATE_TX_IQ); 
 }
 
 void StartPowerCal(void){

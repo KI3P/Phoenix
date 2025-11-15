@@ -491,7 +491,7 @@ TEST(Loop, CalibrationTXIQTransition){
 
     // Trigger calibration TX IQ mode
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
 }
 
 TEST(Loop, CalibrationSSBPATransition){

@@ -45,11 +45,19 @@ static void CALIBRATE_SSB_PA_exit(ModeSm* sm);
 
 static void CALIBRATE_SSB_PA_calibrate_exit(ModeSm* sm);
 
-static void CALIBRATE_TX_IQ_enter(ModeSm* sm);
+static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm);
 
-static void CALIBRATE_TX_IQ_exit(ModeSm* sm);
+static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm);
 
-static void CALIBRATE_TX_IQ_calibrate_exit(ModeSm* sm);
+static void CALIBRATE_TX_IQ_MARK_ptt_released(ModeSm* sm);
+
+static void CALIBRATE_TX_IQ_SPACE_enter(ModeSm* sm);
+
+static void CALIBRATE_TX_IQ_SPACE_exit(ModeSm* sm);
+
+static void CALIBRATE_TX_IQ_SPACE_calibrate_exit(ModeSm* sm);
+
+static void CALIBRATE_TX_IQ_SPACE_ptt_pressed(ModeSm* sm);
 
 static void NORMAL_STATES_enter(ModeSm* sm);
 
@@ -231,11 +239,22 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             }
             break;
         
-        // STATE: CALIBRATE_TX_IQ
-        case ModeSm_StateId_CALIBRATE_TX_IQ:
+        // STATE: CALIBRATE_TX_IQ_MARK
+        case ModeSm_StateId_CALIBRATE_TX_IQ_MARK:
             switch (event_id)
             {
-                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_TX_IQ_calibrate_exit(sm); break;
+                case ModeSm_EventId_PTT_RELEASED: CALIBRATE_TX_IQ_MARK_ptt_released(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: CALIBRATE_TX_IQ_SPACE
+        case ModeSm_StateId_CALIBRATE_TX_IQ_SPACE:
+            switch (event_id)
+            {
+                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_TX_IQ_SPACE_calibrate_exit(sm); break;
+                case ModeSm_EventId_PTT_PRESSED: CALIBRATE_TX_IQ_SPACE_ptt_pressed(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -419,7 +438,9 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state)
             
             case ModeSm_StateId_CALIBRATE_SSB_PA: CALIBRATE_SSB_PA_exit(sm); break;
             
-            case ModeSm_StateId_CALIBRATE_TX_IQ: CALIBRATE_TX_IQ_exit(sm); break;
+            case ModeSm_StateId_CALIBRATE_TX_IQ_MARK: CALIBRATE_TX_IQ_MARK_exit(sm); break;
+            
+            case ModeSm_StateId_CALIBRATE_TX_IQ_SPACE: CALIBRATE_TX_IQ_SPACE_exit(sm); break;
             
             case ModeSm_StateId_NORMAL_STATES: NORMAL_STATES_exit(sm); break;
             
@@ -692,40 +713,89 @@ static void CALIBRATE_SSB_PA_calibrate_exit(ModeSm* sm)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// event handlers for state CALIBRATE_TX_IQ
+// event handlers for state CALIBRATE_TX_IQ_MARK
 ////////////////////////////////////////////////////////////////////////////////
 
-static void CALIBRATE_TX_IQ_enter(ModeSm* sm)
+static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm)
 {
-    sm->state_id = ModeSm_StateId_CALIBRATE_TX_IQ;
+    sm->state_id = ModeSm_StateId_CALIBRATE_TX_IQ_MARK;
     
-    // CALIBRATE_TX_IQ behavior
+    // CALIBRATE_TX_IQ_MARK behavior
     // uml: enter / { CalibrateTXIQEnter(); }
     {
         // Step 1: execute action `CalibrateTXIQEnter();`
         CalibrateTXIQEnter();
-    } // end of behavior for CALIBRATE_TX_IQ
+    } // end of behavior for CALIBRATE_TX_IQ_MARK
 }
 
-static void CALIBRATE_TX_IQ_exit(ModeSm* sm)
+static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm)
 {
-    // CALIBRATE_TX_IQ behavior
+    // CALIBRATE_TX_IQ_MARK behavior
     // uml: exit / { CalibrateTXIQExit(); }
     {
         // Step 1: execute action `CalibrateTXIQExit();`
         CalibrateTXIQExit();
-    } // end of behavior for CALIBRATE_TX_IQ
+    } // end of behavior for CALIBRATE_TX_IQ_MARK
     
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
-static void CALIBRATE_TX_IQ_calibrate_exit(ModeSm* sm)
+static void CALIBRATE_TX_IQ_MARK_ptt_released(ModeSm* sm)
 {
-    // CALIBRATE_TX_IQ behavior
+    // CALIBRATE_TX_IQ_MARK behavior
+    // uml: PTT_RELEASED TransitionTo(CALIBRATE_TX_IQ_SPACE)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_TX_IQ_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ_SPACE`.
+        CALIBRATE_TX_IQ_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_TX_IQ_MARK
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state CALIBRATE_TX_IQ_SPACE
+////////////////////////////////////////////////////////////////////////////////
+
+static void CALIBRATE_TX_IQ_SPACE_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_CALIBRATE_TX_IQ_SPACE;
+    
+    // CALIBRATE_TX_IQ_SPACE behavior
+    // uml: enter / { CalibrateTXIQEnter(); }
+    {
+        // Step 1: execute action `CalibrateTXIQEnter();`
+        CalibrateTXIQEnter();
+    } // end of behavior for CALIBRATE_TX_IQ_SPACE
+}
+
+static void CALIBRATE_TX_IQ_SPACE_exit(ModeSm* sm)
+{
+    // CALIBRATE_TX_IQ_SPACE behavior
+    // uml: exit / { CalibrateTXIQExit(); }
+    {
+        // Step 1: execute action `CalibrateTXIQExit();`
+        CalibrateTXIQExit();
+    } // end of behavior for CALIBRATE_TX_IQ_SPACE
+    
+    sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
+}
+
+static void CALIBRATE_TX_IQ_SPACE_calibrate_exit(ModeSm* sm)
+{
+    // CALIBRATE_TX_IQ_SPACE behavior
     // uml: CALIBRATE_EXIT TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
     {
         // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
-        CALIBRATE_TX_IQ_exit(sm);
+        CALIBRATE_TX_IQ_SPACE_exit(sm);
         
         // Step 2: Transition action: ``.
         
@@ -735,7 +805,27 @@ static void CALIBRATE_TX_IQ_calibrate_exit(ModeSm* sm)
         // Finish transition by calling pseudo state transition function.
         CALIBRATION_STATES_ExitPoint_done__transition(sm);
         return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
-    } // end of behavior for CALIBRATE_TX_IQ
+    } // end of behavior for CALIBRATE_TX_IQ_SPACE
+    
+    // No ancestor handles this event.
+}
+
+static void CALIBRATE_TX_IQ_SPACE_ptt_pressed(ModeSm* sm)
+{
+    // CALIBRATE_TX_IQ_SPACE behavior
+    // uml: PTT_PRESSED TransitionTo(CALIBRATE_TX_IQ_MARK)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_TX_IQ_SPACE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ_MARK`.
+        CALIBRATE_TX_IQ_MARK_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_TX_IQ_SPACE
     
     // No ancestor handles this event.
 }
@@ -842,16 +932,16 @@ static void NORMAL_STATES_calibrate_ssb_pa(ModeSm* sm)
 static void NORMAL_STATES_calibrate_tx_iq(ModeSm* sm)
 {
     // NORMAL_STATES behavior
-    // uml: CALIBRATE_TX_IQ TransitionTo(CALIBRATE_TX_IQ)
+    // uml: CALIBRATE_TX_IQ TransitionTo(CALIBRATE_TX_IQ_SPACE)
     {
         // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
         exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
         
         // Step 2: Transition action: ``.
         
-        // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ`.
+        // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ_SPACE`.
         CALIBRATION_STATES_enter(sm);
-        CALIBRATE_TX_IQ_enter(sm);
+        CALIBRATE_TX_IQ_SPACE_enter(sm);
         
         // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
         return;
@@ -1546,7 +1636,8 @@ char const * ModeSm_state_id_to_string(ModeSm_StateId id)
         case ModeSm_StateId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
         case ModeSm_StateId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
         case ModeSm_StateId_CALIBRATE_SSB_PA: return "CALIBRATE_SSB_PA";
-        case ModeSm_StateId_CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
+        case ModeSm_StateId_CALIBRATE_TX_IQ_MARK: return "CALIBRATE_TX_IQ_MARK";
+        case ModeSm_StateId_CALIBRATE_TX_IQ_SPACE: return "CALIBRATE_TX_IQ_SPACE";
         case ModeSm_StateId_NORMAL_STATES: return "NORMAL_STATES";
         case ModeSm_StateId_CW_RECEIVE: return "CW_RECEIVE";
         case ModeSm_StateId_CW_TRANSMIT_DAH_MARK: return "CW_TRANSMIT_DAH_MARK";

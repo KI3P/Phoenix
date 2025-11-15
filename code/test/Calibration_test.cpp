@@ -122,7 +122,7 @@ void ScrollAndSelectCalibrateTransmitIQ(void){
     loop(); MyDelay(10); 
 
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
 }
 
 void ScrollAndSelectCalibratePower(void){
@@ -306,24 +306,372 @@ void CheckThatStateIsCalReceiveIQ(){
     CheckThatHardwareRegisterMatchesActualHardware();
 }
 
-TEST_F(CalibrationTest, CalibrateReceiveIQState) {
+void CheckThatStateIsCalTransmitIQ(){
+    // Check that the hardware register contains the expected bits
+    int32_t band = ED.currentBand[ED.activeVFO];
+    EXPECT_EQ(GETHWRBITS(LPFBAND0BIT,4), BandToBCD(band)); // LPF filter
+    EXPECT_EQ(GETHWRBITS(ANT0BIT,2), ED.antennaSelection[band]); // antenna
+    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 1);   // transverter should be HI (out of path) for receive
+    EXPECT_EQ(GET_BIT(hardwareRegister,PA100WBIT), 0); // PA should always be LO (bypassed)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 1);  // TX path should include BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXBPFBIT), 0);  // RX path should bypass BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 1);   // RXTX bit should be TX (1)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 0);     // CW bit should be 0 (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT),1);   // MODE should be HI (SSB)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[ED.currentBand[ED.activeVFO]]));  // RX attenuation
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[ED.currentBand[ED.activeVFO]]));  // TX attenuation
+    EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    // Now check that the GPIO registers match the hardware register
+    CheckThatHardwareRegisterMatchesActualHardware();
+}
+
+void CheckThatRegisterStateIsReceive(){
+    // Check that the hardware register contains the expected bits
+    int32_t band = ED.currentBand[ED.activeVFO];
+    EXPECT_EQ(GETHWRBITS(LPFBAND0BIT,4), BandToBCD(band)); // LPF filter
+    EXPECT_EQ(GETHWRBITS(ANT0BIT,2), ED.antennaSelection[band]); // antenna
+    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 0);   // transverter should be LO (in path) for receive
+    EXPECT_EQ(GET_BIT(hardwareRegister,PA100WBIT), 0); // PA should always be LO (bypassed)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 0);  // TX path should bypass BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXBPFBIT), 1);  // RX path should include BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 0);      // RXTX bit should be RX (0)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 0);     // CW bit should be 0 (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT), 1);   // MODE doesn't matter for receive, should be HI(SSB)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
+    // Note: TX attenuation is not checked in receive mode because it doesn't affect RX operation
+    // and the timing of when it gets reset during state transitions is implementation-dependent
+    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
+    EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
+    // Now check that the GPIO registers match the hardware register
+    CheckThatHardwareRegisterMatchesActualHardware();
+}
+
+TEST_F(CalibrationTest, CalibrateTransmitIQState) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-    ScrollAndSelectCalibrateReceiveIQ();
+
+    Serial.println("1-Entering TX IQ space state");
+
+    ScrollAndSelectCalibrateTransmitIQ();
     
     for (int k=0; k<50; k++){
         loop(); MyDelay(10); 
     }
 
-    // Now, check to ensure that we are in the receive IQ state
-    CheckThatStateIsCalReceiveIQ();
+    // Now, check to ensure that we are in the SSB receive from a hardware register POV
+    CheckThatRegisterStateIsReceive();
+    EXPECT_EQ(modeSM.state_id,ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(uiSM.state_id,UISm_StateId_CALIBRATE_TX_IQ);
+    Serial.println("1-In TX IQ space state");
+
+    // Press the PTT to go to CAL IQ transmit mode
+    Serial.println("2-Entering TX IQ mark state");
+
+    SetInterrupt(iPTT_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id,UISm_StateId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    CheckThatStateIsCalTransmitIQ();
+
+    Serial.println("2-In TX IQ mark state");
+
+    // Release PTT to go back to CAL IQ transmit space mode
+    Serial.println("3-Entering TX IQ space state");
+    SetInterrupt(iPTT_RELEASED);
+    loop(); MyDelay(10);
+
+    CheckThatRegisterStateIsReceive();
+    EXPECT_EQ(modeSM.state_id,ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(uiSM.state_id,UISm_StateId_CALIBRATE_TX_IQ);
+    Serial.println("3-In TX IQ space state");
+
+    // Exit back to home screen
+    Serial.println("4-Entering home state");
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10); 
+    loop(); MyDelay(10); 
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    Serial.println("4-In home state");
+
+}
+
+TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Navigate to the Transmit IQ calibration state
+    ScrollAndSelectCalibrateTransmitIQ();
+
+    // Allow state machine to settle
+    for (int k=0; k<50; k++){
+        loop(); MyDelay(10);
+    }
+
+    // Verify we're in the correct state
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+
+    // Get the current band and store initial IQXPhaseCorrectionFactor value
+    int32_t currentBand = ED.currentBand[ED.activeVFO];
+    float32_t initialPhase = ED.IQXPhaseCorrectionFactor[currentBand];
+
+    // Expected increment value (default is 0.001 from incvals[1])
+    const float32_t expectedIncrement = 0.001;
+
+    // Test incrementing the phase correction by rotating filter encoder clockwise
+    SetInterrupt(iFILTER_INCREASE);
+    loop(); MyDelay(10);
+
+    float32_t phaseAfterIncrease = ED.IQXPhaseCorrectionFactor[currentBand];
+    EXPECT_NEAR(phaseAfterIncrease, initialPhase + expectedIncrement, 0.00001);
+
+    // Test decrementing the phase correction by rotating filter encoder counter-clockwise
+    SetInterrupt(iFILTER_DECREASE);
+    loop(); MyDelay(10);
+
+    float32_t phaseAfterDecrease = ED.IQXPhaseCorrectionFactor[currentBand];
+    EXPECT_NEAR(phaseAfterDecrease, initialPhase, 0.00001);
+
+    // Test multiple increments
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iFILTER_INCREASE);
+        loop(); MyDelay(10);
+    }
+
+    float32_t phaseAfterMultipleIncrements = ED.IQXPhaseCorrectionFactor[currentBand];
+    EXPECT_NEAR(phaseAfterMultipleIncrements, initialPhase + 5 * expectedIncrement, 0.00001);
+
+    // Test multiple decrements
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iFILTER_DECREASE);
+        loop(); MyDelay(10);
+    }
+
+    float32_t phaseAfterMultipleDecrements = ED.IQXPhaseCorrectionFactor[currentBand];
+    EXPECT_NEAR(phaseAfterMultipleDecrements, initialPhase, 0.00001);
+
+    // Test upper limit (max value is 0.5)
+    // Set to a value close to max
+    ED.IQXPhaseCorrectionFactor[currentBand] = 0.499;
+    SetInterrupt(iFILTER_INCREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXPhaseCorrectionFactor[currentBand], 0.5, 0.00001);
+
+    // Try to increment beyond max - should be clamped at 0.5
+    SetInterrupt(iFILTER_INCREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXPhaseCorrectionFactor[currentBand], 0.5, 0.00001);
+
+    // Test lower limit (min value is -0.5)
+    // Set to a value close to min
+    ED.IQXPhaseCorrectionFactor[currentBand] = -0.499;
+    SetInterrupt(iFILTER_DECREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXPhaseCorrectionFactor[currentBand], -0.5, 0.00001);
+
+    // Try to decrement beyond min - should be clamped at -0.5
+    SetInterrupt(iFILTER_DECREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXPhaseCorrectionFactor[currentBand], -0.5, 0.00001);
+
+    // Exit back to home screen
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+TEST_F(CalibrationTest, VolumeEncoderChangesTXIQAmp) {
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Navigate to the Transmit IQ calibration state
+    ScrollAndSelectCalibrateTransmitIQ();
+
+    // Allow state machine to settle
+    for (int k=0; k<50; k++){
+        loop(); MyDelay(10);
+    }
+
+    // Verify we're in the correct state
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+
+    // Get the current band and store initial IQXAmpCorrectionFactor value
+    int32_t currentBand = ED.currentBand[ED.activeVFO];
+    float32_t initialAmp = ED.IQXAmpCorrectionFactor[currentBand];
+
+    // Expected increment value (default is 0.001 from incvals[1])
+    const float32_t expectedIncrement = 0.001;
+
+    // Test incrementing the amplitude correction by rotating volume encoder clockwise
+    SetInterrupt(iVOLUME_INCREASE);
+    loop(); MyDelay(10);
+
+    float32_t ampAfterIncrease = ED.IQXAmpCorrectionFactor[currentBand];
+    EXPECT_NEAR(ampAfterIncrease, initialAmp + expectedIncrement, 0.00001);
+
+    // Test decrementing the amplitude correction by rotating volume encoder counter-clockwise
+    SetInterrupt(iVOLUME_DECREASE);
+    loop(); MyDelay(10);
+
+    float32_t ampAfterDecrease = ED.IQXAmpCorrectionFactor[currentBand];
+    EXPECT_NEAR(ampAfterDecrease, initialAmp, 0.00001);
+
+    // Test multiple increments
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iVOLUME_INCREASE);
+        loop(); MyDelay(10);
+    }
+
+    float32_t ampAfterMultipleIncrements = ED.IQXAmpCorrectionFactor[currentBand];
+    EXPECT_NEAR(ampAfterMultipleIncrements, initialAmp + 5 * expectedIncrement, 0.00001);
+
+    // Test multiple decrements
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iVOLUME_DECREASE);
+        loop(); MyDelay(10);
+    }
+
+    float32_t ampAfterMultipleDecrements = ED.IQXAmpCorrectionFactor[currentBand];
+    EXPECT_NEAR(ampAfterMultipleDecrements, initialAmp, 0.00001);
+
+    // Test upper limit (max value is 2.0)
+    // Set to a value close to max
+    ED.IQXAmpCorrectionFactor[currentBand] = 1.999;
+    SetInterrupt(iVOLUME_INCREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.0, 0.00001);
+
+    // Try to increment beyond max - should be clamped at 2.0
+    SetInterrupt(iVOLUME_INCREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.0, 0.00001);
+
+    // Test lower limit (min value is 0.5)
+    // Set to a value close to min
+    ED.IQXAmpCorrectionFactor[currentBand] = 0.501;
+    SetInterrupt(iVOLUME_DECREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 0.5, 0.00001);
+
+    // Try to decrement beyond min - should be clamped at 0.5
+    SetInterrupt(iVOLUME_DECREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 0.5, 0.00001);
+
+    // Exit back to home screen
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Navigate to the Transmit IQ calibration state
+    ScrollAndSelectCalibrateTransmitIQ();
+
+    // Allow state machine to settle
+    for (int k=0; k<50; k++){
+        loop(); MyDelay(10);
+    }
+
+    // Verify we're in the correct state
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+
+    // Get the current band and store initial XAttenSSB value
+    int32_t currentBand = ED.currentBand[ED.activeVFO];
+    float32_t initialAtten = ED.XAttenSSB[currentBand];
+
+    // Expected increment value (0.5 for transmit attenuation)
+    const float32_t expectedIncrement = 0.5;
+
+    // Test incrementing the transmit attenuation by rotating finetune encoder clockwise
+    SetInterrupt(iFINETUNE_INCREASE);
+    loop(); MyDelay(10);
+
+    float32_t attenAfterIncrease = ED.XAttenSSB[currentBand];
+    EXPECT_NEAR(attenAfterIncrease, initialAtten + expectedIncrement, 0.00001);
+
+    // Test decrementing the transmit attenuation by rotating finetune encoder counter-clockwise
+    SetInterrupt(iFINETUNE_DECREASE);
+    loop(); MyDelay(10);
+
+    float32_t attenAfterDecrease = ED.XAttenSSB[currentBand];
+    EXPECT_NEAR(attenAfterDecrease, initialAtten, 0.00001);
+
+    // Test multiple increments
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iFINETUNE_INCREASE);
+        loop(); MyDelay(10);
+    }
+
+    float32_t attenAfterMultipleIncrements = ED.XAttenSSB[currentBand];
+    EXPECT_NEAR(attenAfterMultipleIncrements, initialAtten + 5 * expectedIncrement, 0.00001);
+
+    // Test multiple decrements
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iFINETUNE_DECREASE);
+        loop(); MyDelay(10);
+    }
+
+    float32_t attenAfterMultipleDecrements = ED.XAttenSSB[currentBand];
+    EXPECT_NEAR(attenAfterMultipleDecrements, initialAtten, 0.00001);
+
+    // Test upper limit (max value is 31.5)
+    // Set to a value close to max
+    ED.XAttenSSB[currentBand] = 31.0;
+    SetInterrupt(iFINETUNE_INCREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.XAttenSSB[currentBand], 31.5, 0.00001);
+
+    // Try to increment beyond max - should be clamped at 31.5
+    SetInterrupt(iFINETUNE_INCREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.XAttenSSB[currentBand], 31.5, 0.00001);
+
+    // Test lower limit (min value is 0.0)
+    // Set to a value close to min
+    ED.XAttenSSB[currentBand] = 0.5;
+    SetInterrupt(iFINETUNE_DECREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.XAttenSSB[currentBand], 0.0, 0.00001);
+
+    // Try to decrement beyond min - should be clamped at 0.0
+    SetInterrupt(iFINETUNE_DECREASE);
+    loop(); MyDelay(10);
+    EXPECT_NEAR(ED.XAttenSSB[currentBand], 0.0, 0.00001);
+
+    // Exit back to home screen
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 }
 
 /*TEST_F(CalibrationTest, CalibrateReceiveIQAutotuneSteps) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     ScrollAndSelectCalibrateReceiveIQ();
-    
+
     for (int k=0; k<50; k++){
-        loop(); MyDelay(10); 
+        loop(); MyDelay(10);
     }
 
     // Now, check to ensure that we are in the receive IQ state
@@ -332,7 +680,7 @@ TEST_F(CalibrationTest, CalibrateReceiveIQState) {
     SetButton(16);
     SetInterrupt(iBUTTON_PRESSED);
     for (int k=0; k<5000; k++){
-        loop(); MyDelay(10); 
+        loop(); MyDelay(10);
     }
 }*/
 

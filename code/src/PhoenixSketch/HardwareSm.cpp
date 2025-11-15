@@ -393,14 +393,19 @@ void UpdateRFHardwareState(void){
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):{
             Debug("Entered hardware cal freq state");
         }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):{
+            Debug("Entered hardware TX IQ cal space state");
+        }
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
+            Debug("Hardware entering RFReceive state");
             rfHardwareState = RFReceive;
             break;
         }
-        case (ModeSm_StateId_CALIBRATE_TX_IQ):
-            Debug("Entered hardware cal TXIQ state");
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
+            Debug("Entered hardware TX IQ cal mark state");
         case (ModeSm_StateId_SSB_TRANSMIT):{
+            Debug("Hardware entering RFTransmit state");
             rfHardwareState = RFTransmit;
             break;
         }
@@ -535,12 +540,14 @@ void HandleTuneState(TuneState tuneState){
  */
 void UpdateTuneState(void){
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
             tuneState = TuneReceive;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             tuneState = TuneSSBTX;
             break;

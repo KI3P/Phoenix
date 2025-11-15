@@ -718,22 +718,25 @@ void DrawCalibrateRXIQ(void){
 // Transmit IQ calibration section
 ///////////////////////////////////////////////////////////////////////////////
 
-static const int8_t NUMBER_OF_TXIQ_PANES = 4;
+static const int8_t NUMBER_OF_TXIQ_PANES = 5;
 // Forward declaration of the pane drawing functions
 static void DrawTXIQAtt(void);
+static void DrawTXIQStatus(void);
 static void DrawTXIQAdjustPane(void);
 static void DrawTXIQTablePane(void);
 static void DrawTXIQInstructionsPane(void);
 
 // Pane instances
 static Pane PaneTXIQAtt =      {310,50,120,40,DrawTXIQAtt,1};
+static Pane PaneTXIQStatus =   {310,130,120,40,DrawTXIQStatus,1};
 static Pane PaneTXIQAdjust =   {3,250,300,230,DrawTXIQAdjustPane,1};
 static Pane PaneTXIQTable =    {320,250,200,230,DrawTXIQTablePane,1};
 static Pane PaneTXIQInstructions = {537,7,260,470,DrawTXIQInstructionsPane,1};
 
 // Array of all panes for iteration
 static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,
-                                    &PaneTXIQInstructions, &PaneTXIQAtt};
+                                    &PaneTXIQInstructions, &PaneTXIQAtt,
+                                    &PaneTXIQStatus};
 
 
 float32_t oldatt = -5.0;
@@ -757,6 +760,36 @@ static void DrawTXIQAtt(void){
     PaneTXIQAtt.stale = false;
 }
 
+static ModeSm_StateId oldstate = ModeSm_StateId_ROOT;
+static void DrawTXIQStatus(void){
+    if (oldstate != modeSM.state_id) 
+        PaneTXIQStatus.stale = true;
+    oldstate = modeSM.state_id;
+    if (!PaneTXIQStatus.stale) return;
+    
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
+
+    tft.fillRect(PaneTXIQStatus.x0-tft.getFontWidth()*10, PaneTXIQStatus.y0, PaneTXIQStatus.width+tft.getFontWidth()*10, PaneTXIQStatus.height, RA8875_BLACK);
+
+    tft.setCursor(PaneTXIQStatus.x0,PaneTXIQStatus.y0);
+    switch(modeSM.state_id){
+        case ModeSm_StateId_CALIBRATE_TX_IQ_SPACE:
+            tft.setTextColor(RA8875_GREEN);
+            tft.print("Off");
+            break;
+        case ModeSm_StateId_CALIBRATE_TX_IQ_MARK:
+            tft.setTextColor(RA8875_RED);
+            tft.print("On");
+            break;
+    }
+    tft.setTextColor(RA8875_WHITE);
+    tft.setCursor(PaneTXIQStatus.x0-tft.getFontWidth()*1,PaneTXIQStatus.y0);
+    tft.print("Transmit:");
+
+    PaneTXIQStatus.stale = false;
+}
 
 static uint8_t incindexTXIQ = 1;
 void ChangeTXIQIncrement(void){

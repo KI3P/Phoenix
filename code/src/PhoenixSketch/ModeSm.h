@@ -45,22 +45,23 @@ typedef enum ModeSm_StateId
     ModeSm_StateId_CALIBRATE_FREQUENCY = 3,
     ModeSm_StateId_CALIBRATE_RX_IQ = 4,
     ModeSm_StateId_CALIBRATE_SSB_PA = 5,
-    ModeSm_StateId_CALIBRATE_TX_IQ = 6,
-    ModeSm_StateId_NORMAL_STATES = 7,
-    ModeSm_StateId_CW_RECEIVE = 8,
-    ModeSm_StateId_CW_TRANSMIT_DAH_MARK = 9,
-    ModeSm_StateId_CW_TRANSMIT_DIT_MARK = 10,
-    ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE = 11,
-    ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 12,
-    ModeSm_StateId_CW_TRANSMIT_MARK = 13,
-    ModeSm_StateId_CW_TRANSMIT_SPACE = 14,
-    ModeSm_StateId_SSB_RECEIVE = 15,
-    ModeSm_StateId_SSB_TRANSMIT = 16
+    ModeSm_StateId_CALIBRATE_TX_IQ_MARK = 6,
+    ModeSm_StateId_CALIBRATE_TX_IQ_SPACE = 7,
+    ModeSm_StateId_NORMAL_STATES = 8,
+    ModeSm_StateId_CW_RECEIVE = 9,
+    ModeSm_StateId_CW_TRANSMIT_DAH_MARK = 10,
+    ModeSm_StateId_CW_TRANSMIT_DIT_MARK = 11,
+    ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE = 12,
+    ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 13,
+    ModeSm_StateId_CW_TRANSMIT_MARK = 14,
+    ModeSm_StateId_CW_TRANSMIT_SPACE = 15,
+    ModeSm_StateId_SSB_RECEIVE = 16,
+    ModeSm_StateId_SSB_TRANSMIT = 17
 } ModeSm_StateId;
 
 enum
 {
-    ModeSm_StateIdCount = 17
+    ModeSm_StateIdCount = 18
 };
 
 
