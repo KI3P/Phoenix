@@ -864,7 +864,6 @@ DataBlock * ReceiveProcessing(const char *fname){
 errno_t ReadMicrophoneBuffer(DataBlock *data){
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
-        Debug('r');
         // get audio samples from the audio  buffers and convert them to float
         // read in 32 blocks á 128 samples in I and Q
         for (unsigned i = 0; i < N_BLOCKS_EX; i++) {

@@ -339,12 +339,12 @@ FASTRUN void PlotSpectrum(void){
     psdupdated = false;
 }
 
-static uint8_t incindex = 1;
+static uint8_t incindex = 0;
 const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
 void ChangeRXIQIncrement(void){
     incindex++;
-    if (incindex > sizeof(incvals)/sizeof(incvals[0])) 
+    if (incindex >= sizeof(incvals)/sizeof(incvals[0])) 
         incindex = 0;
     increment = incvals[incindex];
 }
@@ -718,10 +718,11 @@ void DrawCalibrateRXIQ(void){
 // Transmit IQ calibration section
 ///////////////////////////////////////////////////////////////////////////////
 
-static const int8_t NUMBER_OF_TXIQ_PANES = 5;
+static const int8_t NUMBER_OF_TXIQ_PANES = 6;
 // Forward declaration of the pane drawing functions
 static void DrawTXIQAtt(void);
 static void DrawTXIQStatus(void);
+static void DrawTXIQFrequency(void);
 static void DrawTXIQAdjustPane(void);
 static void DrawTXIQTablePane(void);
 static void DrawTXIQInstructionsPane(void);
@@ -729,6 +730,7 @@ static void DrawTXIQInstructionsPane(void);
 // Pane instances
 static Pane PaneTXIQAtt =      {310,50,120,40,DrawTXIQAtt,1};
 static Pane PaneTXIQStatus =   {310,130,120,40,DrawTXIQStatus,1};
+static Pane PaneTXIQFrequency ={310,200,140,40,DrawTXIQFrequency,1};
 static Pane PaneTXIQAdjust =   {3,250,300,230,DrawTXIQAdjustPane,1};
 static Pane PaneTXIQTable =    {320,250,200,230,DrawTXIQTablePane,1};
 static Pane PaneTXIQInstructions = {537,7,260,470,DrawTXIQInstructionsPane,1};
@@ -736,7 +738,7 @@ static Pane PaneTXIQInstructions = {537,7,260,470,DrawTXIQInstructionsPane,1};
 // Array of all panes for iteration
 static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,
                                     &PaneTXIQInstructions, &PaneTXIQAtt,
-                                    &PaneTXIQStatus};
+                                    &PaneTXIQStatus, &PaneTXIQFrequency};
 
 
 float32_t oldatt = -5.0;
@@ -791,10 +793,34 @@ static void DrawTXIQStatus(void){
     PaneTXIQStatus.stale = false;
 }
 
-static uint8_t incindexTXIQ = 1;
+int64_t oldfreq = 0;
+static void DrawTXIQFrequency(void){
+    int64_t freq = GetTXRXFreq(ED.activeVFO);
+    if (oldfreq != freq) 
+        PaneTXIQFrequency.stale = true;
+    oldfreq = freq;
+    if (!PaneTXIQFrequency.stale) return;
+    
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
+
+    tft.fillRect(PaneTXIQFrequency.x0-tft.getFontWidth()*11, PaneTXIQFrequency.y0, PaneTXIQFrequency.width+tft.getFontWidth()*11, PaneTXIQFrequency.height, RA8875_BLACK);
+
+    tft.setCursor(PaneTXIQFrequency.x0,PaneTXIQFrequency.y0);
+    tft.print(freq/1000);
+    tft.print("kHz");
+    tft.setCursor(PaneTXIQFrequency.x0-tft.getFontWidth()*11,PaneTXIQFrequency.y0);
+    tft.print("Frequency:");
+
+    PaneTXIQFrequency.stale = false;
+}
+
+
+static uint8_t incindexTXIQ = 0;
 void ChangeTXIQIncrement(void){
     incindexTXIQ++;
-    if (incindexTXIQ > sizeof(incvals)/sizeof(incvals[0])) 
+    if (incindexTXIQ >= sizeof(incvals)/sizeof(incvals[0])) 
         incindexTXIQ = 0;
     increment = incvals[incindexTXIQ];
 }
@@ -1005,6 +1031,10 @@ void DrawCalibrateTXIQ(void){
         tft.setFontScale((enum RA8875tsize)1);
         tft.setCursor(10,10);
         tft.print("Transmit IQ calibration");
+
+        ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
+        ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+        ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
 
         // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_TXIQ_PANES; i++){

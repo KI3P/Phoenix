@@ -320,9 +320,9 @@ void UpdateAudioIOState(void){
             // IQ from receive stops
             Q_in_L.end(); 
             Q_in_R.end();
-            // Microphone stops
-            Q_in_L_Ex.end();
-            Q_in_R_Ex.end();
+            // Start up the input queues
+            Q_in_L_Ex.begin();
+            Q_in_R_Ex.begin();
 
             // Input is calibration oscillator
             SelectMixerChannel(&modeSelectInExL,1);
@@ -518,7 +518,7 @@ void InitializeAudio(void){
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
 
     // The transmit IQ cal oscillator. Only used during the TXIQ calibration state
-    transmitIQcal_oscillator.amplitude(20.0/500);
+    transmitIQcal_oscillator.amplitude(40.0/500);
     transmitIQcal_oscillator.frequency(200); // 800 Hz
 
     // Warm up the audio I/O to clear initialization issues
