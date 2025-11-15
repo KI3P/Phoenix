@@ -9,8 +9,6 @@ enum RFHardwareState {
     RFReceive,
     RFTransmit,
     RFCalReceiveIQ,
-    RFCalTransmitIQ,
-    RFCalPower,
     RFInvalid
 };
 

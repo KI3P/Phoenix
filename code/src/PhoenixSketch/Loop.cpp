@@ -1068,7 +1068,6 @@ void ConsumeInterrupt(void){
     switch (interrupt){
         case (iBUTTON_PRESSED):{
             int32_t button = GetButton();
-            Debug(String("Pressed button:") + String(button));
             HandleButtonPress(button);
             break;
         }

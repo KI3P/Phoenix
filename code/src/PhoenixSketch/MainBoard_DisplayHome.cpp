@@ -1448,7 +1448,6 @@ void DrawHome(){
         return;
     tft.writeTo(L1);
     if (uiSM.vars.clearScreen){
-        Debug("Clearing the screen upon entry to HOME state");
         tft.fillWindow();
         uiSM.vars.clearScreen = false;
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){

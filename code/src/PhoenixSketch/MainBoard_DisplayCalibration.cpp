@@ -785,6 +785,8 @@ static void DrawTXIQStatus(void){
             tft.setTextColor(RA8875_RED);
             tft.print("On");
             break;
+        default:
+            break;
     }
     tft.setTextColor(RA8875_WHITE);
     tft.setCursor(PaneTXIQStatus.x0-tft.getFontWidth()*10,PaneTXIQStatus.y0);
@@ -1021,7 +1023,6 @@ static void DrawTXIQInstructionsPane(void){
 
 void DrawCalibrateTXIQ(void){
     if (uiSM.vars.clearScreen){
-        Debug("Entry to CALIBRATE_TXIQ state");
         tft.writeTo(L2);
         tft.fillWindow();
         tft.writeTo(L1);

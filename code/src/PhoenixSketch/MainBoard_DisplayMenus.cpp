@@ -588,8 +588,6 @@ int32_t oband = -1;  // Previous band value
 void DrawMainMenu(void){
     if (!(uiSM.state_id == UISm_StateId_MAIN_MENU)) return;
     if (uiSM.vars.clearScreen){
-        Debug("Entry to MAIN_MENU state");
-
         tft.writeTo(L2);
         tft.fillRect(1, 5, 650, 460, RA8875_BLACK);
         tft.writeTo(L1);
@@ -617,7 +615,6 @@ void DrawMainMenu(void){
 void DrawSecondaryMenu(void){
     if (!(uiSM.state_id == UISm_StateId_SECONDARY_MENU)) return;
     if (uiSM.vars.clearScreen){
-        Debug("Clearing the screen upon entry to SECONDARY_MENU state");
         uiSM.vars.clearScreen = false;
         redrawMenu = true;
     }

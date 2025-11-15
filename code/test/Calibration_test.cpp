@@ -155,6 +155,10 @@ protected:
         Q_in_R.setChannel(1);
         Q_in_L.clear();
         Q_in_R.clear();
+        Q_in_L_Ex.setChannel(0);
+        Q_in_R_Ex.setChannel(1);
+        Q_in_L_Ex.clear();
+        Q_in_R_Ex.clear();
         StartMillis();
 
         //-------------------------------------------------------------
@@ -421,8 +425,8 @@ TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
     int32_t currentBand = ED.currentBand[ED.activeVFO];
     float32_t initialPhase = ED.IQXPhaseCorrectionFactor[currentBand];
 
-    // Expected increment value (default is 0.001 from incvals[1])
-    const float32_t expectedIncrement = 0.001;
+    // Expected increment value (default is 0.01 from incvals[0])
+    const float32_t expectedIncrement = 0.01;
 
     // Test incrementing the phase correction by rotating filter encoder clockwise
     SetInterrupt(iFILTER_INCREASE);
@@ -509,8 +513,8 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTXIQAmp) {
     int32_t currentBand = ED.currentBand[ED.activeVFO];
     float32_t initialAmp = ED.IQXAmpCorrectionFactor[currentBand];
 
-    // Expected increment value (default is 0.001 from incvals[1])
-    const float32_t expectedIncrement = 0.001;
+    // Expected increment value (default is 0.01 from incvals[0])
+    const float32_t expectedIncrement = 0.01;
 
     // Test incrementing the amplitude correction by rotating volume encoder clockwise
     SetInterrupt(iVOLUME_INCREASE);

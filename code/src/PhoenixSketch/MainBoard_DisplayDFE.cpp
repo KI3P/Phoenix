@@ -77,7 +77,6 @@ void DrawFrequencyEntryPad(void){
         return;
     tft.writeTo(L1);
     if (uiSM.vars.clearScreen){
-        Debug("Clearing the screen upon entry to Frequency Entry state");
         tft.fillWindow();
         tft.writeTo(L2);
         tft.fillWindow();
