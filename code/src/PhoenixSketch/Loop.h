@@ -32,7 +32,8 @@ typedef enum {
     iVFO_CHANGE,              /**< Active VFO changed (A/B toggle) */
     iUPDATE_TUNE,             /**< Request VFO frequency update */
     iMODE_CHANGE,             /**< Operating mode changed (SSB/CW) */
-    iPOWER_CHANGE             /**< Transmit power level changed */
+    iPOWER_CHANGE,            /**< Transmit power level changed */
+    iEQUALIZER                /**< Adjust the transmit and receive equalizers */
 } InterruptType;
 
 /**

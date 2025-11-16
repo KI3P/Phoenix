@@ -242,6 +242,8 @@ void DrawFrequencyEntryPad(void);
 int8_t DFEGetNumDigits(void);
 char * DFEGetFString(void);
 
+void DrawEqualizerAdjustment(void);
+
 void DrawCalibrateFrequency(void);
 void DrawCalibrateRXIQ(void);
 void DrawCalibrateTXIQ(void);

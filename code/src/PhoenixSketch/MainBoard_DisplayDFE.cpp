@@ -4,6 +4,7 @@
  *
  * This module displays the number pad to allow direct frequency entry
  *
+ * @see window_panes.drawio, DFE tab for layout
  * @see MainBoard_Display.cpp for core display infrastructure
  * @see MainBoard_DisplayMenus.cpp for menu system
  */
@@ -11,7 +12,6 @@
 #include "SDT.h"
 #include "MainBoard_Display.h"
 #include <RA8875.h>
-
 
 static const int8_t NUMBER_OF_PANES = 4;
 

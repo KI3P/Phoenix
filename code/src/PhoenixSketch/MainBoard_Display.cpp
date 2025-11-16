@@ -119,6 +119,10 @@ void DrawDisplay(void){
             }
             break;
         }
+        case (UISm_StateId_EQUALIZER):{
+            DrawEqualizerAdjustment();
+            break;
+        }
         case (UISm_StateId_FREQ_ENTRY):{
             DrawFrequencyEntryPad();
             break;

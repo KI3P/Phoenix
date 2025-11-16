@@ -20,14 +20,15 @@ typedef enum UISm_EventId
     UISm_EventId_CALIBRATE_RX_IQ = 3,
     UISm_EventId_CALIBRATE_TX_IQ = 4,
     UISm_EventId_DFE = 5,
-    UISm_EventId_HOME = 6,
-    UISm_EventId_MENU = 7,
-    UISm_EventId_SELECT = 8
+    UISm_EventId_EQUALIZER = 6,
+    UISm_EventId_HOME = 7,
+    UISm_EventId_MENU = 8,
+    UISm_EventId_SELECT = 9
 } UISm_EventId;
 
 enum
 {
-    UISm_EventIdCount = 9
+    UISm_EventIdCount = 10
 };
 
 typedef enum UISm_StateId
@@ -37,17 +38,18 @@ typedef enum UISm_StateId
     UISm_StateId_CALIBRATE_POWER = 2,
     UISm_StateId_CALIBRATE_RX_IQ = 3,
     UISm_StateId_CALIBRATE_TX_IQ = 4,
-    UISm_StateId_FREQ_ENTRY = 5,
-    UISm_StateId_HOME = 6,
-    UISm_StateId_MAIN_MENU = 7,
-    UISm_StateId_SECONDARY_MENU = 8,
-    UISm_StateId_SPLASH = 9,
-    UISm_StateId_UPDATE = 10
+    UISm_StateId_EQUALIZER = 5,
+    UISm_StateId_FREQ_ENTRY = 6,
+    UISm_StateId_HOME = 7,
+    UISm_StateId_MAIN_MENU = 8,
+    UISm_StateId_SECONDARY_MENU = 9,
+    UISm_StateId_SPLASH = 10,
+    UISm_StateId_UPDATE = 11
 } UISm_StateId;
 
 enum
 {
-    UISm_StateIdCount = 11
+    UISm_StateIdCount = 12
 };
 
 

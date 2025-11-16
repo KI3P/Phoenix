@@ -39,6 +39,12 @@ static void CALIBRATE_TX_IQ_exit(UISm* sm);
 
 static void CALIBRATE_TX_IQ_home(UISm* sm);
 
+static void EQUALIZER_enter(UISm* sm);
+
+static void EQUALIZER_exit(UISm* sm);
+
+static void EQUALIZER_home(UISm* sm);
+
 static void FREQ_ENTRY_enter(UISm* sm);
 
 static void FREQ_ENTRY_exit(UISm* sm);
@@ -58,6 +64,8 @@ static void HOME_calibrate_rx_iq(UISm* sm);
 static void HOME_calibrate_tx_iq(UISm* sm);
 
 static void HOME_dfe(UISm* sm);
+
+static void HOME_equalizer(UISm* sm);
 
 static void HOME_menu(UISm* sm);
 
@@ -179,6 +187,16 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
             }
             break;
         
+        // STATE: EQUALIZER
+        case UISm_StateId_EQUALIZER:
+            switch (event_id)
+            {
+                case UISm_EventId_HOME: EQUALIZER_home(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
         // STATE: FREQ_ENTRY
         case UISm_StateId_FREQ_ENTRY:
             switch (event_id)
@@ -199,6 +217,7 @@ void UISm_dispatch_event(UISm* sm, UISm_EventId event_id)
                 case UISm_EventId_CALIBRATE_TX_IQ: HOME_calibrate_tx_iq(sm); break;
                 case UISm_EventId_CALIBRATE_FREQUENCY: HOME_calibrate_frequency(sm); break;
                 case UISm_EventId_CALIBRATE_POWER: HOME_calibrate_power(sm); break;
+                case UISm_EventId_EQUALIZER: HOME_equalizer(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -265,6 +284,8 @@ static void exit_up_to_state_handler(UISm* sm, UISm_StateId desired_state)
             case UISm_StateId_CALIBRATE_RX_IQ: CALIBRATE_RX_IQ_exit(sm); break;
             
             case UISm_StateId_CALIBRATE_TX_IQ: CALIBRATE_TX_IQ_exit(sm); break;
+            
+            case UISm_StateId_EQUALIZER: EQUALIZER_exit(sm); break;
             
             case UISm_StateId_FREQ_ENTRY: FREQ_ENTRY_exit(sm); break;
             
@@ -463,6 +484,48 @@ static void CALIBRATE_TX_IQ_home(UISm* sm)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// event handlers for state EQUALIZER
+////////////////////////////////////////////////////////////////////////////////
+
+static void EQUALIZER_enter(UISm* sm)
+{
+    sm->state_id = UISm_StateId_EQUALIZER;
+    
+    // EQUALIZER behavior
+    // uml: enter / { clearScreen = true; }
+    {
+        // Step 1: execute action `clearScreen = true;`
+        sm->vars.clearScreen = true;
+    } // end of behavior for EQUALIZER
+}
+
+static void EQUALIZER_exit(UISm* sm)
+{
+    sm->state_id = UISm_StateId_ROOT;
+}
+
+static void EQUALIZER_home(UISm* sm)
+{
+    // EQUALIZER behavior
+    // uml: HOME TransitionTo(HOME)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        EQUALIZER_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `HOME`.
+        HOME_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for EQUALIZER
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // event handlers for state FREQ_ENTRY
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -617,6 +680,26 @@ static void HOME_dfe(UISm* sm)
         
         // Step 3: Enter/move towards transition target `FREQ_ENTRY`.
         FREQ_ENTRY_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for HOME
+    
+    // No ancestor handles this event.
+}
+
+static void HOME_equalizer(UISm* sm)
+{
+    // HOME behavior
+    // uml: EQUALIZER TransitionTo(EQUALIZER)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        HOME_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `EQUALIZER`.
+        EQUALIZER_enter(sm);
         
         // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
         return;
@@ -891,6 +974,7 @@ char const * UISm_state_id_to_string(UISm_StateId id)
         case UISm_StateId_CALIBRATE_POWER: return "CALIBRATE_POWER";
         case UISm_StateId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
         case UISm_StateId_CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
+        case UISm_StateId_EQUALIZER: return "EQUALIZER";
         case UISm_StateId_FREQ_ENTRY: return "FREQ_ENTRY";
         case UISm_StateId_HOME: return "HOME";
         case UISm_StateId_MAIN_MENU: return "MAIN_MENU";
@@ -912,6 +996,7 @@ char const * UISm_event_id_to_string(UISm_EventId id)
         case UISm_EventId_CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
         case UISm_EventId_DFE: return "DFE";
         case UISm_EventId_DO: return "DO";
+        case UISm_EventId_EQUALIZER: return "EQUALIZER";
         case UISm_EventId_HOME: return "HOME";
         case UISm_EventId_MENU: return "MENU";
         case UISm_EventId_SELECT: return "SELECT";

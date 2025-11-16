@@ -10,7 +10,7 @@ errno_t InitializeBPFBoard(void){
     SET_BPF_BAND(BandToBCD(ED.currentBand[ED.activeVFO]));   
     if (mcpBPF.begin_I2C(BPF_MCP23017_ADDR,&Wire2)){
         bit_results.BPF_I2C_present = true;
-        Debug("Initialising BPF board");
+        Debug("Initializing BPF board");
         mcpBPF.enableAddrPins();
         // Set all pins to be outputs
         for (int i=0;i<16;i++){

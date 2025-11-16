@@ -330,12 +330,17 @@ void SelectNRKim(void){ ED.nrOptionSelect = NRKim; }
 void SelectNRSpectral(void){ ED.nrOptionSelect = NRSpectral; }
 void SelectNRLMS(void){ ED.nrOptionSelect = NRLMS; }
 
-struct SecondaryMenuOption AudioOptions[10] = {
+void StartEqualizerAdjust(void){
+    SetInterrupt(iEQUALIZER);
+}
+
+struct SecondaryMenuOption AudioOptions[11] = {
     "AGC Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
     "AGC Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
     "AGC Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
     "AGC Medium", functionOption, NULL, (void *)SelectAGCMedium, NULL,
     "AGC Fast", functionOption, NULL, (void *)SelectAGCFast, NULL,
+    "Adjust Equalizers",functionOption, NULL, (void *)StartEqualizerAdjust, NULL,
     "Toggle Autonotch", functionOption, NULL, (void *)ToggleAutonotch, NULL,
     "Noise Reduction Off", functionOption, NULL, (void *)SelectNROff, NULL,
     "Kim Noise Reduction", functionOption, NULL, (void *)SelectNRKim, NULL,

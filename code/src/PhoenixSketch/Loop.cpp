@@ -343,6 +343,8 @@ void TimerInterrupt(void){
 ///////////////////////////////////////////////////////////////////////////////
 void ChangeRXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangeTXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ToggleRXTXEqualizerEdit(void); // from MainBoard_DisplayEqualizer.cpp
+void AdjustEqualizerIncrement(void); // from MainBoard_DisplayEqualizer.cpp
 
 /**
  * Process button press events from the front panel.
@@ -612,6 +614,25 @@ void HandleButtonPress(int32_t button){
             }
             break;
         } // end of FREQ_ENTRY state
+        case (UISm_StateId_EQUALIZER):{
+            switch (button){
+                case HOME_SCREEN:{
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                    break;
+                }
+                case 15:{
+                    ToggleRXTXEqualizerEdit();
+                    break;
+                }
+                case 16:{
+                    AdjustEqualizerIncrement();
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of FREQ_ENTRY state
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (button){
                 case HOME_SCREEN:{
@@ -827,6 +848,10 @@ void IncrementTXIQAmp(void);
 void DecrementTXIQAmp(void);
 void IncrementTransmitAtt(void);
 void DecrementTransmitAtt(void);
+void IncrementEqualizerValue(void);
+void DecrementEqualizerValue(void);
+void IncrementEqualizerSelection(void);
+void DecrementEqualizerSelection(void);
 
 /**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
@@ -985,7 +1010,29 @@ void ConsumeInterrupt(void){
             }
             break;
         } // end of SECONDARY_MENU state, encoder interrupts
-
+        case (UISm_StateId_EQUALIZER):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncrementEqualizerValue();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecrementEqualizerValue();
+                    break;
+                }
+                case (iVOLUME_INCREASE):{
+                    IncrementEqualizerSelection();
+                    break;
+                }
+                case (iVOLUME_DECREASE):{
+                    DecrementEqualizerSelection();
+                    break;
+                }
+                default: // handle them later
+                    break;
+            }
+            break;
+        } // end of EQUALIZER state, encoder interrupts
         case (UISm_StateId_CALIBRATE_RX_IQ):{
             switch (interrupt){
                 case (iFILTER_INCREASE):{
@@ -1120,6 +1167,10 @@ void ConsumeInterrupt(void){
         case (iKEY2_PRESSED):{
             if (ED.keyType == KeyTypeId_Keyer)
                 HandleKeyer(interrupt);
+            break;
+        }
+        case (iEQUALIZER):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_EQUALIZER);
             break;
         }
         case (iCALIBRATE_FREQUENCY):{

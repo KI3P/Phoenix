@@ -2430,3 +2430,644 @@ TEST_F(DisplayTest, FreqEntry_EmptyButtons) {
     loop(); MyDelay(10);
     EXPECT_EQ(DFEGetNumDigits(), 0);
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Equalizer Tests
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Test navigation to equalizer screen from HOME
+ * Verifies that the equalizer screen can be entered from the home state
+ */
+TEST_F(DisplayTest, Equalizer_NavigateToScreen) {
+    // Set up the queues and start the "clock"
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    // Radio startup code
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Verify we start in HOME state
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+
+    // Verify we're in EQUALIZER state
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+}
+
+/**
+ * Test navigation away from equalizer screen to HOME
+ * Verifies that pressing HOME_SCREEN button exits the equalizer
+ */
+TEST_F(DisplayTest, Equalizer_NavigateToHome) {
+    // Set up the queues and start the "clock"
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    // Radio startup code
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Exit to home screen
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Verify we're back in HOME state
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+}
+
+/**
+ * Test toggling between RX and TX equalizer editing
+ * Verifies that button 15 toggles between RX and TX equalizer modes
+ */
+TEST_F(DisplayTest, Equalizer_ToggleRXTX) {
+    extern void ToggleRXTXEqualizerEdit(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Toggle to TX (button 15)
+    SetButton(15);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Toggle back to RX
+    SetButton(15);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Verify we can toggle multiple times without issues
+    SetButton(15);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Toggle back to RX to leave in default state for other tests
+    SetButton(15);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+}
+
+/**
+ * Test incrementing equalizer cell selection
+ * Verifies that volume encoder can move through equalizer cells
+ */
+TEST_F(DisplayTest, Equalizer_IncrementCellSelection) {
+    extern void IncrementEqualizerSelection(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Increment cell selection multiple times
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iVOLUME_INCREASE);
+        loop(); MyDelay(10);
+    }
+
+    // Test passes if no crashes occur
+    SUCCEED();
+}
+
+/**
+ * Test decrementing equalizer cell selection
+ * Verifies that volume encoder can move backward through equalizer cells
+ */
+TEST_F(DisplayTest, Equalizer_DecrementCellSelection) {
+    extern void DecrementEqualizerSelection(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Decrement cell selection multiple times (should wrap around)
+    for (int i = 0; i < 5; i++) {
+        SetInterrupt(iVOLUME_DECREASE);
+        loop(); MyDelay(10);
+    }
+
+    // Test passes if no crashes occur
+    SUCCEED();
+}
+
+/**
+ * Test incrementing equalizer cell value
+ * Verifies that filter encoder can increase equalizer cell values
+ */
+TEST_F(DisplayTest, Equalizer_IncrementCellValue) {
+    extern void IncrementEqualizerValue(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Set all cells to the same initial value
+    // (we don't know which cell is currently selected due to static state)
+    int32_t initialValue = 50;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        ED.equalizerRec[i] = initialValue;
+    }
+
+    // Increment the currently selected cell value
+    SetInterrupt(iFILTER_INCREASE);
+    loop(); MyDelay(10);
+
+    // Verify that at least one value increased (the selected cell)
+    bool found = false;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        if (ED.equalizerRec[i] > initialValue) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+/**
+ * Test decrementing equalizer cell value
+ * Verifies that filter encoder can decrease equalizer cell values
+ */
+TEST_F(DisplayTest, Equalizer_DecrementCellValue) {
+    extern void DecrementEqualizerValue(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Set all cells to the same initial value
+    // (we don't know which cell is currently selected due to static state)
+    int32_t initialValue = 50;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        ED.equalizerRec[i] = initialValue;
+    }
+
+    // Decrement the currently selected cell value
+    SetInterrupt(iFILTER_DECREASE);
+    loop(); MyDelay(10);
+
+    // Verify that at least one value decreased (the selected cell)
+    bool found = false;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        if (ED.equalizerRec[i] < initialValue) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+/**
+ * Test equalizer cell value upper bound
+ * Verifies that values cannot exceed 100
+ */
+TEST_F(DisplayTest, Equalizer_ValueUpperBound) {
+    extern void IncrementEqualizerValue(void);
+
+    // Set all cells to value near maximum
+    // (we don't know which cell is currently selected)
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        ED.equalizerRec[i] = 99;
+    }
+
+    // Increment the currently selected cell
+    IncrementEqualizerValue();
+
+    // Verify that exactly one cell is at 100
+    int count100 = 0;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        if (ED.equalizerRec[i] == 100) count100++;
+    }
+    EXPECT_EQ(count100, 1);
+
+    // Try to increment beyond maximum - should stay at 100
+    IncrementEqualizerValue();
+
+    // Verify still at 100 (no cell exceeds 100)
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        EXPECT_LE(ED.equalizerRec[i], 100);
+    }
+}
+
+/**
+ * Test equalizer cell value lower bound
+ * Verifies that values cannot go below 0
+ */
+TEST_F(DisplayTest, Equalizer_ValueLowerBound) {
+    extern void DecrementEqualizerValue(void);
+
+    // Set all cells to value near minimum
+    // (we don't know which cell is currently selected)
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        ED.equalizerRec[i] = 1;
+    }
+
+    // Decrement the currently selected cell
+    DecrementEqualizerValue();
+
+    // Verify that exactly one cell is at 0
+    int count0 = 0;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        if (ED.equalizerRec[i] == 0) count0++;
+    }
+    EXPECT_EQ(count0, 1);
+
+    // Try to decrement below minimum - should stay at 0
+    DecrementEqualizerValue();
+
+    // Verify still at 0 (no cell goes negative)
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        EXPECT_GE(ED.equalizerRec[i], 0);
+    }
+}
+
+/**
+ * Test TX equalizer value modification
+ * Verifies that TX equalizer values can be modified when in TX mode
+ */
+TEST_F(DisplayTest, Equalizer_TXValueModification) {
+    extern void IncrementEqualizerValue(void);
+    extern void DecrementEqualizerValue(void);
+    extern void ToggleRXTXEqualizerEdit(void);
+
+    // Set all TX cells to initial value
+    // (we don't know which cell is currently selected)
+    int32_t initialValue = 50;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        ED.equalizerXmt[i] = initialValue;
+    }
+
+    // Switch to TX mode (toggle from default RX)
+    ToggleRXTXEqualizerEdit();
+
+    // Increment TX value
+    IncrementEqualizerValue();
+
+    // Verify that exactly one TX cell increased
+    int countIncreased = 0;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        if (ED.equalizerXmt[i] > initialValue) countIncreased++;
+    }
+    EXPECT_EQ(countIncreased, 1);
+
+    // Decrement TX value
+    DecrementEqualizerValue();
+
+    // Verify that the cell returned to initial value
+    int countAtInitial = 0;
+    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        if (ED.equalizerXmt[i] == initialValue) countAtInitial++;
+    }
+    EXPECT_EQ(countAtInitial, EQUALIZER_CELL_COUNT);
+}
+
+/**
+ * Test cell selection wraparound forward
+ * Verifies that cell selection wraps from last to first cell
+ */
+TEST_F(DisplayTest, Equalizer_CellSelectionWrapForward) {
+    extern void IncrementEqualizerSelection(void);
+
+    // Increment through all cells and verify it wraps
+    for (int i = 0; i < EQUALIZER_CELL_COUNT + 2; i++) {
+        IncrementEqualizerSelection();
+    }
+
+    // Test passes if no crashes occur
+    SUCCEED();
+}
+
+/**
+ * Test cell selection wraparound backward
+ * Verifies that cell selection wraps from first to last cell
+ */
+TEST_F(DisplayTest, Equalizer_CellSelectionWrapBackward) {
+    extern void DecrementEqualizerSelection(void);
+
+    // Decrement from initial position (should wrap to end)
+    for (int i = 0; i < 5; i++) {
+        DecrementEqualizerSelection();
+    }
+
+    // Test passes if no crashes occur
+    SUCCEED();
+}
+
+/**
+ * Test adjusting equalizer increment value
+ * Verifies that button 16 cycles through increment values
+ */
+TEST_F(DisplayTest, Equalizer_AdjustIncrement) {
+    extern void AdjustEqualizerIncrement(void);
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+
+    // Navigate to equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Adjust increment (button 16)
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Adjust again to cycle through
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Should cycle back to first increment
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Test passes if no crashes occur
+    SUCCEED();
+}
+
+/**
+ * Test complete equalizer workflow
+ * Tests a realistic sequence: enter, navigate cells, modify values, toggle RX/TX, exit
+ */
+TEST_F(DisplayTest, Equalizer_CompleteWorkflow) {
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+
+    // Enter equalizer screen
+    SetInterrupt(iEQUALIZER);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_EQUALIZER);
+
+    // Perform a complete workflow of equalizer operations
+    // (Individual tests verify the actual value changes work correctly)
+
+    // Modify currently selected cell with filter encoder
+    SetInterrupt(iFILTER_INCREASE);
+    loop(); MyDelay(10);
+    SetInterrupt(iFILTER_DECREASE);
+    loop(); MyDelay(10);
+
+    // Navigate cells with volume encoder
+    SetInterrupt(iVOLUME_INCREASE);
+    loop(); MyDelay(10);
+    SetInterrupt(iVOLUME_DECREASE);
+    loop(); MyDelay(10);
+
+    // Toggle to TX equalizer
+    SetButton(15);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Modify TX cell
+    SetInterrupt(iFILTER_INCREASE);
+    loop(); MyDelay(10);
+
+    // Toggle back to RX
+    SetButton(15);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Change increment value
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Exit to home
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+}

@@ -2,6 +2,7 @@
  * @file MainBoard_DisplayCalibration.cpp
  * @brief Calibration screens for Phoenix SDR radio calibration
  *
+ * @see window_panes.drawio for layouts
  * @see MainBoard_Display.h for menu structure definitions
  * @see MainBoard_Display.cpp for display infrastructure
  */
