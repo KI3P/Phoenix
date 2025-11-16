@@ -69,13 +69,14 @@ void SelectCalibrationMenu(void){
     IncrementPrimaryMenu();
     IncrementPrimaryMenu();
     IncrementPrimaryMenu();
+    IncrementPrimaryMenu();
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
     // Verify that we're on the calibration secondary menu
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SECONDARY_MENU);
-    extern struct PrimaryMenuOption primaryMenu[6];
+    extern struct PrimaryMenuOption primaryMenu[7];
     extern size_t primaryMenuIndex;
     EXPECT_STREQ(primaryMenu[primaryMenuIndex].label, "Calibration");
 }

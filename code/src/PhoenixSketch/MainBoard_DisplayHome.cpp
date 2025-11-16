@@ -716,6 +716,7 @@ void DrawSpectrumPane(void) {
  * Render the state of health pane showing DSP load and system status.
  */
 void DrawStateOfHealthPane(void) {
+    return; // Remove this line to enable this pane
     if (!PaneStateOfHealth.stale) return;
     if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag))
         return;

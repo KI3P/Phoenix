@@ -1,14 +1,58 @@
 # This repository
 
-This is a preview of a new software approach, called Phoenix, for the T41-EP radio running V12 hardware. It is missing calibration routines and hardware SSB transmit is not yet enabled. Receive should be working correctly. 
-
-It is a ground-up rewrite of the T41 software, which has been authored by dozens of people over the years. I have listed the known authors that left their call signs in the code in the file `code/Contributors.txt` -- please let me know if I've missed anyone!
+This is a new software approach, called Phoenix, for the T41-EP radio running V12 hardware. It is a ground-up rewrite of the T41 software, which had been authored by dozens of people over the years. I have listed the known authors that left their call signs in the code in the file `code/Contributors.txt` -- please let me know if I've missed anyone!
 
 # T41-EP overview
 
-The T41-EP Software Defined Transceiver (SDT), originally designed by Al Peter-AC8GY and Jack Purdum-W8TEE, is a 20W, HF, 7 band, CW/SSB Software Defined Transceiver (SDT) with features like 192kHz spectrum display bandwidth, ALP CW decoder, Bode Plots. The T41-EP is a self-contain SDT that does not require an external PC, laptop, or tablet to use. Al and Jack wrote a book, available on [Amazon](https://www.amazon.com/Digital-Signal-Processing-Software-Defined/dp/B0F5BDQZW3), describing the theory and operation of the T41-EP. Al has made a website describing the radio [here](https://t41sdrtransceiver.wordpress.com/). A block diagram of the V12 radio hardware is shown below.
+The T41-EP Software Defined Transceiver (SDT), originally designed by Al Peter-AC8GY and Jack Purdum-W8TEE, is a 20W, HF, 7 band, CW/SSB Software Defined Transceiver (SDT) with features like 192kHz spectrum display bandwidth, ALP CW decoder, Bode Plots. The T41-EP is a self-contain SDT that does not require an external PC, laptop, or tablet to use. Al and Jack wrote a book, available on [Amazon](https://www.amazon.com/Digital-Signal-Processing-Software-Defined/dp/B0F5BDQZW3), describing the theory and operation of the T41-EP. Al has made a website describing the radio [here](https://t41sdrtransceiver.wordpress.com/). 
+
+Some of the features of the T41 V12 hardware running the Phoenix firmware:
+
+* Operation across all amateur radio bands from 160m to 6m.
+* Controllable receive and transmit power levels in 0.5 dB steps.
+* Audio gain control via a variety of algorithms.
+* Noise reduction via a variety of algorithms.
+* Receive and transmit audio equalizers.
+* Automated receive IQ calibration routine.
+* CAT control.
+
+## Screenshots
+
+The home screen should look familiar, with some change in the layout.
+
+![](images/Home_window.png)
+
+The menu system has been completely rewritten.
+
+![](images/Menu_window.png)
+
+As have the calibration routines. The receive IQ calibration can now automatically tune across all the bands with a single button press.
+
+![](images/RXIQ_window.png)
+
+A block diagram of the V12 radio hardware is shown below.
 
 ![](images/T41_V12_block_diagram.png)
+
+# File Organization
+
+## Source Code Locations
+
+The main Arduino sketch and all accompanying source files are located here:
+
+* **Teensy Source Code**: `code/src/PhoenixSketch/`
+
+The comprehensive unit tests, mocking functions, and their build files are located here:
+
+## Useful Diagrams (.drawio files)
+
+These diagrams can be edited with draw.io. Some are used to generate state machine code with StateSmith:
+
+* **code/src/PhoenixSketch/ModeSm.drawio**: StateSmith radio mode state machine - controls transmit/receive states, mode selection (SSB/CW), and hardware transitions
+* **code/src/PhoenixSketch/UISm.drawio**: StateSmith user interface state machine - manages display states, menu navigation, and screen layouts
+* **images/state_machine_architecture.drawio**: High-level state machine architecture diagram showing how the state machines interact
+* **code/docs/window_panes.drawio**: UI window pane layout designs and screen organization, button functions
+* **code/docs/HAL_diagrams/T41_V12_board_api.drawio**: Hardware abstraction layer API documentation for the T41 V12 board interfaces
 
 # Architecture overview
 
@@ -54,6 +98,7 @@ We don't want button presses to change the hardware state at random, unspecified
 ## Remote control
 
 The radio will provide two serial interfaces over USB. The first, at a baud rate of 115200, prints debug messages. The second, at a baud rate of 38400, implements CAT control with a partial implementation of the Kenwood TS2000 CAT Interface.
+
 
 # Build environment
 

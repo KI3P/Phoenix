@@ -31,6 +31,11 @@ static Pane PaneInstructions = {537,7,260,470,DrawInstructionsPane,1};
 static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneRXEqualizer,&PaneTXEqualizer,
                                     &PaneIncrement,&PaneInstructions};
 
+/**
+ * @brief Main equalizer adjustment screen rendering function
+ * @note Called from DrawDisplay() when in EQUALIZER UI state
+ * @note Displays receive and transmit equalizer bars with adjustment controls
+ */
 void DrawEqualizerAdjustment(void){
     if (!(uiSM.state_id == UISm_StateId_EQUALIZER) )
         return;
@@ -41,7 +46,7 @@ void DrawEqualizerAdjustment(void){
         tft.fillWindow();
         tft.writeTo(L1);
         uiSM.vars.clearScreen = false;
-        
+
         tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)1);
         tft.setCursor(10,10);
@@ -75,6 +80,11 @@ const uint8_t RECEIVE = 0;
 const uint8_t TRANSMIT = 1;
 static uint8_t rxtxSelection = 0;
 
+/**
+ * @brief Toggle between receive and transmit equalizer editing
+ * @note Switches rxtxSelection between RECEIVE (0) and TRANSMIT (1)
+ * @note Called when user presses button 15
+ */
 void ToggleRXTXEqualizerEdit(void){
     if (rxtxSelection == 0)
         rxtxSelection = 1;
@@ -82,12 +92,22 @@ void ToggleRXTXEqualizerEdit(void){
         rxtxSelection = 0;
 }
 
+/**
+ * @brief Move selection to next equalizer frequency band (with wrap-around)
+ * @note Cycles through EQUALIZER_CELL_COUNT frequency bands (typically 14)
+ * @note Called when user rotates volume encoder clockwise
+ */
 void IncrementEqualizerSelection(void){
     cellSelection++;
     if (cellSelection >= EQUALIZER_CELL_COUNT)
         cellSelection = 0;
 }
 
+/**
+ * @brief Move selection to previous equalizer frequency band (with wrap-around)
+ * @note Cycles backward through EQUALIZER_CELL_COUNT frequency bands
+ * @note Called when user rotates volume encoder counter-clockwise
+ */
 void DecrementEqualizerSelection(void){
     if (cellSelection >= 1)
         cellSelection--;
@@ -98,12 +118,24 @@ void DecrementEqualizerSelection(void){
 static const int16_t increments[] = {1,10};
 static uint8_t incIndex = 0;
 
+/**
+ * @brief Cycle through available equalizer adjustment increments
+ * @note Toggles between increment values defined in increments[] array (1, 10)
+ * @note Called when user presses button 16
+ */
 void AdjustEqualizerIncrement(void){
     incIndex++;
     if (incIndex >= sizeof(increments)/sizeof(increments[0]))
         incIndex = 0;
 }
 
+/**
+ * @brief Increase the gain of the currently selected equalizer frequency band
+ * @note Operates on either RX or TX equalizer based on rxtxSelection
+ * @note Increments by current increment value (1 or 10)
+ * @note Clamps maximum value to 100
+ * @note Called when user rotates filter encoder clockwise
+ */
 void IncrementEqualizerValue(void){
     int32_t *equalizer;
     if (rxtxSelection == RECEIVE)
@@ -115,6 +147,13 @@ void IncrementEqualizerValue(void){
         equalizer[cellSelection] = 100;
 }
 
+/**
+ * @brief Decrease the gain of the currently selected equalizer frequency band
+ * @note Operates on either RX or TX equalizer based on rxtxSelection
+ * @note Decrements by current increment value (1 or 10)
+ * @note Clamps minimum value to 0
+ * @note Called when user rotates filter encoder counter-clockwise
+ */
 void DecrementEqualizerValue(void){
     int32_t *equalizer;
     if (rxtxSelection == RECEIVE)
@@ -126,6 +165,11 @@ void DecrementEqualizerValue(void){
         equalizer[cellSelection] = 0;
 }
 
+/**
+ * @brief Calculate sum of all receive equalizer band values
+ * @return Sum of all EQUALIZER_CELL_COUNT receive equalizer values
+ * @note Used to detect changes requiring pane redraw
+ */
 int32_t SumRXEq(void){
     int32_t sum = 0;
     for (uint8_t i = 0; i < EQUALIZER_CELL_COUNT; i++) {
@@ -137,6 +181,12 @@ int32_t SumRXEq(void){
 static int32_t oldRsum = 0;
 static uint8_t oldRCellSel = 25;
 static uint8_t oldrsel = 5;
+/**
+ * @brief Render the receive equalizer bar graph pane
+ * @note Displays 14 frequency band bars with current selection highlighted
+ * @note Selected band shown in green, other bands in blue (when editing RX)
+ * @note Dimmed/gray when transmit equalizer is being edited
+ */
 void DrawRXEqualizerPane(void) {
     int32_t newsum = SumRXEq();
     if ((oldRsum != newsum) || (oldRCellSel != cellSelection) || (oldrsel != rxtxSelection)){
@@ -173,6 +223,11 @@ void DrawRXEqualizerPane(void) {
     }
 }
 
+/**
+ * @brief Calculate sum of all transmit equalizer band values
+ * @return Sum of all EQUALIZER_CELL_COUNT transmit equalizer values
+ * @note Used to detect changes requiring pane redraw
+ */
 int32_t SumTXEq(void){
     int32_t sum = 0;
     for (uint8_t i = 0; i < EQUALIZER_CELL_COUNT; i++) {
@@ -184,6 +239,12 @@ int32_t SumTXEq(void){
 static int32_t oldTsum = 0;
 static uint8_t oldTCellSel = 25;
 static uint8_t oldtsel = 5;
+/**
+ * @brief Render the transmit equalizer bar graph pane
+ * @note Displays 14 frequency band bars with current selection highlighted
+ * @note Selected band shown in green, other bands in blue (when editing TX)
+ * @note Dimmed/gray when receive equalizer is being edited
+ */
 void DrawTXEqualizerPane(void) {
     int32_t newsum = SumTXEq();
     if ((oldTsum != newsum) || (oldTCellSel != cellSelection) || (oldtsel != rxtxSelection)){
@@ -220,6 +281,11 @@ void DrawTXEqualizerPane(void) {
     }
 }
     
+/**
+ * @brief Render the equalizer instructions pane
+ * @note Displays user instructions for operating the equalizer adjustment screen
+ * @note Explains button functions and encoder controls
+ */
 void DrawInstructionsPane(void) {
     if (!PaneInstructions.stale) return;
     PaneInstructions.stale = false;
@@ -267,6 +333,11 @@ void DrawInstructionsPane(void) {
 }
 
 static uint8_t oldindex = 5;
+/**
+ * @brief Render the current increment value display pane
+ * @note Shows current adjustment increment (1 or 10)
+ * @note Updates when user cycles increments with button 16
+ */
 void DrawIncrementPane(void) {
     if (oldindex != incIndex)
         PaneIncrement.stale = true;
@@ -282,5 +353,5 @@ void DrawIncrementPane(void) {
     tft.print(increments[incIndex]);
     tft.setCursor(PaneIncrement.x0-tft.getFontWidth()*7, PaneIncrement.y0);
     tft.print("Incr.:");
-    
+
 }
