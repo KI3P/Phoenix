@@ -413,13 +413,21 @@ struct SecondaryMenuOption DisplayOptions[2] = {
     "Spectrum scale", variableOption, &spectrumscale, NULL, (void *)ScaleUpdated,
 };
 
+// EEPROM Menu
+struct SecondaryMenuOption EEPROMOptions[3] = {
+    "Save data to storage", functionOption, NULL, (void *)SaveDataToStorage, NULL,
+    "Load from SD card", functionOption, NULL, (void *)RestoreDataFromSDCard, NULL,
+    "Print data to Serial", functionOption, NULL, (void *)PrintEDToSerial, NULL,
+};
+
 // Primary menu structure
-struct PrimaryMenuOption primaryMenu[6] = {
+struct PrimaryMenuOption primaryMenu[7] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
     "Audio Options", AudioOptions, sizeof(AudioOptions)/sizeof(AudioOptions[0]),
     "Display", DisplayOptions, sizeof(DisplayOptions)/sizeof(DisplayOptions[0]),
+    "EEPROM", EEPROMOptions, sizeof(EEPROMOptions)/sizeof(EEPROMOptions[0]),
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
 };
 

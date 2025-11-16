@@ -101,10 +101,6 @@ void DrawDisplay(void){
             break;
         }
         case (UISm_StateId_UPDATE):{
-            extern size_t primaryMenuIndex;
-            extern size_t secondaryMenuIndex;
-            extern struct PrimaryMenuOption primaryMenu[6];
-
             if (primaryMenu[primaryMenuIndex].secondary[secondaryMenuIndex].action == variableOption){
                 if (uiSM.vars.clearScreen)
                     redrawParameter = true;

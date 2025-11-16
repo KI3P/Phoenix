@@ -41,7 +41,26 @@ void DrawEqualizerAdjustment(void){
         tft.fillWindow();
         tft.writeTo(L1);
         uiSM.vars.clearScreen = false;
-                
+        
+        tft.setFontDefault();
+        tft.setFontScale((enum RA8875tsize)1);
+        tft.setCursor(10,10);
+        tft.print("Receive Equalizer");
+
+        tft.setCursor(10,290);
+        tft.print("Transmit Equalizer");
+
+        tft.setFontScale((enum RA8875tsize)0);
+        tft.setCursor(50,60);
+        tft.print("100");
+        tft.setCursor(50,160);
+        tft.print("  0");
+
+        tft.setCursor(50,340);
+        tft.print("100");
+        tft.setCursor(50,440);
+        tft.print("  0");
+
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
             WindowPanes[i]->stale = true;
         }
@@ -76,13 +95,22 @@ void DecrementEqualizerSelection(void){
         cellSelection = EQUALIZER_CELL_COUNT-1;
 }
 
+static const int16_t increments[] = {1,10};
+static uint8_t incIndex = 0;
+
+void AdjustEqualizerIncrement(void){
+    incIndex++;
+    if (incIndex >= sizeof(increments)/sizeof(increments[0]))
+        incIndex = 0;
+}
+
 void IncrementEqualizerValue(void){
     int32_t *equalizer;
     if (rxtxSelection == RECEIVE)
         equalizer = ED.equalizerRec;
     else
         equalizer = ED.equalizerXmt;
-    equalizer[cellSelection]++;
+    equalizer[cellSelection] += increments[incIndex];
     if (equalizer[cellSelection] > 100)
         equalizer[cellSelection] = 100;
 }
@@ -93,7 +121,7 @@ void DecrementEqualizerValue(void){
         equalizer = ED.equalizerRec;
     else
         equalizer = ED.equalizerXmt;
-    equalizer[cellSelection]--;
+    equalizer[cellSelection] -= increments[incIndex];
     if (equalizer[cellSelection] < 0)
         equalizer[cellSelection] = 0;
 }
@@ -214,7 +242,7 @@ void DrawInstructionsPane(void) {
     tft.print("* Press button 15 to alternate");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    between RX and TX equalizers.");
+    tft.print("    between RX & TX equalizers.");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     tft.print("* Press button 16 to change the");
@@ -236,15 +264,6 @@ void DrawInstructionsPane(void) {
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     tft.print(" * Press Home to save and exit.");
-}
-
-static const int16_t increments[] = {1,10};
-static uint8_t incIndex = 0;
-
-void AdjustEqualizerIncrement(void){
-    incIndex++;
-    if (incIndex >= sizeof(increments)/sizeof(increments[0]))
-        incIndex = 0;
 }
 
 static uint8_t oldindex = 5;

@@ -622,7 +622,6 @@ char *TX_write( char* cmd ){
     return obuf;
 }
 
-static char buff[30];
 /**
  * CAT command ED - Dump EEPROM data structure to Serial (non-standard Kenwood command)
  * @param cmd CAT command string
@@ -630,114 +629,7 @@ static char buff[30];
  */
 char *ED_read(  char* cmd  ){
     // Print out the state of the EEPROM data
-    Serial.println("=== ED Struct Contents ===");
-    Serial.print("agc:               "); Serial.println(ED.agc);
-    Serial.print("audioVolume:       "); Serial.println(ED.audioVolume);
-    Serial.print("rfGainAllBands_dB: "); Serial.println(ED.rfGainAllBands_dB);
-    Serial.print("stepFineTune:      "); Serial.println(ED.stepFineTune);
-    Serial.print("nrOptionSelect:    "); Serial.println(ED.nrOptionSelect);
-    Serial.print("ANR_notchOn:       "); Serial.println(ED.ANR_notchOn);
-    Serial.print("spectrumScale:     "); Serial.println(ED.spectrumScale);
-    Serial.print("spectrumNoiseFloor:");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.spectrumNoiseFloor[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-    Serial.print("spectrum_zoom:     "); Serial.println(ED.spectrum_zoom);
-    Serial.print("CWFilterIndex:     "); Serial.println(ED.CWFilterIndex);
-    Serial.print("CWToneIndex:       "); Serial.println(ED.CWToneIndex);
-    Serial.print("decoderFlag:       "); Serial.println(ED.decoderFlag);
-    Serial.print("keyType:           "); Serial.println(ED.keyType);
-    Serial.print("currentWPM:        "); Serial.println(ED.currentWPM);
-    Serial.print("sidetoneVolume:    "); Serial.println(ED.sidetoneVolume);
-    Serial.print("freqIncrement:     "); Serial.println(ED.freqIncrement);
-    Serial.print("freqCorrectionFactor: "); Serial.println(ED.freqCorrectionFactor);
-    Serial.print("activeVFO:         "); Serial.println(ED.activeVFO);
-    Serial.print("currentBand[0]:    "); Serial.println(ED.currentBand[0]);
-    Serial.print("currentBand[1]:    "); Serial.println(ED.currentBand[1]);
-    Serial.print("centerFreq_Hz[0]:  "); Serial.println(ED.centerFreq_Hz[0]);
-    Serial.print("centerFreq_Hz[1]:  "); Serial.println(ED.centerFreq_Hz[1]);
-    Serial.print("fineTuneFreq_Hz[0]: "); Serial.println(ED.fineTuneFreq_Hz[0]);
-    Serial.print("fineTuneFreq_Hz[1]: "); Serial.println(ED.fineTuneFreq_Hz[1]);
-    Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
-    Serial.print("dbm_calibration: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.dbm_calibration[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-    Serial.print("keyerFlip:         "); Serial.println(ED.keyerFlip);
-
-    Serial.print("equalizerRec: ");
-    for(int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        Serial.print(ED.equalizerRec[i]);
-        if(i < EQUALIZER_CELL_COUNT-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("equalizerXmt: ");
-    for(int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        Serial.print(ED.equalizerXmt[i]);
-        if(i < EQUALIZER_CELL_COUNT-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("powerOutCW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.powerOutCW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("powerOutSSB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.powerOutSSB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("IQAmpCorrectionFactor: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        sprintf(buff,"%4.3f",ED.IQAmpCorrectionFactor[i]);
-        Serial.print(buff);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("IQPhaseCorrectionFactor: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        sprintf(buff,"%4.3f",ED.IQPhaseCorrectionFactor[i]);
-        Serial.print(buff);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("IQXAmpCorrectionFactor: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        sprintf(buff,"%4.3f",ED.IQXAmpCorrectionFactor[i]);
-        Serial.print(buff);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("IQXPhaseCorrectionFactor: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        sprintf(buff,"%4.3f",ED.IQXPhaseCorrectionFactor[i]);
-        Serial.print(buff);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("antennaSelection: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.antennaSelection[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.println("=== End ED Struct ===");
-
+    PrintEDToSerial();
     sprintf( obuf, "ED;");
     return obuf;
 }

@@ -617,6 +617,7 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_EQUALIZER):{
             switch (button){
                 case HOME_SCREEN:{
+                    SaveDataToStorage(false);
                     UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
                     break;
                 }
@@ -636,7 +637,7 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (button){
                 case HOME_SCREEN:{
-                    SaveDataToStorage();
+                    SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
@@ -663,7 +664,7 @@ void HandleButtonPress(int32_t button){
             switch (button){
                 case HOME_SCREEN:{
                     // Force a save here
-                    SaveDataToStorage();
+                    SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
@@ -711,7 +712,7 @@ void HandleButtonPress(int32_t button){
             switch (button){
                 case HOME_SCREEN:{
                     // Force a save here
-                    SaveDataToStorage();
+                    SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
@@ -1225,7 +1226,7 @@ void ConsumeInterrupt(void){
  */
 void ShutdownTeensy(void){
     // Do whatever is needed before cutting power here
-    SaveDataToStorage();
+    SaveDataToStorage(true);
     
     // Tell the ATTiny that we have finished shutdown and it's safe to power off
     digitalWrite(SHUTDOWN_COMPLETE, 1);

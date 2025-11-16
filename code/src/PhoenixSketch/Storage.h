@@ -10,12 +10,20 @@
 void RestoreDataFromStorage(void);
 
 /**
+ * @brief Restore radio configuration from SD card storage
+ * @note Attempts to load config from SD card if available
+ * @note Deserializes JSON configuration file to populate ED (EEPROMData) structure
+ * @note Saves the new data to internal flash file system
+ */
+void RestoreDataFromSDCard(void);
+
+/**
  * @brief Save radio configuration to persistent storage
  * @note Serializes ED (EEPROMData) structure to JSON format
  * @note Saves to both LittleFS program flash (1MB) and SD card if present
  * @note Configuration includes VFO settings, band data, calibration, and all user preferences
  */
-void SaveDataToStorage(void);
+void SaveDataToStorage(bool savetosd);
 
 /**
  * @brief Initialize persistent storage subsystems
@@ -24,5 +32,10 @@ void SaveDataToStorage(void);
  * @note Automatically calls RestoreDataFromStorage() after initialization
  */
 void InitializeStorage(void);
+
+/**
+ * @brief Print ED structure over Serial link
+ */
+void PrintEDToSerial(void);
 
 #endif // STORAGE_H
