@@ -206,6 +206,7 @@ void StartMillis(void){
 
 void AddMillisTime(uint64_t delta_ms){
     tstart -= delta_ms;
+    tstartMicros -= delta_ms * 1000;  // Also advance micros() for timing tests
 }
 
 int64_t millis(void){
