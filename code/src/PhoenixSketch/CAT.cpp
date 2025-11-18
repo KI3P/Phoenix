@@ -54,6 +54,8 @@ char *RX_write( char* cmd );
 char *SA_write( char* cmd );
 char *SA_read(  char* cmd );
 char *TX_write( char* cmd );
+char *VX_write( char* cmd );
+char *VX_read( char* cmd );
 char *ED_read(  char* cmd );
 char *PR_read( char* cmd);
 
@@ -68,7 +70,7 @@ typedef struct  {
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 22
+#define NUM_SUPPORTED_COMMANDS 23
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 7,  4, AG_write, AG_read },  //audio gain
@@ -89,8 +91,9 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "PC", 6,  3, PC_write, PC_read }, // output power
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
         { "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
-        { "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
-        { "TX", 4,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
+        { "RX", 3,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
+        { "TX", 3,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
+        { "VX", 3+1, 3, VX_write, VX_read }, // VOX write/read
         { "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
         { "PR", 0,  3, unsupported_cmd, PR_read } // print out the state of the hardware register -- NOT a Kenwood keyword
     };
@@ -153,6 +156,7 @@ char *DB_write( char* cmd  ){
     return empty_string_p;
 }
 
+void AdjustBand(void); // in Loop.cpp
 /**
  * Set VFO frequency and save previous frequency to lastFrequencies array
  * @param freq Frequency in Hz to set
@@ -171,6 +175,7 @@ void set_vfo(int64_t freq, uint8_t vfo){
     // Set the frequencies
     ED.centerFreq_Hz[vfo] = freq + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[vfo] = 0;
+    AdjustBand();
     SetInterrupt(iUPDATE_TUNE);
 }
 
@@ -219,7 +224,7 @@ char *FA_read(  char* cmd  ){
  */
 char *FB_write( char* cmd  ){
     long freq = atol( &cmd[ 2 ] );
-    set_vfo_b( freq );
+    set_vfo_a( freq ); // was set vfo_a
     sprintf( obuf, "FB%011ld;", freq );
     return obuf;
 }
@@ -332,7 +337,7 @@ char *IF_read(  char* cmd ){
     }
 
     sprintf( obuf,
-             "IF%011lld%04ld%+06d%d%d%d%02d%d%d%d%d%d%d%02d%d;",
+             "IF%011lld%04ld%+06d%d%d%d%02d%d%d%d%d%d%d%02d;",
              ED.centerFreq_Hz[ED.activeVFO],
              ED.freqIncrement, // freqIncrement 
              0, // rit
@@ -345,8 +350,8 @@ char *IF_read(  char* cmd ){
              0, // Scan Status
              0, // split,
              0, // CTCSS enabled
-             0, // CTCSS
-             0 );
+             0 // CTCSS
+              );
     return obuf;
 }
 
@@ -584,6 +589,7 @@ char *PS_read(  char* cmd ){
  * @return Response "RX0;" after releasing PTT or key depending on current mode
  */
 char *RX_write( char* cmd ){
+    Debug("Issuing PTT released");
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_TRANSMIT):{
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
@@ -596,7 +602,7 @@ char *RX_write( char* cmd ){
         default:
             break;
     }
-    sprintf( obuf, "RX0;");
+    sprintf( obuf, ""); // was RX0
     return obuf;   // We'll support that later.
 }
 
@@ -606,6 +612,7 @@ char *RX_write( char* cmd ){
  * @return Response "TX0;" after pressing PTT or key depending on current mode
  */
 char *TX_write( char* cmd ){
+    Debug("Issuing PTT pressed");
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_RECEIVE):{
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
@@ -618,7 +625,19 @@ char *TX_write( char* cmd ){
         default:
             break;
     }
-    sprintf( obuf, "TX0;");
+    sprintf( obuf, ""); // was TX0
+    return obuf;
+}
+
+char *VX_write( char* cmd ){
+    Debug("Got VX write, ignore");
+    sprintf( obuf, ""); // expects no reply
+    return obuf;
+}
+
+char *VX_read( char* cmd ){
+    Debug("Got VX read, ignore");
+    sprintf( obuf, "VX0;");
     return obuf;
 }
 
@@ -721,7 +740,7 @@ void CheckForCATSerialEvents(void){
  */
 char *command_parser( char* command ){
     // loop through the entire list of supported commands
-    //Serial.println( String("command_parser(): cmd is ") + String(command) );
+    //Debug( String("command_parser(): cmd is ") + String(command) );
     for( int i = 0; i < NUM_SUPPORTED_COMMANDS; i++ ){
         if( ! strncmp( command, valid_commands[ i ].name, 2 ) ){
             //Serial.println( String("command_parser(): found ") + String(valid_commands[i].name) );
@@ -742,6 +761,7 @@ char *command_parser( char* command ){
             return obuf;
         }
     }
+    Debug("Unrecognized command:"+String(command));
     // Went through the list, nothing found.
     sprintf( obuf, "?;");
     return obuf;
