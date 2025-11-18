@@ -344,9 +344,8 @@ extern struct dispSc displayScale[];
  * Calculate vertical pixel position for a spectrum FFT bin.
  */
 FASTRUN int16_t pixeln(uint32_t i){
-    int16_t result = displayScale[0].baseOffset + // 20dB scale
-                    20 + // pixeloffset
-                    (int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
+    int16_t zeroPoint = -1*(int16_t)((-124.0 - RECEIVE_POWER_OFFSET)/10.0*displayScale[ED.spectrumScale].dBScale);
+    int16_t result = zeroPoint+(int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
     return result;
 }
 

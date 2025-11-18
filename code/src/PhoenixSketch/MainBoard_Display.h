@@ -39,8 +39,6 @@ struct dispSc {
     const char *dbText;           ///< Text label for this scale (e.g., "10dB/div")
     float32_t dBScale;            ///< Number of dB per division
     uint16_t pixelsPerDB;         ///< Pixel height per dB
-    uint16_t baseOffset;          ///< Base vertical offset in pixels
-    float32_t offsetIncrement;    ///< Offset adjustment per step
 };
 
 // Helper function declarations

@@ -493,12 +493,6 @@ VariableParameter spectrumscale = {
     .limits = {.i32 = {.min = 0, .max=4, .step=1}}
 };
 
-VariableParameter spectrumFloorAuto = {
-    .variable = &ED.spectrumFloorAuto,
-    .type = TYPE_I8,
-    .limits = {.i8 = {.min = 0, .max=1, .step=1}}
-};
-
 /**
  * Post-update callback when spectrum scale is modified.
  * Marks the spectrum pane as stale to trigger a redraw with the new scale.
@@ -508,7 +502,16 @@ void ScaleUpdated(void){
     PaneSpectrum.stale = true;
 }
 
-struct SecondaryMenuOption DisplayOptions[2] = {
+void EnableAutonoisefloor(void){
+    ED.spectrumFloorAuto = 1;
+}
+void DisableAutonoisefloor(void){
+    ED.spectrumFloorAuto = 0;
+}
+
+struct SecondaryMenuOption DisplayOptions[4] = {
+    "Auto spectrum floor", functionOption, NULL, (void *)EnableAutonoisefloor, NULL,
+    "Manual spectrum floor", functionOption, NULL, (void *)DisableAutonoisefloor, NULL,
     "Spectrum floor", variableOption, &spectrumfloor, NULL, NULL,
     "Spectrum scale", variableOption, &spectrumscale, NULL, (void *)ScaleUpdated,
 };

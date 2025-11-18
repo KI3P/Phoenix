@@ -312,7 +312,6 @@ struct band {
     float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
     uint8_t band_type;      /** UNUSED */
     int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
-    int16_t pixel_offset;   /** Offset the spectrum in display plot */
 };
 
 /** Contains the block of audio time samples being processed */
