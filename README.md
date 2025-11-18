@@ -119,6 +119,19 @@ The libraries to install using this process are:
 
 * OpenAudio: [https://github.com/chipaudette/OpenAudio_ArduinoLibrary](https://github.com/chipaudette/OpenAudio_ArduinoLibrary)
 
+Configure the Arduino IDE to compile with the following settings:
+
+* Dual Serial
+* 600 MHz
+* Fast with LTO
+
+You should see the following memory usage when compilation is complete:
+```
+Memory Usage on Teensy 4.1:
+  FLASH: code:268796, data:63384, headers:8808   free for files:7785476
+   RAM1: variables:121888, code:265608, padding:29304   free for local variables:107488
+   RAM2: variables:300480  free for malloc/new:223808
+```
 
 ## StateSmith
 

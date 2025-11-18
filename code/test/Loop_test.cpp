@@ -644,8 +644,8 @@ TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
 
     // The sequence should have multiple buffer entries with time gaps
     // RFReceive sequence: CWoff, DisableCWVFOOutput, SetTXAttenuation(31.5), TXBypassBPF,
-    // SelectXVTR, Bypass100WPA, **50ms delay**, RXSelectBPF, UpdateTuneState, SetRXAttenuation,
-    // EnableSSBVFOOutput, DisableCalFeedback, **50ms delay**, SelectRXMode, **50ms delay**, SetTXAttenuation
+    // SelectXVTR, Bypass100WPA, **10ms delay**, RXSelectBPF, UpdateTuneState, SetRXAttenuation,
+    // EnableSSBVFOOutput, DisableCalFeedback, **10ms delay**, SelectRXMode, **20ms delay**, SetTXAttenuation
 
     // Verify we have multiple buffer entries (should be 10+ hardware operations)
     EXPECT_GE(buffer.count, 10);
@@ -654,20 +654,31 @@ TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
     std::vector<size_t> delay_indices;
     for (size_t i = 1; i < buffer.count; i++) {
         uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
-        // Look for gaps > 45ms (allowing some tolerance for the 50ms delays)
-        if (time_gap > 45000) { // 45ms in microseconds
+        // Look for gaps > 8ms (allowing some tolerance for the delays)
+        if (time_gap > 8000) { // 8ms in microseconds
             delay_indices.push_back(i);
         }
     }
 
-    // Should have 3 delay points in the RFReceive sequence
+    // Should have 3 delay points in the RFReceive sequence (10ms, 10ms, 20ms)
     EXPECT_EQ(delay_indices.size(), 3);
 
-    // Verify the delays are approximately 50ms each
-    for (size_t idx : delay_indices) {
-        uint32_t time_gap = buffer.entries[idx].timestamp - buffer.entries[idx-1].timestamp;
-        EXPECT_GE(time_gap, 45000); // At least 45ms
-        EXPECT_LE(time_gap, 55000); // At most 55ms (allowing some tolerance)
+    // Verify the delays are approximately correct (10ms, 10ms, 20ms)
+    if (delay_indices.size() >= 3) {
+        // First delay: 10ms
+        uint32_t time_gap = buffer.entries[delay_indices[0]].timestamp - buffer.entries[delay_indices[0]-1].timestamp;
+        EXPECT_GE(time_gap, 8000);  // At least 8ms
+        EXPECT_LE(time_gap, 12000); // At most 12ms
+
+        // Second delay: 10ms
+        time_gap = buffer.entries[delay_indices[1]].timestamp - buffer.entries[delay_indices[1]-1].timestamp;
+        EXPECT_GE(time_gap, 8000);  // At least 8ms
+        EXPECT_LE(time_gap, 12000); // At most 12ms
+
+        // Third delay: 20ms
+        time_gap = buffer.entries[delay_indices[2]].timestamp - buffer.entries[delay_indices[2]-1].timestamp;
+        EXPECT_GE(time_gap, 18000); // At least 18ms
+        EXPECT_LE(time_gap, 22000); // At most 22ms
     }
 }
 
@@ -695,9 +706,9 @@ TEST(Loop, HardwareStateMachineRFTransmitTimingDelays) {
     UpdateRFHardwareState(); // This should trigger the transmit sequence with delays
 
     // The sequence should have multiple buffer entries
-    // RFTransmit sequence: RXBypassBPF, DisableCalFeedback, **50ms delay**, SetTXAttenuation,
+    // RFTransmit sequence: RXBypassBPF, DisableCalFeedback, **10ms delay**, SetTXAttenuation,
     // DisableCWVFOOutput, CWoff, UpdateTuneState, EnableSSBVFOOutput, SelectTXSSBModulation,
-    // TXSelectBPF, BypassXVTR, Bypass100WPA, **50ms delay**, SelectTXMode
+    // TXSelectBPF, BypassXVTR, Bypass100WPA, **10ms delay**, SelectTXMode
 
     // Verify we have multiple buffer entries (should be 10+ hardware operations)
     EXPECT_GE(buffer.count, 10);
@@ -706,20 +717,20 @@ TEST(Loop, HardwareStateMachineRFTransmitTimingDelays) {
     std::vector<size_t> delay_indices;
     for (size_t i = 1; i < buffer.count; i++) {
         uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
-        // Look for gaps > 45ms (allowing some tolerance for the 50ms delays)
-        if (time_gap > 45000) { // 45ms in microseconds
+        // Look for gaps > 8ms (allowing some tolerance for the 10ms delays)
+        if (time_gap > 8000) { // 8ms in microseconds
             delay_indices.push_back(i);
         }
     }
 
-    // Should have 2 delay points in the RFTransmit sequence
+    // Should have 2 delay points in the RFTransmit sequence (10ms, 10ms)
     EXPECT_EQ(delay_indices.size(), 2);
 
-    // Verify the delays are approximately 50ms each
+    // Verify the delays are approximately 10ms each
     for (size_t idx : delay_indices) {
         uint32_t time_gap = buffer.entries[idx].timestamp - buffer.entries[idx-1].timestamp;
-        EXPECT_GE(time_gap, 45000); // At least 45ms
-        EXPECT_LE(time_gap, 55000); // At most 55ms (allowing some tolerance)
+        EXPECT_GE(time_gap, 8000);  // At least 8ms
+        EXPECT_LE(time_gap, 12000); // At most 12ms (allowing some tolerance)
     }
 }
 
@@ -749,7 +760,7 @@ TEST(Loop, HardwareStateMachineRFCWMarkTimingDelays) {
     // The sequence should have multiple buffer entries
     // RFCWMark sequence (from non-CWSpace): RXBypassBPF, DisableCalFeedback, SetTXAttenuation,
     // DisableSSBVFOOutput, UpdateTuneState, EnableCWVFOOutput, SelectTXCWModulation,
-    // TXSelectBPF, BypassXVTR, Bypass100WPA, SelectTXMode, **50ms delay**, CWon
+    // TXSelectBPF, BypassXVTR, Bypass100WPA, SelectTXMode, **20ms delay**, CWon
 
     // Verify we have multiple buffer entries (should be 10+ hardware operations)
     EXPECT_GE(buffer.count, 10);
@@ -758,8 +769,8 @@ TEST(Loop, HardwareStateMachineRFCWMarkTimingDelays) {
     std::vector<size_t> delay_indices;
     for (size_t i = 1; i < buffer.count; i++) {
         uint32_t time_gap = buffer.entries[i].timestamp - buffer.entries[i-1].timestamp;
-        // Look for gaps > 45ms (allowing some tolerance for the 50ms delays)
-        if (time_gap > 45000) { // 45ms in microseconds
+        // Look for gaps > 18ms (allowing some tolerance for the 20ms delay)
+        if (time_gap > 18000) { // 18ms in microseconds
             delay_indices.push_back(i);
         }
     }
@@ -767,12 +778,12 @@ TEST(Loop, HardwareStateMachineRFCWMarkTimingDelays) {
     // Should have 1 delay point in the RFCWMark sequence (before CWon)
     EXPECT_EQ(delay_indices.size(), 1);
 
-    // Verify the delay is approximately 50ms
+    // Verify the delay is approximately 20ms
     if (delay_indices.size() >= 1) {
         size_t idx = delay_indices[0];
         uint32_t time_gap = buffer.entries[idx].timestamp - buffer.entries[idx-1].timestamp;
-        EXPECT_GE(time_gap, 45000); // At least 45ms
-        EXPECT_LE(time_gap, 55000); // At most 55ms (allowing some tolerance)
+        EXPECT_GE(time_gap, 18000); // At least 18ms
+        EXPECT_LE(time_gap, 22000); // At most 22ms (allowing some tolerance)
     }
 }
 
@@ -869,10 +880,10 @@ TEST(Loop, HardwareStateMachineTimingSequenceVerification) {
     UpdateRFHardwareState();
     uint32_t end_time = micros();
 
-    // The total time should include the delays (should be ~100ms)
+    // The total time should include the delays (should be ~20ms)
     uint32_t total_time = end_time - start_time;
-    EXPECT_GE(total_time, 90000);  // At least 90ms (2 x 50ms delays - some tolerance)
-    EXPECT_LE(total_time, 150000); // At most 150ms (allowing for processing overhead)
+    EXPECT_GE(total_time, 18000);  // At least 18ms (2 x 10ms delays - some tolerance)
+    EXPECT_LE(total_time, 30000);  // At most 30ms (allowing for processing overhead)
 
     size_t transmit_entries = buffer.count;
     EXPECT_GE(transmit_entries, 10); // Should have multiple hardware operations
@@ -886,10 +897,10 @@ TEST(Loop, HardwareStateMachineTimingSequenceVerification) {
     UpdateRFHardwareState();
     end_time = micros();
 
-    // The total time should include the delays (should be ~150ms)
+    // The total time should include the delays (should be ~40ms)
     total_time = end_time - start_time;
-    EXPECT_GE(total_time, 135000); // At least 135ms (3 x 50ms delays - some tolerance)
-    EXPECT_LE(total_time, 200000); // At most 200ms (allowing for processing overhead)
+    EXPECT_GE(total_time, 36000); // At least 36ms (10ms + 10ms + 20ms delays - some tolerance)
+    EXPECT_LE(total_time, 50000); // At most 50ms (allowing for processing overhead)
 
     size_t receive_entries = buffer.count;
     EXPECT_GE(receive_entries, 12); // Should have more hardware operations than transmit
@@ -959,12 +970,12 @@ TEST(Loop, HardwareStateMachineDelayOrderingVerification) {
     // Find delay boundaries (large time gaps)
     std::vector<size_t> delay_boundaries;
     for (size_t i = 1; i < operation_times.size(); i++) {
-        if (operation_times[i] - operation_times[i-1] > 45000) { // 45ms threshold
+        if (operation_times[i] - operation_times[i-1] > 8000) { // 8ms threshold (allows for 10ms and 20ms delays)
             delay_boundaries.push_back(i);
         }
     }
 
-    // Verify we have the expected 3 delays for receive sequence
+    // Verify we have the expected 3 delays for receive sequence (10ms, 10ms, 20ms)
     EXPECT_EQ(delay_boundaries.size(), 3);
 
     if (delay_boundaries.size() >= 3) {
