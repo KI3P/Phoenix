@@ -2,7 +2,7 @@
 #define SDT_H
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx Beta"
+#define VERSION "Phx V1RC2"
 
 #include "BuildInfo.h"
 
