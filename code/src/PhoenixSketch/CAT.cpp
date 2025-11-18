@@ -338,11 +338,11 @@ char *IF_read(  char* cmd ){
     sprintf( obuf,
             //  P1     P2   P3   P4P5P6P7  P8P9P10 P12 P14 P15
             //                                   P11 P13
-             "IF%011lld     %+04d%d%d%d%02d%d%d%d%d%d%d%02d ;",
+             "IF%011lld     %+05d%d%d%d%02d%d%d%d%d%d%d%02d ;",
              GetTXRXFreq(ED.activeVFO),  // P1: frequency
              // P2 is 5 spaces
              0, // P3: rit/xit frequency
-             0, // P4: rit enabled
+             1, // P4: rit enabled
              0, // P5: xit enabled
              0, // P6: always 0, Channel bank
              0, // P7: memory channel number
