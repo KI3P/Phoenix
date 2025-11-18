@@ -244,6 +244,7 @@ extern struct config_t {
     uint8_t ANR_notchOn = 0;        /** Automatic notch filter on/off */
     int32_t spectrumScale = 1;      /** dB/pixel selection for spectrum display */
     int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50}; /** Shift spectrum up/down on display */
+    int8_t spectrumFloorAuto = 1;   /** Automatically adjust the spectrum floor */
     uint32_t spectrum_zoom = 1;     /** Zoom level for spectrum */
     int32_t CWFilterIndex = 5;      /** Selects the receive CW audio filter */
     int32_t CWToneIndex = 3;        /** Selects the transmitted CW tone frequency */

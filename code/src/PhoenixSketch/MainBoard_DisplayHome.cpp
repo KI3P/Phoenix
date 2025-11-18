@@ -83,6 +83,7 @@ static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMo
 // DISPLAY SCALE AND COLOR STRUCTURES (HOME SCREEN SPECIFIC)
 ///////////////////////////////////////////////////////////////////////////////
 
+// dbText, dBScale, pixelsPerDB, baseOffset, offsetIncrement
 struct dispSc displayScale[] = {
     { "20 dB/", 10.0, 2, 24, 1.00 },
     { "10 dB/", 20.0, 4, 10, 0.50 },

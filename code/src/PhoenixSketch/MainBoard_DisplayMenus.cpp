@@ -493,6 +493,12 @@ VariableParameter spectrumscale = {
     .limits = {.i32 = {.min = 0, .max=4, .step=1}}
 };
 
+VariableParameter spectrumFloorAuto = {
+    .variable = &ED.spectrumFloorAuto,
+    .type = TYPE_I8,
+    .limits = {.i8 = {.min = 0, .max=1, .step=1}}
+};
+
 /**
  * Post-update callback when spectrum scale is modified.
  * Marks the spectrum pane as stale to trigger a redraw with the new scale.

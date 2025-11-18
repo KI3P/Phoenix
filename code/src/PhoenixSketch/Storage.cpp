@@ -624,6 +624,27 @@ void PrintEDToSerial(void){
     }
     Serial.println();
 
+    Serial.print("RAtten: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.RAtten[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("XAttenCW: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.XAttenCW[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("XAtteSSB: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.XAttenSSB[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
     Serial.print("powerOutSSB: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.powerOutSSB[i]);
