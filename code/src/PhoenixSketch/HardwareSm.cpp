@@ -182,20 +182,21 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
         case RFReceive:{
             // First, do things that reduce the transmitted power
 
-            // Set cwState to LO
-            CWoff();
+            // Set cwState to LO                             //  Duration | Total
+            CWoff();                                            // <<1ms  | < 1ms
             // Set clockEnableCW to LO
-            DisableCWVFOOutput();
-            SetTXAttenuation(31.5);
-            TXBypassBPF(); // BPF out of TX path
-            SelectXVTR();  // Shunt the TX path to nothing
-            Bypass100WPA(); // always bypassed
+            DisableCWVFOOutput();                               // ~ 1ms  | < 2ms
+            SetTXAttenuation(31.5);                             // ~ 1ms  | < 3ms
+            TXBypassBPF(); // BPF out of TX path                // ~ 1ms  | < 4ms
+            SelectXVTR();  // Shunt the TX path to nothing      // ~ 1ms  | < 5ms
+            Bypass100WPA(); // always bypassed                  // 0 ms   | < 5ms
             // Wait to make sure all the above have happened
-            MyDelay(50);
+            // This settling time is probably unnecessary
+            MyDelay(10);                                        // 10ms   | <15 ms  
             
             // Now, switch in the receive path hardware
             // Set frequency
-            RXSelectBPF(); // BPF in to RX path
+            RXSelectBPF(); // BPF in to RX path                 // ~1ms   | <16 ms
             UpdateTuneState();
             // Set GPA state to appropriate value
             SetRXAttenuation( ED.RAtten[ED.currentBand[ED.activeVFO]] );
@@ -207,11 +208,12 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Make sure calFeedbackState is LO
             DisableCalFeedback();
             // Wait to make sure all these changes have happened
-            MyDelay(50);
+            // This settling time is probably unnecessary
+            MyDelay(10);
             // Set rxtxState to LO (RX)
             SelectRXMode();
-            // Wait for the relay to switch
-            MyDelay(50);
+            // Wait for the relay to switch. This takes about 6 ms. Wait a little longer
+            MyDelay(20);
             SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
             break;
         }
@@ -220,7 +222,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             RXBypassBPF(); // BPF out of RX path
             // Set calFeedbackState to LO
             DisableCalFeedback();
-            MyDelay(50);
+            MyDelay(10);
 
             // Start configuring the transmit chain
             // Set GPB state to appropriate value
@@ -243,7 +245,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             BypassXVTR();  // Bypass XVTR
             Bypass100WPA(); // always bypassed
 
-            MyDelay(50);
+            MyDelay(10);
             // Set rxtxState to HI (TX)
             SelectTXMode();
             
@@ -275,7 +277,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 SelectTXMode();
                 // Potential issue here if we don't wait for the relay to switch before
                 // we turn the CW signal on.
-                MyDelay(50);
+                MyDelay(20);
             }
             // Set cwState to HI
             CWon();
@@ -321,7 +323,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             TXBypassBPF(); // BPF out of TX path
             SelectXVTR();  // Shunt the TX path to nothing
             Bypass100WPA(); // always bypassed
-            MyDelay(50);
+            MyDelay(10);
 
             // Now, switch in the receive path hardware
             // Set frequency
@@ -337,7 +339,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Make sure calFeedbackState is HI
             EnableCalFeedback();
             // Wait to make sure all these changes have happened
-            MyDelay(50);
+            MyDelay(10);
             // Set rxtxState to LO (RX)
             SelectRXMode();
             

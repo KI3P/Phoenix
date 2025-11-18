@@ -82,13 +82,13 @@ static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMo
 ///////////////////////////////////////////////////////////////////////////////
 // DISPLAY SCALE AND COLOR STRUCTURES (HOME SCREEN SPECIFIC)
 ///////////////////////////////////////////////////////////////////////////////
-
+// dbText, dBScale, pixelsPerDB
 struct dispSc displayScale[] = {
-    { "20 dB/", 10.0, 2, 24, 1.00 },
-    { "10 dB/", 20.0, 4, 10, 0.50 },
-    { "5 dB/", 40.0, 8, 58, 0.25 },
-    { "2 dB/", 100.0, 20, 120, 0.10 },
-    { "1 dB/", 200.0, 40, 200, 0.05 }
+    { "20 dB/", 10.0, 2},
+    { "10 dB/", 20.0, 4},
+    { "5 dB/",  40.0, 8},
+    { "2 dB/", 100.0, 20},
+    { "1 dB/", 200.0, 40}
 };
 
 const uint16_t gradient[] = {
@@ -191,19 +191,6 @@ FASTRUN int16_t FreqToBin(int64_t freq_Hz){
     if (val < 0) val = 0;
     if (val > SPECTRUM_RES) val = SPECTRUM_RES;
     return val;
-}
-
-/**
- * Calculate vertical pixel position for a spectrum FFT bin.
- */
-FASTRUN int16_t pixelnew(uint32_t i){
-    int16_t result = displayScale[ED.spectrumScale].baseOffset +
-                    bands[ED.currentBand[ED.activeVFO]].pixel_offset +
-                    (int16_t)(displayScale[ED.spectrumScale].dBScale * psdnew[i]);
-    if (result < 220)
-        return result;
-    else
-        return 220;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -611,17 +598,41 @@ static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED
 static int16_t y_current = offset;
 static int16_t smeterLength;
 static bool redrawSpectrum = false;
+static int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+static int16_t middleSlice = centerLine / 2;
+static float32_t adjustment = 0.0f; // used by ED.spectrumFloorAuto
+static float32_t newadjust = 0.0f; // used by ED.spectrumFloorAuto
+static int16_t pixelmax = 0; // used by ED.spectrumFloorAuto
+
+/**
+ * Calculate vertical pixel position for a spectrum FFT bin. This is an 
+ * amplitude in pixels such that -124 dBm is at 0 and higher powers are
+ * positive. 
+ * 
+ * Power to zero point pixel location is calculated as follows:
+ *   zeroPoint = (Power [dBm] - RECEIVE_POWER_OFFSET)/10 * dBScale
+ *             = (-124 + 93.15)/10 * 20 = -61.74
+ * 
+ * PSD value at a power of -124 dBm should be roughly:
+ *  (-124+RECEIVE_POWER_OFFSET)/10 = -3.087
+ */
+FASTRUN int16_t pixelnew(uint32_t i){
+    int16_t zeroPoint = -1*(int16_t)((-124.0 - RECEIVE_POWER_OFFSET)/10.0*displayScale[ED.spectrumScale].dBScale);
+    int16_t result = zeroPoint+(int16_t)(displayScale[ED.spectrumScale].dBScale*psdnew[i]);
+    return result;
+}
 
 /**
  * Render the real-time spectrum line display (FASTRUN - executes from RAM).
  */
 FASTRUN void ShowSpectrum(void){
-    int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
-    int16_t middleSlice = centerLine / 2;
-    offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
     for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
         y_left = y_current;
-        y_current = offset - pixelnew(x1);
+        y_current = offset - pixelnew(x1); // offset is line on screen where -124 dBm is located
+        if (ED.spectrumFloorAuto){
+            if (y_current > pixelmax) pixelmax = y_current;
+        }
+        y_current = y_current + (int16_t)adjustment;
         if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
         if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
 
@@ -652,8 +663,20 @@ FASTRUN void ShowSpectrum(void){
             test1 = 117;
         waterfall[x1] = gradient[test1];
     }
-
+    
     if (x1 >= MAX_WATERFALL_WIDTH){
+        // if we're shifting the spectrum automatically, update the adjustment
+        if (ED.spectrumFloorAuto){
+            // our adjustment puts pixelmax (which is minimum power) at the bottom
+            newadjust = float32_t(SPECTRUM_TOP_Y + SPECTRUM_HEIGHT - pixelmax);
+            adjustment = 0.8*adjustment + 0.2*newadjust;
+            pixelmax = 0;
+        } else {
+            adjustment = 0.0;
+        }
+        // In case spectrumNoiseFloor was changed
+        offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
+        
         x1 = 0;
         y_prev = pixelold[0];
         y_current = offset;
@@ -716,6 +739,7 @@ void DrawSpectrumPane(void) {
  * Render the state of health pane showing DSP load and system status.
  */
 void DrawStateOfHealthPane(void) {
+    return; // Remove this line to enable this pane
     if (!PaneStateOfHealth.stale) return;
     if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag))
         return;

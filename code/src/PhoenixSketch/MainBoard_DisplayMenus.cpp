@@ -250,15 +250,26 @@ VariableParameter antenna = {
     .limits = {.i32 = {.min = 0, .max=3, .step=1}}
 };
 
-// Post-update callback functions for RF Set menu
+/**
+ * Post-update callback to apply RX attenuation value to hardware.
+ * Called after rxAtten variable is modified via menu.
+ */
 void UpdateRatten(void){
     SetRXAttenuation(*(float32_t *)rxAtten.variable);
 }
 
+/**
+ * Post-update callback to apply TX attenuation value for CW mode.
+ * Called after txAttenCW variable is modified via menu.
+ */
 void UpdateTXAttenCW(void){
     SetTXAttenuation(*(float32_t *)txAttenCW.variable);
 }
 
+/**
+ * Post-update callback to apply TX attenuation value for SSB mode.
+ * Called after txAttenSSB variable is modified via menu.
+ */
 void UpdateTXAttenSSB(void){
     SetTXAttenuation(*(float32_t *)txAttenSSB.variable);
 }
@@ -280,14 +291,26 @@ VariableParameter wpm = {
     .limits = {.i32 = {.min = 5, .max=50, .step=1}}
 };
 
+/**
+ * Menu callback to select straight key mode for CW operation.
+ * Sets keyType to KeyTypeId_Straight in the EEPROM data structure.
+ */
 void SelectStraightKey(void){
     ED.keyType = KeyTypeId_Straight;
 }
 
+/**
+ * Menu callback to select electronic keyer mode for CW operation.
+ * Sets keyType to KeyTypeId_Keyer in the EEPROM data structure.
+ */
 void SelectKeyer(void){
     ED.keyType = KeyTypeId_Keyer;
 }
 
+/**
+ * Menu callback to flip the paddle configuration (dit/dah swap).
+ * Toggles the keyerFlip flag in the EEPROM data structure.
+ */
 void FlipPaddle(void){
     ED.keyerFlip = !ED.keyerFlip;
 }
@@ -313,23 +336,74 @@ struct SecondaryMenuOption CWOptions[6] = {
     "Sidetone volume", variableOption, &stv, NULL, NULL,
 };
 
-// Audio Options
+/**
+ * Menu callback to disable Automatic Gain Control (AGC).
+ * Sets AGC mode to AGCOff in the EEPROM data structure.
+ */
 void SelectAGCOff(void){ ED.agc = AGCOff; }
+
+/**
+ * Menu callback to set AGC to Long mode (slowest attack/release).
+ * Sets AGC mode to AGCLong in the EEPROM data structure.
+ */
 void SelectAGCLong(void){ ED.agc = AGCLong; }
+
+/**
+ * Menu callback to set AGC to Slow mode.
+ * Sets AGC mode to AGCSlow in the EEPROM data structure.
+ */
 void SelectAGCSlow(void){ ED.agc = AGCSlow; }
+
+/**
+ * Menu callback to set AGC to Medium mode.
+ * Sets AGC mode to AGCMed in the EEPROM data structure.
+ */
 void SelectAGCMedium(void){ ED.agc = AGCMed; }
+
+/**
+ * Menu callback to set AGC to Fast mode (fastest attack/release).
+ * Sets AGC mode to AGCFast in the EEPROM data structure.
+ */
 void SelectAGCFast(void){ ED.agc = AGCFast; }
+
+/**
+ * Menu callback to toggle the automatic notch filter on/off.
+ * Flips the ANR_notchOn flag in the EEPROM data structure.
+ */
 void ToggleAutonotch(void){
     if (ED.ANR_notchOn)
         ED.ANR_notchOn = 0;
-    else 
+    else
         ED.ANR_notchOn = 1;
 }
+/**
+ * Menu callback to disable noise reduction.
+ * Sets noise reduction mode to NROff in the EEPROM data structure.
+ */
 void SelectNROff(void){ ED.nrOptionSelect = NROff; }
+
+/**
+ * Menu callback to enable Kim noise reduction algorithm.
+ * Sets noise reduction mode to NRKim in the EEPROM data structure.
+ */
 void SelectNRKim(void){ ED.nrOptionSelect = NRKim; }
+
+/**
+ * Menu callback to enable spectral noise reduction algorithm.
+ * Sets noise reduction mode to NRSpectral in the EEPROM data structure.
+ */
 void SelectNRSpectral(void){ ED.nrOptionSelect = NRSpectral; }
+
+/**
+ * Menu callback to enable LMS (Least Mean Squares) noise reduction algorithm.
+ * Sets noise reduction mode to NRLMS in the EEPROM data structure.
+ */
 void SelectNRLMS(void){ ED.nrOptionSelect = NRLMS; }
 
+/**
+ * Menu callback to start the equalizer adjustment interface.
+ * Triggers an interrupt to enter the equalizer adjustment mode.
+ */
 void StartEqualizerAdjust(void){
     SetInterrupt(iEQUALIZER);
 }
@@ -366,20 +440,36 @@ VariableParameter rflevelcal = {
     .limits = {.f32 = {.min = -20.0F, .max=50.0F, .step=0.5F}}
 };
 
+/**
+ * Menu callback to start frequency calibration process.
+ * Triggers an interrupt to enter the frequency calibration mode.
+ */
 void StartFreqCal(void){
     SetInterrupt(iCALIBRATE_FREQUENCY);
 }
 
+/**
+ * Menu callback to start receive IQ calibration process.
+ * Triggers an interrupt to enter the RX IQ calibration mode.
+ */
 void StartRXIQCal(void){
-    SetInterrupt(iCALIBRATE_RX_IQ);  
+    SetInterrupt(iCALIBRATE_RX_IQ);
 }
 
+/**
+ * Menu callback to start transmit IQ calibration process.
+ * Triggers an interrupt to enter the TX IQ calibration mode.
+ */
 void StartTXIQCal(void){
-    SetInterrupt(iCALIBRATE_TX_IQ); 
+    SetInterrupt(iCALIBRATE_TX_IQ);
 }
 
+/**
+ * Menu callback to start CW power amplifier calibration process.
+ * Triggers an interrupt to enter the PA power calibration mode.
+ */
 void StartPowerCal(void){
-    SetInterrupt(iCALIBRATE_CW_PA);   
+    SetInterrupt(iCALIBRATE_CW_PA);
 }
 
 struct SecondaryMenuOption CalOptions[5] = {
@@ -403,12 +493,25 @@ VariableParameter spectrumscale = {
     .limits = {.i32 = {.min = 0, .max=4, .step=1}}
 };
 
+/**
+ * Post-update callback when spectrum scale is modified.
+ * Marks the spectrum pane as stale to trigger a redraw with the new scale.
+ */
 void ScaleUpdated(void){
     extern Pane PaneSpectrum;
     PaneSpectrum.stale = true;
 }
 
-struct SecondaryMenuOption DisplayOptions[2] = {
+void EnableAutonoisefloor(void){
+    ED.spectrumFloorAuto = 1;
+}
+void DisableAutonoisefloor(void){
+    ED.spectrumFloorAuto = 0;
+}
+
+struct SecondaryMenuOption DisplayOptions[4] = {
+    "Auto spectrum floor", functionOption, NULL, (void *)EnableAutonoisefloor, NULL,
+    "Manual spectrum floor", functionOption, NULL, (void *)DisableAutonoisefloor, NULL,
     "Spectrum floor", variableOption, &spectrumfloor, NULL, NULL,
     "Spectrum scale", variableOption, &spectrumscale, NULL, (void *)ScaleUpdated,
 };
@@ -526,6 +629,17 @@ void DecrementValue(void){
 // MENU RENDERING FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Render the primary (category) menu labels on the display.
+ *
+ * @param foreground If true, renders in normal foreground mode with current
+ *                   selection highlighted in green. If false, renders in
+ *                   background mode with muted colors.
+ *
+ * Displays all primary menu category names in a vertical list with the
+ * currently selected category highlighted. Also displays the git commit
+ * hash at the bottom of the menu.
+ */
 void PrintMainMenuOptions(bool foreground){
     int16_t x = 10;
     int16_t y = 20;
@@ -563,6 +677,17 @@ void PrintMainMenuOptions(bool foreground){
     tft.print(msg);
 }
 
+/**
+ * Render the secondary (option) menu labels for the current category.
+ *
+ * @param foreground If true, renders in normal foreground mode with current
+ *                   selection highlighted in green. If false, renders in
+ *                   background mode with muted colors.
+ *
+ * Displays all secondary menu option names for the currently selected
+ * primary category in a vertical list with the currently selected
+ * option highlighted.
+ */
 void PrintSecondaryMenuOptions(bool foreground){
     int16_t x = 300;
     int16_t y = 20;
@@ -598,6 +723,19 @@ void PrintSecondaryMenuOptions(bool foreground){
 uint8_t oavfo = 7;   // Previous active VFO value
 int32_t oband = -1;  // Previous band value
 
+/**
+ * Draw the main menu display (MAIN_MENU state).
+ *
+ * This function renders the primary menu categories with the secondary menu
+ * options visible but dimmed. It handles:
+ * - Initial screen clearing when entering the menu state
+ * - Band/VFO change detection to update band-specific variable pointers
+ * - Drawing the yellow border around the menu area
+ * - Rendering primary menu in foreground and secondary menu in background
+ *
+ * The function only executes when in the MAIN_MENU UI state and only redraws
+ * when the redrawMenu flag is set.
+ */
 void DrawMainMenu(void){
     if (!(uiSM.state_id == UISm_StateId_MAIN_MENU)) return;
     if (uiSM.vars.clearScreen){
@@ -625,6 +763,18 @@ void DrawMainMenu(void){
 
 }
 
+/**
+ * Draw the secondary menu display (SECONDARY_MENU state).
+ *
+ * This function renders the secondary menu options with the primary menu
+ * categories visible but dimmed. It handles:
+ * - Initial screen clearing when entering the secondary menu state
+ * - Drawing the yellow border around the menu area
+ * - Rendering primary menu in background and secondary menu in foreground
+ *
+ * The function only executes when in the SECONDARY_MENU UI state and only
+ * redraws when the redrawMenu flag is set.
+ */
 void DrawSecondaryMenu(void){
     if (!(uiSM.state_id == UISm_StateId_SECONDARY_MENU)) return;
     if (uiSM.vars.clearScreen){

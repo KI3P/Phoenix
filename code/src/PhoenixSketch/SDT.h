@@ -2,7 +2,7 @@
 #define SDT_H
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx Alpha"
+#define VERSION "Phx Beta"
 
 #include "BuildInfo.h"
 
@@ -244,6 +244,7 @@ extern struct config_t {
     uint8_t ANR_notchOn = 0;        /** Automatic notch filter on/off */
     int32_t spectrumScale = 1;      /** dB/pixel selection for spectrum display */
     int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50}; /** Shift spectrum up/down on display */
+    int8_t spectrumFloorAuto = 1;   /** Automatically adjust the spectrum floor */
     uint32_t spectrum_zoom = 1;     /** Zoom level for spectrum */
     int32_t CWFilterIndex = 5;      /** Selects the receive CW audio filter */
     int32_t CWToneIndex = 3;        /** Selects the transmitted CW tone frequency */
@@ -311,7 +312,6 @@ struct band {
     float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
     uint8_t band_type;      /** UNUSED */
     int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
-    int16_t pixel_offset;   /** Offset the spectrum in display plot */
 };
 
 /** Contains the block of audio time samples being processed */

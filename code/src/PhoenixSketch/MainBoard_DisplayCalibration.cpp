@@ -2,7 +2,15 @@
  * @file MainBoard_DisplayCalibration.cpp
  * @brief Calibration screens for Phoenix SDR radio calibration
  *
- * @see window_panes.drawio for layouts
+ * This module implements four calibration modes:
+ * 1. Frequency calibration - Uses SAM demodulator to measure and correct reference oscillator error
+ * 2. RX IQ calibration - Adjusts IQ amplitude and phase to minimize sideband rejection
+ * 3. TX IQ calibration - Adjusts transmit IQ to minimize opposite sideband energy
+ * 4. Power calibration - Calibrates transmit power measurement (placeholder)
+ *
+ * Each calibration mode has its own UI state, panes, and adjustment functions.
+ *
+ * @see window_panes.drawio for layout diagrams
  * @see MainBoard_Display.h for menu structure definitions
  * @see MainBoard_Display.cpp for display infrastructure
  */
@@ -15,7 +23,15 @@
 extern RA8875 tft;
 
 ///////////////////////////////////////////////////////////////////////////////
-// Frequency calibration section
+// FREQUENCY CALIBRATION SECTION
+///////////////////////////////////////////////////////////////////////////////
+//
+// Frequency calibration corrects the reference oscillator error by:
+// 1. Tuning to a known reference signal (e.g., WWV, CHU)
+// 2. Using SAM (Synchronous AM) demodulator to measure carrier offset
+// 3. Adjusting freqCorrectionFactor until SAM error approaches zero
+// 4. Correction factor is applied to all VFO frequency calculations
+//
 ///////////////////////////////////////////////////////////////////////////////
 
 static const int8_t NUMBER_OF_FREQ_PANES = 6;
@@ -40,11 +56,20 @@ static Pane* FreqWindowPanes[NUMBER_OF_FREQ_PANES] = {&PaneFreqPlot,&PaneFreqFac
                                     &PaneFreqError,&PaneFreqInstructions,&PaneFreqMod};
 
 
+/**
+ * @brief Render frequency calibration plot pane (placeholder)
+ * @note Reserved for future spectrum/trend plotting
+ */
 static void DrawFreqPlotPane(void){
     // blank for now
 }
 
 static int32_t ofcf = -100000;
+/**
+ * @brief Render the frequency correction factor display pane
+ * @note Shows current freqCorrectionFactor value
+ * @note Updates when user adjusts correction via filter encoder
+ */
 static void DrawFreqFactorPane(void){
     if (ofcf != ED.freqCorrectionFactor)
         PaneFreqFactor.stale = true;
@@ -62,26 +87,48 @@ static void DrawFreqFactorPane(void){
     PaneFreqFactor.stale = false;
 }
 
+// Frequency correction increment values (in Hz)
 const int32_t freqIncrements[] = {1,10,100,1000,10000};
 static uint8_t freqIncrementIndex = 1;
 
+/**
+ * @brief Cycle through frequency correction factor increment values
+ * @note Toggles through: 1, 10, 100, 1000, 10000 Hz
+ * @note Called when user presses button 15
+ */
 void ChangeFrequencyCorrectionFactorIncrement(void){
     freqIncrementIndex++;
     if (freqIncrementIndex > sizeof(freqIncrements)/sizeof(freqIncrements[0]))
         freqIncrementIndex = 0;
 }
 
+/**
+ * @brief Increase frequency correction factor
+ * @note Increments by current increment value
+ * @note Immediately applies correction to Si5351 VFO
+ * @note Called when user rotates filter encoder clockwise
+ */
 void IncreaseFrequencyCorrectionFactor(void){
     ED.freqCorrectionFactor += freqIncrements[freqIncrementIndex];
     SetFrequencyCorrectionFactor(ED.freqCorrectionFactor);
 }
 
+/**
+ * @brief Decrease frequency correction factor
+ * @note Decrements by current increment value
+ * @note Immediately applies correction to Si5351 VFO
+ * @note Called when user rotates filter encoder counter-clockwise
+ */
 void DecreaseFrequencyCorrectionFactor(void){
     ED.freqCorrectionFactor -= freqIncrements[freqIncrementIndex];
     SetFrequencyCorrectionFactor(ED.freqCorrectionFactor);
 }
 
 static int32_t offi = -100000;
+/**
+ * @brief Render the frequency correction increment display pane
+ * @note Shows current adjustment increment (1, 10, 100, 1000, or 10000 Hz)
+ */
 static void DrawFreqFactorIncrPane(void){
     if (offi != freqIncrements[freqIncrementIndex])
         PaneFreqFactorIncr.stale = true;
@@ -100,6 +147,11 @@ static void DrawFreqFactorIncrPane(void){
 }
 
 static ModulationType omod = DCF77;
+/**
+ * @brief Render the modulation mode display pane
+ * @note Shows current modulation (should be SAM for frequency calibration)
+ * @note SAM shown in green (correct), other modes in red (incorrect)
+ */
 static void DrawFreqModulationPane(void){
     if (omod != ED.modulation[ED.activeVFO])
         PaneFreqMod.stale = true;
@@ -135,6 +187,11 @@ static void DrawFreqModulationPane(void){
 }
 
 static float32_t ofe = -100000.0;
+/**
+ * @brief Render the SAM carrier offset error display pane
+ * @note Shows SAM demodulator carrier frequency error in Hz
+ * @note Target is to minimize this value (ideally < 1 Hz)
+ */
 static void DrawFreqErrorPane(void){
     float32_t SAMOffset = GetSAMCarrierOffset();
     if (ofe != SAMOffset)
@@ -154,6 +211,11 @@ static void DrawFreqErrorPane(void){
     PaneFreqError.stale = false;
 }
 
+/**
+ * @brief Render the frequency calibration instructions pane
+ * @note Displays step-by-step calibration procedure
+ * @note Reminds user to use SAM mode and minimize error value
+ */
 static void DrawFreqInstructionsPane(void){
     if (!PaneFreqInstructions.stale) return;
     tft.fillRect(PaneFreqInstructions.x0, PaneFreqInstructions.y0, PaneFreqInstructions.width, PaneFreqInstructions.height, RA8875_BLACK);
@@ -200,6 +262,11 @@ static void DrawFreqInstructionsPane(void){
     PaneFreqInstructions.stale = false;
 }
 
+/**
+ * @brief Main frequency calibration screen rendering function
+ * @note Called from DrawDisplay() when in CALIBRATE_FREQUENCY UI state
+ * @note User adjusts freqCorrectionFactor while monitoring SAM error
+ */
 void DrawCalibrateFrequency(void){
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_FREQUENCY state");
@@ -234,7 +301,22 @@ void DrawCalibrateFrequency(void){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Receive IQ calibration section
+// RECEIVE IQ CALIBRATION SECTION
+///////////////////////////////////////////////////////////////////////////////
+//
+// RX IQ calibration minimizes image rejection by adjusting:
+// - IQAmpCorrectionFactor: Amplitude imbalance between I and Q channels
+// - IQPhaseCorrectionFactor: Phase error between I and Q channels
+//
+// Calibration procedure:
+// 1. Generate CW tone offset by 48 kHz from LO
+// 2. Measure desired sideband level vs unwanted sideband level
+// 3. Adjust amplitude/phase to maximize sideband separation (Delta)
+// 4. Target Delta > 60 dB for good image rejection
+// 5. Repeat for all bands
+//
+// Optional auto-tune algorithm performs systematic parameter sweep
+//
 ///////////////////////////////////////////////////////////////////////////////
 static bool autotune = false;
 static const int8_t NUMBER_OF_PANES = 5;
@@ -262,9 +344,8 @@ extern struct dispSc displayScale[];
  * Calculate vertical pixel position for a spectrum FFT bin.
  */
 FASTRUN int16_t pixeln(uint32_t i){
-    int16_t result = displayScale[0].baseOffset + // 20dB scale
-                    20 + // pixeloffset
-                    (int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
+    int16_t zeroPoint = -1*(int16_t)((-124.0 - RECEIVE_POWER_OFFSET)/10.0*displayScale[ED.spectrumScale].dBScale);
+    int16_t result = zeroPoint+(int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
     return result;
 }
 
@@ -284,9 +365,16 @@ static int16_t y_current = offset;
 static float32_t sideband_separation = 0.0;
 char buff[100];
 int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
-static float32_t deltaVals[NUMBER_OF_BANDS];
-static int32_t Nreadings = 0;
+static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for each band
+static int32_t Nreadings = 0;                  // Reading counter for measurement averaging
 
+/**
+ * @brief Render RX IQ calibration spectrum display
+ * @note Shows two highlighted regions for upper/lower sideband measurement
+ * @note Blue region = desired sideband, dark red = unwanted sideband
+ * @note Measures sideband separation and updates Delta display
+ * @note Runs in real-time from ISR when new PSD data available
+ */
 FASTRUN void PlotSpectrum(void){
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
 
@@ -340,18 +428,30 @@ FASTRUN void PlotSpectrum(void){
     psdupdated = false;
 }
 
+// RX IQ adjustment increment values
 static uint8_t incindex = 0;
 const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
+
+/**
+ * @brief Toggle RX IQ calibration adjustment increment
+ * @note Switches between 0.01 and 0.001 step sizes
+ * @note Called when user presses button 15
+ */
 void ChangeRXIQIncrement(void){
     incindex++;
-    if (incindex >= sizeof(incvals)/sizeof(incvals[0])) 
+    if (incindex >= sizeof(incvals)/sizeof(incvals[0]))
         incindex = 0;
     increment = incvals[incindex];
 }
 
 
 static float32_t oldsep = 0.0;
+/**
+ * @brief Render the sideband separation (Delta) display pane
+ * @note Shows measured dB difference between desired and unwanted sideband
+ * @note Higher values indicate better IQ balance (target > 60 dB)
+ */
 static void DrawDeltaPane(void){
     if (oldsep != deltaVals[ED.currentBand[ED.activeVFO]])
         PaneDelta.stale = true;
@@ -370,21 +470,44 @@ static void DrawDeltaPane(void){
 }
 
 
+/**
+ * @brief Increase RX IQ phase correction factor for current band
+ * @note Increments by current increment value, clamped to [-0.5, 0.5]
+ * @note Called when user rotates filter encoder clockwise
+ */
 void IncrementRXIQPhase(void){
     ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
     if (ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] > 0.5)
         ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.5;
 }
+
+/**
+ * @brief Decrease RX IQ phase correction factor for current band
+ * @note Decrements by current increment value, clamped to [-0.5, 0.5]
+ * @note Called when user rotates filter encoder counter-clockwise
+ */
 void DecrementRXIQPhase(void){
     ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] -= increment;
     if (ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] < -0.5)
         ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = -0.5;
 }
+
+/**
+ * @brief Increase RX IQ amplitude correction factor for current band
+ * @note Increments by current increment value, clamped to [0.5, 2.0]
+ * @note Called when user rotates volume encoder clockwise
+ */
 void IncrementRXIQAmp(void){
     ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
     if (ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] > 2.0)
         ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 2.0;
 }
+
+/**
+ * @brief Decrease RX IQ amplitude correction factor for current band
+ * @note Decrements by current increment value, clamped to [0.5, 2.0]
+ * @note Called when user rotates volume encoder counter-clockwise
+ */
 void DecrementRXIQAmp(void){
     ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] -= increment;
     if (ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] < 0.5)
@@ -394,6 +517,11 @@ void DecrementRXIQAmp(void){
 int8_t oldincind = 5;
 float32_t oldamp = -5.0;
 float32_t oldphase = -5.0;
+/**
+ * @brief Render the RX IQ current band adjustment values pane
+ * @note Shows band name, amplitude, phase, and increment values
+ * @note Updates when user adjusts parameters or changes bands
+ */
 static void DrawAdjustPane(void){
     if ((oldincind != incindex) || 
         (oldamp != ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]) || 
@@ -438,7 +566,11 @@ static void DrawAdjustPane(void){
     PaneAdjust.stale = false;
 }
 
-// Used to detect a change in any of the parameters to know whether the table should be updated
+/**
+ * @brief Calculate sum of RX IQ amplitude correction factors across all bands
+ * @return Sum of absolute amplitude correction values
+ * @note Used to detect changes requiring table pane redraw
+ */
 float32_t GetAmpSum(void){
     float32_t ampsum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){
@@ -447,6 +579,11 @@ float32_t GetAmpSum(void){
     return ampsum;
 }
 
+/**
+ * @brief Calculate sum of RX IQ phase correction factors across all bands
+ * @return Sum of absolute phase correction values
+ * @note Used to detect changes requiring table pane redraw
+ */
 float32_t GetPhsSum(void){
     float32_t phssum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){
@@ -457,6 +594,11 @@ float32_t GetPhsSum(void){
 
 static float32_t oldampsums = 0;
 static float32_t oldphssums = -10;
+/**
+ * @brief Render the RX IQ all-bands calibration summary table
+ * @note Shows amplitude, phase, and Delta values for all bands
+ * @note Helps user track calibration progress across bands
+ */
 static void DrawTablePane(void){
     float32_t nas = GetAmpSum();
     float32_t nps = GetPhsSum();
@@ -503,6 +645,11 @@ static void DrawTablePane(void){
     PaneTable.stale = false;
 }
 
+/**
+ * @brief Render the RX IQ calibration instructions pane
+ * @note Displays step-by-step calibration procedure
+ * @note Explains encoder controls and target Delta value
+ */
 static void DrawInstructionsPane(void){
     if (!PaneInstructions.stale) return;
     tft.fillRect(PaneInstructions.x0, PaneInstructions.y0, PaneInstructions.width, PaneInstructions.height, RA8875_BLACK);
@@ -554,25 +701,47 @@ static void DrawInstructionsPane(void){
     PaneInstructions.stale = false;
 }
 
+/**
+ * @brief Render the RX IQ calibration spectrum pane
+ * @note Calls PlotSpectrum() when new PSD data available
+ */
 static void DrawSpectrumPane(void){
     if (psdupdated){
         PlotSpectrum();
     }
 }
 
+/**
+ * @brief Enable automatic RX IQ calibration algorithm
+ * @note Initiates systematic parameter sweep to find optimal IQ settings
+ * @note Called when user presses button 16
+ */
 void EngageRXIQAutotune(void){
     autotune = true;
 }
 
-// Pass 1
-//  Gain in 0.01 steps from 0.5 to 1.5            (iteration 1)
-//  Phase changes in 0.01 steps from -0.2 to 0.2  (iteration 2)
-// Pass 2
-//  Gain in 0.01 steps from 4 steps below previous minimum to 4 steps above   (iteration 3)
-//  phase in 0.01 steps from 4 steps below previous minimum to 4 steps above  (iteration 4)
-// Pass 3
-//  Gain in 0.001 steps 10 steps below to 10 steps above   (iteration 5)
-//  Phase in 0.001 steps 10 steps below to 10 steps above  (iteration 6)
+/**
+ * RX IQ Auto-Tune Algorithm
+ *
+ * Systematically sweeps amplitude and phase parameters to maximize sideband separation.
+ *
+ * Three-pass approach with progressively finer resolution:
+ *
+ * Pass 1 (Coarse):
+ *   - Iteration 0: Amplitude 0.5 to 1.5 in 0.01 steps
+ *   - Iteration 1: Phase -0.2 to 0.2 in 0.01 steps
+ *
+ * Pass 2 (Medium):
+ *   - Iteration 2: Amplitude ±4 steps around Pass 1 optimum
+ *   - Iteration 3: Phase ±4 steps around Pass 1 optimum
+ *
+ * Pass 3 (Fine):
+ *   - Iteration 4: Amplitude ±10 steps (0.001) around Pass 2 optimum
+ *   - Iteration 5: Phase ±10 steps (0.001) around Pass 2 optimum
+ *
+ * For each iteration, measures sideband separation and records best-performing value.
+ * Automatically advances through all bands.
+ */
 float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0};
 int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
 float32_t Delta[] = {0.01,                 0.01,                 0.01,0.01,0.001,0.001};
@@ -583,11 +752,23 @@ static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static bool initialEntry = false;
 
+/**
+ * @brief Calculate parameter value for given iteration and step
+ * @param iter Iteration number (0-5)
+ * @param stp Step number within iteration
+ * @return Calculated amplitude or phase value
+ */
 float32_t GetNewVal(int8_t iter, int8_t stp){
     float32_t newval = center[iter]-(NSteps[iter]*Delta[iter])/2.0+stp*Delta[iter];
     return newval;
 }
 
+/**
+ * @brief Set amplitude or phase correction factor for auto-tune algorithm
+ * @param iter Iteration number (even=amplitude, odd=phase)
+ * @param stp Step number within iteration
+ * @note Resets measurement counter to allow new reading to stabilize
+ */
 void SetAmpPhase(int8_t iter, int8_t stp){
     float32_t newval = GetNewVal(iter, stp);
     Nreadings = 0;
@@ -598,6 +779,12 @@ void SetAmpPhase(int8_t iter, int8_t stp){
     }
 }
 float32_t maxSBS_save;
+/**
+ * @brief Execute one step of the RX IQ auto-tune algorithm
+ * @note Called repeatedly from DrawCalibrateRXIQ() when autotune enabled
+ * @note State machine advances through iterations and bands automatically
+ * @note Completes when all bands calibrated or autotune disabled
+ */
 void TuneIQValues(void){
     // Catch the initial entry condition:
     if (initialEntry){
@@ -683,6 +870,12 @@ void TuneIQValues(void){
 
 }
 
+/**
+ * @brief Main RX IQ calibration screen rendering function
+ * @note Called from DrawDisplay() when in CALIBRATE_RX_IQ UI state
+ * @note User manually adjusts amp/phase or runs auto-tune algorithm
+ * @note Displays real-time spectrum with sideband separation measurement
+ */
 void DrawCalibrateRXIQ(void){
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_RXIQ state");
@@ -716,7 +909,21 @@ void DrawCalibrateRXIQ(void){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Transmit IQ calibration section
+// TRANSMIT IQ CALIBRATION SECTION
+///////////////////////////////////////////////////////////////////////////////
+//
+// TX IQ calibration minimizes transmitted opposite sideband by adjusting:
+// - IQXAmpCorrectionFactor: Transmit I/Q amplitude balance
+// - IQXPhaseCorrectionFactor: Transmit I/Q phase balance
+//
+// Calibration procedure:
+// 1. Connect radio transmitter output to calibrated receiver
+// 2. Generate SSB tone (LSB or USB)
+// 3. Measure opposite sideband suppression visually on receiver
+// 4. Adjust TX IQ parameters to minimize unwanted sideband
+// 5. Adjust TX attenuation to control power level into receiver
+// 6. Repeat for all bands
+//
 ///////////////////////////////////////////////////////////////////////////////
 
 static const int8_t NUMBER_OF_TXIQ_PANES = 6;
@@ -743,6 +950,10 @@ static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQT
 
 
 float32_t oldatt = -5.0;
+/**
+ * @brief Render the TX attenuation display pane
+ * @note Shows current transmit attenuation for power control during calibration
+ */
 static void DrawTXIQAtt(void){
     if (oldatt != ED.XAttenSSB[ED.currentBand[ED.activeVFO]]) 
         PaneTXIQAtt.stale = true;
@@ -764,6 +975,11 @@ static void DrawTXIQAtt(void){
 }
 
 static ModeSm_StateId oldstate = ModeSm_StateId_ROOT;
+/**
+ * @brief Render the transmit on/off status display pane
+ * @note Shows "On" (red) when transmitting, "Off" (green) when not
+ * @note TX toggles on/off automatically during TX IQ calibration
+ */
 static void DrawTXIQStatus(void){
     if (oldstate != modeSM.state_id) 
         PaneTXIQStatus.stale = true;
@@ -797,6 +1013,11 @@ static void DrawTXIQStatus(void){
 }
 
 int64_t oldfreq = 0;
+/**
+ * @brief Render the transmit frequency display pane
+ * @note Shows current TX frequency in kHz
+ * @note Frequency is band center during TX IQ calibration
+ */
 static void DrawTXIQFrequency(void){
     int64_t freq = GetTXRXFreq(ED.activeVFO);
     if (oldfreq != freq) 
@@ -821,13 +1042,23 @@ static void DrawTXIQFrequency(void){
 
 
 static uint8_t incindexTXIQ = 0;
+/**
+ * @brief Toggle TX IQ calibration adjustment increment
+ * @note Switches between 0.01 and 0.001 step sizes
+ * @note Called when user presses button 15
+ */
 void ChangeTXIQIncrement(void){
     incindexTXIQ++;
-    if (incindexTXIQ >= sizeof(incvals)/sizeof(incvals[0])) 
+    if (incindexTXIQ >= sizeof(incvals)/sizeof(incvals[0]))
         incindexTXIQ = 0;
     increment = incvals[incindexTXIQ];
 }
 
+/**
+ * @brief Increase transmit attenuation by 0.5 dB
+ * @note Clamped to maximum 31.5 dB
+ * @note Called when user rotates finetune encoder clockwise
+ */
 void IncrementTransmitAtt(void){
     ED.XAttenSSB[ED.currentBand[ED.activeVFO]] += 0.5;
     if (ED.XAttenSSB[ED.currentBand[ED.activeVFO]] > 31.5)
@@ -835,6 +1066,11 @@ void IncrementTransmitAtt(void){
     SetTXAttenuation(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]);
 }
 
+/**
+ * @brief Decrease transmit attenuation by 0.5 dB
+ * @note Clamped to minimum 0.0 dB
+ * @note Called when user rotates finetune encoder counter-clockwise
+ */
 void DecrementTransmitAtt(void){
     ED.XAttenSSB[ED.currentBand[ED.activeVFO]] -= 0.5;
     if (ED.XAttenSSB[ED.currentBand[ED.activeVFO]] < 0.0)
@@ -842,21 +1078,43 @@ void DecrementTransmitAtt(void){
     SetTXAttenuation(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]);
 }
 
+/**
+ * @brief Increase TX IQ phase correction factor for current band
+ * @note Increments by current increment value, clamped to [-0.5, 0.5]
+ * @note Called when user rotates filter encoder clockwise
+ */
 void IncrementTXIQPhase(void){
     ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
     if (ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] > 0.5)
         ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.5;
 }
+/**
+ * @brief Decrease TX IQ phase correction factor for current band
+ * @note Decrements by current increment value, clamped to [-0.5, 0.5]
+ * @note Called when user rotates filter encoder counter-clockwise
+ */
 void DecrementTXIQPhase(void){
     ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] -= increment;
     if (ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] < -0.5)
         ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = -0.5;
 }
+
+/**
+ * @brief Increase TX IQ amplitude correction factor for current band
+ * @note Increments by current increment value, clamped to [0.5, 2.0]
+ * @note Called when user rotates volume encoder clockwise
+ */
 void IncrementTXIQAmp(void){
     ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
     if (ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] > 2.0)
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 2.0;
 }
+
+/**
+ * @brief Decrease TX IQ amplitude correction factor for current band
+ * @note Decrements by current increment value, clamped to [0.5, 2.0]
+ * @note Called when user rotates volume encoder counter-clockwise
+ */
 void DecrementTXIQAmp(void){
     ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] -= increment;
     if (ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] < 0.5)
@@ -866,6 +1124,11 @@ void DecrementTXIQAmp(void){
 int8_t oldTXIQincind = 5;
 float32_t oldTXIQamp = -5.0;
 float32_t oldTXIQphase = -5.0;
+/**
+ * @brief Render the TX IQ current band adjustment values pane
+ * @note Shows band name, amplitude, phase, and increment values
+ * @note Updates when user adjusts parameters or changes bands
+ */
 static void DrawTXIQAdjustPane(void){
     if ((oldTXIQincind != incindexTXIQ) || 
         (oldTXIQamp != ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]) || 
@@ -910,7 +1173,11 @@ static void DrawTXIQAdjustPane(void){
     PaneTXIQAdjust.stale = false;
 }
 
-// Used to detect a change in any of the parameters to know whether the table should be updated
+/**
+ * @brief Calculate sum of TX IQ amplitude correction factors across all bands
+ * @return Sum of absolute amplitude correction values
+ * @note Used to detect changes requiring table pane redraw
+ */
 float32_t GetTXIQAmpSum(void){
     float32_t ampsum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){
@@ -919,6 +1186,11 @@ float32_t GetTXIQAmpSum(void){
     return ampsum;
 }
 
+/**
+ * @brief Calculate sum of TX IQ phase correction factors across all bands
+ * @return Sum of absolute phase correction values
+ * @note Used to detect changes requiring table pane redraw
+ */
 float32_t GetTXIQPhsSum(void){
     float32_t phssum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){
@@ -929,6 +1201,11 @@ float32_t GetTXIQPhsSum(void){
 
 static float32_t oldTXIQampsums = 0;
 static float32_t oldTXIQphssums = -10;
+/**
+ * @brief Render the TX IQ all-bands calibration summary table
+ * @note Shows amplitude and phase values for all bands
+ * @note Helps user track calibration progress across bands
+ */
 static void DrawTXIQTablePane(void){
     float32_t nas = GetTXIQAmpSum();
     float32_t nps = GetTXIQPhsSum();
@@ -968,6 +1245,11 @@ static void DrawTXIQTablePane(void){
     PaneTXIQTable.stale = false;
 }
 
+/**
+ * @brief Render the TX IQ calibration instructions pane
+ * @note Displays step-by-step calibration procedure
+ * @note Explains encoder controls and external receiver requirement
+ */
 static void DrawTXIQInstructionsPane(void){
     if (!PaneTXIQInstructions.stale) return;
     tft.fillRect(PaneTXIQInstructions.x0, PaneTXIQInstructions.y0, PaneTXIQInstructions.width, PaneTXIQInstructions.height, RA8875_BLACK);
@@ -1022,6 +1304,12 @@ static void DrawTXIQInstructionsPane(void){
     PaneTXIQInstructions.stale = false;
 }
 
+/**
+ * @brief Main TX IQ calibration screen rendering function
+ * @note Called from DrawDisplay() when in CALIBRATE_TX_IQ UI state
+ * @note User manually adjusts TX IQ parameters while monitoring external receiver
+ * @note TX automatically toggles on/off to generate test signal
+ */
 void DrawCalibrateTXIQ(void){
     if (uiSM.vars.clearScreen){
         tft.writeTo(L2);
@@ -1051,9 +1339,19 @@ void DrawCalibrateTXIQ(void){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Power calibration section
+// POWER CALIBRATION SECTION
+///////////////////////////////////////////////////////////////////////////////
+//
+// Power calibration (placeholder for future implementation)
+// Will calibrate forward and reflected power measurements
+//
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Main power calibration screen rendering function (placeholder)
+ * @note Called from DrawDisplay() when in CALIBRATE_POWER UI state
+ * @note Future implementation will calibrate power measurement circuitry
+ */
 void DrawCalibratePower(void){
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_POWER state");

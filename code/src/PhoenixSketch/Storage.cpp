@@ -43,6 +43,7 @@ void SaveDataToStorage(bool savetosd){
     doc["stepFineTune"] = ED.stepFineTune;
     doc["nrOptionSelect"] = ED.nrOptionSelect;
     doc["ANR_notchOn"] = ED.ANR_notchOn;
+    doc["spectrumFloorAuto"] = ED.spectrumFloorAuto;
     doc["spectrumScale"] = ED.spectrumScale;
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         doc["spectrumNoiseFloor"][i] = ED.spectrumNoiseFloor[i];
@@ -235,6 +236,7 @@ void RestoreDataFromStorage(void){
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
     ED.ANR_notchOn = doc["ANR_notchOn"] | ED.ANR_notchOn;
     ED.spectrumScale = doc["spectrumScale"] | ED.spectrumScale;
+    ED.spectrumFloorAuto = doc["spectrumFloorAuto"] | ED.spectrumFloorAuto;
     if (doc["spectrumNoiseFloor"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.spectrumNoiseFloor[i] = doc["spectrumNoiseFloor"][i] | ED.spectrumNoiseFloor[i];
@@ -419,6 +421,7 @@ void RestoreDataFromSDCard(void){
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
     ED.ANR_notchOn = doc["ANR_notchOn"] | ED.ANR_notchOn;
     ED.spectrumScale = doc["spectrumScale"] | ED.spectrumScale;
+    ED.spectrumFloorAuto = doc["spectrumFloorAuto"] | ED.spectrumFloorAuto;
     if (doc["spectrumNoiseFloor"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.spectrumNoiseFloor[i] = doc["spectrumNoiseFloor"][i] | ED.spectrumNoiseFloor[i];
@@ -572,6 +575,7 @@ void PrintEDToSerial(void){
     Serial.print("nrOptionSelect:    "); Serial.println(ED.nrOptionSelect);
     Serial.print("ANR_notchOn:       "); Serial.println(ED.ANR_notchOn);
     Serial.print("spectrumScale:     "); Serial.println(ED.spectrumScale);
+    Serial.print("spectrumFloorAuto: "); Serial.println(ED.spectrumFloorAuto);
     Serial.print("spectrumNoiseFloor:");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.spectrumNoiseFloor[i]);
@@ -620,6 +624,27 @@ void PrintEDToSerial(void){
     Serial.print("powerOutCW: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.powerOutCW[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("RAtten: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.RAtten[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("XAttenCW: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.XAttenCW[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("XAtteSSB: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.XAttenSSB[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();

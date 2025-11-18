@@ -365,6 +365,15 @@ void AdjustEqualizerIncrement(void); // from MainBoard_DisplayEqualizer.cpp
  * @param button Button ID from the front panel (defined in button constants)
  */
 void HandleButtonPress(int32_t button){
+    // Disable all buttons when in an active transmit mode
+    if ((modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE) ||
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT) ||
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE) ||
+        (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT))
+        return;
 
     switch (uiSM.state_id){
         case (UISm_StateId_UPDATE):

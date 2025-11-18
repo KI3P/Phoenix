@@ -7,29 +7,38 @@
 #define WINDOW_HEIGHT   480
 #define DARKGREY 0x7BEF
 
-// Forward declarations and structures
+/**
+ * Display pane structure for modular screen regions.
+ * Each pane represents a rectangular area with its own draw function.
+ */
 struct Pane {
-    uint16_t x0;
-    uint16_t y0;
-    uint16_t width;
-    uint16_t height;
-    void (*DrawFunction)(void);
-    bool stale;
+    uint16_t x0;            ///< Top-left X coordinate
+    uint16_t y0;            ///< Top-left Y coordinate
+    uint16_t width;         ///< Width in pixels
+    uint16_t height;        ///< Height in pixels
+    void (*DrawFunction)(void);  ///< Function to render this pane
+    bool stale;             ///< True if pane needs redrawing
 };
 
+/**
+ * Simple rectangle structure for defining display regions.
+ * Used for text bounding boxes and erase operations.
+ */
 struct Rectangle {
-    uint16_t x0;
-    uint16_t y0;
-    uint16_t width;
-    uint16_t height;
+    uint16_t x0;            ///< Top-left X coordinate
+    uint16_t y0;            ///< Top-left Y coordinate
+    uint16_t width;         ///< Width in pixels
+    uint16_t height;        ///< Height in pixels
 };
 
+/**
+ * Display scale configuration for spectrum/waterfall display.
+ * Defines dB scale parameters and pixel mapping.
+ */
 struct dispSc {
-    const char *dbText;
-    float32_t dBScale;
-    uint16_t pixelsPerDB;
-    uint16_t baseOffset;
-    float32_t offsetIncrement;
+    const char *dbText;           ///< Text label for this scale (e.g., "10dB/div")
+    float32_t dBScale;            ///< Number of dB per division
+    uint16_t pixelsPerDB;         ///< Pixel height per dB
 };
 
 // Helper function declarations
@@ -54,30 +63,37 @@ void CalculateTextCorners(int16_t x0,int16_t y0,Rectangle *rect,int16_t Nchars,
  */
 void BlankBox(Rectangle *rect);
 
-// The variable being changed will have a type
+/**
+ * Variable type enumeration for type-safe parameter handling.
+ * Used by VariableParameter to support different data types in menu system.
+ */
 enum VarType {
-    TYPE_I8,
-    TYPE_I16,
-    TYPE_I32,
-    TYPE_I64,
-    TYPE_F32,
-    TYPE_KeyTypeId,
-    TYPE_BOOL
+    TYPE_I8,          ///< 8-bit signed integer
+    TYPE_I16,         ///< 16-bit signed integer
+    TYPE_I32,         ///< 32-bit signed integer
+    TYPE_I64,         ///< 64-bit signed integer
+    TYPE_F32,         ///< 32-bit floating point
+    TYPE_KeyTypeId,   ///< CW key type enumeration
+    TYPE_BOOL         ///< Boolean value
 };
 
-// We need a struct that tells us how to change the variable
+/**
+ * Type-safe parameter descriptor for menu variable manipulation.
+ * Encapsulates variable pointer, type information, and min/max/step constraints.
+ * Enables generic increment/decrement operations with bounds checking.
+ */
 struct VariableParameter {
-    void *variable;      // Pointer to the variable
-    VarType type;        // Type of the variable
+    void *variable;      ///< Pointer to the actual variable being controlled
+    VarType type;        ///< Data type of the variable
     union {
-        struct { int8_t min; int8_t max; int8_t step;} i8;
-        struct { int16_t min; int16_t max; int16_t step;} i16;
-        struct { int32_t min; int32_t max; int32_t step;} i32;
-        struct { int64_t min; int64_t max; int64_t step;} i64;
-        struct { float32_t min; float32_t max; float32_t step;} f32;
-        struct { KeyTypeId min; KeyTypeId max; int8_t step;} keyType;
-        struct { bool min; bool max; int8_t step;} b;
-    } limits;
+        struct { int8_t min; int8_t max; int8_t step;} i8;           ///< Limits for TYPE_I8
+        struct { int16_t min; int16_t max; int16_t step;} i16;       ///< Limits for TYPE_I16
+        struct { int32_t min; int32_t max; int32_t step;} i32;       ///< Limits for TYPE_I32
+        struct { int64_t min; int64_t max; int64_t step;} i64;       ///< Limits for TYPE_I64
+        struct { float32_t min; float32_t max; float32_t step;} f32; ///< Limits for TYPE_F32
+        struct { KeyTypeId min; KeyTypeId max; int8_t step;} keyType;///< Limits for TYPE_KeyTypeId
+        struct { bool min; bool max; int8_t step;} b;                ///< Limits for TYPE_BOOL
+    } limits;  ///< Min/max/step values specific to variable type
 };
 
 /**
@@ -104,26 +120,36 @@ void DecrementVariable(const VariableParameter *bv);
  */
 String GetVariableValueAsString(const VariableParameter *vp);
 
-// Menu option types
+/**
+ * Menu option action type enumeration.
+ * Determines whether menu item adjusts a variable or calls a function.
+ */
 enum optionType {
-    variableOption,
-    functionOption
+    variableOption,   ///< Menu item controls a variable (with increment/decrement)
+    functionOption    ///< Menu item executes a function when selected
 };
 
-// Secondary menu option structure
+/**
+ * Secondary menu option descriptor.
+ * Defines a single option within a submenu, either for variable adjustment
+ * or function execution.
+ */
 struct SecondaryMenuOption {
-    const char *label;
-    optionType action;
-    VariableParameter *varPam; // pointer to the variable, if appropriate
-    void *func; // pointer to the function to call, if appropriate
-    void *postUpdateFunc; // pointer to a function to call after the variable was update, if appropriate
+    const char *label;              ///< Display text for this menu option
+    optionType action;              ///< Type of action (variable or function)
+    VariableParameter *varPam;      ///< Pointer to variable descriptor (if variableOption)
+    void *func;                     ///< Function to call when selected (if functionOption)
+    void *postUpdateFunc;           ///< Callback after variable update (optional)
 };
 
-// Primary menu option structure
+/**
+ * Primary menu category descriptor.
+ * Defines a top-level menu category containing multiple secondary options.
+ */
 struct PrimaryMenuOption {
-    const char *label;
-    SecondaryMenuOption *secondary;
-    size_t length;
+    const char *label;              ///< Display text for this category
+    SecondaryMenuOption *secondary; ///< Array of secondary menu options
+    size_t length;                  ///< Number of options in secondary array
 };
 
 // Core display functions (MainBoard_Display.cpp)
@@ -237,21 +263,88 @@ void UpdateArrayVariables(void);
  */
 void InterpretFrequencyEntryButtonPress(int32_t button);
 
+/**
+ * @brief Draw the frequency entry keypad display
+ * @note Shows numeric keypad and current frequency being entered
+ * @note Displayed when user enters direct frequency input mode
+ */
 void DrawFrequencyEntryPad(void);
-// Used for unit tests
+
+/**
+ * @brief Get number of digits entered in frequency entry mode
+ * @return Number of digits currently in the frequency string
+ * @note Used for unit tests to verify frequency entry logic
+ */
 int8_t DFEGetNumDigits(void);
+
+/**
+ * @brief Get the current frequency entry string
+ * @return Pointer to frequency string buffer
+ * @note Used for unit tests to verify frequency entry state
+ */
 char * DFEGetFString(void);
 
+/**
+ * @brief Draw the audio equalizer adjustment interface
+ * @note Displays graphical EQ with frequency bands and gain controls
+ * @note Allows real-time adjustment of receive audio EQ settings
+ */
 void DrawEqualizerAdjustment(void);
 
+/**
+ * @brief Draw the frequency calibration interface
+ * @note Displays controls for adjusting Si5351 clock generator calibration
+ * @note Used to compensate for crystal frequency errors
+ */
 void DrawCalibrateFrequency(void);
+
+/**
+ * @brief Draw the receive IQ calibration interface
+ * @note Displays controls for phase and gain balance adjustment
+ * @note Minimizes unwanted sideband images in receive path
+ */
 void DrawCalibrateRXIQ(void);
+
+/**
+ * @brief Draw the transmit IQ calibration interface
+ * @note Displays controls for TX phase and gain balance adjustment
+ * @note Minimizes carrier and sideband leakage in transmit path
+ */
 void DrawCalibrateTXIQ(void);
+
+/**
+ * @brief Draw the CW power amplifier calibration interface
+ * @note Displays controls for PA power level calibration
+ * @note Maps power settings to actual RF output levels
+ */
 void DrawCalibratePower(void);
+
+/**
+ * @brief Start automatic RX IQ calibration procedure
+ * @note Automatically adjusts phase and gain for optimal sideband rejection
+ * @note Uses internal test signal for calibration
+ */
 void EngageRXIQAutotune(void);
 
+/**
+ * @brief Increase the frequency correction factor
+ * @note Increments the Si5351 calibration value by current step size
+ * @note Used during frequency calibration to adjust VFO accuracy
+ */
 void IncreaseFrequencyCorrectionFactor(void);
+
+/**
+ * @brief Decrease the frequency correction factor
+ * @note Decrements the Si5351 calibration value by current step size
+ * @note Used during frequency calibration to adjust VFO accuracy
+ */
 void DecreaseFrequencyCorrectionFactor(void);
+
+/**
+ * @brief Change the frequency correction adjustment increment
+ * @note Cycles through different step sizes (1Hz, 10Hz, 100Hz, etc.)
+ * @note Allows coarse and fine adjustment during calibration
+ */
 void ChangeFrequencyCorrectionFactorIncrement(void);
 
 // External variable declarations (shared between display modules)
