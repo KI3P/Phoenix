@@ -852,6 +852,17 @@ DataBlock * ReceiveProcessing(const char *fname){
     return &data;
 }
 
+static float32_t L_in_RMS = 0;
+static float32_t R_in_RMS = 0;
+
+float32_t GetMicLRMS(void){
+    return L_in_RMS;
+}
+
+float32_t GetMicRRMS(void){
+    return R_in_RMS;
+}
+
 /**
  * Read in N_BLOCKS blocks of BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex 
  * AudioRecordQueue objects into the data float buffers. This is the transmit chain,
@@ -865,7 +876,10 @@ errno_t ReadMicrophoneBuffer(DataBlock *data){
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
         // get audio samples from the audio  buffers and convert them to float
-        // read in 32 blocks á 128 samples in I and Q
+        // read in 32 blocks á 128 samples in I and Q. At a sample rate of 192ksps,
+        // 128 samples is 0.6ms. A full block of 2048 samples is 10.6ms
+        float32_t buffer_rms_I = 0;
+        float32_t buffer_rms_Q = 0;
         for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
             sp_L2 = Q_in_L_Ex.readBuffer();
             sp_R2 = Q_in_R_Ex.readBuffer();
@@ -876,9 +890,17 @@ errno_t ReadMicrophoneBuffer(DataBlock *data){
             arm_q15_to_float(sp_R2, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
             Q_in_L_Ex.freeBuffer();
             Q_in_R_Ex.freeBuffer();
+            for (size_t k=0;k<BUFFER_SIZE;k++){
+                buffer_rms_I += data->I[k]*data->I[k];
+                buffer_rms_Q += data->Q[k]*data->Q[k];
+            }
         }
         data->N = N_BLOCKS_EX * BUFFER_SIZE;
         data->sampleRate_Hz = SR[SampleRate].rate;
+        buffer_rms_I /= data->N;
+        buffer_rms_Q /= data->N;
+        L_in_RMS = 0.9*L_in_RMS + 0.1*buffer_rms_I;
+        R_in_RMS = 0.9*R_in_RMS + 0.1*buffer_rms_Q;
         return ESUCCESS;
     } else {
         return EFAIL;

@@ -735,11 +735,33 @@ void DrawSpectrumPane(void) {
 // STATE OF HEALTH PANE
 ///////////////////////////////////////////////////////////////////////////////
 
+
+float32_t GetMicLRMS(void);
+float32_t GetMicRRMS(void);
 /**
  * Render the state of health pane showing DSP load and system status.
  */
 void DrawStateOfHealthPane(void) {
-    return; // Remove this line to enable this pane
+    if ((modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) && PaneStateOfHealth.stale){
+        // Print the RMS values
+        tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
+        tft.setFontDefault();
+        tft.setFontScale((enum RA8875tsize)0);
+        tft.setTextColor(RA8875_WHITE);
+
+        tft.setCursor(PaneStateOfHealth.x0+15, PaneStateOfHealth.y0+5);
+        tft.print("Lrms=");
+        tft.print(GetMicLRMS()*1000);
+
+        tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0+5);
+        tft.print("Rrms=");
+        tft.print(GetMicRRMS()*1000);
+        PaneStateOfHealth.stale = false;
+        return;
+    }
+
+    return; // Remove this line to enable this pane in all other modes
+
     if (!PaneStateOfHealth.stale) return;
     if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag))
         return;
@@ -1488,6 +1510,8 @@ void DrawHome(){
         timerDisplay_ms = millis();
         if (redrawSpectrum == false)
             redrawSpectrum = true;
+        if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)
+            PaneStateOfHealth.stale = true;
     }
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
         WindowPanes[i]->DrawFunction();
