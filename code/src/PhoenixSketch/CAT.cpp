@@ -207,7 +207,7 @@ char *FA_write( char* cmd ){
  * @return Response string with current VFO A frequency
  */
 char *FA_read(  char* cmd  ){
-    sprintf( obuf, "FA%011lld;", ED.centerFreq_Hz[VFO_A] );
+    sprintf( obuf, "FA%011lld;", GetTXRXFreq(VFO_A) );
     return obuf;
 }
 
@@ -229,7 +229,7 @@ char *FB_write( char* cmd  ){
  * @return Response string with current VFO B frequency
  */
 char *FB_read(  char* cmd  ){
-    sprintf( obuf, "FB%011lld;", ED.centerFreq_Hz[VFO_B] );
+    sprintf( obuf, "FB%011lld;", GetTXRXFreq(VFO_B) );
     return obuf;
 }
 
@@ -342,7 +342,7 @@ char *IF_read(  char* cmd ){
              GetTXRXFreq(ED.activeVFO),  // P1: frequency
              // P2 is 5 spaces
              0, // P3: rit/xit frequency
-             1, // P4: rit enabled
+             0, // P4: rit enabled
              0, // P5: xit enabled
              0, // P6: always 0, Channel bank
              0, // P7: memory channel number
@@ -583,8 +583,7 @@ char *RX_write( char* cmd ){
         default:
             break;
     }
-    sprintf( obuf, ""); // returns nothing
-    return obuf;
+    return empty_string_p;
 }
 
 /**
@@ -606,14 +605,12 @@ char *TX_write( char* cmd ){
         default:
             break;
     }
-    sprintf( obuf, ""); // returns nothing
-    return obuf;
+    return empty_string_p;
 }
 
 char *VX_write( char* cmd ){
     Debug("Got VX write");
-    sprintf( obuf, ""); // expects no reply
-    return obuf;
+    return empty_string_p;
 }
 
 char *VX_read( char* cmd ){
