@@ -854,6 +854,27 @@ DataBlock * ReceiveProcessing(const char *fname){
 
 static float32_t L_in_RMS = 0;
 static float32_t R_in_RMS = 0;
+static q15_t L_in_MAX = 0;
+static q15_t R_in_MAX = 0;
+static q15_t L_in_MIN = 0;
+static q15_t R_in_MIN = 0;
+uint32_t pInd;
+
+int16_t GetMicLp2p(void){
+    return (int16_t)(L_in_MAX - L_in_MIN);
+}
+
+int16_t GetMicRp2p(void){
+    return (int16_t)(R_in_MAX - R_in_MIN);
+}
+
+int16_t GetMicLmax(void){
+    return (int16_t)(L_in_MAX);
+}
+
+int16_t GetMicLmin(void){
+    return (int16_t)(L_in_MIN);
+}
 
 float32_t GetMicLRMS(void){
     return L_in_RMS;
@@ -880,6 +901,17 @@ errno_t ReadMicrophoneBuffer(DataBlock *data){
         // 128 samples is 0.6ms. A full block of 2048 samples is 10.6ms
         float32_t buffer_rms_I = 0;
         float32_t buffer_rms_Q = 0;
+
+        q15_t L_MAX = 0;
+        q15_t R_MAX = 0;
+        q15_t L_MIN = 0;
+        q15_t R_MIN = 0;
+
+        q15_t L_in_MAXt = 0;
+        q15_t R_in_MAXt = 0;
+        q15_t L_in_MINt = 10000;
+        q15_t R_in_MINt = 10000;
+
         for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
             sp_L2 = Q_in_L_Ex.readBuffer();
             sp_R2 = Q_in_R_Ex.readBuffer();
@@ -888,19 +920,35 @@ errno_t ReadMicrophoneBuffer(DataBlock *data){
             // Float_buffer samples are now standardized from > -1.0 to < 1.0
             arm_q15_to_float(sp_L2, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
             arm_q15_to_float(sp_R2, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_max_q15(sp_L2,BUFFER_SIZE,&L_MAX,&pInd);
+            arm_max_q15(sp_R2,BUFFER_SIZE,&R_MAX,&pInd);
+            arm_min_q15(sp_L2,BUFFER_SIZE,&L_MIN,&pInd);
+            arm_min_q15(sp_R2,BUFFER_SIZE,&R_MIN,&pInd);
+            if (L_MAX > L_in_MAXt) L_in_MAXt = L_MAX;
+            if (R_MAX > R_in_MAXt) R_in_MAXt = R_MAX;
+            if (L_MIN < L_in_MINt) L_in_MINt = L_MIN;
+            if (R_MIN < R_in_MINt) R_in_MINt = R_MIN;
+
             Q_in_L_Ex.freeBuffer();
             Q_in_R_Ex.freeBuffer();
             for (size_t k=0;k<BUFFER_SIZE;k++){
                 buffer_rms_I += data->I[k]*data->I[k];
                 buffer_rms_Q += data->Q[k]*data->Q[k];
             }
+
         }
         data->N = N_BLOCKS_EX * BUFFER_SIZE;
         data->sampleRate_Hz = SR[SampleRate].rate;
         buffer_rms_I /= data->N;
         buffer_rms_Q /= data->N;
+        buffer_rms_I = sqrt(buffer_rms_I);
+        buffer_rms_Q = sqrt(buffer_rms_Q);
         L_in_RMS = 0.9*L_in_RMS + 0.1*buffer_rms_I;
         R_in_RMS = 0.9*R_in_RMS + 0.1*buffer_rms_Q;
+        L_in_MAX = 0.9*L_in_MAX + 0.1*L_in_MAXt;
+        L_in_MIN = 0.9*L_in_MIN + 0.1*L_in_MINt;
+        R_in_MAX = 0.9*R_in_MAX + 0.1*R_in_MAXt;
+        R_in_MIN = 0.9*R_in_MIN + 0.1*R_in_MINt;
         return ESUCCESS;
     } else {
         return EFAIL;

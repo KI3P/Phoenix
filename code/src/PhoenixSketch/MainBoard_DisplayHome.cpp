@@ -738,6 +738,11 @@ void DrawSpectrumPane(void) {
 
 float32_t GetMicLRMS(void);
 float32_t GetMicRRMS(void);
+int16_t GetMicLp2p(void);
+int16_t GetMicRp2p(void);
+int16_t GetMicLmin(void);
+int16_t GetMicLmax(void);
+
 /**
  * Render the state of health pane showing DSP load and system status.
  */
@@ -750,12 +755,12 @@ void DrawStateOfHealthPane(void) {
         tft.setTextColor(RA8875_WHITE);
 
         tft.setCursor(PaneStateOfHealth.x0+15, PaneStateOfHealth.y0+5);
-        tft.print("Lrms=");
+        tft.print(GetMicLmin());
+        tft.print(",");
+        tft.print(GetMicLmax());
+        tft.print(",");
         tft.print(GetMicLRMS()*1000);
 
-        tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0+5);
-        tft.print("Rrms=");
-        tft.print(GetMicRRMS()*1000);
         PaneStateOfHealth.stale = false;
         return;
     }
