@@ -570,7 +570,6 @@ char *PS_read(  char* cmd ){
  * @return Response "RX0;" after releasing PTT or key depending on current mode
  */
 char *RX_write( char* cmd ){
-    Debug("Issuing PTT released");
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_TRANSMIT):{
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
@@ -592,7 +591,6 @@ char *RX_write( char* cmd ){
  * @return Response "TX0;" after pressing PTT or key depending on current mode
  */
 char *TX_write( char* cmd ){
-    Debug("Issuing PTT pressed");
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_RECEIVE):{
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
