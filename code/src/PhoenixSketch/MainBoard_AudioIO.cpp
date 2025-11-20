@@ -493,14 +493,15 @@ void InitializeAudio(void){
     sgtl5000_teensy.enable();
     AudioMemory(500);
     AudioMemory_F32(10);
-    sgtl5000_teensy.inputSelect(AUDIO_INPUT_MIC);
-    sgtl5000_teensy.micGain(10);
-    sgtl5000_teensy.lineInLevel(0);
-    sgtl5000_teensy.lineOutLevel(13);
+    sgtl5000_teensy.inputSelect(AUDIO_INPUT_MIC); // set mic pre-amp gain to 40dB & audio gain to 12dB
+    sgtl5000_teensy.micGain(10); // sets pre-amp and input gain to achieve 10dB of total gain
+    sgtl5000_teensy.lineInLevel(0); // set ADC right and left channel volumes to 0dB
+    sgtl5000_teensy.lineOutLevel(13); // clips at 3.16 volts p-p (line 703, control_sgtl5000.cpp)
     //reduces noise.  https://forum.pjrc.com/threads/27215-24-bit-audio-boards?p=78831&viewfull=1#post78831
     sgtl5000_teensy.adcHighPassFilterDisable();
+    sgtl5000_teensy.audioProcessorDisable(); // disable the audio processor
 
-    // The sgtl5000_mainBoard is the controller for the audio inputs and outputs on the 
+    // The pcm5102_mainBoard is the controller for the audio inputs and outputs on the 
     // main board. We use it to digitize the IQ outputs of the receive chain and to produce
     // the audio outputs to the speaker.
     pcm5102_mainBoard.setAddress(HIGH);
