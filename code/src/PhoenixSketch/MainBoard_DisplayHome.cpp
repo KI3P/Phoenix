@@ -742,24 +742,66 @@ int16_t GetMicLp2p(void);
 int16_t GetMicRp2p(void);
 int16_t GetMicLmin(void);
 int16_t GetMicLmax(void);
+float32_t GetOutIRMS(void);
+float32_t GetOutQRMS(void);
+int16_t greenLimit = (int16_t)map(0.5,0,0.7,0,100);
+int16_t yellowLimit = (int16_t)map(0.6,0,0.7,0,100);
+
+void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
+    int16_t widthbar = (int16_t)map(RMSval,0,0.7,0,100);
+    if (widthbar > 100)
+        widthbar = 100;
+    int16_t widthgreen, widthyellow, widthred;
+    if (widthbar <= greenLimit){
+        widthgreen = widthbar;
+        widthyellow = 0;
+        widthred = 0;
+    } else {
+        if ( widthbar <= yellowLimit ){
+            widthgreen = greenLimit;
+            widthyellow = widthbar - widthgreen;
+            widthred = 0;
+        } else {
+            widthgreen = greenLimit;
+            widthyellow = yellowLimit-greenLimit;
+            widthred = widthbar - widthgreen - widthyellow;
+        }
+    }
+    // Draw outline of the bar:
+    tft.drawRect(x0, y0, 100, 22, RA8875_WHITE);
+    // Fill the bar:
+    tft.fillRect(x0+1, y0+1,widthgreen, 20, RA8875_GREEN);
+    if (widthyellow > 0)
+        tft.fillRect(x0+1+widthgreen, y0+1,widthyellow, 20, RA8875_YELLOW);
+    if (widthred > 0)
+        tft.fillRect(x0+1+widthgreen+widthyellow, y0+1,widthred, 20, RA8875_RED);
+}
 
 /**
- * Render the state of health pane showing DSP load and system status.
+ * Render the state of health pane showing DSP load and system status. Use this pane for
+ * VU meters of transmit amplitude in SSB transmit mode.
  */
 void DrawStateOfHealthPane(void) {
     if ((modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) && PaneStateOfHealth.stale){
-        // Print the RMS values
+
+        // Draw some color bars to warn when the audio power is getting too large for 
+        // the transmit IQ chain. The RF board starts to clip when RMS values exceed 0.6.
+        // The audio hat starts to clip when they exceed 0.7
+        //    __________     __________
+        // I |__________| Q |__________|
+        //   <---100 --->
+
         tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
         tft.setFontDefault();
-        tft.setFontScale((enum RA8875tsize)0);
+        tft.setFontScale((enum RA8875tsize)1);
         tft.setTextColor(RA8875_WHITE);
 
-        tft.setCursor(PaneStateOfHealth.x0+15, PaneStateOfHealth.y0+5);
-        tft.print(GetMicLmin());
-        tft.print(",");
-        tft.print(GetMicLmax());
-        tft.print(",");
-        tft.print(GetMicLRMS()*1000);
+        tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
+        tft.print("I");
+        tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0);
+        tft.print("Q");
+        DrawVUBar(PaneStateOfHealth.x0+20, PaneStateOfHealth.y0+7, GetOutIRMS());
+        DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
 
         PaneStateOfHealth.stale = false;
         return;

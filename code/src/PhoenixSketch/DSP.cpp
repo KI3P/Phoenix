@@ -955,6 +955,20 @@ errno_t ReadMicrophoneBuffer(DataBlock *data){
     }
 }
 
+static float32_t I_out_RMS = 0;
+static float32_t Q_out_RMS = 0;
+float32_t tval = 0.9;
+
+// output starts to clip the DAC when these values exceed ~0.7. They start to clip the
+// RF board IQ chain when they exceed 0.6
+float32_t GetOutIRMS(void){
+    return I_out_RMS;
+}
+
+float32_t GetOutQRMS(void){
+    return Q_out_RMS;
+}
+
 /**
  * Play the data contained in data->I and data->Q on the transmitter exciter output
  */
@@ -967,6 +981,18 @@ void PlayIQData(DataBlock *data){
         Q_out_L_Ex.playBuffer();  // play it !
         Q_out_R_Ex.playBuffer();  // play it !
     }
+    float32_t buffer_rms_I = 0;
+    float32_t buffer_rms_Q = 0;
+    for (size_t k=0;k<BUFFER_SIZE*N_BLOCKS_EX;k++){
+        buffer_rms_I += data->I[k]*data->I[k];
+        buffer_rms_Q += data->Q[k]*data->Q[k];
+    }
+    buffer_rms_I /= (BUFFER_SIZE*N_BLOCKS_EX);
+    buffer_rms_Q /= (BUFFER_SIZE*N_BLOCKS_EX);
+    buffer_rms_I = sqrt(buffer_rms_I);
+    buffer_rms_Q = sqrt(buffer_rms_Q);
+    I_out_RMS = tval*I_out_RMS + (1-tval)*buffer_rms_I;
+    Q_out_RMS = tval*Q_out_RMS + (1-tval)*buffer_rms_Q;
 }
 
 /**

@@ -6,7 +6,7 @@
 // Configure the IDE to set Tools->USB Type to Dual Serial.
 
 // Uncomment to see CAT messages on the Serial Output
-#define DEBUG_CAT
+//#define DEBUG_CAT
 
 bool catTX = false;
 static char catCommand[128];
