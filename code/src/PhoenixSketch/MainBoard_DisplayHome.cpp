@@ -735,20 +735,30 @@ void DrawSpectrumPane(void) {
 // STATE OF HEALTH PANE
 ///////////////////////////////////////////////////////////////////////////////
 
-
+// Reuse the state of health pane during transmit to display the VU meters
 float32_t GetMicLRMS(void);
 float32_t GetMicRRMS(void);
-int16_t GetMicLp2p(void);
-int16_t GetMicRp2p(void);
-int16_t GetMicLmin(void);
-int16_t GetMicLmax(void);
 float32_t GetOutIRMS(void);
 float32_t GetOutQRMS(void);
-int16_t greenLimit = (int16_t)map(0.5,0,0.7,0,100);
-int16_t yellowLimit = (int16_t)map(0.6,0,0.7,0,100);
+// Used to "stretch" the green portion of the bar so it looks nicer and corresponds
+// more closely to audio power
+#define STRETCH(x) (sqrt(x))
+// Change these values to set when green / yellow thresholds are crossed
+// Green indicates good audio: low IMD and no clipping
+// Yellow indicates raised IMD, but no clipping
+// Red indicates that audio hat or RF chain are clipping
+// These values were determined experimentally
+const float32_t maxval = STRETCH(0.7);
+const float32_t greenthreshold = STRETCH(0.36);
+const float32_t yellowthreshold = STRETCH(0.6);
+int16_t greenLimit = (int16_t)map(greenthreshold,0,maxval,0,100);
+int16_t yellowLimit = (int16_t)map(yellowthreshold,0,maxval,0,100);
 
+/**
+ * This isn't a real VU meter, but it looks like one!
+ */
 void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
-    int16_t widthbar = (int16_t)map(RMSval,0,0.7,0,100);
+    int16_t widthbar = (int16_t)map(STRETCH(RMSval),0,maxval,0,100);
     if (widthbar > 100)
         widthbar = 100;
     int16_t widthgreen, widthyellow, widthred;
@@ -800,6 +810,7 @@ void DrawStateOfHealthPane(void) {
         tft.print("I");
         tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0);
         tft.print("Q");
+        //Debug(GetOutIRMS()); // uncomment to print the RMS values on the Serial line
         DrawVUBar(PaneStateOfHealth.x0+20, PaneStateOfHealth.y0+7, GetOutIRMS());
         DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
 
@@ -807,7 +818,9 @@ void DrawStateOfHealthPane(void) {
         return;
     }
 
-    return; // Remove this line to enable this pane in all other modes
+    // State of health data is something you might want to display, but most won't
+    // Remove the return statement below to enable the state of health information
+    return; 
 
     if (!PaneStateOfHealth.stale) return;
     if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag))

@@ -562,7 +562,6 @@ void HandleButtonPress(int32_t button){
                     if (newvol > (int8_t)SidetoneVolume)
                         newvol = (int8_t)AudioVolume;
                     volumeFunction = (VolumeFunction)newvol;
-                    Debug("Volume knob function is " + String(volumeFunction));
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states

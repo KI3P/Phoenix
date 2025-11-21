@@ -521,7 +521,7 @@ void InitializeAudio(void){
     transmitIQcal_oscillator.frequency(200); // 800 Hz
 
     // Warm up the audio I/O to clear initialization issues
-    WarmUpAudioIO();
+    //WarmUpAudioIO();
 }
 
 /**
