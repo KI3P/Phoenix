@@ -126,6 +126,7 @@ class AudioControlSGTL5000_Extended : public AudioControlSGTL5000
 {
     public:
         AudioControlSGTL5000_Extended(void){ }
+        void audioProcessorDisable(void){ }
 };
 
 class AudioConnection

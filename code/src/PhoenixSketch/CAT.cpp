@@ -22,6 +22,8 @@ char *command_parser( char* command );
 char* unsupported_cmd( char* cmd  );
 char* AG_read(  char* cmd );
 char* AG_write( char* cmd );
+char* AI_read(  char* cmd );
+char* AI_write( char* cmd );
 char *BU_write( char* cmd );
 char *BD_write( char* cmd );
 char *DB_write( char* cmd );
@@ -33,8 +35,12 @@ char *FT_write( char* cmd );
 char *FT_read(  char* cmd );
 char *FR_write( char* cmd );
 char *FR_read(  char* cmd );
+char *FW_write( char* cmd );
+char *FW_read(  char* cmd );
 char *ID_read(  char* cmd );
 char *IF_read(  char* cmd );
+char *KS_write( char* cmd );
+char *KS_read(  char* cmd );
 char *MD_write( char* cmd );
 char *MD_read(  char* cmd );
 char *MG_write( char* cmd );
@@ -66,10 +72,11 @@ typedef struct  {
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 23
+#define NUM_SUPPORTED_COMMANDS 25
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
+        { "AI", 3+1,3, AI_write, AI_read },  //auto information
         { "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
         { "BU", 3,  0, BU_write, unsupported_cmd }, //band up
         { "DB", 3+4,3, DB_write, unsupported_cmd }, //dBm calibration
@@ -77,8 +84,10 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "FB", 3+11,3, FB_write, FB_read },  //VFO B
         { "FR", 3+1, 3, FR_write, FR_read }, // selects or reads the VFO of the receiver
         { "FT", 3+1, 3, FT_write, FT_read }, // selects or reads the VFO of the transmitter
+        { "FW", 3+4,3+4,FW_write, FW_read }, // DSP filter bandwidth
         { "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
         { "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
+        { "KS", 3+1,3, KS_write, KS_read }, // keyer speed
         { "MD", 3+1,3, MD_write, MD_read }, // operating mode, CW, USB etc
         { "MG", 3+3,3, MG_write, MG_read }, // mike gain
         { "NR", 3+1,3, NR_write, NR_read }, // Noise reduction function: 0=off
@@ -118,6 +127,24 @@ char *AG_write( char* cmd  ){
     ED.audioVolume = ( int32_t )( ( ( float32_t )atoi( &cmd[3] ) * 100.0 ) / 255.0 );
     if( ED.audioVolume > 100 ) ED.audioVolume = 100;
     if( ED.audioVolume < 0 ) ED.audioVolume = 0;
+    return empty_string_p;
+}
+
+
+/**
+ * Return AI0. This command exists only for compatability with hamlib expectations
+ * for a TS-480 radio -- it does nothing.
+ */
+char *AI_read(  char* cmd ){
+    sprintf( obuf, "AI0;");
+    return obuf;
+}
+
+/**
+ * This command exists only for compatability with hamlib expectations
+ * for a TS-480 radio -- it does nothing.
+ */
+char *AI_write( char* cmd  ){
     return empty_string_p;
 }
 
@@ -286,6 +313,58 @@ char *FR_read(  char* cmd  ){
 }
 
 /**
+ * Return the DSP filter bandwidth in the form FWADCD; where ABCD is bandwidth in Hz.
+ * We return the upper frequency.
+ */
+char *FW_read(  char* cmd ){
+    int32_t fhigh = 0;
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            fhigh = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz ;
+            break;
+        }
+        case AM:
+        case SAM:
+        case USB:{
+            fhigh = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    sprintf( obuf, "FW%04ld;", fhigh);
+    return obuf;
+}
+
+/**
+ * Set the filter bandwidth.
+ */
+char *FW_write( char* cmd  ){
+    int32_t g = atoi( &cmd[2] );
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            if (g > -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz)
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -g;
+            break;
+        }
+        case AM:
+        case SAM:
+        case USB:{
+            if (g > bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz)
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = g;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    // Calculate the new FIR filter mask
+    UpdateFIRFilterMask(&RXfilters);
+    return empty_string_p;
+}
+
+/**
  * CAT command ID - Read radio identification
  * @param cmd CAT command string
  * @return Response "ID020;" (Kenwood TS-480 identifier)
@@ -356,6 +435,24 @@ char *IF_read(  char* cmd ){
              // P15 is a space character
               );
     return obuf;
+}
+
+/**
+ * Return the keyer speed in the form KSABC; where ABC is speed in WPM.
+ */
+char *KS_read(  char* cmd ){
+    sprintf( obuf, "KS%03ld;", ED.currentWPM);
+    return obuf;
+}
+
+/**
+ * Set the keyer speed.
+ */
+char *KS_write( char* cmd  ){
+    int32_t g = atoi( &cmd[2] );
+    if ((g >= 10) && (g <= 60)) // limits specified by the TS-480 manual
+        ED.currentWPM = g;
+    return empty_string_p;
 }
 
 /**
