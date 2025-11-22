@@ -735,11 +735,93 @@ void DrawSpectrumPane(void) {
 // STATE OF HEALTH PANE
 ///////////////////////////////////////////////////////////////////////////////
 
+// Reuse the state of health pane during transmit to display the VU meters
+float32_t GetMicLRMS(void);
+float32_t GetMicRRMS(void);
+float32_t GetOutIRMS(void);
+float32_t GetOutQRMS(void);
+// Used to "stretch" the green portion of the bar so it looks nicer and corresponds
+// more closely to audio power
+#define STRETCH(x) (sqrt(x))
+// Change these values to set when green / yellow thresholds are crossed
+// Green indicates good audio: low IMD and no clipping
+// Yellow indicates raised IMD, but no clipping
+// Red indicates that audio hat or RF chain are clipping
+// These values were determined experimentally
+const float32_t maxval = STRETCH(0.7);
+const float32_t greenthreshold = STRETCH(0.36);
+const float32_t yellowthreshold = STRETCH(0.6);
+int16_t greenLimit = (int16_t)map(greenthreshold,0,maxval,0,100);
+int16_t yellowLimit = (int16_t)map(yellowthreshold,0,maxval,0,100);
+
 /**
- * Render the state of health pane showing DSP load and system status.
+ * This isn't a real VU meter, but it looks like one!
+ */
+void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
+    int16_t widthbar = (int16_t)map(STRETCH(RMSval),0,maxval,0,100);
+    if (widthbar > 100)
+        widthbar = 100;
+    int16_t widthgreen, widthyellow, widthred;
+    if (widthbar <= greenLimit){
+        widthgreen = widthbar;
+        widthyellow = 0;
+        widthred = 0;
+    } else {
+        if ( widthbar <= yellowLimit ){
+            widthgreen = greenLimit;
+            widthyellow = widthbar - widthgreen;
+            widthred = 0;
+        } else {
+            widthgreen = greenLimit;
+            widthyellow = yellowLimit-greenLimit;
+            widthred = widthbar - widthgreen - widthyellow;
+        }
+    }
+    // Draw outline of the bar:
+    tft.drawRect(x0, y0, 100, 22, RA8875_WHITE);
+    // Fill the bar:
+    tft.fillRect(x0+1, y0+1,widthgreen, 20, RA8875_GREEN);
+    if (widthyellow > 0)
+        tft.fillRect(x0+1+widthgreen, y0+1,widthyellow, 20, RA8875_YELLOW);
+    if (widthred > 0)
+        tft.fillRect(x0+1+widthgreen+widthyellow, y0+1,widthred, 20, RA8875_RED);
+}
+
+/**
+ * Render the state of health pane showing DSP load and system status. Use this pane for
+ * VU meters of transmit amplitude in SSB transmit mode.
  */
 void DrawStateOfHealthPane(void) {
-    return; // Remove this line to enable this pane
+    if ((modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) && PaneStateOfHealth.stale){
+
+        // Draw some color bars to warn when the audio power is getting too large for 
+        // the transmit IQ chain. The RF board starts to clip when RMS values exceed 0.6.
+        // The audio hat starts to clip when they exceed 0.7
+        //    __________     __________
+        // I |__________| Q |__________|
+        //   <---100 --->
+
+        tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height, RA8875_BLACK);
+        tft.setFontDefault();
+        tft.setFontScale((enum RA8875tsize)1);
+        tft.setTextColor(RA8875_WHITE);
+
+        tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
+        tft.print("I");
+        tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0);
+        tft.print("Q");
+        //Debug(GetOutIRMS()); // uncomment to print the RMS values on the Serial line
+        DrawVUBar(PaneStateOfHealth.x0+20, PaneStateOfHealth.y0+7, GetOutIRMS());
+        DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
+
+        PaneStateOfHealth.stale = false;
+        return;
+    }
+
+    // State of health data is something you might want to display, but most won't
+    // Remove the return statement below to enable the state of health information
+    return; 
+
     if (!PaneStateOfHealth.stale) return;
     if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag))
         return;
@@ -1488,6 +1570,8 @@ void DrawHome(){
         timerDisplay_ms = millis();
         if (redrawSpectrum == false)
             redrawSpectrum = true;
+        if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)
+            PaneStateOfHealth.stale = true;
     }
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
         WindowPanes[i]->DrawFunction();

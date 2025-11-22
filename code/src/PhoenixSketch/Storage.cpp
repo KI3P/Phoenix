@@ -3,7 +3,7 @@
 #include <SD.h>
 #include <ArduinoJson.h>
 
-const char *filename = "config.txt";
+const char *filename = "T41_configuration.txt";
 LittleFS_Program myfs;
 static bool SDpresent = false;
 

@@ -263,8 +263,8 @@ TEST(Loop, CATTransmitCommandViaRepeatedLoop){
     UpdateAudioIOState();
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 
-    // Feed a CAT command to trigger transmit
-    SerialUSB1.feedData("TX0;");
+    // Feed a CAT command to trigger transmit (TX command length is 3)
+    SerialUSB1.feedData("TX;");
 
     // Execute loop() to process the CAT serial event
     // The loop() function calls CheckForCATSerialEvents() which processes the TX command
@@ -284,7 +284,7 @@ TEST(Loop, CATTransmitCommandViaRepeatedLoop){
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
 
     // Feed another TX command for CW mode
-    SerialUSB1.feedData("TX1;");
+    SerialUSB1.feedData("TX;");
 
     // Execute loop() to process the second CAT command
     loop();
@@ -300,7 +300,7 @@ TEST(Loop, CATTransmitCommandViaRepeatedLoop){
     ModeSm_StateId initial_transmit_state = modeSM.state_id;
 
     // Send TX command - should have no effect since already transmitting
-    SerialUSB1.feedData("TX0;");
+    SerialUSB1.feedData("TX;");
     loop();
 
     EXPECT_EQ(GetInterrupt(), iNONE);

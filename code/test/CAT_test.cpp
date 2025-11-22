@@ -366,36 +366,36 @@ TEST(CAT, FAWriteBandEdgeFrequencies){
 
 // Test FB_write function for valid frequency parsing
 TEST(CAT, FBWriteValidFrequencyParsing){
-    // Test setting VFO B to a valid 20m frequency
+    // Test setting frequency to a valid 20m frequency (FB sets VFO_A)
     char command[] = "FB00014200000;";  // 14.2 MHz
-    
+
     char* result = FB_write(command);
-    
+
     // Verify the response string is correctly formatted
     EXPECT_STREQ(result, "FB00014200000;");
-    
-    // Verify VFO B center frequency was set (accounting for SR offset)
+
+    // Verify VFO A center frequency was set (accounting for SR offset)
     int64_t expectedCenterFreq = 14200000L + SR[SampleRate].rate/4;
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_B], expectedCenterFreq);
-    
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
+
     // Verify fine tune was reset to 0
-    EXPECT_EQ(ED.fineTuneFreq_Hz[VFO_B], 0);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[VFO_A], 0);
 }
 
-// Test FB_write VFO B frequency setting for different bands
+// Test FB_write frequency setting for different bands (FB sets VFO_A)
 TEST(CAT, FBWriteVFOBFrequencySetting){
-    // Test setting VFO B to 40m band
+    // Test setting to 40m band
     char command[] = "FB00007150000;";  // 7.15 MHz
-    
+
     char* result = FB_write(command);
-    
-    // Verify VFO B center frequency was set correctly
+
+    // Verify VFO A center frequency was set correctly
     int64_t expectedCenterFreq = 7150000L + SR[SampleRate].rate/4;
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_B], expectedCenterFreq);
-    
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
+
     // Verify correct band was selected (BAND_40M = 3)
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_40M);
-    
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_40M);
+
     // Verify response string
     EXPECT_STREQ(result, "FB00007150000;");
 }
@@ -405,22 +405,22 @@ TEST(CAT, FBWriteBandDetection){
     // Test 160m band detection
     char command160[] = "FB00001850000;";  // 1.85 MHz
     FB_write(command160);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_160M);
-    
-    // Test 80m band detection  
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_160M);
+
+    // Test 80m band detection
     char command80[] = "FB00003700000;";   // 3.7 MHz
     FB_write(command80);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_80M);
-    
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_80M);
+
     // Test 20m band detection
     char command20[] = "FB00014200000;";   // 14.2 MHz
     FB_write(command20);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_20M);
-    
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
+
     // Test 10m band detection
     char command10[] = "FB00028350000;";   // 28.35 MHz
     FB_write(command10);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_10M);
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_10M);
 }
 
 // Test FB_write response string formatting
@@ -447,16 +447,16 @@ TEST(CAT, FBWriteResponseStringFormatting){
 TEST(CAT, FBWriteOutOfBandFrequency){
     // Test frequency that doesn't fall within any defined ham band
     char command[] = "FB00000500000;";     // 500 kHz (not in any ham band)
-    
+
     char* result = FB_write(command);
-    
+
     // Should still set the frequency
     int64_t expectedCenterFreq = 500000L + SR[SampleRate].rate/4;
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_B], expectedCenterFreq);
-    
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
+
     // GetBand should return -1 for out-of-band frequency, which gets stored
-    EXPECT_EQ(ED.currentBand[VFO_B], -1);
-    
+    EXPECT_EQ(ED.currentBand[VFO_A], -1);
+
     // Response should still be formatted correctly
     EXPECT_STREQ(result, "FB00000500000;");
 }
@@ -466,41 +466,37 @@ TEST(CAT, FBWriteBandEdgeFrequencies){
     // Test frequency at lower edge of 20m band (14.000 MHz)
     char commandLow[] = "FB00014000000;";
     FB_write(commandLow);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_20M);
-    
-    // Test frequency at upper edge of 20m band (14.350 MHz)  
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
+
+    // Test frequency at upper edge of 20m band (14.350 MHz)
     char commandHigh[] = "FB00014350000;";
     FB_write(commandHigh);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_20M);
-    
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
+
     // Test frequency just outside 20m band (13.999 MHz)
     char commandOutside[] = "FB00013999000;";
     FB_write(commandOutside);
-    EXPECT_EQ(ED.currentBand[VFO_B], -1);  // Should not match any band
+    EXPECT_EQ(ED.currentBand[VFO_A], -1);  // Should not match any band
 }
 
-// Test FB_write independence from VFO A
+// Test FB_write sets VFO A (same as FA_write)
 TEST(CAT, FBWriteVFOIndependence){
-    // Set VFO A to one frequency
+    // Set VFO A to one frequency using FA
     char commandA[] = "FA00014200000;";  // 14.2 MHz (20m)
     FA_write(commandA);
-    
-    // Set VFO B to a different frequency
-    char commandB[] = "FB00007150000;";  // 7.15 MHz (40m)
-    FB_write(commandB);
-    
-    // Verify VFO A and B have different frequencies and bands
-    EXPECT_NE(ED.centerFreq_Hz[VFO_A], ED.centerFreq_Hz[VFO_B]);
-    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
-    EXPECT_EQ(ED.currentBand[VFO_B], BAND_40M);
-    
-    // Verify VFO A frequency hasn't changed when VFO B was set
+
     int64_t expectedCenterFreqA = 14200000L + SR[SampleRate].rate/4;
     EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreqA);
-    
-    // Verify VFO B frequency is correct
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
+
+    // Set VFO A to a different frequency using FB (FB also sets VFO_A)
+    char commandB[] = "FB00007150000;";  // 7.15 MHz (40m)
+    FB_write(commandB);
+
+    // Verify VFO A was updated by FB
     int64_t expectedCenterFreqB = 7150000L + SR[SampleRate].rate/4;
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_B], expectedCenterFreqB);
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreqB);
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_40M);
 }
 
 TEST(CAT, CATSerialVFOChange){
@@ -612,101 +608,90 @@ TEST(CAT, FA_write_SetsVFOAFrequency) {
 }
 
 TEST(CAT, FA_read_ReturnsVFOAFrequency) {
-    // Set up test frequency
-    ED.centerFreq_Hz[VFO_A] = 14074000L;
-    
+    // Set up test frequency (GetTXRXFreq returns centerFreq - fineTuneFreq - rate/4)
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_A] = 14074000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_A] = 0;
+
     char command[] = "FA;";
     char *result = FA_read(command);
-    
+
     // Verify response format and content
     EXPECT_STREQ(result, "FA00014074000;");
 }
 
 TEST(CAT, FB_write_SetsVFOBFrequency) {
     char command[] = "FB00007074000;";
-    
+
     char *result = FB_write(command);
-    
-    // Verify frequency was set correctly
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_B], 7074000L + SR[SampleRate].rate/4);
-    EXPECT_EQ(ED.fineTuneFreq_Hz[VFO_B], 0);
-    
+
+    // Verify frequency was set correctly (FB sets VFO_A)
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 7074000L + SR[SampleRate].rate/4);
+    EXPECT_EQ(ED.fineTuneFreq_Hz[VFO_A], 0);
+
     // Verify response format
     EXPECT_STREQ(result, "FB00007074000;");
 }
 
 TEST(CAT, FB_read_ReturnsVFOBFrequency) {
-    // Set up test frequency
-    ED.centerFreq_Hz[VFO_B] = 7074000L;
-    
+    // Set up test frequency (GetTXRXFreq returns centerFreq - fineTuneFreq - rate/4)
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_B] = 7074000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_B] = 0;
+
     char command[] = "FB;";
     char *result = FB_read(command);
-    
+
     // Verify response format and content
     EXPECT_STREQ(result, "FB00007074000;");
 }
 
 TEST(CAT, FT_write_SetsActiveVFOFrequency) {
     ED.activeVFO = VFO_A;
-    char command[] = "FT00021074000;";
-    
+    char command[] = "FT1;";
+
     char *result = FT_write(command);
-    
-    // Verify active VFO was updated
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 21074000L + SR[SampleRate].rate/4);
-    EXPECT_EQ(ED.fineTuneFreq_Hz[VFO_A], 0);
-    
+
+    // Verify active VFO was set to VFO_B (1)
+    EXPECT_EQ(ED.activeVFO, VFO_B);
+
     // Verify response format
-    EXPECT_STREQ(result, "FT00021074000;");
+    EXPECT_STREQ(result, "FT1;");
 }
 
 TEST(CAT, FT_read_ReturnsTransmitFrequency) {
     // Set up test data
     ED.activeVFO = VFO_B;
-    ED.centerFreq_Hz[VFO_B] = 14074000L;
-    ED.fineTuneFreq_Hz[VFO_B] = 100L;
-    SampleRate = SAMPLE_RATE_48K;
 
     char command[] = "FT;";
     char *result = FT_read(command);
 
-    // Expected: GetTXRXFreq_dHz()/100 formatted
-    // GetTXRXFreq_dHz() = 100 * (centerFreq - fineTuneFreq - rate/4) (see Tune.cpp:98)
-    // GetTXRXFreq_dHz() = 100 * (14074000 - 100 - 12000) = 1406190000
-    // /100 = 14061900
-    EXPECT_STREQ(result, "FT00014061900;");
+    // FT_read returns the active VFO number
+    EXPECT_STREQ(result, "FT1;");
 }
 
 TEST(CAT, FR_write_SetsActiveVFOReceiveFrequency) {
-    ED.activeVFO = VFO_A;
-    char command[] = "FR00007030000;";
-    
+    ED.activeVFO = VFO_B;
+    char command[] = "FR0;";
+
     char *result = FR_write(command);
-    
-    // Verify active VFO was updated
-    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 7030000L + SR[SampleRate].rate/4);
-    EXPECT_EQ(ED.fineTuneFreq_Hz[VFO_A], 0);
-    
+
+    // Verify active VFO was set to VFO_A (0)
+    EXPECT_EQ(ED.activeVFO, VFO_A);
+
     // Verify response format
-    EXPECT_STREQ(result, "FR00007030000;");
+    EXPECT_STREQ(result, "FR0;");
 }
 
 TEST(CAT, FR_read_ReturnsReceiveFrequency) {
     // Set up test data
     ED.activeVFO = VFO_A;
-    ED.centerFreq_Hz[VFO_A] = 7074000L;
-    ED.fineTuneFreq_Hz[VFO_A] = 200L;
-    SampleRate = SAMPLE_RATE_48K;
 
     char command[] = "FR;";
     char *result = FR_read(command);
 
-    // Expected: GetTXRXFreq_dHz()/100 formatted
-    // GetTXRXFreq_dHz() = 100 * (centerFreq - fineTuneFreq - rate/4) (see Tune.cpp:98)
-    // GetTXRXFreq_dHz() = 100 * (7074000 - 200 - 12000) = 706180000
-    // /100 = 7061800
-    // Note: The function seems to have a typo returning "FT" instead of "FR"
-    EXPECT_STREQ(result, "FT00007061800;");
+    // FR_read returns the active VFO number
+    EXPECT_STREQ(result, "FR0;");
 }
 
 TEST(CAT, AG_write_SetsAudioVolume) {
@@ -807,14 +792,16 @@ TEST(CAT, command_parser_RecognizesSupportedCommands) {
     char ag_command[] = "AG0128;";
     char *result = command_parser(ag_command);
     EXPECT_STREQ(result, "");
-    
+
     // Test FA command
     char fa_command[] = "FA00007074000;";
     result = command_parser(fa_command);
     EXPECT_STREQ(result, "FA00007074000;");
-    
-    // Test FB read command
-    ED.centerFreq_Hz[VFO_B] = 14074000L;
+
+    // Test FB read command (GetTXRXFreq returns centerFreq - fineTuneFreq - rate/4)
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_B] = 14074000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_B] = 0;
     char fb_read[] = "FB;";
     result = command_parser(fb_read);
     EXPECT_STREQ(result, "FB00014074000;");
@@ -1102,29 +1089,25 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInSSBReceive) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_20M;
-    ED.centerFreq_Hz[VFO_A] = 14200000L;
-    ED.freqIncrement = 1000;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_A] = 14200000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_A] = 0;
     bands[BAND_20M].mode = USB;
-    
+
     char command[] = "IF;";
     char *result = IF_read(command);
-    
-    // Verify the IF response format: 
-    // IF + 11-digit freq + 4-digit step + signed RIT + flags...
+
     // Should start with "IF00014200000" (frequency)
     EXPECT_EQ(strncmp(result, "IF00014200000", 13), 0);
-    
-    // Check that it contains "1000" for frequency increment
-    EXPECT_NE(strstr(result, "1000"), nullptr);
-    
+
     // Should end with semicolon
     size_t len = strlen(result);
     EXPECT_EQ(result[len-1], ';');
-    
+
     // Should indicate RX mode (0) - character at position 28 should be '0'
     EXPECT_EQ(result[28], '0');
-    
-    // Should indicate USB mode (2) - character at position 29 should be '2' 
+
+    // Should indicate USB mode (2) - character at position 29 should be '2'
     EXPECT_EQ(result[29], '2');
 }
 
@@ -1133,22 +1116,20 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInCWReceive) {
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
     ED.activeVFO = VFO_B;
     ED.currentBand[VFO_B] = BAND_40M;
-    ED.centerFreq_Hz[VFO_B] = 7074000L;
-    ED.freqIncrement = 500;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_B] = 7074000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_B] = 0;
     bands[BAND_40M].mode = LSB; // CW usually uses LSB on 40m
-    
+
     char command[] = "IF;";
     char *result = IF_read(command);
-    
+
     // Should start with "IF00007074000" (frequency)
     EXPECT_EQ(strncmp(result, "IF00007074000", 13), 0);
-    
-    // Check that it contains "0500" for frequency increment
-    EXPECT_NE(strstr(result, "0500"), nullptr);
-    
+
     // Should indicate RX mode (0)
     EXPECT_EQ(result[28], '0');
-    
+
     // Should indicate CW mode (3) when in CW_RECEIVE state
     EXPECT_EQ(result[29], '3');
 }
@@ -1158,19 +1139,20 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInSSBTransmit) {
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_15M;
-    ED.centerFreq_Hz[VFO_A] = 21200000L;
-    ED.freqIncrement = 2500;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_A] = 21200000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_A] = 0;
     bands[BAND_15M].mode = USB;
-    
+
     char command[] = "IF;";
     char *result = IF_read(command);
-    
+
     // Should start with "IF00021200000" (frequency)
     EXPECT_EQ(strncmp(result, "IF00021200000", 13), 0);
-    
+
     // Should indicate TX mode (1)
-    EXPECT_EQ(result[28], '1'); 
-    
+    EXPECT_EQ(result[28], '1');
+
     // Should indicate USB mode (2)
     EXPECT_EQ(result[29], '2');
 }
@@ -1180,21 +1162,22 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInCWTransmitMark) {
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_80M;
-    ED.centerFreq_Hz[VFO_A] = 3574000L;
-    ED.freqIncrement = 100;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_A] = 3574000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_A] = 0;
     bands[BAND_80M].mode = LSB;
-    
+
     char command[] = "IF;";
     char *result = IF_read(command);
-    
+
     // Should start with "IF00003574000" (frequency)
     EXPECT_EQ(strncmp(result, "IF00003574000", 13), 0);
-    
-    // Should indicate TX mode (1) 
+
+    // Should indicate TX mode (1)
     EXPECT_EQ(result[28], '1');
-    
+
     // Should indicate CW mode (3)
-    EXPECT_EQ(result[29], '3'); 
+    EXPECT_EQ(result[29], '3');
 }
 
 TEST(CAT, IF_read_ReturnsCorrectFormatInCWTransmitSpace) {
@@ -1202,19 +1185,20 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInCWTransmitSpace) {
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
     ED.activeVFO = VFO_B;
     ED.currentBand[VFO_B] = BAND_10M;
-    ED.centerFreq_Hz[VFO_B] = 28200000L;
-    ED.freqIncrement = 10;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_B] = 28200000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_B] = 0;
     bands[BAND_10M].mode = USB;
-    
+
     char command[] = "IF;";
     char *result = IF_read(command);
-    
+
     // Should start with "IF00028200000" (frequency)
     EXPECT_EQ(strncmp(result, "IF00028200000", 13), 0);
-    
+
     // Should indicate TX mode (1)
     EXPECT_EQ(result[28], '1');
-    
+
     // Should indicate CW mode (3)
     EXPECT_EQ(result[29], '3');
 }
@@ -1252,26 +1236,17 @@ TEST(CAT, IF_read_HandlesFrequencyIncrement) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_40M;
-    ED.centerFreq_Hz[VFO_A] = 7100000L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_A] = 7100000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_A] = 0;
     bands[BAND_40M].mode = LSB;
-    
-    // Test various frequency increments
+
+    // Test IF command
     char command[] = "IF;";
-    
-    // Test small increment
-    ED.freqIncrement = 10;
     char *result = IF_read(command);
-    EXPECT_NE(strstr(result, "0010"), nullptr);
-    
-    // Test larger increment
-    ED.freqIncrement = 5000;
-    result = IF_read(command);
-    EXPECT_NE(strstr(result, "5000"), nullptr);
-    
-    // Test maximum normal increment
-    ED.freqIncrement = 9999;
-    result = IF_read(command);
-    EXPECT_NE(strstr(result, "9999"), nullptr);
+
+    // Should start with "IF00007100000" (frequency)
+    EXPECT_EQ(strncmp(result, "IF00007100000", 13), 0);
 }
 
 TEST(CAT, IF_read_FormatLength) {
@@ -1302,14 +1277,15 @@ TEST(CAT, command_parser_RecognizesIFCommand) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_20M;
-    ED.centerFreq_Hz[VFO_A] = 14200000L;
-    ED.freqIncrement = 1000;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.centerFreq_Hz[VFO_A] = 14200000L + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[VFO_A] = 0;
     bands[BAND_20M].mode = USB;
-    
+
     // Test IF read command through command parser
     char if_read[] = "IF;";
     char *result = command_parser(if_read);
-    
+
     // Should return proper IF response
     EXPECT_EQ(strncmp(result, "IF00014200000", 13), 0);
     EXPECT_EQ(result[29], '2'); // USB mode
@@ -1322,18 +1298,18 @@ TEST(CAT, command_parser_RecognizesIFCommand) {
 TEST(CAT, ID_read_ReturnsCorrectID) {
     char command[] = "ID;";
     char *result = ID_read(command);
-    
-    // Should return Kenwood TS-2000 ID
-    EXPECT_STREQ(result, "ID019;");
+
+    // Should return Kenwood TS-480 ID
+    EXPECT_STREQ(result, "ID020;");
 }
 
 TEST(CAT, command_parser_RecognizesIDCommand) {
     // Test ID read command through command parser
     char id_read[] = "ID;";
     char *result = command_parser(id_read);
-    
-    // Should return proper ID response
-    EXPECT_STREQ(result, "ID019;");
+
+    // Should return proper ID response (TS-480)
+    EXPECT_STREQ(result, "ID020;");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2111,56 +2087,49 @@ TEST(CAT, command_parser_RecognizesPSCommands) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 TEST(CAT, RX_write_ReturnsRX0Response) {
-    // Test that RX_write returns RX0 response
+    // Test that RX_write returns empty string (no response per TS-480 spec)
     char command[] = "RX0;";
-    
+
     char *result = RX_write(command);
-    
-    // Should return RX0 response
-    EXPECT_STREQ(result, "RX0;");
+
+    // Should return empty string
+    EXPECT_STREQ(result, "");
 }
 
 TEST(CAT, RX_write_AcceptsVariousCommands) {
     // Test that RX_write handles different receiver selection commands
     char command0[] = "RX0;"; // Main receiver
     char command1[] = "RX1;"; // Sub receiver (if supported)
-    
+
     char *result0 = RX_write(command0);
     char *result1 = RX_write(command1);
-    
-    // Both should return RX0 (indicating main receiver selected/only supported)
-    EXPECT_STREQ(result0, "RX0;");
-    EXPECT_STREQ(result1, "RX0;");
+
+    // Both should return empty string (no response per TS-480 spec)
+    EXPECT_STREQ(result0, "");
+    EXPECT_STREQ(result1, "");
 }
 
 TEST(CAT, RX_write_ConsistentResponse) {
     // Test that RX_write always returns consistent response
     char command[] = "RX0;";
-    
+
     char *result1 = RX_write(command);
     char *result2 = RX_write(command);
-    
-    // Both calls should return RX0
-    EXPECT_STREQ(result1, "RX0;");
-    EXPECT_STREQ(result2, "RX0;");
+
+    // Both calls should return empty string
+    EXPECT_STREQ(result1, "");
+    EXPECT_STREQ(result2, "");
 }
 
 TEST(CAT, command_parser_RecognizesRXCommands) {
-    // Test RX commands through the command parser
-    
-    // Test RX write command
-    char rx_write[] = "RX1;"; // Select sub receiver
-    char *result = command_parser(rx_write);
-    
-    // Should return RX0 (main receiver selected/supported)
-    EXPECT_STREQ(result, "RX0;");
-    
-    // Test with main receiver selection
-    char rx_main[] = "RX0;";
-    result = command_parser(rx_main);
-    
-    // Should return RX0
-    EXPECT_STREQ(result, "RX0;");
+    // Test RX command through the command parser
+    // Note: RX command length is 3 ("RX;")
+
+    char rx_cmd[] = "RX;";
+    char *result = command_parser(rx_cmd);
+
+    // Should return empty string (no response per TS-480 spec)
+    EXPECT_STREQ(result, "");
 }
 
 TEST(CAT, command_parser_NewCommandsLengthValidation) {
@@ -2209,62 +2178,62 @@ TEST(CAT, command_parser_AllNewCommandsIntegration) {
     result = command_parser(ps_cmd);
     EXPECT_STREQ(result, "PS0;");
     
-    // Test RX (Receiver Selection)
-    char rx_cmd[] = "RX0;";
+    // Test RX (Receiver Selection) - command length is 3 ("RX;")
+    char rx_cmd[] = "RX;";
     result = command_parser(rx_cmd);
-    EXPECT_STREQ(result, "RX0;");
-    
-    // Test TX (Transmit)
+    EXPECT_STREQ(result, "");
+
+    // Test TX (Transmit) - command length is 3 ("TX;")
     ModeSm_start(&modeSM);
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    char tx_cmd[] = "TX0;";
+    char tx_cmd[] = "TX;";
     result = command_parser(tx_cmd);
-    EXPECT_STREQ(result, "TX0;");
+    EXPECT_STREQ(result, "");
 }
 
 // TX function tests
 TEST(CAT, TX_write_ReturnsTX0Response){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
+
     char command[] = "TX0;";
     char *result = TX_write(command);
-    EXPECT_STREQ(result, "TX0;");
+    EXPECT_STREQ(result, "");
 }
 
 TEST(CAT, TX_write_AcceptsVariousCommands){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
+
     // Test with TX0;
     char command1[] = "TX0;";
     char *result1 = TX_write(command1);
-    EXPECT_STREQ(result1, "TX0;");
-    
+    EXPECT_STREQ(result1, "");
+
     // Test with TX1;
     char command2[] = "TX1;";
     char *result2 = TX_write(command2);
-    EXPECT_STREQ(result2, "TX0;");
-    
+    EXPECT_STREQ(result2, "");
+
     // Test with TX;
     char command3[] = "TX;";
     char *result3 = TX_write(command3);
-    EXPECT_STREQ(result3, "TX0;");
+    EXPECT_STREQ(result3, "");
 }
 
 TEST(CAT, TX_write_TriggersSSBTransmitFromSSBReceive){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
+
     // Ensure we're in SSB receive state
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ModeSm_StateId initial_state = modeSM.state_id;
     EXPECT_EQ(initial_state, ModeSm_StateId_SSB_RECEIVE);
-    
+
     char command[] = "TX0;";
     char *result = TX_write(command);
-    EXPECT_STREQ(result, "TX0;");
-    
+    EXPECT_STREQ(result, "");
+
     // Verify state changed to SSB transmit
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
 }
@@ -2272,16 +2241,16 @@ TEST(CAT, TX_write_TriggersSSBTransmitFromSSBReceive){
 TEST(CAT, TX_write_TriggersCWTransmitFromCWReceive){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
+
     // Set to CW receive state
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
     ModeSm_StateId initial_state = modeSM.state_id;
     EXPECT_EQ(initial_state, ModeSm_StateId_CW_RECEIVE);
-    
+
     char command[] = "TX0;";
     char *result = TX_write(command);
-    EXPECT_STREQ(result, "TX0;");
-    
+    EXPECT_STREQ(result, "");
+
     // Verify state changed to CW transmit mark (straight key behavior)
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
 }
@@ -2289,15 +2258,15 @@ TEST(CAT, TX_write_TriggersCWTransmitFromCWReceive){
 TEST(CAT, TX_write_NoStateChangeFromTransmitStates){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
+
     // Test from SSB transmit state - should have no effect
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     ModeSm_StateId initial_state = modeSM.state_id;
-    
+
     char command[] = "TX0;";
     char *result = TX_write(command);
-    EXPECT_STREQ(result, "TX0;");
-    
+    EXPECT_STREQ(result, "");
+
     // State should remain unchanged
     EXPECT_EQ(modeSM.state_id, initial_state);
 }
@@ -2305,30 +2274,25 @@ TEST(CAT, TX_write_NoStateChangeFromTransmitStates){
 TEST(CAT, TX_write_ConsistentResponse){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
+
     // Call TX_write multiple times and verify consistent response
     char command[] = "TX0;";
-    
+
     char *result1 = TX_write(command);
     char *result2 = TX_write(command);
     char *result3 = TX_write(command);
-    
-    EXPECT_STREQ(result1, "TX0;");
-    EXPECT_STREQ(result2, "TX0;");
-    EXPECT_STREQ(result3, "TX0;");
+
+    EXPECT_STREQ(result1, "");
+    EXPECT_STREQ(result2, "");
+    EXPECT_STREQ(result3, "");
 }
 
 TEST(CAT, command_parser_RecognizesTXCommands){
     UISm_start(&uiSM);
     ModeSm_start(&modeSM);
-    
-    // Test TX1; command
-    char tx1_cmd[] = "TX1;";
-    char *result = command_parser(tx1_cmd);
-    EXPECT_STREQ(result, "TX0;");
-    
-    // Test TX0; command
-    char tx0_cmd[] = "TX0;";
-    result = command_parser(tx0_cmd);
-    EXPECT_STREQ(result, "TX0;");
+
+    // Test TX; command (command length is 3)
+    char tx_cmd[] = "TX;";
+    char *result = command_parser(tx_cmd);
+    EXPECT_STREQ(result, "");
 }

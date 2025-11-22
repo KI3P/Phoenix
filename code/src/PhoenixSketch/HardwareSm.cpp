@@ -279,6 +279,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 // we turn the CW signal on.
                 MyDelay(20);
             }
+            DisableCalFeedback();
             // Set cwState to HI
             CWon();
             break;
@@ -310,6 +311,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             }
             // Set cwState to LO
             CWoff();
+            EnableCalFeedback(); // reduce the power even more
             break;
         }
         case RFCalReceiveIQ:{

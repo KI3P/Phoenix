@@ -165,7 +165,6 @@
  * - **Build system**: CMake for test compilation, Arduino IDE for firmware
  *
  * For more details, see:
- * - CLAUDE.md: Project overview and development guidelines
  * - Individual module .cpp/.h files: Implementation details
  * - code/test/: Unit tests demonstrating module usage
  */

@@ -852,6 +852,22 @@ DataBlock * ReceiveProcessing(const char *fname){
     return &data;
 }
 
+
+// Calculate the RMS value of the inputs from the mic. This is used for debugging only.
+static float32_t L_in_RMS = 0;
+static float32_t R_in_RMS = 0;
+
+float32_t GetMicLRMS(void){
+    return L_in_RMS;
+}
+
+float32_t GetMicRRMS(void){
+    return R_in_RMS;
+}
+
+//static char buff[50];
+//static int32_t counter = 0;
+
 /**
  * Read in N_BLOCKS blocks of BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex 
  * AudioRecordQueue objects into the data float buffers. This is the transmit chain,
@@ -864,8 +880,14 @@ DataBlock * ReceiveProcessing(const char *fname){
 errno_t ReadMicrophoneBuffer(DataBlock *data){
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
+        //counter++;
+        //Debug("Iteration " + String(counter));
         // get audio samples from the audio  buffers and convert them to float
-        // read in 32 blocks á 128 samples in I and Q
+        // read in 32 blocks á 128 samples in I and Q. At a sample rate of 192ksps,
+        // 128 samples is 0.6ms. A full block of 2048 samples is 10.6ms
+        float32_t buffer_rms_I = 0;
+        float32_t buffer_rms_Q = 0;
+
         for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
             sp_L2 = Q_in_L_Ex.readBuffer();
             sp_R2 = Q_in_R_Ex.readBuffer();
@@ -876,13 +898,53 @@ errno_t ReadMicrophoneBuffer(DataBlock *data){
             arm_q15_to_float(sp_R2, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
             Q_in_L_Ex.freeBuffer();
             Q_in_R_Ex.freeBuffer();
+            for (size_t k=0;k<BUFFER_SIZE;k++){
+                buffer_rms_I += data->I[k]*data->I[k];
+                buffer_rms_Q += data->Q[k]*data->Q[k];
+            }
+
         }
         data->N = N_BLOCKS_EX * BUFFER_SIZE;
         data->sampleRate_Hz = SR[SampleRate].rate;
+        buffer_rms_I /= data->N;
+        buffer_rms_Q /= data->N;
+        buffer_rms_I = sqrt(buffer_rms_I);
+        buffer_rms_Q = sqrt(buffer_rms_Q);
+        L_in_RMS = 0.9*L_in_RMS + 0.1*buffer_rms_I;
+        R_in_RMS = 0.9*R_in_RMS + 0.1*buffer_rms_Q;
+        //sprintf(buff,"Lin:%4.3f,Rin:%4.3f",L_in_RMS,R_in_RMS);
+        //Debug(buff);
         return ESUCCESS;
     } else {
         return EFAIL;
     }
+}
+
+static float32_t I_out_RMS = 0;
+static float32_t Q_out_RMS = 0;
+float32_t tval = 0.9;
+
+/**
+ * Return the RMS of the main board transmit I output. Used by the "VU" meter on 
+ * the home screen during transmit to give a readout of the power being sent to
+ * the RF board. This is helpful when setting microphone gain to reduce IMD and
+ * prevent clipping.
+ * 
+ * @return Unitless measure of I output RMS, float32_t
+ */
+float32_t GetOutIRMS(void){
+    return I_out_RMS;
+}
+
+/**
+ * Return the RMS of the main board transmit Q output. Used by the "VU" meter on 
+ * the home screen during transmit to give a readout of the power being sent to
+ * the RF board. This is helpful when setting microphone gain to reduce IMD and
+ * prevent clipping.
+ * @return Unitless measure of Q output RMS, float32_t
+ */
+float32_t GetOutQRMS(void){
+    return Q_out_RMS;
 }
 
 /**
@@ -897,6 +959,19 @@ void PlayIQData(DataBlock *data){
         Q_out_L_Ex.playBuffer();  // play it !
         Q_out_R_Ex.playBuffer();  // play it !
     }
+    // Calculate the RMS value of the outputs from the mic. Used for the TX "VU meter"
+    float32_t buffer_rms_I = 0;
+    float32_t buffer_rms_Q = 0;
+    for (size_t k=0;k<BUFFER_SIZE*N_BLOCKS_EX;k++){
+        buffer_rms_I += data->I[k]*data->I[k];
+        buffer_rms_Q += data->Q[k]*data->Q[k];
+    }
+    buffer_rms_I /= (BUFFER_SIZE*N_BLOCKS_EX);
+    buffer_rms_Q /= (BUFFER_SIZE*N_BLOCKS_EX);
+    buffer_rms_I = sqrt(buffer_rms_I);
+    buffer_rms_Q = sqrt(buffer_rms_Q);
+    I_out_RMS = tval*I_out_RMS + (1-tval)*buffer_rms_I;
+    Q_out_RMS = tval*Q_out_RMS + (1-tval)*buffer_rms_Q;
 }
 
 /**

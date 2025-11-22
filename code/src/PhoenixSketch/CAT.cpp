@@ -1,12 +1,12 @@
 #include "CAT.h"
 
-// Kenwood TS2000 CAT Interface - Minimal support for WDSP-X
+// Kenwood TS-480 CAT Interface (partial)
 //
-// Note that this uses SerialUSB1 for the CAT interface.
+// Note that this uses SerialUSB1 for the CAT interface at 38400 baud
 // Configure the IDE to set Tools->USB Type to Dual Serial.
 
 // Uncomment to see CAT messages on the Serial Output
-#define DEBUG_CAT
+//#define DEBUG_CAT
 
 bool catTX = false;
 static char catCommand[128];
@@ -22,6 +22,8 @@ char *command_parser( char* command );
 char* unsupported_cmd( char* cmd  );
 char* AG_read(  char* cmd );
 char* AG_write( char* cmd );
+char* AI_read(  char* cmd );
+char* AI_write( char* cmd );
 char *BU_write( char* cmd );
 char *BD_write( char* cmd );
 char *DB_write( char* cmd );
@@ -33,14 +35,16 @@ char *FT_write( char* cmd );
 char *FT_read(  char* cmd );
 char *FR_write( char* cmd );
 char *FR_read(  char* cmd );
+char *FW_write( char* cmd );
+char *FW_read(  char* cmd );
 char *ID_read(  char* cmd );
 char *IF_read(  char* cmd );
+char *KS_write( char* cmd );
+char *KS_read(  char* cmd );
 char *MD_write( char* cmd );
 char *MD_read(  char* cmd );
 char *MG_write( char* cmd );
 char *MG_read(  char* cmd );
-char *NF_write( char* cmd );
-char *NF_read(  char* cmd );
 char *NR_write( char* cmd );
 char *NR_read(  char* cmd );
 char *NT_write( char* cmd );
@@ -51,9 +55,9 @@ char *PD_read(  char* cmd );
 char *PS_write( char* cmd );
 char *PS_read(  char* cmd );
 char *RX_write( char* cmd );
-char *SA_write( char* cmd );
-char *SA_read(  char* cmd );
 char *TX_write( char* cmd );
+char *VX_write( char* cmd );
+char *VX_read( char* cmd );
 char *ED_read(  char* cmd );
 char *PR_read( char* cmd);
 
@@ -68,29 +72,32 @@ typedef struct  {
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 22
+#define NUM_SUPPORTED_COMMANDS 25
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
-        { "AG", 7,  4, AG_write, AG_read },  //audio gain
+        { "AG", 3+4,4, AG_write, AG_read },  //audio gain
+        { "AI", 3+1,3, AI_write, AI_read },  //auto information
         { "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
         { "BU", 3,  0, BU_write, unsupported_cmd }, //band up
         { "DB", 3+4,3, DB_write, unsupported_cmd }, //dBm calibration
-        { "FA", 14, 3, FA_write, FA_read },  //VFO A
-        { "FB", 14, 3, FB_write, FB_read },  //VFO B
-        { "FR", 14, 3, FR_write, FR_read }, //RECEIVE VFO
-        { "FT", 14, 3, FT_write, FT_read }, //XMT VFO
+        { "FA", 3+11,3, FA_write, FA_read },  //VFO A
+        { "FB", 3+11,3, FB_write, FB_read },  //VFO B
+        { "FR", 3+1, 3, FR_write, FR_read }, // selects or reads the VFO of the receiver
+        { "FT", 3+1, 3, FT_write, FT_read }, // selects or reads the VFO of the transmitter
+        { "FW", 3+4,3+4,FW_write, FW_read }, // DSP filter bandwidth
         { "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
         { "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
-        { "MD", 4,  3, MD_write, MD_read }, //operating mode, CW, USB etc
-        { "MG", 6,  3, MG_write, MG_read }, // mike gain
-        { "NF", 3+3,  3, NF_write, NF_read }, // spectrum noise floor. 3 digit number
-        { "NR", 4,  3, NR_write, NR_read }, // Noise reduction function: 0=off
-        { "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON
-        { "PC", 6,  3, PC_write, PC_read }, // output power
+        { "KS", 3+1,3, KS_write, KS_read }, // keyer speed
+        { "MD", 3+1,3, MD_write, MD_read }, // operating mode, CW, USB etc
+        { "MG", 3+3,3, MG_write, MG_read }, // mike gain
+        { "NR", 3+1,3, NR_write, NR_read }, // Noise reduction function: 0=off
+        { "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON -- NOT a Kenwood keyword
+        { "PC", 3+3,3, PC_write, PC_read }, // output power
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
-        { "PS", 4,  3, PS_write, PS_read },  // Rig power on/off
-        { "RX", 4,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
-        { "TX", 4,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
+        { "PS", 3+1,3, PS_write, PS_read },  // Rig power on/off
+        { "RX", 3,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
+        { "TX", 3,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
+        { "VX", 3+1, 3, VX_write, VX_read }, // VOX write/read
         { "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
         { "PR", 0,  3, unsupported_cmd, PR_read } // print out the state of the hardware register -- NOT a Kenwood keyword
     };
@@ -109,7 +116,6 @@ char *unsupported_cmd( char *cmd ){
  * Return the audio volume contained in the EEPROMData->audioVolume variable
  */
 char *AG_read(  char* cmd ){
-    Serial.print( "AG_read()!\n");
     sprintf( obuf, "AG%c%03ld;", cmd[ 2 ], ( int32_t )( ( ( float32_t )ED.audioVolume * 255.0 ) / 100.0 ) );
     return obuf;
 }
@@ -121,6 +127,24 @@ char *AG_write( char* cmd  ){
     ED.audioVolume = ( int32_t )( ( ( float32_t )atoi( &cmd[3] ) * 100.0 ) / 255.0 );
     if( ED.audioVolume > 100 ) ED.audioVolume = 100;
     if( ED.audioVolume < 0 ) ED.audioVolume = 0;
+    return empty_string_p;
+}
+
+
+/**
+ * Return AI0. This command exists only for compatability with hamlib expectations
+ * for a TS-480 radio -- it does nothing.
+ */
+char *AI_read(  char* cmd ){
+    sprintf( obuf, "AI0;");
+    return obuf;
+}
+
+/**
+ * This command exists only for compatability with hamlib expectations
+ * for a TS-480 radio -- it does nothing.
+ */
+char *AI_write( char* cmd  ){
     return empty_string_p;
 }
 
@@ -153,6 +177,7 @@ char *DB_write( char* cmd  ){
     return empty_string_p;
 }
 
+void AdjustBand(void); // in Loop.cpp
 /**
  * Set VFO frequency and save previous frequency to lastFrequencies array
  * @param freq Frequency in Hz to set
@@ -171,6 +196,7 @@ void set_vfo(int64_t freq, uint8_t vfo){
     // Set the frequencies
     ED.centerFreq_Hz[vfo] = freq + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[vfo] = 0;
+    AdjustBand();
     SetInterrupt(iUPDATE_TUNE);
 }
 
@@ -208,7 +234,7 @@ char *FA_write( char* cmd ){
  * @return Response string with current VFO A frequency
  */
 char *FA_read(  char* cmd  ){
-    sprintf( obuf, "FA%011lld;", ED.centerFreq_Hz[VFO_A] );
+    sprintf( obuf, "FA%011lld;", GetTXRXFreq(VFO_A) );
     return obuf;
 }
 
@@ -219,7 +245,7 @@ char *FA_read(  char* cmd  ){
  */
 char *FB_write( char* cmd  ){
     long freq = atol( &cmd[ 2 ] );
-    set_vfo_b( freq );
+    set_vfo_a( freq ); // was set vfo_a
     sprintf( obuf, "FB%011ld;", freq );
     return obuf;
 }
@@ -230,7 +256,7 @@ char *FB_write( char* cmd  ){
  * @return Response string with current VFO B frequency
  */
 char *FB_read(  char* cmd  ){
-    sprintf( obuf, "FB%011lld;", ED.centerFreq_Hz[VFO_B] );
+    sprintf( obuf, "FB%011lld;", GetTXRXFreq(VFO_B) );
     return obuf;
 }
 
@@ -240,10 +266,13 @@ char *FB_read(  char* cmd  ){
  * @return Response string with set frequency
  */
 char *FT_write( char* cmd  ){
-    //Assuming not SPLIT;  fix it later.
-    long freq = atol( &cmd[ 2 ] );
-    set_vfo( freq, ED.activeVFO );
-    sprintf( obuf, "FT%011ld;", freq );
+    int vfo = atol( &cmd[ 2 ] );
+    if ((vfo >= 0) && (vfo <=1)){
+        ED.activeVFO = vfo;
+        sprintf( obuf, "FT%d;", ED.activeVFO);
+    } else {
+        sprintf( obuf, "?;");
+    }
     return obuf;
 }
 
@@ -253,42 +282,96 @@ char *FT_write( char* cmd  ){
  * @return Response string with current transmit frequency
  */
 char *FT_read(  char* cmd  ){
-    //Assuming not SPLIT; fix it later.
-    sprintf( obuf, "FT%011lld;", GetTXRXFreq_dHz()/100 );
+    sprintf( obuf, "FT%d;", ED.activeVFO);
     return obuf;
 }
 
 /**
  * CAT command FR - Set receive frequency (assumes no SPLIT operation)
- * @param cmd CAT command string with frequency after position 2
- * @return Response string with set frequency
+ * @param cmd CAT command string with VFO number after position 2
+ * @return Response string with active VFO number 
  */
 char *FR_write( char* cmd  ){
-    long freq = atol( &cmd[ 2 ] );
-    //Assuming not SPLIT; fix it later.
-    set_vfo( freq, ED.activeVFO );
-    sprintf( obuf, "FR%011ld;", freq);
+    int vfo = atol( &cmd[ 2 ] );
+    if ((vfo >= 0) && (vfo <=1)){
+        ED.activeVFO = vfo;
+        sprintf( obuf, "FR%d;", ED.activeVFO);
+    } else {
+        sprintf( obuf, "?;");
+    }
     return obuf;
 }
 
 /**
- * CAT command FR - Read receive frequency (assumes no SPLIT operation)
+ * CAT command FR - Read active VFO
  * @param cmd CAT command string
- * @return Response string with current receive frequency
+ * @return Response string with active VFO
  */
 char *FR_read(  char* cmd  ){
-    sprintf( obuf, "FT%011lld;", GetTXRXFreq_dHz()/100 );
+    sprintf( obuf, "FR%d;", ED.activeVFO);
     return obuf;
+}
+
+/**
+ * Return the DSP filter bandwidth in the form FWADCD; where ABCD is bandwidth in Hz.
+ * We return the upper frequency.
+ */
+char *FW_read(  char* cmd ){
+    int32_t fhigh = 0;
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            fhigh = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz ;
+            break;
+        }
+        case AM:
+        case SAM:
+        case USB:{
+            fhigh = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    sprintf( obuf, "FW%04ld;", fhigh);
+    return obuf;
+}
+
+/**
+ * Set the filter bandwidth.
+ */
+char *FW_write( char* cmd  ){
+    int32_t g = atoi( &cmd[2] );
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            if (g > -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz)
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -g;
+            break;
+        }
+        case AM:
+        case SAM:
+        case USB:{
+            if (g > bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz)
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = g;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    // Calculate the new FIR filter mask
+    UpdateFIRFilterMask(&RXfilters);
+    return empty_string_p;
 }
 
 /**
  * CAT command ID - Read radio identification
  * @param cmd CAT command string
- * @return Response "ID019;" (Kenwood TS-2000 identifier)
+ * @return Response "ID020;" (Kenwood TS-480 identifier)
  */
 char *ID_read(  char* cmd  ){
-    sprintf( obuf, "ID019;");
-    return obuf;                            // Kenwood TS-2000 ID
+    sprintf( obuf, "ID020;");
+    return obuf;                            // Kenwood TS-480
 }
 
 /**
@@ -330,24 +413,46 @@ char *IF_read(  char* cmd ){
     } else {
         rxtx = 1;
     }
-
+    
     sprintf( obuf,
-             "IF%011lld%04ld%+06d%d%d%d%02d%d%d%d%d%d%d%02d%d;",
-             ED.centerFreq_Hz[ED.activeVFO],
-             ED.freqIncrement, // freqIncrement 
-             0, // rit
-             0, // rit enabled
-             0, // xit enabled
-             0, 0, // Channel bank
-             rxtx, // RX/TX (always RX in test)
-             mode, // operating mode
-             0, // RX VFO
-             0, // Scan Status
-             0, // split,
-             0, // CTCSS enabled
-             0, // CTCSS
-             0 );
+            //  P1     P2   P3   P4P5P6P7  P8P9P10 P12 P14 P15
+            //                                   P11 P13
+             "IF%011lld     %+05d%d%d%d%02d%d%d%d%d%d%d%02d ;",
+             GetTXRXFreq(ED.activeVFO),  // P1: frequency
+             // P2 is 5 spaces
+             0, // P3: rit/xit frequency
+             0, // P4: rit enabled
+             0, // P5: xit enabled
+             0, // P6: always 0, Channel bank
+             0, // P7: memory channel number
+             rxtx, // P8: RX/TX (always RX in test)
+             mode, // P9: operating mode
+             ED.activeVFO, // P10: active VFO
+             0, // P11: Scan Status
+             0, // P12: split
+             0, // P13: CTCSS enabled (OFF)
+             0  // P14: tone number
+             // P15 is a space character
+              );
     return obuf;
+}
+
+/**
+ * Return the keyer speed in the form KSABC; where ABC is speed in WPM.
+ */
+char *KS_read(  char* cmd ){
+    sprintf( obuf, "KS%03ld;", ED.currentWPM);
+    return obuf;
+}
+
+/**
+ * Set the keyer speed.
+ */
+char *KS_write( char* cmd  ){
+    int32_t g = atoi( &cmd[2] );
+    if ((g >= 10) && (g <= 60)) // limits specified by the TS-480 manual
+        ED.currentWPM = g;
+    return empty_string_p;
 }
 
 /**
@@ -436,28 +541,6 @@ char *MG_read(  char* cmd ){
     // convert from -40 .. 30 to 0..100
     int g = ( int )( ( double )( ED.currentMicGain + 40 ) * 100.0 / 70.0 );
     sprintf( obuf, "MG%03d;", g );
-    return obuf;
-}
-
-/**
- * CAT command NF - Set spectrum noise floor for current band
- * @param cmd CAT command string with noise floor value
- * @return Empty string
- */
-char *NF_write( char* cmd ){
-    int nf = atoi( &cmd[2] );
-    Debug(nf);
-    ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]] = nf;
-    return empty_string_p;
-}
-
-/**
- * CAT command NF - Read spectrum noise floor for current band
- * @param cmd CAT command string
- * @return Response string with noise floor value
- */
-char *NF_read(  char* cmd ){
-    sprintf( obuf, "NF%03d;", ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]] );
     return obuf;
 }
 
@@ -596,8 +679,7 @@ char *RX_write( char* cmd ){
         default:
             break;
     }
-    sprintf( obuf, "RX0;");
-    return obuf;   // We'll support that later.
+    return empty_string_p;
 }
 
 /**
@@ -618,7 +700,17 @@ char *TX_write( char* cmd ){
         default:
             break;
     }
-    sprintf( obuf, "TX0;");
+    return empty_string_p;
+}
+
+char *VX_write( char* cmd ){
+    Debug("Got VX write");
+    return empty_string_p;
+}
+
+char *VX_read( char* cmd ){
+    Debug("Got VX read");
+    sprintf( obuf, "VX0;");
     return obuf;
 }
 
@@ -721,7 +813,7 @@ void CheckForCATSerialEvents(void){
  */
 char *command_parser( char* command ){
     // loop through the entire list of supported commands
-    //Serial.println( String("command_parser(): cmd is ") + String(command) );
+    //Debug( String("command_parser(): cmd is ") + String(command) );
     for( int i = 0; i < NUM_SUPPORTED_COMMANDS; i++ ){
         if( ! strncmp( command, valid_commands[ i ].name, 2 ) ){
             //Serial.println( String("command_parser(): found ") + String(valid_commands[i].name) );
@@ -742,6 +834,7 @@ char *command_parser( char* command ){
             return obuf;
         }
     }
+    Debug("Unrecognized command:"+String(command));
     // Went through the list, nothing found.
     sprintf( obuf, "?;");
     return obuf;
