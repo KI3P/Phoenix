@@ -98,7 +98,7 @@ static uint8_t freqIncrementIndex = 1;
  */
 void ChangeFrequencyCorrectionFactorIncrement(void){
     freqIncrementIndex++;
-    if (freqIncrementIndex > sizeof(freqIncrements)/sizeof(freqIncrements[0]))
+    if (freqIncrementIndex >= sizeof(freqIncrements)/sizeof(freqIncrements[0]))
         freqIncrementIndex = 0;
 }
 

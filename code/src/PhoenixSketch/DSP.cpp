@@ -865,8 +865,8 @@ float32_t GetMicRRMS(void){
     return R_in_RMS;
 }
 
-static char buff[50];
-static int32_t counter = 0;
+//static char buff[50];
+//static int32_t counter = 0;
 
 /**
  * Read in N_BLOCKS blocks of BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex 
@@ -880,8 +880,8 @@ static int32_t counter = 0;
 errno_t ReadMicrophoneBuffer(DataBlock *data){
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
-        counter++;
-        Debug("Iteration " + String(counter));
+        //counter++;
+        //Debug("Iteration " + String(counter));
         // get audio samples from the audio  buffers and convert them to float
         // read in 32 blocks á 128 samples in I and Q. At a sample rate of 192ksps,
         // 128 samples is 0.6ms. A full block of 2048 samples is 10.6ms

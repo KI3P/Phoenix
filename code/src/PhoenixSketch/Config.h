@@ -1,7 +1,5 @@
 #define FAST_TUNE
 
-#define MY_LAT                                  39.07466 // Coordinates for QTH
-#define MY_LON                                  -84.42677
 #define MY_CALL                                 "ABCDE" // Default max is 10 chars
 #define MY_TIMEZONE                             "EST: "  // Default max is 10 chars
 //#define ITU_REGION                            1 //for Europe
@@ -19,8 +17,6 @@
 
 // Timing for startup screens
 #define SPLASH_DURATION_MS 1000 // How long to show Splash screen
-#define I2C_DELAY_LONG 10000L   // How long to show I2C screen with errors
-#define I2C_DELAY_SHORT 1000L   // How long to show I2C screen when no error
 
 // Control encoder direction and speed
 #define VOLUME_REVERSED true
