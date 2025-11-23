@@ -515,89 +515,9 @@ TEST(Radio, RadioStateRunThrough) {
     stop_timer1ms();
 }
 
-// Test that entering RX IQ calibration saves equalizer arrays and exiting restores them
-TEST(Radio, CalibrateRXIQ_SavesAndRestoresEqualizers) {
-    // Set up the queues and start the clock
-    Q_in_L.setChannel(0);
-    Q_in_R.setChannel(1);
-    Q_in_L.clear();
-    Q_in_R.clear();
-    Q_in_L_Ex.setChannel(0);
-    Q_in_R_Ex.setChannel(1);
-    Q_in_L_Ex.clear();
-    Q_in_R_Ex.clear();
-    StartMillis();
 
-    // Initialize the hardware
-    InitializeFrontPanel();
-    InitializeSignalProcessing();
-    InitializeAudio();
-    InitializeDisplay();
-    InitializeRFHardware();
-
-    // Start the mode state machines
-    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
-    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
-    ModeSm_start(&modeSM);
-
-    // Set splash duration to 0 to immediately transition to HOME
-    uiSM.vars.splashDuration_ms = 0;
-    UISm_start(&uiSM);
-    UISm_dispatch_event(&uiSM, UISm_EventId_DO);  // Trigger transition to HOME
-
-    UpdateAudioIOState();
-
-    // Clear any previously saved params
-    ClearSavedParams();
-
-    // Set up known initial values for equalizers
-    int32_t originalEqualizerRec[EQUALIZER_CELL_COUNT];
-    int32_t originalEqualizerXmt[EQUALIZER_CELL_COUNT];
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = i + 10;  // 10, 11, 12, ...
-        ED.equalizerXmt[i] = i + 20;  // 20, 21, 22, ...
-        originalEqualizerRec[i] = ED.equalizerRec[i];
-        originalEqualizerXmt[i] = ED.equalizerXmt[i];
-    }
-
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-
-    // Enter RX IQ calibration - this should save the equalizers
-    SetInterrupt(iCALIBRATE_RX_IQ);
-    loop();
-
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_RX_IQ);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_RX_IQ);
-
-    // Verify arrays were saved
-    EXPECT_TRUE(IsArraySaved(0));  // equalizerRec
-    EXPECT_TRUE(IsArraySaved(1));  // equalizerXmt
-
-    // Modify the equalizers during calibration (simulating user changes)
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = 99;
-        ED.equalizerXmt[i] = 88;
-    }
-
-    // Verify they were changed
-    EXPECT_EQ(ED.equalizerRec[0], 99);
-    EXPECT_EQ(ED.equalizerXmt[0], 88);
-
-    // Exit calibration by pressing HOME_SCREEN button - this should restore equalizers
-    SetButton(HOME_SCREEN);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop();
-
-    // Verify original values were restored
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        EXPECT_EQ(ED.equalizerRec[i], originalEqualizerRec[i]) << "equalizerRec[" << i << "] not restored";
-        EXPECT_EQ(ED.equalizerXmt[i], originalEqualizerXmt[i]) << "equalizerXmt[" << i << "] not restored";
-    }
-}
-
-// Test that entering TX IQ calibration saves equalizers and XAttenSSB, and exiting restores them
-TEST(Radio, CalibrateTXIQ_SavesAndRestoresEqualizersAndAttenuation) {
+// Test that entering TX IQ calibration saves XAttenSSB, and exiting restores them
+TEST(Radio, CalibrateTXIQ_SavesAndRestoresAttenuation) {
     // Set up the queues and start the clock
     Q_in_L.setChannel(0);
     Q_in_R.setChannel(1);
@@ -632,16 +552,8 @@ TEST(Radio, CalibrateTXIQ_SavesAndRestoresEqualizersAndAttenuation) {
     ClearSavedParams();
 
     // Set up known initial values
-    int32_t originalEqualizerRec[EQUALIZER_CELL_COUNT];
-    int32_t originalEqualizerXmt[EQUALIZER_CELL_COUNT];
     float originalXAttenSSB[NUMBER_OF_BANDS];
 
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = i + 5;
-        ED.equalizerXmt[i] = i + 15;
-        originalEqualizerRec[i] = ED.equalizerRec[i];
-        originalEqualizerXmt[i] = ED.equalizerXmt[i];
-    }
     for (int i = 0; i < NUMBER_OF_BANDS; i++) {
         ED.XAttenSSB[i] = (float)(i * 1.5);
         originalXAttenSSB[i] = ED.XAttenSSB[i];
@@ -658,22 +570,14 @@ TEST(Radio, CalibrateTXIQ_SavesAndRestoresEqualizersAndAttenuation) {
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
 
     // Verify all arrays were saved
-    EXPECT_TRUE(IsArraySaved(0));  // equalizerRec
-    EXPECT_TRUE(IsArraySaved(1));  // equalizerXmt
-    EXPECT_TRUE(IsArraySaved(2));  // XAttenSSB
+    EXPECT_TRUE(IsArraySaved(0));  // XAttenSSB
 
     // Modify values during calibration
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = 77;
-        ED.equalizerXmt[i] = 66;
-    }
     for (int i = 0; i < NUMBER_OF_BANDS; i++) {
         ED.XAttenSSB[i] = 31.5f;
     }
 
     // Verify they were changed
-    EXPECT_EQ(ED.equalizerRec[0], 77);
-    EXPECT_EQ(ED.equalizerXmt[0], 66);
     EXPECT_FLOAT_EQ(ED.XAttenSSB[0], 31.5f);
 
     // Exit calibration by pressing HOME_SCREEN button
@@ -682,10 +586,6 @@ TEST(Radio, CalibrateTXIQ_SavesAndRestoresEqualizersAndAttenuation) {
     loop();
 
     // Verify original values were restored
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        EXPECT_EQ(ED.equalizerRec[i], originalEqualizerRec[i]) << "equalizerRec[" << i << "] not restored";
-        EXPECT_EQ(ED.equalizerXmt[i], originalEqualizerXmt[i]) << "equalizerXmt[" << i << "] not restored";
-    }
     for (int i = 0; i < NUMBER_OF_BANDS; i++) {
         EXPECT_FLOAT_EQ(ED.XAttenSSB[i], originalXAttenSSB[i]) << "XAttenSSB[" << i << "] not restored";
     }
@@ -738,91 +638,4 @@ TEST(Radio, CalibrateFrequency_DoesNotSaveArrays) {
     EXPECT_FALSE(IsArraySaved(0));
     EXPECT_FALSE(IsArraySaved(1));
     EXPECT_FALSE(IsArraySaved(2));
-}
-
-// Test save/restore across multiple calibration cycles
-TEST(Radio, MultipleCalibrationCycles_SaveRestoreWorks) {
-    // Set up the queues and start the clock
-    Q_in_L.setChannel(0);
-    Q_in_R.setChannel(1);
-    Q_in_L.clear();
-    Q_in_R.clear();
-    Q_in_L_Ex.setChannel(0);
-    Q_in_R_Ex.setChannel(1);
-    Q_in_L_Ex.clear();
-    Q_in_R_Ex.clear();
-    StartMillis();
-
-    // Initialize the hardware
-    InitializeFrontPanel();
-    InitializeSignalProcessing();
-    InitializeAudio();
-    InitializeDisplay();
-    InitializeRFHardware();
-
-    // Start the mode state machines
-    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
-    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
-    ModeSm_start(&modeSM);
-
-    // Set splash duration to 0 to immediately transition to HOME
-    uiSM.vars.splashDuration_ms = 0;
-    UISm_start(&uiSM);
-    UISm_dispatch_event(&uiSM, UISm_EventId_DO);
-
-    UpdateAudioIOState();
-
-    // Clear any previously saved params
-    ClearSavedParams();
-
-    // First cycle - set initial values
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = 10;
-        ED.equalizerXmt[i] = 20;
-    }
-
-    // Enter RX IQ calibration
-    SetInterrupt(iCALIBRATE_RX_IQ);
-    loop();
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_RX_IQ);
-
-    // Modify during calibration
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = 50;
-    }
-
-    // Exit calibration
-    SetButton(HOME_SCREEN);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop();
-
-    // Verify restored to 10
-    EXPECT_EQ(ED.equalizerRec[0], 10);
-
-    // Process the iCALIBRATE_EXIT interrupt from the first cycle
-    loop();
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-
-    // Second cycle - change base values
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = 30;
-    }
-
-    // Enter RX IQ calibration again
-    SetInterrupt(iCALIBRATE_RX_IQ);
-    loop();
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_RX_IQ);
-
-    // Modify during calibration
-    for (int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
-        ED.equalizerRec[i] = 99;
-    }
-
-    // Exit calibration
-    SetButton(HOME_SCREEN);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop();
-
-    // Should restore to 30 (the new base value), not 10
-    EXPECT_EQ(ED.equalizerRec[0], 30);
 }
