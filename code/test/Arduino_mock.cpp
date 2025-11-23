@@ -290,6 +290,10 @@ void __enable_irq(void) {
 long map(long value, long fromLow, long fromHigh, long toLow, long toHigh) {
     // Arduino map function implementation
     // Maps a value from one range to another
+    // Guard against division by zero
+    if (fromHigh == fromLow) {
+        return toLow;
+    }
     return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
 }
 

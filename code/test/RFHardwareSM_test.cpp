@@ -70,8 +70,8 @@ TEST(RFHardwareState, StateTransitionToCWSpace){
     EXPECT_EQ(getCWState(), 0); // CW off
     // TX mode
     EXPECT_EQ(getRXTXState(), 1); // TX
-    // Cal feedback off
-    EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
+    // Cal feedback on (for power reduction during space)
+    EXPECT_EQ(getCalFeedbackState(), 1); // CAL_ON
     // CW mode
     EXPECT_EQ(getModulationState(), 0); // XMIT_CW
 

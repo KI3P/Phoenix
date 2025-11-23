@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include "../src/PhoenixSketch/SDT.h"
+#include "../src/PhoenixSketch/ParamSave.h"
 
 // Mutex to protect buffer_add() from race conditions
 static std::mutex buffer_mutex;
@@ -148,7 +149,7 @@ void CheckThatStateIsCWTransmitSpace(){
     EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 1);   // RXTX bit should be TX (1)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 0);     // CW bit should be 0 (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT), 0);   // MODE should be LO (CW)
-    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on for power reduction)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be 1 (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 0); // SSB VFO should be LO (off)
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenCW[band])); // TX attenuation (CW mode)
@@ -211,6 +212,10 @@ TEST(Radio, RadioStateRunThrough) {
     ModeSm_start(&modeSM);
     UISm_start(&uiSM);
     UpdateAudioIOState();
+
+    // Initialize key pins to released state (active low)
+    digitalWrite(KEY1, 1); // KEY1 released
+    digitalWrite(KEY2, 1); // KEY2 released
 
     // Now, start the 1ms timer interrupt to simulate hardware timer
     start_timer1ms();
@@ -300,6 +305,7 @@ TEST(Radio, RadioStateRunThrough) {
     Debug("Change to CW receive mode:");print_frequency_state();
     
     // Press the key to start transmitting
+    digitalWrite(KEY1, 0); // KEY1 pressed (active low)
     SetInterrupt(iKEY1_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
@@ -314,21 +320,25 @@ TEST(Radio, RadioStateRunThrough) {
 
 
     // Do a sequence of key pressed and releases
+    digitalWrite(KEY1, 1); // KEY1 released (active low)
     SetInterrupt(iKEY1_RELEASED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
     CheckThatStateIsCWTransmitSpace();
 
+    digitalWrite(KEY1, 0); // KEY1 pressed
     SetInterrupt(iKEY1_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
     CheckThatStateIsCWTransmitMark();
 
+    digitalWrite(KEY1, 1); // KEY1 released
     SetInterrupt(iKEY1_RELEASED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
     CheckThatStateIsCWTransmitSpace();
 
+    digitalWrite(KEY1, 0); // KEY1 pressed
     SetInterrupt(iKEY1_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
@@ -336,6 +346,7 @@ TEST(Radio, RadioStateRunThrough) {
 
 
     // Release the PTT key, we should go to receive state after a delay
+    digitalWrite(KEY1, 1); // KEY1 released
     SetInterrupt(iKEY1_RELEASED);
     loop();
     // Immediately after key is released we are still in transmit space state
@@ -502,4 +513,129 @@ TEST(Radio, RadioStateRunThrough) {
 
     // Stop the 1ms timer interrupt
     stop_timer1ms();
+}
+
+
+// Test that entering TX IQ calibration saves XAttenSSB, and exiting restores them
+TEST(Radio, CalibrateTXIQ_SavesAndRestoresAttenuation) {
+    // Set up the queues and start the clock
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    Q_in_L_Ex.setChannel(0);
+    Q_in_R_Ex.setChannel(1);
+    Q_in_L_Ex.clear();
+    Q_in_R_Ex.clear();
+    StartMillis();
+
+    // Initialize the hardware
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    // Start the mode state machines
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+
+    // Set splash duration to 0 to immediately transition to HOME
+    uiSM.vars.splashDuration_ms = 0;
+    UISm_start(&uiSM);
+    UISm_dispatch_event(&uiSM, UISm_EventId_DO);
+
+    UpdateAudioIOState();
+
+    // Clear any previously saved params
+    ClearSavedParams();
+
+    // Set up known initial values
+    float originalXAttenSSB[NUMBER_OF_BANDS];
+
+    for (int i = 0; i < NUMBER_OF_BANDS; i++) {
+        ED.XAttenSSB[i] = (float)(i * 1.5);
+        originalXAttenSSB[i] = ED.XAttenSSB[i];
+    }
+
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+
+    // Enter TX IQ calibration - this should save equalizers and XAttenSSB
+    SetInterrupt(iCALIBRATE_TX_IQ);
+    loop();
+
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
+
+    // Verify all arrays were saved
+    EXPECT_TRUE(IsArraySaved(0));  // XAttenSSB
+
+    // Modify values during calibration
+    for (int i = 0; i < NUMBER_OF_BANDS; i++) {
+        ED.XAttenSSB[i] = 31.5f;
+    }
+
+    // Verify they were changed
+    EXPECT_FLOAT_EQ(ED.XAttenSSB[0], 31.5f);
+
+    // Exit calibration by pressing HOME_SCREEN button
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop();
+
+    // Verify original values were restored
+    for (int i = 0; i < NUMBER_OF_BANDS; i++) {
+        EXPECT_FLOAT_EQ(ED.XAttenSSB[i], originalXAttenSSB[i]) << "XAttenSSB[" << i << "] not restored";
+    }
+}
+
+// Test that arrays are not saved when entering other calibration modes
+TEST(Radio, CalibrateFrequency_DoesNotSaveArrays) {
+    // Set up the queues and start the clock
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    Q_in_L_Ex.setChannel(0);
+    Q_in_R_Ex.setChannel(1);
+    Q_in_L_Ex.clear();
+    Q_in_R_Ex.clear();
+    StartMillis();
+
+    // Initialize the hardware
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    // Start the mode state machines
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+
+    // Set splash duration to 0 to immediately transition to HOME
+    uiSM.vars.splashDuration_ms = 0;
+    UISm_start(&uiSM);
+    UISm_dispatch_event(&uiSM, UISm_EventId_DO);
+
+    UpdateAudioIOState();
+
+    // Clear any previously saved params
+    ClearSavedParams();
+
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Enter frequency calibration - this should NOT save arrays
+    SetInterrupt(iCALIBRATE_FREQUENCY);
+    loop();
+
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_FREQUENCY);
+
+    // Verify arrays were NOT saved
+    EXPECT_FALSE(IsArraySaved(0));
+    EXPECT_FALSE(IsArraySaved(1));
+    EXPECT_FALSE(IsArraySaved(2));
 }

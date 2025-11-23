@@ -315,7 +315,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             break;
         }
         case RFCalReceiveIQ:{
-            
+
             // Turn these off just in case we somehow entered from CW Transmit Mode
             // Set cwState to LO
             CWoff();
@@ -443,7 +443,7 @@ void UpdateRFHardwareState(void){
 
 // Functions we need to invoke when tuning for calibration
 void TuneForReceiveIQCalibration(void){
-    ED.fineTuneFreq_Hz[ED.currentBand[ED.activeVFO]] = 0;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
     int64_t band_center = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz + 
                             bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2;
     SetSSBVFOFrequency( band_center*100 );

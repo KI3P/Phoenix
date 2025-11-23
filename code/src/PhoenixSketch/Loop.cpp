@@ -642,6 +642,17 @@ void HandleButtonPress(int32_t button){
             }
             break;
         } // end of FREQ_ENTRY state
+        case (UISm_StateId_BIT):{
+            switch (button){
+                case HOME_SCREEN:{
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of BIT state
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (button){
                 case HOME_SCREEN:{
@@ -719,6 +730,8 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Restore the equalizers from the save
+                    RestoreArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -1182,6 +1195,10 @@ void ConsumeInterrupt(void){
             UISm_dispatch_event(&uiSM,UISm_EventId_EQUALIZER);
             break;
         }
+        case (iBITDISPLAY):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_BIT);
+            break;
+        }
         case (iCALIBRATE_FREQUENCY):{
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_FREQUENCY);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_FREQUENCY);
@@ -1189,10 +1206,11 @@ void ConsumeInterrupt(void){
         }
         case (iCALIBRATE_RX_IQ):{
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_RX_IQ);
-            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);  
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);
             break;
         }
         case (iCALIBRATE_TX_IQ):{
+            SaveArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_TX_IQ);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);  
             break;

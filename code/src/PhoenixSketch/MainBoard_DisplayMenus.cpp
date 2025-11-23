@@ -523,8 +523,25 @@ struct SecondaryMenuOption EEPROMOptions[3] = {
     "Print data to Serial", functionOption, NULL, (void *)PrintEDToSerial, NULL,
 };
 
+// Diagnostic Menu
+void GotoDisplayBIT(void){
+    SetInterrupt(iBITDISPLAY);
+}
+
+void RestoreReceiveEQ(void){
+    for (size_t k = 0; k < EQUALIZER_CELL_COUNT; k++){
+        ED.equalizerRec[k] = 100;
+    }
+}
+
+struct SecondaryMenuOption DiagnosticOptions[3] = {
+    "I2C BIT test", functionOption, NULL, (void *)GotoDisplayBIT, NULL,
+    "Restore receive EQ", functionOption, NULL, (void *)RestoreReceiveEQ, NULL,
+};
+
+
 // Primary menu structure
-struct PrimaryMenuOption primaryMenu[7] = {
+struct PrimaryMenuOption primaryMenu[8] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
@@ -532,6 +549,7 @@ struct PrimaryMenuOption primaryMenu[7] = {
     "Display", DisplayOptions, sizeof(DisplayOptions)/sizeof(DisplayOptions[0]),
     "EEPROM", EEPROMOptions, sizeof(EEPROMOptions)/sizeof(EEPROMOptions[0]),
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
+    "Diagnostics", DiagnosticOptions, sizeof(DiagnosticOptions)/sizeof(DiagnosticOptions[0]),
 };
 
 /**
