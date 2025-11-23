@@ -684,9 +684,6 @@ void HandleButtonPress(int32_t button){
                 case HOME_SCREEN:{
                     // Force a save here
                     SaveDataToStorage(false);
-                    // Restore the equalizers from the save
-                    RestoreArray(0,ED.equalizerRec,sizeof(ED.equalizerRec));
-                    RestoreArray(1,ED.equalizerXmt,sizeof(ED.equalizerXmt));
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
@@ -733,12 +730,10 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Restore the equalizers from the save
+                    RestoreArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
                     // Force a save here
                     SaveDataToStorage(false);
-                    // Restore the equalizers from the save
-                    RestoreArray(0,ED.equalizerRec,sizeof(ED.equalizerRec));
-                    RestoreArray(1,ED.equalizerXmt,sizeof(ED.equalizerXmt));
-                    RestoreArray(2,ED.XAttenSSB,sizeof(ED.XAttenSSB));
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
@@ -1212,16 +1207,12 @@ void ConsumeInterrupt(void){
         case (iCALIBRATE_RX_IQ):{
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_RX_IQ);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);
-            SaveArray(0,ED.equalizerRec,sizeof(ED.equalizerRec));
-            SaveArray(1,ED.equalizerXmt,sizeof(ED.equalizerXmt));
             break;
         }
         case (iCALIBRATE_TX_IQ):{
+            SaveArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_TX_IQ);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);  
-            SaveArray(0,ED.equalizerRec,sizeof(ED.equalizerRec));
-            SaveArray(1,ED.equalizerXmt,sizeof(ED.equalizerXmt));
-            SaveArray(2,ED.XAttenSSB,sizeof(ED.XAttenSSB));
             break;
         }
         case (iCALIBRATE_CW_PA):{
