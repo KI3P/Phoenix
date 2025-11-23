@@ -612,6 +612,7 @@ struct AGCConfig {
 #include "UISm.h"
 #include "HardwareSm.h"
 // Others
+#include "ParamSave.h"
 #include "Loop.h"
 #include "Tune.h"
 #include "MainBoard_Display.h"
