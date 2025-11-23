@@ -148,7 +148,7 @@ void CheckThatStateIsCWTransmitSpace(){
     EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 1);   // RXTX bit should be TX (1)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 0);     // CW bit should be 0 (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT), 0);   // MODE should be LO (CW)
-    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on for power reduction)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be 1 (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 0); // SSB VFO should be LO (off)
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenCW[band])); // TX attenuation (CW mode)
@@ -211,6 +211,10 @@ TEST(Radio, RadioStateRunThrough) {
     ModeSm_start(&modeSM);
     UISm_start(&uiSM);
     UpdateAudioIOState();
+
+    // Initialize key pins to released state (active low)
+    digitalWrite(KEY1, 1); // KEY1 released
+    digitalWrite(KEY2, 1); // KEY2 released
 
     // Now, start the 1ms timer interrupt to simulate hardware timer
     start_timer1ms();
@@ -300,6 +304,7 @@ TEST(Radio, RadioStateRunThrough) {
     Debug("Change to CW receive mode:");print_frequency_state();
     
     // Press the key to start transmitting
+    digitalWrite(KEY1, 0); // KEY1 pressed (active low)
     SetInterrupt(iKEY1_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
@@ -314,21 +319,25 @@ TEST(Radio, RadioStateRunThrough) {
 
 
     // Do a sequence of key pressed and releases
+    digitalWrite(KEY1, 1); // KEY1 released (active low)
     SetInterrupt(iKEY1_RELEASED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
     CheckThatStateIsCWTransmitSpace();
 
+    digitalWrite(KEY1, 0); // KEY1 pressed
     SetInterrupt(iKEY1_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
     CheckThatStateIsCWTransmitMark();
 
+    digitalWrite(KEY1, 1); // KEY1 released
     SetInterrupt(iKEY1_RELEASED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_SPACE);
     CheckThatStateIsCWTransmitSpace();
 
+    digitalWrite(KEY1, 0); // KEY1 pressed
     SetInterrupt(iKEY1_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
@@ -336,6 +345,7 @@ TEST(Radio, RadioStateRunThrough) {
 
 
     // Release the PTT key, we should go to receive state after a delay
+    digitalWrite(KEY1, 1); // KEY1 released
     SetInterrupt(iKEY1_RELEASED);
     loop();
     // Immediately after key is released we are still in transmit space state
