@@ -1,7 +1,5 @@
 #include "FrontPanel.h"
 
-#define V12_PANEL_MCP23017_ADDR_1 0x20
-#define V12_PANEL_MCP23017_ADDR_2 0x21
 #define LED1 0
 #define LED2 1
 #define LED_1_PORT 6

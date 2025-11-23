@@ -3,10 +3,6 @@
 
 #include <Adafruit_I2CDevice.h>
 
-// Base I2C address, chip comes with two possible addresses depending on part number
-#define AD7991_I2C_ADDR1 0x28
-#define AD7991_I2C_ADDR2 0x29
-
 // Command byte structure:
 // D7 D6 D5 D4 D3 D2 D1 D0
 //   D7 to D4: [CH3 CH2 CH1 CH0] - if channel address bit is set to 1, channel is selected for conversion

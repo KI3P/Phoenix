@@ -33,11 +33,17 @@
 #define KEYER_TYPE                              KeyTypeId_Straight // or KeyTypeId_Keyer
 #define KEYER_FLIP                              false // or true
 
-// Set the I2C addresses of the LPF, BPF, and RF boards
+// Set the I2C addresses of the LPF, BPF, RF, and front panel boards
 #define SI5351_BUS_BASE_ADDR    0x60
 #define LPF_MCP23017_ADDR       0x25
 #define BPF_MCP23017_ADDR       0x24
 #define RF_MCP23017_ADDR        0x27
+#define V12_PANEL_MCP23017_ADDR_1 0x20
+#define V12_PANEL_MCP23017_ADDR_2 0x21
+// LPF board AD7991 chip comes with two possible addresses depending on part number
+// This is not a parameter you need to change
+#define AD7991_I2C_ADDR1 0x28
+#define AD7991_I2C_ADDR2 0x29
 
 // Front panel button functions
 #define MENU_OPTION_SELECT  0
