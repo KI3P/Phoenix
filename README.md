@@ -61,6 +61,16 @@ The main Arduino sketch and all accompanying source files are located here:
 
 The comprehensive unit tests, mocking functions, and their build files are located here:
 
+* **Unit tests**: `code/test`
+
+Useful sketches for testing the boards as you build them are here:
+
+* **Board tests**: `code/src/BoardTest`
+
+The sketch for the ATTiny85 in the main board power control block is here:
+
+* **ATTiny85 power control**: `code/src/ATTiny85_On_Off`
+
 ## Useful Diagrams (.drawio files)
 
 These diagrams can be edited with draw.io. Some are used to generate state machine code with StateSmith:
