@@ -330,18 +330,21 @@ TEST(CAT, FAWriteResponseStringFormatting){
 
 // Test FA_write out-of-band frequency handling
 TEST(CAT, FAWriteOutOfBandFrequency){
+    // Set initial band to a known value
+    ED.currentBand[VFO_A] = BAND_20M;
+
     // Test frequency that doesn't fall within any defined ham band
     char command[] = "FA00000500000;";     // 500 kHz (not in any ham band)
-    
+
     char* result = FA_write(command);
-    
+
     // Should still set the frequency
     int64_t expectedCenterFreq = 500000L + SR[SampleRate].rate/4;
     EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
-    
-    // GetBand should return -1 for out-of-band frequency, which gets stored
-    EXPECT_EQ(ED.currentBand[VFO_A], -1);
-    
+
+    // Band should remain unchanged for out-of-band frequency (avoids -1 index)
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
+
     // Response should still be formatted correctly
     EXPECT_STREQ(result, "FA00000500000;");
 }
@@ -361,7 +364,7 @@ TEST(CAT, FAWriteBandEdgeFrequencies){
     // Test frequency just outside 20m band (13.999 MHz)
     char commandOutside[] = "FA00013999000;";
     FA_write(commandOutside);
-    EXPECT_EQ(ED.currentBand[VFO_A], -1);  // Should not match any band
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);  // Band remains unchanged for out-of-band
 }
 
 // Test FB_write function for valid frequency parsing
@@ -445,6 +448,9 @@ TEST(CAT, FBWriteResponseStringFormatting){
 
 // Test FB_write out-of-band frequency handling
 TEST(CAT, FBWriteOutOfBandFrequency){
+    // Set initial band to a known value
+    ED.currentBand[VFO_A] = BAND_20M;
+
     // Test frequency that doesn't fall within any defined ham band
     char command[] = "FB00000500000;";     // 500 kHz (not in any ham band)
 
@@ -454,8 +460,8 @@ TEST(CAT, FBWriteOutOfBandFrequency){
     int64_t expectedCenterFreq = 500000L + SR[SampleRate].rate/4;
     EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
 
-    // GetBand should return -1 for out-of-band frequency, which gets stored
-    EXPECT_EQ(ED.currentBand[VFO_A], -1);
+    // Band should remain unchanged for out-of-band frequency (avoids -1 index)
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
 
     // Response should still be formatted correctly
     EXPECT_STREQ(result, "FB00000500000;");
@@ -476,7 +482,7 @@ TEST(CAT, FBWriteBandEdgeFrequencies){
     // Test frequency just outside 20m band (13.999 MHz)
     char commandOutside[] = "FB00013999000;";
     FB_write(commandOutside);
-    EXPECT_EQ(ED.currentBand[VFO_A], -1);  // Should not match any band
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);  // Band remains unchanged for out-of-band
 }
 
 // Test FB_write sets VFO A (same as FA_write)
@@ -1824,7 +1830,7 @@ TEST(CAT, PC_write_SetsSSBPowerOutput) {
     char *result = PC_write(command);
     
     // Verify SSB power was set correctly
-    EXPECT_EQ(ED.powerOutSSB[ED.activeVFO], 50);
+    EXPECT_EQ(ED.powerOutSSB[ED.currentBand[ED.activeVFO]], 50);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
@@ -1849,7 +1855,7 @@ TEST(CAT, PC_write_SetsCWPowerOutput) {
     char *result = PC_write(command);
     
     // Verify CW power was set correctly
-    EXPECT_EQ(ED.powerOutCW[ED.activeVFO], 75);
+    EXPECT_EQ(ED.powerOutCW[ED.currentBand[ED.activeVFO]], 75);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
@@ -1874,7 +1880,7 @@ TEST(CAT, PC_write_HandlesSSBTransmitMode) {
     char *result = PC_write(command);
     
     // Verify SSB power was set (not CW)
-    EXPECT_EQ(ED.powerOutSSB[ED.activeVFO], 25);
+    EXPECT_EQ(ED.powerOutSSB[ED.currentBand[ED.activeVFO]], 25);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
@@ -1896,7 +1902,7 @@ TEST(CAT, PC_write_HandlesCWTransmitModes) {
     
     char command1[] = "PC040;";
     char *result = PC_write(command1);
-    EXPECT_EQ(ED.powerOutCW[ED.activeVFO], 40);
+    EXPECT_EQ(ED.powerOutCW[ED.currentBand[ED.activeVFO]], 40);
     EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
     EXPECT_STREQ(result, "PC040;");
     ConsumeInterrupt();
@@ -1905,7 +1911,7 @@ TEST(CAT, PC_write_HandlesCWTransmitModes) {
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
     char command2[] = "PC060;";
     result = PC_write(command2);
-    EXPECT_EQ(ED.powerOutCW[ED.activeVFO], 60);
+    EXPECT_EQ(ED.powerOutCW[ED.currentBand[ED.activeVFO]], 60);
     EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
     ConsumeInterrupt();
 }
@@ -1914,7 +1920,7 @@ TEST(CAT, PC_read_ReturnsSSBPowerInSSBMode) {
     // Set up SSB mode with known power
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     ED.activeVFO = VFO_A;
-    ED.powerOutSSB[ED.activeVFO] = 80;
+    ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = 80;
     
     char command[] = "PC;";
     char *result = PC_read(command);
@@ -1927,7 +1933,7 @@ TEST(CAT, PC_read_ReturnsCWPowerInCWMode) {
     // Set up CW mode with known power
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
     ED.activeVFO = VFO_B;
-    ED.powerOutCW[ED.activeVFO] = 45;
+    ED.powerOutCW[ED.currentBand[ED.activeVFO]] = 45;
     
     char command[] = "PC;";
     char *result = PC_read(command);
@@ -1942,7 +1948,7 @@ TEST(CAT, PC_read_HandlesRoundingCorrectly) {
     // Test SSB mode rounding
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     ED.activeVFO = VFO_A;
-    ED.powerOutSSB[ED.activeVFO] = 33.7; // Should round to 34
+    ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = 33.7; // Should round to 34
     
     char command[] = "PC;";
     char *result = PC_read(command);
@@ -1950,7 +1956,7 @@ TEST(CAT, PC_read_HandlesRoundingCorrectly) {
     
     // Test CW mode rounding
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
-    ED.powerOutCW[ED.activeVFO] = 66.2; // Should round to 66
+    ED.powerOutCW[ED.currentBand[ED.activeVFO]] = 66.2; // Should round to 66
     
     result = PC_read(command);
     EXPECT_STREQ(result, "PC066;");
@@ -1969,7 +1975,7 @@ TEST(CAT, command_parser_RecognizesPCCommands) {
     char *result = command_parser(pc_write);
     
     // Verify power was set
-    EXPECT_EQ(ED.powerOutSSB[ED.activeVFO], 90);
+    EXPECT_EQ(ED.powerOutSSB[ED.currentBand[ED.activeVFO]], 90);
     EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
     EXPECT_STREQ(result, "PC090;");
     ConsumeInterrupt();

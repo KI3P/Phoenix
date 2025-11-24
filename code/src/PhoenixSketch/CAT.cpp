@@ -192,7 +192,10 @@ void set_vfo(int64_t freq, uint8_t vfo){
     // the current band for VFO A is ED.currentBand[0], B is ED.currentBand[1]
     ED.lastFrequencies[ED.currentBand[vfo]][0] = ED.centerFreq_Hz[vfo];
     ED.lastFrequencies[ED.currentBand[vfo]][1] = ED.fineTuneFreq_Hz[vfo];
-    ED.currentBand[vfo] = GetBand(freq);
+    int newband = GetBand(freq);
+    if (newband != -1){
+        ED.currentBand[vfo] = newband;
+    }
     // Set the frequencies
     ED.centerFreq_Hz[vfo] = freq + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[vfo] = 0;
@@ -597,11 +600,11 @@ char *NT_read(  char* cmd ){
  */
 char *PC_write( char* cmd ){
     int requested_power = atoi( &cmd[ 3 ]);
-    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) | 
+    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) |
         ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
-        ED.powerOutSSB[ED.activeVFO] = requested_power;
+        ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = requested_power;
     } else {
-        ED.powerOutCW[ED.activeVFO] = requested_power;
+        ED.powerOutCW[ED.currentBand[ED.activeVFO]] = requested_power;
     }
     SetInterrupt(iPOWER_CHANGE);
     sprintf( obuf, "PC%03d;", requested_power );
@@ -615,11 +618,11 @@ char *PC_write( char* cmd ){
  */
 char *PC_read(  char* cmd ){
     unsigned int o_param;
-    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) | 
+    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) |
         ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
-        o_param = round( ED.powerOutSSB[ED.activeVFO] );
+        o_param = round( ED.powerOutSSB[ED.currentBand[ED.activeVFO]] );
     } else {
-        o_param = round( ED.powerOutCW[ED.activeVFO] );
+        o_param = round( ED.powerOutCW[ED.currentBand[ED.activeVFO]] );
     }
     sprintf( obuf, "PC%03d;", o_param );
     return obuf;
