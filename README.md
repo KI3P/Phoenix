@@ -4,7 +4,7 @@ This is a new software approach, called Phoenix, for the T41-EP radio running V1
 
 # T41-EP overview
 
-The T41-EP Software Defined Transceiver (SDT), originally designed by Al Peter-AC8GY and Jack Purdum-W8TEE, is a 20W, HF, 7 band, CW/SSB Software Defined Transceiver (SDT) with features like 192kHz spectrum display bandwidth, ALP CW decoder, Bode Plots. The T41-EP is a self-contain SDT that does not require an external PC, laptop, or tablet to use. Al and Jack wrote a book, available on [Amazon](https://www.amazon.com/Digital-Signal-Processing-Software-Defined/dp/B0F5BDQZW3), describing the theory and operation of the T41-EP. Al has made a website describing the radio [here](https://t41sdrtransceiver.wordpress.com/). 
+The T41-EP Software Defined Transceiver (SDT), originally designed by Al Peter-AC8GY and Jack Purdum-W8TEE, is a 20W, HF, 7 band, CW/SSB Software Defined Transceiver (SDT) with features like 192kHz spectrum display bandwidth, ALP CW decoder, Bode Plots. The T41-EP is a self-contain SDT that does not require an external PC, laptop, or tablet to use. Al and Jack wrote a book, available on [Amazon](https://www.amazon.com/Digital-Signal-Processing-Software-Defined/dp/B0F5BDQZW3), describing the theory and operation of the T41-EP. The [project's website](https://t41sdrtransceiver.wordpress.com/) gives an overview of the project and its history.
 
 Some of the features of the T41 V12 hardware running the Phoenix firmware:
 
@@ -15,6 +15,23 @@ Some of the features of the T41 V12 hardware running the Phoenix firmware:
 * Receive and transmit audio equalizers.
 * Automated receive IQ calibration routine.
 * CAT control.
+
+The T41-EP is a fully open-source radio. This repository hosts the transceiver software. The hardware designs are hosted on Bill-K9HZ's [GitHub repository](https://github.com/DRWJSCHMIDT/T41/tree/main/T41_V012_Files). The primary forum for discussions on the T41-EP radio is on [Groups.io](https://groups.io/g/SoftwareControlledHamRadio/topics).
+
+The EP stands for Experimenter's Platform because the T41-EP is designed around 5 small printed circuit boards (100mm x 100mm) that can be easily swapped for boards of your own design. Because the T41-EP project is completely Open Source, you have complete access to the C/C++ source code that controls the T41-EP as well as the KiCad design files, schematics, and Gerber files. 
+
+The hardware design files for the V12 radio modules can be found at the following links:
+
+* [Main board](https://github.com/DRWJSCHMIDT/T41/tree/main/T41_V012_Files/T41_V012_PCBs/T41_V012_PCBs_KiCad/T41-main-board-V012)
+* [RF board](https://github.com/DRWJSCHMIDT/T41/tree/main/T41_V012_Files/T41_V012_PCBs/T41_V012_PCBs_KiCad/T41-RF-board-V012)
+* [BPF board](https://github.com/DRWJSCHMIDT/T41/tree/main/T41_V012_Files/T41_V012_PCBs/T41_V012_PCBs_KiCad/T41-BPF-filter-board)
+* [Front panel switch board](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_Front_Panel_Boards)
+* [Front panel encoder boards](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_Encoder_Boards)
+* [LPF module](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_LPF_Module)
+* [20W amplifier module](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_20W_PA)
+
+The latest version (V12.6) of the bare PCBs are available for less than $5 each on the [discussion forum](https://groups.io/g/SoftwareControlledHamRadio) by contacting Bill K9HZ. If you prefer a partially-assembled kit,  Justin AI6YM sells them on his [website](https://ai6ym.radio/t41-ep-sdt/).
+
 
 ## Screenshots
 
@@ -97,7 +114,7 @@ We don't want button presses to change the hardware state at random, unspecified
 
 ## Remote control
 
-The radio will provide two serial interfaces over USB. The first, at a baud rate of 115200, prints debug messages. The second, at a baud rate of 38400, implements CAT control with a partial implementation of the Kenwood TS2000 CAT Interface.
+The radio will provide two serial interfaces over USB. The first, at a baud rate of 115200, prints debug messages. The second, at a baud rate of 38400, implements CAT control with a partial implementation of the Kenwood TS-480 CAT Interface.
 
 
 # Build environment
