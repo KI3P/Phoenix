@@ -50,4 +50,7 @@ void AdjustFineTune(int32_t filter_change);
  */
 void ResetTuning(void);
 
+float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode);
+float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel);
+
 #endif // TUNE_H

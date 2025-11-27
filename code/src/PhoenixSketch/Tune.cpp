@@ -147,3 +147,104 @@ int8_t GetBand(int64_t freq){
     }
     return -1; // Frequency not within one of the defined ham bands
 }
+
+/*
+ * The output power of a radio is well-fit by a hyperbolic tan function:
+ *    Pout ​= Psat tanh( Psat*​G / Pin )
+ * Where Psat is the power at saturation and G parameterizes the power at which
+ * the radio starts to saturate.
+ * 
+ * A more convenient way for us to write this is based on the attenuation setting:
+ *    Pout ​= Psat tanh( k 10^{-A/10}​ )
+ */
+
+/**
+ * Return the predicted output power given an attenuation setting, PA selection
+ * and mode selection (SSB or CW). The output power is given by the equation:
+ *   Pout [W] ​= Psat [mW] tanh( k 10^{-Attenuation [dB]/10}​ ) / 1000
+ * 
+ * @param atten Attenuation setting in dB
+ * @param PAsel 0 for 20W, 1 for 100W
+ * @param mode 1 for SSB, 0 for CW
+ * @return Output power in mW
+ */
+float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode){
+    if (atten_dB < 0){
+        Debug("Atten must be positive!");
+        return 0;
+    }
+    if (atten_dB > 31.5){
+        Debug("Atten must be <31.5!");
+        return 0;
+    }
+    float32_t Psat,k,Aoff;
+    if (PAsel == 0){
+        Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
+        k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
+        if (mode == 1){
+            Aoff = ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]];
+        } else {
+            Aoff = 0;
+        }
+    } else {
+        Psat = ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]];
+        k = ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]];
+        if (mode == 1){
+            Aoff = ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]];
+        } else {
+            Aoff = 0;
+        }
+    }
+
+    float32_t a = pow(10.0f,-(atten_dB + Aoff)/10.0f);
+    float32_t P_mW = Psat * tanhf32( k * a );
+    return P_mW;
+}
+
+
+/**
+ * Return the attenuation setting necessary to produce the requested output power 
+ * given a mode selection (SSB or CW). The attenuation is given by the equation:
+ *    Atten [dB] ​= -10*log10( 1/k * arctanh( ​Power [W]/(Psat [mW] *1000) ) )
+ * 
+ * @param Power_W Desired power in W
+ * @param mode 1 for SSB, 0 for CW
+ * @param *PAsel Pointer to PA setting, we set this to 1 if 100W amp is needed
+ * @return Attenuation setting in dB (float32_t
+ */
+float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
+    if (Power_W < 0){
+        Debug("Power must be positive!");
+        return 0;
+    }
+    if (Power_W > 100){
+        Debug("Power must be <100!");
+        return 0;
+    }
+    if (Power_W >= ED.PowerCal_20W_to_100W_threshold_W){
+        *PAsel = 1;
+    } else {
+        *PAsel = 0;
+    }
+    float32_t Psat,k,Aoff;
+    if (*PAsel == 0){
+        Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
+        k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
+        if (mode == 1){
+            Aoff = ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]];
+        } else {
+            Aoff = 0;
+        }
+    } else {
+        Psat = ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]];
+        k = ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]];
+        if (mode == 1){
+            Aoff = ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]];
+        } else {
+            Aoff = 0;
+        }
+    }
+
+    return (-Aoff-10.0*log10f((1.0/k)*atanhf32(Power_W*1000.0/Psat)));
+}
+

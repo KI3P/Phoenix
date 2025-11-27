@@ -689,3 +689,275 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     }
 }*/
 
+/**
+ * Test fixture for Power Calibration function tests
+ * These tests verify the mathematical correctness of PredictPowerLevel and CalculateAttenuation
+ */
+class PowerCalibrationTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Initialize minimal environment for power calculation tests
+        InitializeStorage();
+
+        // Set known calibration values for testing
+        // Using default values from SDT.h for 20W PA
+        ED.PowerCal_20W_Psat_mW[BAND_20M] = 14680.0f;
+        ED.PowerCal_20W_kindex[BAND_20M] = 16.2f;
+        ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
+
+        // Default values for 100W PA
+        ED.PowerCal_100W_Psat_mW[BAND_20M] = 86000.0f;
+        ED.PowerCal_100W_kindex[BAND_20M] = 10.0f;
+        ED.PowerCal_100W_att_offset_dB[BAND_20M] = 0.0f;
+
+        // Threshold for PA selection
+        ED.PowerCal_20W_to_100W_threshold_W = 10.0f;
+
+        // Set active band to 20M for testing
+        ED.currentBand[ED.activeVFO] = BAND_20M;
+    }
+};
+
+/**
+ * Test PredictPowerLevel returns zero for negative attenuation
+ */
+TEST_F(PowerCalibrationTest, PredictPowerLevel_RejectsNegativeAttenuation) {
+    float32_t power = PredictPowerLevel(-1.0f, 0, 0);
+    EXPECT_EQ(power, 0.0f);
+}
+
+/**
+ * Test PredictPowerLevel returns zero for out-of-range attenuation
+ */
+TEST_F(PowerCalibrationTest, PredictPowerLevel_RejectsExcessiveAttenuation) {
+    float32_t power = PredictPowerLevel(32.0f, 0, 0);
+    EXPECT_EQ(power, 0.0f);
+}
+
+/**
+ * Test PredictPowerLevel with zero attenuation approaches saturation power
+ */
+TEST_F(PowerCalibrationTest, PredictPowerLevel_ZeroAttenuation_20W_CW) {
+    // With zero attenuation, output should approach Psat
+    float32_t power = PredictPowerLevel(0.0f, 0, 0);
+    // At zero attenuation: tanh(k) = tanh(16.2) ≈ 1.0
+    EXPECT_NEAR(power, ED.PowerCal_20W_Psat_mW[BAND_20M], 1.0f);
+}
+
+/**
+ * Test PredictPowerLevel with maximum attenuation gives very low power
+ */
+TEST_F(PowerCalibrationTest, PredictPowerLevel_MaxAttenuation_20W_CW) {
+    // With maximum attenuation (31.5 dB), output should be very small
+    float32_t power = PredictPowerLevel(31.5f, 0, 0);
+    // At 31.5 dB attenuation, power should be much less than 1W (1000 mW)
+    EXPECT_LT(power, 1000.0f);
+}
+
+/**
+ * Test PredictPowerLevel for 100W PA
+ */
+TEST_F(PowerCalibrationTest, PredictPowerLevel_ZeroAttenuation_100W_CW) {
+    float32_t power = PredictPowerLevel(0.0f, 1, 0);
+    // At zero attenuation: tanh(k) = tanh(10.0) ≈ 1.0
+    EXPECT_NEAR(power, ED.PowerCal_100W_Psat_mW[BAND_20M], 1.0f);
+}
+
+/**
+ * Test PredictPowerLevel SSB mode applies offset
+ */
+TEST_F(PowerCalibrationTest, PredictPowerLevel_SSB_AppliesOffset) {
+    // Set a non-zero offset for SSB mode
+    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 3.0f;
+
+    // Get power for CW (no offset)
+    float32_t powerCW = PredictPowerLevel(10.0f, 0, 0);
+
+    // Get power for SSB (with offset)
+    float32_t powerSSB = PredictPowerLevel(10.0f, 0, 1);
+
+    // SSB should have lower power due to the 3dB offset (effective attenuation is higher)
+    EXPECT_LT(powerSSB, powerCW);
+
+    // Reset offset
+    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
+}
+
+/**
+ * Test CalculateAttenuation returns zero for negative power
+ */
+TEST_F(PowerCalibrationTest, CalculateAttenuation_RejectsNegativePower) {
+    int8_t PAsel = 0;
+    float32_t atten = CalculateAttenuation(-1.0f, 0, &PAsel);
+    EXPECT_EQ(atten, 0.0f);
+}
+
+/**
+ * Test CalculateAttenuation returns zero for excessive power
+ */
+TEST_F(PowerCalibrationTest, CalculateAttenuation_RejectsExcessivePower) {
+    int8_t PAsel = 0;
+    float32_t atten = CalculateAttenuation(101.0f, 0, &PAsel);
+    EXPECT_EQ(atten, 0.0f);
+}
+
+/**
+ * Test CalculateAttenuation selects correct PA for low power
+ */
+TEST_F(PowerCalibrationTest, CalculateAttenuation_SelectsLowPA_ForLowPower) {
+    int8_t PAsel = 0;
+    CalculateAttenuation(5.0f, 0, &PAsel);
+    EXPECT_EQ(PAsel, 0);  // Should select 20W PA for 5W
+}
+
+/**
+ * Test CalculateAttenuation selects correct PA for high power
+ */
+TEST_F(PowerCalibrationTest, CalculateAttenuation_SelectsHighPA_ForHighPower) {
+    int8_t PAsel = 0;
+    CalculateAttenuation(15.0f, 0, &PAsel);
+    EXPECT_EQ(PAsel, 1);  // Should select 100W PA for 15W
+}
+
+/**
+ * Test CalculateAttenuation at threshold power
+ */
+TEST_F(PowerCalibrationTest, CalculateAttenuation_ThresholdPower_SelectsHighPA) {
+    int8_t PAsel = 0;
+    CalculateAttenuation(10.0f, 0, &PAsel);
+    EXPECT_EQ(PAsel, 1);  // Should select 100W PA at exactly 10W threshold
+}
+
+/**
+ * Test that PredictPowerLevel and CalculateAttenuation are inverses (20W PA, CW)
+ * Note: Only test attenuations that result in power below the PA selection threshold
+ */
+TEST_F(PowerCalibrationTest, InverseFunctions_20W_CW) {
+    // Test attenuation values that keep power below 10W threshold
+    // Higher attenuations to avoid PA auto-selection issues
+    float32_t test_attenuations[] = {15.0f, 20.0f, 25.0f, 31.5f};
+
+    for (float32_t atten : test_attenuations) {
+        // Predict power from attenuation
+        float32_t power_mW = PredictPowerLevel(atten, 0, 0);
+        float32_t power_W = power_mW / 1000.0f;
+
+        // Calculate attenuation from power
+        int8_t PAsel = 0;
+        float32_t calculated_atten = CalculateAttenuation(power_W, 0, &PAsel);
+
+        // Should get back the original attenuation (within tolerance)
+        // Use larger tolerance for numerical precision issues
+        EXPECT_NEAR(calculated_atten, atten, 0.1f)
+            << "Failed for attenuation=" << atten
+            << ", power=" << power_W << "W";
+
+        // Should select the correct PA
+        EXPECT_EQ(PAsel, 0) << "Wrong PA selected for " << power_W << "W";
+    }
+}
+
+/**
+ * Test that PredictPowerLevel and CalculateAttenuation are inverses (100W PA, CW)
+ * Note: Only test attenuations that result in power above the PA selection threshold
+ */
+TEST_F(PowerCalibrationTest, InverseFunctions_100W_CW) {
+    // Test attenuation values that result in power above 10W threshold
+    // so PA auto-selection picks 100W PA
+    float32_t test_attenuations[] = {5.0f, 10.0f, 15.0f};
+
+    for (float32_t atten : test_attenuations) {
+        // Predict power from attenuation
+        float32_t power_mW = PredictPowerLevel(atten, 1, 0);
+        float32_t power_W = power_mW / 1000.0f;
+
+        // Calculate attenuation from power
+        int8_t PAsel = 0;
+        float32_t calculated_atten = CalculateAttenuation(power_W, 0, &PAsel);
+
+        // Should get back the original attenuation (within tolerance)
+        // Use larger tolerance for numerical precision issues
+        EXPECT_NEAR(calculated_atten, atten, 0.1f)
+            << "Failed for attenuation=" << atten
+            << ", power=" << power_W << "W";
+
+        // For high power outputs, should select 100W PA
+        if (power_W >= ED.PowerCal_20W_to_100W_threshold_W) {
+            EXPECT_EQ(PAsel, 1) << "Wrong PA selected for " << power_W << "W";
+        }
+    }
+}
+
+/**
+ * Test that PredictPowerLevel and CalculateAttenuation are inverses (SSB mode)
+ * Note: Use higher attenuations to keep power below PA selection threshold
+ */
+TEST_F(PowerCalibrationTest, InverseFunctions_20W_SSB) {
+    // Set a non-zero offset for SSB
+    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 2.5f;
+
+    // Test attenuation values that keep power below 10W threshold
+    // Higher attenuations to avoid PA auto-selection issues
+    float32_t test_attenuations[] = {15.0f, 20.0f, 25.0f};
+
+    for (float32_t atten : test_attenuations) {
+        // Predict power from attenuation (SSB mode)
+        float32_t power_mW = PredictPowerLevel(atten, 0, 1);
+        float32_t power_W = power_mW / 1000.0f;
+
+        // Calculate attenuation from power (SSB mode)
+        int8_t PAsel = 0;
+        float32_t calculated_atten = CalculateAttenuation(power_W, 1, &PAsel);
+
+        // Should get back the original attenuation (within tolerance)
+        // Use larger tolerance for numerical precision issues
+        EXPECT_NEAR(calculated_atten, atten, 0.1f)
+            << "Failed for attenuation=" << atten
+            << ", power=" << power_W << "W";
+    }
+
+    // Reset offset
+    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
+}
+
+/**
+ * Test power prediction for realistic operating scenarios
+ */
+TEST_F(PowerCalibrationTest, RealisticOperatingScenarios) {
+    // Scenario 1: Low power QRP operation (5W)
+    int8_t PAsel = 0;
+    float32_t atten_5W = CalculateAttenuation(5.0f, 0, &PAsel);
+    float32_t power_5W = PredictPowerLevel(atten_5W, PAsel, 0);
+    EXPECT_NEAR(power_5W / 1000.0f, 5.0f, 0.05f);
+    EXPECT_EQ(PAsel, 0);  // Should use 20W PA
+
+    // Scenario 2: Medium power operation (50W)
+    PAsel = 0;
+    float32_t atten_50W = CalculateAttenuation(50.0f, 0, &PAsel);
+    float32_t power_50W = PredictPowerLevel(atten_50W, PAsel, 0);
+    EXPECT_NEAR(power_50W / 1000.0f, 50.0f, 0.5f);
+    EXPECT_EQ(PAsel, 1);  // Should use 100W PA
+
+    // Scenario 3: High power operation (100W)
+    PAsel = 0;
+    float32_t atten_100W = CalculateAttenuation(80.0f, 0, &PAsel);
+    float32_t power_100W = PredictPowerLevel(atten_100W, PAsel, 0);
+    EXPECT_NEAR(power_100W / 1000.0f, 80.0f, 0.8f);
+    EXPECT_EQ(PAsel, 1);  // Should use 100W PA
+}
+
+/**
+ * Test that higher attenuation always produces lower power
+ */
+TEST_F(PowerCalibrationTest, MonotonicBehavior) {
+    float32_t power_0dB = PredictPowerLevel(0.0f, 0, 0);
+    float32_t power_10dB = PredictPowerLevel(10.0f, 0, 0);
+    float32_t power_20dB = PredictPowerLevel(20.0f, 0, 0);
+    float32_t power_31_5dB = PredictPowerLevel(31.5f, 0, 0);
+
+    // Power should decrease monotonically with increasing attenuation
+    EXPECT_GT(power_0dB, power_10dB);
+    EXPECT_GT(power_10dB, power_20dB);
+    EXPECT_GT(power_20dB, power_31_5dB);
+}
+
