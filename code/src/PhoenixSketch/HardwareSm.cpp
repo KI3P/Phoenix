@@ -243,7 +243,10 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             
             TXSelectBPF(); // BPF in to TX path
             BypassXVTR();  // Bypass XVTR
-            Bypass100WPA(); // always bypassed
+            if (ED.PA100Wactive)
+                Select100WPA();
+            else
+                Bypass100WPA();
 
             MyDelay(10);
             // Set rxtxState to HI (TX)
@@ -272,7 +275,10 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 SelectTXCWModulation();
                 TXSelectBPF(); // BPF in to TX path
                 BypassXVTR();  // Bypass XVTR
-                Bypass100WPA(); // always bypassed
+                if (ED.PA100Wactive)
+                    Select100WPA();
+                else
+                    Bypass100WPA();
                 // Set rxtxState to HI (TX)
                 SelectTXMode();
                 // Potential issue here if we don't wait for the relay to switch before
@@ -305,7 +311,10 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 SelectTXCWModulation();
                 TXSelectBPF(); // BPF in to TX path
                 BypassXVTR();  // Bypass XVTR
-                Bypass100WPA(); // always bypassed
+                if (ED.PA100Wactive)
+                    Select100WPA();
+                else
+                    Bypass100WPA();
                 // Set rxtxState to HI (TX)
                 SelectTXMode();
             }
@@ -422,10 +431,11 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFCalReceiveIQ;
             break;
         }
-        case (ModeSm_StateId_CALIBRATE_CW_PA):{
-            Debug("Entered hardware cal power state");
-            break;
-        }
+        // Power calibration now uses CALIBRATE_TX_IQ_SPACE/MARK states
+        //case (ModeSm_StateId_CALIBRATE_CW_PA):{
+        //    Debug("Entered hardware cal power state");
+        //    break;
+        //}
         //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
         //    break;
         //}
@@ -483,6 +493,10 @@ void TuneForReceiveIQCalibration(void){
 void HandleTuneState(TuneState tuneState){
     if (tuneState == TuneInvalid) return;
     
+    if (ED.PA100Wactive)
+        Select100WPA();
+    else
+        Bypass100WPA();
     SelectLPFBand(ED.currentBand[ED.activeVFO]);
     SelectBPFBand(ED.currentBand[ED.activeVFO]);
     SelectAntenna(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);

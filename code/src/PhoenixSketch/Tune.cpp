@@ -253,13 +253,6 @@ float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
 // Model: P_out = P_sat * tanh(k * 10^(-Att/10))
 ///////////////////////////////////////////////////////////////////////////////
 
-struct FitResult {
-    float32_t P_sat;    // in mW
-    float32_t k;        // drive ratio
-    int32_t iterations;
-    float32_t rms_error;
-};
-
 // Model function
 float32_t model(float32_t att, float32_t P_sat, float32_t k) {
     return P_sat * tanh(k * powf(10.0f, -att / 10.0f));
@@ -268,7 +261,7 @@ float32_t model(float32_t att, float32_t P_sat, float32_t k) {
 // Gauss-Newton least squares fit
 FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n, 
                        float32_t P_sat_init, float32_t k_init,
-                       int32_t max_iter = 50, float32_t tol = 1e-6) {
+                       int32_t max_iter = 100, float32_t tol = 1e-6) {
     
     float32_t P_sat = P_sat_init;
     float32_t k = k_init;
@@ -342,7 +335,7 @@ FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n,
     return result;
 }
 
-void FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
+FitResult FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
                     float32_t P_sat_init = 15000.0f, float32_t k_init = 10.0f) {    
     // Initial guesses for P_sat_init and k_init are close for 20W amp case
     
@@ -355,5 +348,24 @@ void FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
     Serial.print("  k = "); Serial.println(fit.k);
     Serial.print("  Iterations: "); Serial.println(fit.iterations);
     Serial.print("  RMS Error: "); Serial.print(fit.rms_error); Serial.println(" mW");
+
+    return fit;
 }
 
+void SetPower(float32_t power_W){
+    float32_t offset = 0.0;
+    int8_t mode = 0; // CW
+    if (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) // replace this with switch/case
+        mode = 1; // SSB
+
+    // Calculate the necessary attenuation:
+    int8_t PAsel;
+    float32_t att = CalculateAttenuation(power_W, mode, &PAsel);
+    ED.PA100Wactive = (bool)PAsel;
+    if (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) // replace this with switch/case
+        ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = att;
+    else
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = att;
+    // Now invoke the hardware state machine change to make these changes
+    SetInterrupt(iPOWER_CHANGE);
+}

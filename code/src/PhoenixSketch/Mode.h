@@ -129,38 +129,6 @@ void CalibrateRXIQEnter(void);
  */
 void CalibrateRXIQExit(void);
 
-// CW PA Calibration Mode
-
-/**
- * @brief Enter CW power amplifier calibration mode
- * @note Called by ModeSm state machine when entering CALIBRATE_CWPA state
- * @note Displays CW PA calibration screen and enables test transmission
- */
-void CalibrateCWPAEnter(void);
-
-/**
- * @brief Exit CW PA calibration mode
- * @note Called by ModeSm state machine when leaving CALIBRATE_CWPA state
- * @note Saves CW PA settings and returns to normal operation
- */
-void CalibrateCWPAExit(void);
-
-// SSB PA Calibration Mode
-
-/**
- * @brief Enter SSB power amplifier calibration mode
- * @note Called by ModeSm state machine when entering CALIBRATE_SSBPA state
- * @note Displays SSB PA calibration screen and enables test transmission
- */
-void CalibrateSSBPAEnter(void);
-
-/**
- * @brief Exit SSB PA calibration mode
- * @note Called by ModeSm state machine when leaving CALIBRATE_SSBPA state
- * @note Saves SSB PA settings and returns to normal operation
- */
-void CalibrateSSBPAExit(void);
-
 // Calibration Trigger Functions
 
 /**

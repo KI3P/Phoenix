@@ -592,6 +592,8 @@ void PrintEDToSerial(void){
     Serial.print("freqIncrement:     "); Serial.println(ED.freqIncrement);
     Serial.print("freqCorrectionFactor: "); Serial.println(ED.freqCorrectionFactor);
     Serial.print("activeVFO:         "); Serial.println(ED.activeVFO);
+    Serial.print("modulation[0]:     "); Serial.println(ED.modulation[0]);
+    Serial.print("modulation[1]:     "); Serial.println(ED.modulation[1]);
     Serial.print("currentBand[0]:    "); Serial.println(ED.currentBand[0]);
     Serial.print("currentBand[1]:    "); Serial.println(ED.currentBand[1]);
     Serial.print("centerFreq_Hz[0]:  "); Serial.println(ED.centerFreq_Hz[0]);
@@ -606,6 +608,7 @@ void PrintEDToSerial(void){
     }
     Serial.println();
     Serial.print("keyerFlip:         "); Serial.println(ED.keyerFlip);
+    Serial.print("PA100Wactive:      "); Serial.println(ED.PA100Wactive);
 
     Serial.print("equalizerRec: ");
     for(int i = 0; i < EQUALIZER_CELL_COUNT; i++) {
@@ -628,6 +631,13 @@ void PrintEDToSerial(void){
     }
     Serial.println();
 
+    Serial.print("powerOutSSB: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.powerOutSSB[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
     Serial.print("RAtten: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.RAtten[i]);
@@ -642,16 +652,9 @@ void PrintEDToSerial(void){
     }
     Serial.println();
 
-    Serial.print("XAtteSSB: ");
+    Serial.print("XAttenSSB: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.XAttenSSB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("powerOutSSB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.powerOutSSB[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
@@ -691,6 +694,87 @@ void PrintEDToSerial(void){
     Serial.print("antennaSelection: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.antennaSelection[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.println("lastFrequencies (center, fine, modulation):");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print("  Band "); Serial.print(i); Serial.print(": ");
+        Serial.print(ED.lastFrequencies[i][0]); Serial.print(", ");
+        Serial.print(ED.lastFrequencies[i][1]); Serial.print(", ");
+        Serial.println(ED.lastFrequencies[i][2]);
+    }
+
+    Serial.print("PowerCal_20W_Psat_mW: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_20W_Psat_mW[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_20W_kindex: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_20W_kindex[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_20W_att_offset_dB: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_20W_att_offset_dB[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_100W_Psat_mW: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_100W_Psat_mW[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_100W_kindex: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_100W_kindex[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_100W_att_offset_dB: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_100W_att_offset_dB[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_20W_to_100W_threshold_W: ");
+    Serial.println(ED.PowerCal_20W_to_100W_threshold_W);
+
+    Serial.print("SWR_F_SlopeAdj: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.SWR_F_SlopeAdj[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("SWR_R_SlopeAdj: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.SWR_R_SlopeAdj[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("SWR_R_Offset: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.SWR_R_Offset[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("SWR_F_Offset: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.SWR_F_Offset[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();

@@ -274,9 +274,28 @@ void UpdateTXAttenSSB(void){
     SetTXAttenuation(*(float32_t *)txAttenSSB.variable);
 }
 
+/**
+ * Post-update callback to set RF power. Called after ssbPower or cwPower
+ * is modified via menu.
+ */
+void UpdatePower(void){
+    float32_t setPower;
+    switch (modeSM.state_id) {
+        case ModeSm_StateId_CW_RECEIVE:
+            setPower = *(float32_t *)cwPower.variable;
+            break;
+        case ModeSm_StateId_SSB_RECEIVE:
+            setPower = *(float32_t *)ssbPower.variable;
+            break;
+        default:
+            break;
+    }
+    SetPower(setPower);
+}
+
 struct SecondaryMenuOption RFSet[7] = {
-    "SSB Power", variableOption, &ssbPower, NULL, NULL,
-    "CW Power", variableOption, &cwPower, NULL, NULL,
+    "SSB Power", variableOption, &ssbPower, NULL, (void *)UpdatePower,
+    "CW Power", variableOption, &cwPower, NULL, (void *)UpdatePower,
     "Gain",variableOption, &gain, NULL, NULL,
     "RX Attenuation",variableOption, &rxAtten, NULL, (void *)UpdateRatten,
     "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
@@ -465,11 +484,11 @@ void StartTXIQCal(void){
 }
 
 /**
- * Menu callback to start CW power amplifier calibration process.
+ * Menu callback to start power amplifier calibration process.
  * Triggers an interrupt to enter the PA power calibration mode.
  */
 void StartPowerCal(void){
-    SetInterrupt(iCALIBRATE_CW_PA);
+    SetInterrupt(iCALIBRATE_POWER);
 }
 
 struct SecondaryMenuOption CalOptions[5] = {

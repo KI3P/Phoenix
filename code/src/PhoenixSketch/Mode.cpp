@@ -63,12 +63,6 @@ void TriggerCalibrateRXIQ(void){
 void TriggerCalibrateTXIQ(void){
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);
 }
-void TriggerCalibrateCWPA(void){
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_CW_PA);
-}
-void TriggerCalibrateSSBPA(void){
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_SSB_PA);
-}
 
 void CalibrateFrequencyEnter(void){
     UpdateRFHardwareState();

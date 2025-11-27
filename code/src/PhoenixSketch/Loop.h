@@ -11,11 +11,10 @@ typedef enum {
     iPTT_PRESSED,             /**< Push-to-talk button pressed */
     iPTT_RELEASED,            /**< Push-to-talk button released */
     iMODE,                    /**< Radio operating mode changed */
-    iCALIBRATE_CW_PA,         /**< Calibrate CW power amplifier */
+    iCALIBRATE_POWER,         /**< Calibrate power amplifier */
     iCALIBRATE_EXIT,          /**< Exit calibration mode */
     iCALIBRATE_FREQUENCY,     /**< Calibrate frequency reference */
     iCALIBRATE_RX_IQ,         /**< Calibrate receiver I/Q balance */
-    iCALIBRATE_SSB_PA,        /**< Calibrate SSB power amplifier */
     iCALIBRATE_TX_IQ,         /**< Calibrate transmitter I/Q balance */
     iKEY1_PRESSED,            /**< CW key 1 pressed (primary paddle or straight key) */
     iKEY1_RELEASED,           /**< CW key 1 released */

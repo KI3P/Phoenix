@@ -793,6 +793,7 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case HOME_SCREEN:{
+                    RestoreArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -1227,7 +1228,8 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iPOWER_CHANGE):{
-            // Nothing here yet
+            // Power settings have changed
+            UpdateRFHardwareState();
             break;
         }
         case (iPTT_PRESSED):{
@@ -1286,9 +1288,10 @@ void ConsumeInterrupt(void){
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);  
             break;
         }
-        case (iCALIBRATE_CW_PA):{
+        case (iCALIBRATE_POWER):{
+            SaveArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_POWER);
-            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_CW_PA);     
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);     
             break;
         }
         case (iCALIBRATE_EXIT):{

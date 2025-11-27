@@ -1366,15 +1366,32 @@ static Pane* PowerWindowPanes[NUMBER_OF_POWER_PANES] = {&PanePowerAdjust,&PanePo
 
 #define PA20W  0
 #define PA100W 1
-static uint8_t PAselect = PA20W; 
-static float32_t measuredPower = 0.0;
+uint8_t PAselect = PA20W;
+float32_t measuredPower = 0.0;
 
-static float32_t attenuations_dB[3];
-static float32_t powers_dB[3];
-static uint32_t Npoints = 0;
+float32_t attenuations_dB[3];
+float32_t powers_W[3];
+uint32_t Npoints = 0;
 
 void CalculatePowerCurveFit(void){
     Debug("Invoked power curve fit");
+    float32_t powers_mW[3];
+    for (size_t k=0; k<3; k++){
+        powers_mW[k] = powers_W[k]*1000.0f;
+    }
+    // If Npoints is 0, it means the buffer wrapped around, so we have 3 points
+    int32_t numPoints = (Npoints == 0) ? 3 : Npoints;
+
+    struct FitResult f;
+    if (PAselect){
+        f = FitPowerCurve(attenuations_dB, powers_mW, numPoints, 75000.0f,10.0f);
+        ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
+        ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+    } else {
+        f = FitPowerCurve(attenuations_dB, powers_mW, numPoints, 15000.0f,10.0f);
+        ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
+        ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+    }
 }
 
 void ChangeCalibrationPASelection(void){
@@ -1386,16 +1403,16 @@ void ChangeCalibrationPASelection(void){
 
 void RecordPowerDataPoint(void){
     attenuations_dB[Npoints] = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-    powers_dB[Npoints] = measuredPower;
+    powers_W[Npoints] = measuredPower;
     Npoints++;
-    if (Npoints >= sizeof(powers_dB)/sizeof(powers_dB[0]))
+    if (Npoints >= sizeof(powers_W)/sizeof(powers_W[0]))
         Npoints = 0;
 }
 
 float32_t GetPowDataSum(void){
     float32_t powsum = 0;
     for (size_t k=0; k<Npoints; k++){
-        powsum += abs(powers_dB[k]);
+        powsum += abs(powers_W[k]);
     }
     return powsum;
 }
@@ -1424,7 +1441,7 @@ static void DrawPowerDataPane(void){
         tft.print(attenuations_dB[k]);
 
         tft.setCursor(PanePowerData.x0+50, y);
-        sprintf(buff,"%3.2f",powers_dB[k]);
+        sprintf(buff,"%3.2f",powers_W[k]);
         tft.print(buff);
 
     }
@@ -1432,7 +1449,7 @@ static void DrawPowerDataPane(void){
 
 }
 
-static uint8_t incindexPower = 0;
+uint8_t incindexPower = 0;
 const float32_t powerincvals[] = {0.1, 0.01};
 /**
  * @brief Toggle power calibration adjustment increment

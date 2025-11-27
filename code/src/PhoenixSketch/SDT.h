@@ -283,7 +283,7 @@ extern struct config_t {
                     {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0}}; /** center tune, fine tune, modulation */
     int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
     bool keyerFlip = KEYER_FLIP; /**false = right paddle = DAH, true = DIT */
-    
+    bool PA100Wactive = false;
     float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680}; /** The saturation power output level when 20W PA is used */
     float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2}; /** k index parameterizes the knee location in the Pout vs attenuation */
     float32_t PowerCal_20W_att_offset_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Offset to align values obtained through CW calibration with those needed for SSB mode */
