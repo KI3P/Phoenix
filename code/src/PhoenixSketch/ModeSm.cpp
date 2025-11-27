@@ -21,12 +21,6 @@ static void CALIBRATION_STATES_exit(ModeSm* sm);
 
 static void CALIBRATION_STATES_ExitPoint_done__transition(ModeSm* sm);
 
-static void CALIBRATE_CW_PA_enter(ModeSm* sm);
-
-static void CALIBRATE_CW_PA_exit(ModeSm* sm);
-
-static void CALIBRATE_CW_PA_calibrate_exit(ModeSm* sm);
-
 static void CALIBRATE_FREQUENCY_enter(ModeSm* sm);
 
 static void CALIBRATE_FREQUENCY_exit(ModeSm* sm);
@@ -38,12 +32,6 @@ static void CALIBRATE_RX_IQ_enter(ModeSm* sm);
 static void CALIBRATE_RX_IQ_exit(ModeSm* sm);
 
 static void CALIBRATE_RX_IQ_calibrate_exit(ModeSm* sm);
-
-static void CALIBRATE_SSB_PA_enter(ModeSm* sm);
-
-static void CALIBRATE_SSB_PA_exit(ModeSm* sm);
-
-static void CALIBRATE_SSB_PA_calibrate_exit(ModeSm* sm);
 
 static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm);
 
@@ -63,13 +51,11 @@ static void NORMAL_STATES_enter(ModeSm* sm);
 
 static void NORMAL_STATES_exit(ModeSm* sm);
 
-static void NORMAL_STATES_calibrate_cw_pa(ModeSm* sm);
-
 static void NORMAL_STATES_calibrate_frequency(ModeSm* sm);
 
-static void NORMAL_STATES_calibrate_rx_iq(ModeSm* sm);
+static void NORMAL_STATES_calibrate_power(ModeSm* sm);
 
-static void NORMAL_STATES_calibrate_ssb_pa(ModeSm* sm);
+static void NORMAL_STATES_calibrate_rx_iq(ModeSm* sm);
 
 static void NORMAL_STATES_calibrate_tx_iq(ModeSm* sm);
 
@@ -199,16 +185,6 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             // No events handled by this state (or its ancestors).
             break;
         
-        // STATE: CALIBRATE_CW_PA
-        case ModeSm_StateId_CALIBRATE_CW_PA:
-            switch (event_id)
-            {
-                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_CW_PA_calibrate_exit(sm); break;
-                
-                default: break; // to avoid "unused enumeration value in switch" warning
-            }
-            break;
-        
         // STATE: CALIBRATE_FREQUENCY
         case ModeSm_StateId_CALIBRATE_FREQUENCY:
             switch (event_id)
@@ -224,16 +200,6 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             switch (event_id)
             {
                 case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_RX_IQ_calibrate_exit(sm); break;
-                
-                default: break; // to avoid "unused enumeration value in switch" warning
-            }
-            break;
-        
-        // STATE: CALIBRATE_SSB_PA
-        case ModeSm_StateId_CALIBRATE_SSB_PA:
-            switch (event_id)
-            {
-                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_SSB_PA_calibrate_exit(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -267,8 +233,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break;
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break;
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break;
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break;
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break;
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -286,8 +251,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -301,8 +265,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -316,8 +279,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -331,8 +293,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -348,8 +309,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -363,8 +323,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -379,8 +338,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -395,8 +353,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -410,8 +367,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_CW_PA: NORMAL_STATES_calibrate_cw_pa(sm); break; // First ancestor handler for this event
-                case ModeSm_EventId_CALIBRATE_SSB_PA: NORMAL_STATES_calibrate_ssb_pa(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -430,13 +386,9 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state)
         {
             case ModeSm_StateId_CALIBRATION_STATES: CALIBRATION_STATES_exit(sm); break;
             
-            case ModeSm_StateId_CALIBRATE_CW_PA: CALIBRATE_CW_PA_exit(sm); break;
-            
             case ModeSm_StateId_CALIBRATE_FREQUENCY: CALIBRATE_FREQUENCY_exit(sm); break;
             
             case ModeSm_StateId_CALIBRATE_RX_IQ: CALIBRATE_RX_IQ_exit(sm); break;
-            
-            case ModeSm_StateId_CALIBRATE_SSB_PA: CALIBRATE_SSB_PA_exit(sm); break;
             
             case ModeSm_StateId_CALIBRATE_TX_IQ_MARK: CALIBRATE_TX_IQ_MARK_exit(sm); break;
             
@@ -509,56 +461,6 @@ static void CALIBRATION_STATES_ExitPoint_done__transition(ModeSm* sm)
         NORMAL_STATES_InitialState_transition(sm);
         return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
     } // end of behavior for CALIBRATION_STATES.<ExitPoint>(done)
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// event handlers for state CALIBRATE_CW_PA
-////////////////////////////////////////////////////////////////////////////////
-
-static void CALIBRATE_CW_PA_enter(ModeSm* sm)
-{
-    sm->state_id = ModeSm_StateId_CALIBRATE_CW_PA;
-    
-    // CALIBRATE_CW_PA behavior
-    // uml: enter / { CalibrateCWPAEnter(); }
-    {
-        // Step 1: execute action `CalibrateCWPAEnter();`
-        CalibrateCWPAEnter();
-    } // end of behavior for CALIBRATE_CW_PA
-}
-
-static void CALIBRATE_CW_PA_exit(ModeSm* sm)
-{
-    // CALIBRATE_CW_PA behavior
-    // uml: exit / { CalibrateCWPAExit(); }
-    {
-        // Step 1: execute action `CalibrateCWPAExit();`
-        CalibrateCWPAExit();
-    } // end of behavior for CALIBRATE_CW_PA
-    
-    sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
-}
-
-static void CALIBRATE_CW_PA_calibrate_exit(ModeSm* sm)
-{
-    // CALIBRATE_CW_PA behavior
-    // uml: CALIBRATE_EXIT TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
-    {
-        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
-        CALIBRATE_CW_PA_exit(sm);
-        
-        // Step 2: Transition action: ``.
-        
-        // Step 3: Enter/move towards transition target `CALIBRATION_STATES.<ExitPoint>(done)`.
-        // CALIBRATION_STATES.<ExitPoint>(done) is a pseudo state and cannot have an `enter` trigger.
-        
-        // Finish transition by calling pseudo state transition function.
-        CALIBRATION_STATES_ExitPoint_done__transition(sm);
-        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
-    } // end of behavior for CALIBRATE_CW_PA
-    
-    // No ancestor handles this event.
 }
 
 
@@ -657,56 +559,6 @@ static void CALIBRATE_RX_IQ_calibrate_exit(ModeSm* sm)
         CALIBRATION_STATES_ExitPoint_done__transition(sm);
         return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
     } // end of behavior for CALIBRATE_RX_IQ
-    
-    // No ancestor handles this event.
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// event handlers for state CALIBRATE_SSB_PA
-////////////////////////////////////////////////////////////////////////////////
-
-static void CALIBRATE_SSB_PA_enter(ModeSm* sm)
-{
-    sm->state_id = ModeSm_StateId_CALIBRATE_SSB_PA;
-    
-    // CALIBRATE_SSB_PA behavior
-    // uml: enter / { CalibrateSSBPAEnter(); }
-    {
-        // Step 1: execute action `CalibrateSSBPAEnter();`
-        CalibrateSSBPAEnter();
-    } // end of behavior for CALIBRATE_SSB_PA
-}
-
-static void CALIBRATE_SSB_PA_exit(ModeSm* sm)
-{
-    // CALIBRATE_SSB_PA behavior
-    // uml: exit / { CalibrateSSBPAExit(); }
-    {
-        // Step 1: execute action `CalibrateSSBPAExit();`
-        CalibrateSSBPAExit();
-    } // end of behavior for CALIBRATE_SSB_PA
-    
-    sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
-}
-
-static void CALIBRATE_SSB_PA_calibrate_exit(ModeSm* sm)
-{
-    // CALIBRATE_SSB_PA behavior
-    // uml: CALIBRATE_EXIT TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
-    {
-        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
-        CALIBRATE_SSB_PA_exit(sm);
-        
-        // Step 2: Transition action: ``.
-        
-        // Step 3: Enter/move towards transition target `CALIBRATION_STATES.<ExitPoint>(done)`.
-        // CALIBRATION_STATES.<ExitPoint>(done) is a pseudo state and cannot have an `enter` trigger.
-        
-        // Finish transition by calling pseudo state transition function.
-        CALIBRATION_STATES_ExitPoint_done__transition(sm);
-        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
-    } // end of behavior for CALIBRATE_SSB_PA
     
     // No ancestor handles this event.
 }
@@ -845,27 +697,6 @@ static void NORMAL_STATES_exit(ModeSm* sm)
     sm->state_id = ModeSm_StateId_ROOT;
 }
 
-static void NORMAL_STATES_calibrate_cw_pa(ModeSm* sm)
-{
-    // NORMAL_STATES behavior
-    // uml: CALIBRATE_CW_PA TransitionTo(CALIBRATE_CW_PA)
-    {
-        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
-        
-        // Step 2: Transition action: ``.
-        
-        // Step 3: Enter/move towards transition target `CALIBRATE_CW_PA`.
-        CALIBRATION_STATES_enter(sm);
-        CALIBRATE_CW_PA_enter(sm);
-        
-        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-        return;
-    } // end of behavior for NORMAL_STATES
-    
-    // No ancestor handles this event.
-}
-
 static void NORMAL_STATES_calibrate_frequency(ModeSm* sm)
 {
     // NORMAL_STATES behavior
@@ -887,6 +718,27 @@ static void NORMAL_STATES_calibrate_frequency(ModeSm* sm)
     // No ancestor handles this event.
 }
 
+static void NORMAL_STATES_calibrate_power(ModeSm* sm)
+{
+    // NORMAL_STATES behavior
+    // uml: CALIBRATE_POWER TransitionTo(CALIBRATE_TX_IQ_SPACE)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ_SPACE`.
+        CALIBRATION_STATES_enter(sm);
+        CALIBRATE_TX_IQ_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for NORMAL_STATES
+    
+    // No ancestor handles this event.
+}
+
 static void NORMAL_STATES_calibrate_rx_iq(ModeSm* sm)
 {
     // NORMAL_STATES behavior
@@ -900,27 +752,6 @@ static void NORMAL_STATES_calibrate_rx_iq(ModeSm* sm)
         // Step 3: Enter/move towards transition target `CALIBRATE_RX_IQ`.
         CALIBRATION_STATES_enter(sm);
         CALIBRATE_RX_IQ_enter(sm);
-        
-        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-        return;
-    } // end of behavior for NORMAL_STATES
-    
-    // No ancestor handles this event.
-}
-
-static void NORMAL_STATES_calibrate_ssb_pa(ModeSm* sm)
-{
-    // NORMAL_STATES behavior
-    // uml: CALIBRATE_SSB_PA TransitionTo(CALIBRATE_SSB_PA)
-    {
-        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
-        
-        // Step 2: Transition action: ``.
-        
-        // Step 3: Enter/move towards transition target `CALIBRATE_SSB_PA`.
-        CALIBRATION_STATES_enter(sm);
-        CALIBRATE_SSB_PA_enter(sm);
         
         // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
         return;
@@ -1632,10 +1463,8 @@ char const * ModeSm_state_id_to_string(ModeSm_StateId id)
     {
         case ModeSm_StateId_ROOT: return "ROOT";
         case ModeSm_StateId_CALIBRATION_STATES: return "CALIBRATION_STATES";
-        case ModeSm_StateId_CALIBRATE_CW_PA: return "CALIBRATE_CW_PA";
         case ModeSm_StateId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
         case ModeSm_StateId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
-        case ModeSm_StateId_CALIBRATE_SSB_PA: return "CALIBRATE_SSB_PA";
         case ModeSm_StateId_CALIBRATE_TX_IQ_MARK: return "CALIBRATE_TX_IQ_MARK";
         case ModeSm_StateId_CALIBRATE_TX_IQ_SPACE: return "CALIBRATE_TX_IQ_SPACE";
         case ModeSm_StateId_NORMAL_STATES: return "NORMAL_STATES";
@@ -1657,11 +1486,10 @@ char const * ModeSm_event_id_to_string(ModeSm_EventId id)
 {
     switch (id)
     {
-        case ModeSm_EventId_CALIBRATE_CW_PA: return "CALIBRATE_CW_PA";
         case ModeSm_EventId_CALIBRATE_EXIT: return "CALIBRATE_EXIT";
         case ModeSm_EventId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
+        case ModeSm_EventId_CALIBRATE_POWER: return "CALIBRATE_POWER";
         case ModeSm_EventId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
-        case ModeSm_EventId_CALIBRATE_SSB_PA: return "CALIBRATE_SSB_PA";
         case ModeSm_EventId_CALIBRATE_TX_IQ: return "CALIBRATE_TX_IQ";
         case ModeSm_EventId_DAH_PRESSED: return "DAH_PRESSED";
         case ModeSm_EventId_DIT_PRESSED: return "DIT_PRESSED";

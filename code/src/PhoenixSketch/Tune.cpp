@@ -197,7 +197,7 @@ float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode){
     }
 
     float32_t a = pow(10.0f,-(atten_dB + Aoff)/10.0f);
-    float32_t P_mW = Psat * tanhf32( k * a );
+    float32_t P_mW = Psat * tanhf( k * a );
     return P_mW;
 }
 
@@ -245,6 +245,115 @@ float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
         }
     }
 
-    return (-Aoff-10.0*log10f((1.0/k)*atanhf32(Power_W*1000.0/Psat)));
+    return (-Aoff-10.0*log10f((1.0/k)*atanhf(Power_W*1000.0/Psat)));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Functions used to fit hyperbolic tan function to saturation curve
+// Model: P_out = P_sat * tanh(k * 10^(-Att/10))
+///////////////////////////////////////////////////////////////////////////////
+
+struct FitResult {
+    float32_t P_sat;    // in mW
+    float32_t k;        // drive ratio
+    int32_t iterations;
+    float32_t rms_error;
+};
+
+// Model function
+float32_t model(float32_t att, float32_t P_sat, float32_t k) {
+    return P_sat * tanh(k * powf(10.0f, -att / 10.0f));
+}
+
+// Gauss-Newton least squares fit
+FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n, 
+                       float32_t P_sat_init, float32_t k_init,
+                       int32_t max_iter = 50, float32_t tol = 1e-6) {
+    
+    float32_t P_sat = P_sat_init;
+    float32_t k = k_init;
+    
+    float32_t J[2];      // Jacobian row
+    float32_t JtJ[4];    // 2x2 normal matrix
+    float32_t Jtr[2];    // J^T * residual
+    float32_t delta[2];  // Parameter update
+    
+    int32_t iter;
+    for (iter = 0; iter < max_iter; iter++) {
+        // Reset accumulators
+        memset(JtJ, 0, sizeof(JtJ));
+        memset(Jtr, 0, sizeof(Jtr));
+        
+        for (int32_t i = 0; i < n; i++) {
+            float32_t x = powf(10.0f, -att[i] / 10.0f);
+            float32_t t = tanh(k * x);
+            float32_t sech2 = 1.0f - t * t;  // sech^2 = 1 - tanh^2
+            
+            float32_t y_pred = P_sat * t;
+            float32_t residual = pout[i] - y_pred;
+            
+            // Partial derivatives
+            J[0] = t;              // dF/dP_sat
+            J[1] = P_sat * sech2 * x;  // dF/dk
+            
+            // Accumulate J^T * J
+            JtJ[0] += J[0] * J[0];
+            JtJ[1] += J[0] * J[1];
+            JtJ[2] += J[1] * J[0];
+            JtJ[3] += J[1] * J[1];
+            
+            // Accumulate J^T * r
+            Jtr[0] += J[0] * residual;
+            Jtr[1] += J[1] * residual;
+        }
+        
+        // Solve 2x2 system: JtJ * delta = Jtr
+        float32_t det = JtJ[0] * JtJ[3] - JtJ[1] * JtJ[2];
+        if (fabsf(det) < 1e-10f) break;
+        
+        delta[0] = (JtJ[3] * Jtr[0] - JtJ[1] * Jtr[1]) / det;
+        delta[1] = (JtJ[0] * Jtr[1] - JtJ[2] * Jtr[0]) / det;
+        
+        // Update parameters
+        P_sat += delta[0];
+        k += delta[1];
+        
+        // Keep parameters positive
+        if (P_sat < 1.0f) P_sat = 1.0f;
+        if (k < 0.01f) k = 0.01f;
+        
+        // Check convergence
+        if (fabsf(delta[0]) < tol && fabsf(delta[1]) < tol) break;
+    }
+    
+    // Calculate RMS error
+    float32_t sse = 0;
+    for (int32_t i = 0; i < n; i++) {
+        float32_t err = pout[i] - model(att[i], P_sat, k);
+        sse += err * err;
+    }
+    
+    FitResult result;
+    result.P_sat = P_sat;
+    result.k = k;
+    result.iterations = iter;
+    result.rms_error = sqrtf(sse / n);
+    
+    return result;
+}
+
+void FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
+                    float32_t P_sat_init = 15000.0f, float32_t k_init = 10.0f) {    
+    // Initial guesses for P_sat_init and k_init are close for 20W amp case
+    
+    // Perform fit
+    FitResult fit = fitTanhModel(att_dB, pout_mW, Npoints, P_sat_init, k_init);
+    
+    Serial.println("Power Curve Fit Results:");
+    Serial.print("  P_sat = "); Serial.print(fit.P_sat); Serial.println(" mW");
+    Serial.print("  P_sat = "); Serial.print(10.0f * log10f(fit.P_sat)); Serial.println(" dBm");
+    Serial.print("  k = "); Serial.println(fit.k);
+    Serial.print("  Iterations: "); Serial.println(fit.iterations);
+    Serial.print("  RMS Error: "); Serial.print(fit.rms_error); Serial.println(" mW");
 }
 

@@ -16,52 +16,49 @@
 typedef enum ModeSm_EventId
 {
     ModeSm_EventId_DO = 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
-    ModeSm_EventId_CALIBRATE_CW_PA = 1,
-    ModeSm_EventId_CALIBRATE_EXIT = 2,
-    ModeSm_EventId_CALIBRATE_FREQUENCY = 3,
+    ModeSm_EventId_CALIBRATE_EXIT = 1,
+    ModeSm_EventId_CALIBRATE_FREQUENCY = 2,
+    ModeSm_EventId_CALIBRATE_POWER = 3,
     ModeSm_EventId_CALIBRATE_RX_IQ = 4,
-    ModeSm_EventId_CALIBRATE_SSB_PA = 5,
-    ModeSm_EventId_CALIBRATE_TX_IQ = 6,
-    ModeSm_EventId_DAH_PRESSED = 7,
-    ModeSm_EventId_DIT_PRESSED = 8,
-    ModeSm_EventId_KEY_PRESSED = 9,
-    ModeSm_EventId_KEY_RELEASED = 10,
-    ModeSm_EventId_PTT_PRESSED = 11,
-    ModeSm_EventId_PTT_RELEASED = 12,
-    ModeSm_EventId_TO_CW_MODE = 13,
-    ModeSm_EventId_TO_SSB_MODE = 14
+    ModeSm_EventId_CALIBRATE_TX_IQ = 5,
+    ModeSm_EventId_DAH_PRESSED = 6,
+    ModeSm_EventId_DIT_PRESSED = 7,
+    ModeSm_EventId_KEY_PRESSED = 8,
+    ModeSm_EventId_KEY_RELEASED = 9,
+    ModeSm_EventId_PTT_PRESSED = 10,
+    ModeSm_EventId_PTT_RELEASED = 11,
+    ModeSm_EventId_TO_CW_MODE = 12,
+    ModeSm_EventId_TO_SSB_MODE = 13
 } ModeSm_EventId;
 
 enum
 {
-    ModeSm_EventIdCount = 15
+    ModeSm_EventIdCount = 14
 };
 
 typedef enum ModeSm_StateId
 {
     ModeSm_StateId_ROOT = 0,
     ModeSm_StateId_CALIBRATION_STATES = 1,
-    ModeSm_StateId_CALIBRATE_CW_PA = 2,
-    ModeSm_StateId_CALIBRATE_FREQUENCY = 3,
-    ModeSm_StateId_CALIBRATE_RX_IQ = 4,
-    ModeSm_StateId_CALIBRATE_SSB_PA = 5,
-    ModeSm_StateId_CALIBRATE_TX_IQ_MARK = 6,
-    ModeSm_StateId_CALIBRATE_TX_IQ_SPACE = 7,
-    ModeSm_StateId_NORMAL_STATES = 8,
-    ModeSm_StateId_CW_RECEIVE = 9,
-    ModeSm_StateId_CW_TRANSMIT_DAH_MARK = 10,
-    ModeSm_StateId_CW_TRANSMIT_DIT_MARK = 11,
-    ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE = 12,
-    ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 13,
-    ModeSm_StateId_CW_TRANSMIT_MARK = 14,
-    ModeSm_StateId_CW_TRANSMIT_SPACE = 15,
-    ModeSm_StateId_SSB_RECEIVE = 16,
-    ModeSm_StateId_SSB_TRANSMIT = 17
+    ModeSm_StateId_CALIBRATE_FREQUENCY = 2,
+    ModeSm_StateId_CALIBRATE_RX_IQ = 3,
+    ModeSm_StateId_CALIBRATE_TX_IQ_MARK = 4,
+    ModeSm_StateId_CALIBRATE_TX_IQ_SPACE = 5,
+    ModeSm_StateId_NORMAL_STATES = 6,
+    ModeSm_StateId_CW_RECEIVE = 7,
+    ModeSm_StateId_CW_TRANSMIT_DAH_MARK = 8,
+    ModeSm_StateId_CW_TRANSMIT_DIT_MARK = 9,
+    ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE = 10,
+    ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 11,
+    ModeSm_StateId_CW_TRANSMIT_MARK = 12,
+    ModeSm_StateId_CW_TRANSMIT_SPACE = 13,
+    ModeSm_StateId_SSB_RECEIVE = 14,
+    ModeSm_StateId_SSB_TRANSMIT = 15
 } ModeSm_StateId;
 
 enum
 {
-    ModeSm_StateIdCount = 18
+    ModeSm_StateIdCount = 16
 };
 
 

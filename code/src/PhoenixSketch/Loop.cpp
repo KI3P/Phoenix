@@ -345,6 +345,10 @@ void ChangeRXIQIncrement(void); // forward declare from MainBoard_DisplayCalibra
 void ChangeTXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ToggleRXTXEqualizerEdit(void); // from MainBoard_DisplayEqualizer.cpp
 void AdjustEqualizerIncrement(void); // from MainBoard_DisplayEqualizer.cpp
+void RecordPowerDataPoint(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void CalculatePowerCurveFit(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ChangePowerIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ChangeCalibrationPASelection(void); // forward declare from MainBoard_DisplayCalibration.cpp
 
 /**
  * Process button press events from the front panel.
@@ -768,8 +772,50 @@ void HandleButtonPress(int32_t button){
         } // end of CALIBRATE_TX_IQ
         case (UISm_StateId_CALIBRATE_POWER):{
             switch (button){
+                case (MENU_OPTION_SELECT):{
+                    // Capture data point
+                    RecordPowerDataPoint();
+                    break;
+                }
+                case (ZOOM):{
+                    // Calculate best fit to data
+                    CalculatePowerCurveFit();
+                    break;
+                }
+                case (15):{
+                    // Change power increment
+                    ChangePowerIncrement();
+                    break;
+                }
+                case (16):{
+                    // Change PA selection
+                    ChangeCalibrationPASelection();
+                    break;
+                }
                 case HOME_SCREEN:{
+                    // Force a save here
+                    SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
+                    break;
+                }
+                case BAND_UP:{
+                    if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
+                        ED.currentBand[ED.activeVFO] = FIRST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    UpdateRFHardwareState();
+                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
+                    break;
+                }
+                case BAND_DN:{
+                    if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
+                        ED.currentBand[ED.activeVFO] = LAST_BAND;
+                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
+                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    UpdateRFHardwareState();
+                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 default:
@@ -874,6 +920,8 @@ void IncrementEqualizerValue(void);
 void DecrementEqualizerValue(void);
 void IncrementEqualizerSelection(void);
 void DecrementEqualizerSelection(void);
+void IncrementCalibrationPower(void);
+void DecrementCalibrationPower(void);
 
 /**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
@@ -1128,6 +1176,29 @@ void ConsumeInterrupt(void){
             break;
         } // end of calibrate frequency encoder interrupts
 
+        case (UISm_StateId_CALIBRATE_POWER):{
+            switch (interrupt){
+                case (iFILTER_INCREASE):{
+                    IncrementCalibrationPower();
+                    break;
+                }
+                case (iFILTER_DECREASE):{
+                    DecrementCalibrationPower();
+                    break;
+                }
+                case (iVOLUME_INCREASE):{
+                    IncrementTransmitAtt();
+                    break;
+                }
+                case (iVOLUME_DECREASE):{
+                    DecrementTransmitAtt();
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of UISm_StateId_CALIBRATE_POWER case
         default:
             break;
     }
