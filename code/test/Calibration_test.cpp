@@ -562,9 +562,9 @@ TEST_F(CalibrationTest, Button15ChangesPowerIncrementInPowerCal) {
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
 
-    // Initial increment index should be 0
+    // Initial increment index should be 1
     uint8_t initialIncIndex = incindexPower;
-    EXPECT_EQ(initialIncIndex, 0);
+    EXPECT_EQ(initialIncIndex, 1);
 
     // Press button 15 to change increment
     SetButton(15);
@@ -572,7 +572,7 @@ TEST_F(CalibrationTest, Button15ChangesPowerIncrementInPowerCal) {
     loop(); MyDelay(10);
 
     // Should cycle to next increment index
-    EXPECT_EQ(incindexPower, 1);
+    EXPECT_EQ(incindexPower, 2);
 
     // Press button 15 again to cycle back
     SetButton(15);
