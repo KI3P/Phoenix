@@ -1352,12 +1352,12 @@ static void DrawPowerTablePane(void);
 static void DrawPowerInstructionsPane(void);
 
 // Pane instances
-static Pane PanePowerAtt =      {310,50,120,40,DrawPowerAttPane,1};
-static Pane PanePowerPower =    {310,130,120,40,DrawPowerPowerPane,1};
+static Pane PanePowerAtt =      {310,50,90,40,DrawPowerAttPane,1};
+static Pane PanePowerPower =    {310,100,90,40,DrawPowerPowerPane,1};
 static Pane PanePowerData =     {320,150,200,90,DrawPowerDataPane,1};
 static Pane PanePowerAdjust =   {3,250,300,230,DrawPowerAdjustPane,1};
 static Pane PanePowerTable =    {320,250,200,230,DrawPowerTablePane,1};
-static Pane PanePowerInstructions = {537,7,260,470,DrawPowerInstructionsPane,1};
+static Pane PanePowerInstructions = {530,7,260,470,DrawPowerInstructionsPane,1};
 
 // Array of all panes for iteration
 static Pane* PowerWindowPanes[NUMBER_OF_POWER_PANES] = {&PanePowerAdjust,&PanePowerTable,
@@ -1379,34 +1379,44 @@ void CalculatePowerCurveFit(void){
     for (size_t k=0; k<3; k++){
         powers_mW[k] = powers_W[k]*1000.0f;
     }
-    // If Npoints is 0, it means the buffer wrapped around, so we have 3 points
-    int32_t numPoints = (Npoints == 0) ? 3 : Npoints;
 
     struct FitResult f;
     if (PAselect){
-        f = FitPowerCurve(attenuations_dB, powers_mW, numPoints, 75000.0f,10.0f);
+        f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 75000.0f,10.0f);
         ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
     } else {
-        f = FitPowerCurve(attenuations_dB, powers_mW, numPoints, 15000.0f,10.0f);
+        f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 15000.0f,10.0f);
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
     }
 }
 
 void ChangeCalibrationPASelection(void){
-    if (PAselect == PA100W)
+    if (PAselect == PA100W){
         PAselect = PA20W;
-    else
+        measuredPower = 10.0;
+    }else{
         PAselect = PA100W;
+        measuredPower = 75.0;
+    }
+    Npoints = 0;
+    PanePowerData.stale = true;
 }
 
 void RecordPowerDataPoint(void){
+    if (Npoints >= sizeof(powers_W)/sizeof(powers_W[0]))
+        Npoints = 0;
     attenuations_dB[Npoints] = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
     powers_W[Npoints] = measuredPower;
     Npoints++;
-    if (Npoints >= sizeof(powers_W)/sizeof(powers_W[0]))
-        Npoints = 0;
+    // Change the target power by factor of 6 dB
+    if (Npoints < 3){
+        measuredPower = measuredPower / 4.0;
+    }else{
+        // We have recorded all three points, calculate the power curve
+        CalculatePowerCurveFit();
+    }
 }
 
 float32_t GetPowDataSum(void){
@@ -1425,22 +1435,22 @@ static void DrawPowerDataPane(void){
 
     if (!PanePowerData.stale) return;
     tft.fillRect(PanePowerData.x0, PanePowerData.y0, PanePowerData.width, PanePowerData.height, RA8875_BLACK);
-    tft.drawRect(PanePowerData.x0, PanePowerData.y0, PanePowerData.width, PanePowerData.height, RA8875_YELLOW);
+    //tft.drawRect(PanePowerData.x0, PanePowerData.y0, PanePowerData.width, PanePowerData.height, RA8875_YELLOW);
 
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
 
     tft.setCursor(PanePowerData.x0+5, PanePowerData.y0+3);
     tft.print("Atten");
-    tft.setCursor(PanePowerData.x0+50, PanePowerData.y0+3);
+    tft.setCursor(PanePowerData.x0+70, PanePowerData.y0+3);
     tft.print("Power");
 
-    for (size_t k=0; k<=Npoints; k++){
+    for (size_t k=0; k<Npoints; k++){
         int16_t y = PanePowerData.y0 + 20 + k*17;
         tft.setCursor(PanePowerData.x0+5, y);
         tft.print(attenuations_dB[k]);
 
-        tft.setCursor(PanePowerData.x0+50, y);
+        tft.setCursor(PanePowerData.x0+70, y);
         sprintf(buff,"%3.2f",powers_W[k]);
         tft.print(buff);
 
@@ -1548,7 +1558,7 @@ static void DrawPowerAdjustPane(void){
 
     if (!PanePowerAdjust.stale) return;
     tft.fillRect(PanePowerAdjust.x0, PanePowerAdjust.y0, PanePowerAdjust.width, PanePowerAdjust.height, RA8875_BLACK);
-    tft.drawRect(PanePowerAdjust.x0, PanePowerAdjust.y0, PanePowerAdjust.width, PanePowerAdjust.height, RA8875_YELLOW);
+    //tft.drawRect(PanePowerAdjust.x0, PanePowerAdjust.y0, PanePowerAdjust.width, PanePowerAdjust.height, RA8875_YELLOW);
     
     int16_t x0 = PanePowerAdjust.x0+3;
     int16_t y0 = PanePowerAdjust.y0+3;
@@ -1574,7 +1584,7 @@ static void DrawPowerAdjustPane(void){
     
     delta += lineD;
     tft.setCursor(x0,y0+delta);
-    tft.print("Frequency:");
+    tft.print("Freq:");
     tft.setCursor(x0+120,y0+delta);
     sprintf(buff,"%lldkHz",GetTXRXFreq(ED.activeVFO)/1000);
     tft.print(buff);
@@ -1582,7 +1592,7 @@ static void DrawPowerAdjustPane(void){
     delta += lineD;
     tft.setCursor(x0,y0+delta);
     tft.print("Transmit:");
-    tft.setCursor(x0+120,y0+delta);
+    tft.setCursor(x0+160,y0+delta);
     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_TX_IQ_MARK){
         tft.setTextColor(RA8875_RED);
         tft.print("On");
@@ -1590,11 +1600,12 @@ static void DrawPowerAdjustPane(void){
         tft.setTextColor(RA8875_GREEN);
         tft.print("Off");
     }
+    tft.setTextColor(RA8875_WHITE);
 
     delta += lineD;
     tft.setCursor(x0,y0+delta);
     tft.print("Increment:");
-    tft.setCursor(x0+120,y0+delta);
+    tft.setCursor(x0+160,y0+delta);
     sprintf(buff,"%3.2f",powerincvals[incindexPower]);
     tft.print(buff);
 
@@ -1650,7 +1661,7 @@ static void DrawPowerTablePane(void){
     if (!PanePowerTable.stale) return;
 
     tft.fillRect(PanePowerTable.x0, PanePowerTable.y0, PanePowerTable.width, PanePowerTable.height, RA8875_BLACK);
-    tft.drawRect(PanePowerTable.x0, PanePowerTable.y0, PanePowerTable.width, PanePowerTable.height, RA8875_YELLOW);
+    //tft.drawRect(PanePowerTable.x0, PanePowerTable.y0, PanePowerTable.width, PanePowerTable.height, RA8875_YELLOW);
     
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
@@ -1659,7 +1670,7 @@ static void DrawPowerTablePane(void){
     tft.print("Band");
     tft.setCursor(PanePowerTable.x0+50, PanePowerTable.y0+3);
     tft.print("Psat");
-    tft.setCursor(PanePowerTable.x0+100, PanePowerTable.y0+3);
+    tft.setCursor(PanePowerTable.x0+120, PanePowerTable.y0+3);
     tft.print("k");
 
     for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
@@ -1675,7 +1686,7 @@ static void DrawPowerTablePane(void){
 
         tft.print(buff);
         
-        tft.setCursor(PanePowerTable.x0+100, y);
+        tft.setCursor(PanePowerTable.x0+120, y);
         if (PAselect)
             sprintf(buff,"%2.1f",ED.PowerCal_100W_kindex[k]);
         else
@@ -1704,50 +1715,67 @@ static void DrawPowerInstructionsPane(void){
     tft.setFontScale((enum RA8875tsize)0);
     int16_t delta = 40;
     int16_t lineD = 20;
+    
     tft.setCursor(x0, y0+delta);
-    tft.print("* Use volume encoder to");
+    //Limits:("                                 ");
+    tft.print("1-Record power level at 0dB atten");
+    
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    adjust attenuation.");
+    //Limits:("                                 ");
+    tft.print("2-Adjust atten to drop pow by 6dB");
+    
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("3-Adjust atten to drop power by");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print(" a further 6dB");
+    
+    delta += 2*lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("Record actual power at each step");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("by pressing SELECT(0) button.");
+    
+    delta += 2*lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("After step 3, the power curve is");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("automatically calculated.");
+
+    
+    delta += 2*lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("* Volume encoder adjusts atten.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Use filter encoder to");
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("    adjust measured power.");
+    //Limits:("                                 ");
+    tft.print("* Filter encoder adjusts power.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Press select button to");
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("    record data point.");
+    //Limits:("                                 ");
+    tft.print("* Button 15 changes increment.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Press zoom button to");
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("    calculate data fit.");
+    //Limits:("                                 ");
+    tft.print("* Button 16 changes PA selection.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Press button 15 to change");
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("    power increment.");
-
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("* Press button 16 to change");
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("    PA selection.");
-
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print(" * Press Home to save and exit.");
+    tft.print("* Press Home to save and exit.");
 
     PanePowerInstructions.stale = false;
 }
@@ -1770,6 +1798,10 @@ void DrawCalibratePower(void){
         tft.setCursor(10,10);
         tft.print("Power calibration");
 
+        if (PAselect == 0)
+            measuredPower = 10.0;
+        else
+            measuredPower = 75.0;
         // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
             PowerWindowPanes[i]->stale = true;

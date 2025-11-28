@@ -338,34 +338,64 @@ FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n,
 FitResult FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
                     float32_t P_sat_init = 15000.0f, float32_t k_init = 10.0f) {    
     // Initial guesses for P_sat_init and k_init are close for 20W amp case
-    
+    char buff[100];
+    Serial.println("Fit to data points:");
+    Serial.println("| Att [dB] | Power [mW] |");
+    Serial.println("|----------|------------|");
+    for (int32_t k=0; k<Npoints; k++){
+        sprintf(buff,  "| %2.1f     | %3.2f |",att_dB[k],pout_mW[k]);
+        Serial.println(buff);
+    }
+
     // Perform fit
     FitResult fit = fitTanhModel(att_dB, pout_mW, Npoints, P_sat_init, k_init);
     
     Serial.println("Power Curve Fit Results:");
-    Serial.print("  P_sat = "); Serial.print(fit.P_sat); Serial.println(" mW");
-    Serial.print("  P_sat = "); Serial.print(10.0f * log10f(fit.P_sat)); Serial.println(" dBm");
-    Serial.print("  k = "); Serial.println(fit.k);
-    Serial.print("  Iterations: "); Serial.println(fit.iterations);
-    Serial.print("  RMS Error: "); Serial.print(fit.rms_error); Serial.println(" mW");
+    Serial.println("| Parameter  | Value |");
+    Serial.println("|------------|-------|");
+    Serial.print(  "| P_sat      | "); Serial.print(fit.P_sat); Serial.println(" mW |");
+    Serial.print(  "| P_sat      | "); Serial.print(10.0f * log10f(fit.P_sat)); Serial.println(" dBm |");
+    Serial.print(  "| k          | "); Serial.print(fit.k); Serial.println(" |");
+    Serial.print(  "| Iterations | "); Serial.print(fit.iterations); Serial.println(" |");
+    Serial.print(  "| RMS Error  | "); Serial.print(fit.rms_error); Serial.println(" mW |");
 
     return fit;
 }
 
-void SetPower(float32_t power_W){
-    float32_t offset = 0.0;
-    int8_t mode = 0; // CW
-    if (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) // replace this with switch/case
-        mode = 1; // SSB
+void SetPower(float32_t power_W, ModeSm_StateId targetState){   
+    int8_t mode;
+    switch (targetState){
+        case ModeSm_StateId_SSB_TRANSMIT:
+            mode = 1;
+            break;
+        case ModeSm_StateId_CW_TRANSMIT_MARK:
+            mode = 0;
+            break;
+        default:
+            return;
+            break;
+    }
 
     // Calculate the necessary attenuation:
     int8_t PAsel;
     float32_t att = CalculateAttenuation(power_W, mode, &PAsel);
+    Debug("Attenuation is " + String(att));
+    Debug("PAsel is " + String(PAsel));
     ED.PA100Wactive = (bool)PAsel;
-    if (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) // replace this with switch/case
-        ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = att;
-    else
-        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = att;
+
+    switch (targetState){
+        case ModeSm_StateId_SSB_TRANSMIT:
+            ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = att;
+            Debug("SSB XAtten is " + String(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]));
+            break;
+        case ModeSm_StateId_CW_TRANSMIT_MARK:
+            ED.XAttenCW[ED.currentBand[ED.activeVFO]] = att;
+            Debug("CW XAtten is " + String(ED.XAttenCW[ED.currentBand[ED.activeVFO]]));
+            break;
+        default:
+            Debug("You should never be able to get here! SetPower function.");
+            break;
+    }
     // Now invoke the hardware state machine change to make these changes
     SetInterrupt(iPOWER_CHANGE);
 }

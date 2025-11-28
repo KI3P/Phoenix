@@ -64,7 +64,6 @@ float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode);
 float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel);
 struct FitResult FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
                     float32_t P_sat_init, float32_t k_init);
-void SetPower(float32_t power_W);
-
+void SetPower(float32_t power_W, ModeSm_StateId targetState);
 
 #endif // TUNE_H

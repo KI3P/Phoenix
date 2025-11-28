@@ -274,28 +274,21 @@ void UpdateTXAttenSSB(void){
     SetTXAttenuation(*(float32_t *)txAttenSSB.variable);
 }
 
-/**
- * Post-update callback to set RF power. Called after ssbPower or cwPower
- * is modified via menu.
- */
-void UpdatePower(void){
-    float32_t setPower;
-    switch (modeSM.state_id) {
-        case ModeSm_StateId_CW_RECEIVE:
-            setPower = *(float32_t *)cwPower.variable;
-            break;
-        case ModeSm_StateId_SSB_RECEIVE:
-            setPower = *(float32_t *)ssbPower.variable;
-            break;
-        default:
-            break;
-    }
-    SetPower(setPower);
+void UpdateSSBPower(void){
+    float32_t setPower = *(float32_t *)ssbPower.variable;
+    Debug("SSB set power is " + String(setPower));
+    SetPower(setPower,ModeSm_StateId_SSB_TRANSMIT);
+}
+
+void UpdateCWPower(void){
+    float32_t setPower = *(float32_t *)cwPower.variable;
+    Debug("CW set power is " + String(setPower));
+    SetPower(setPower,ModeSm_StateId_CW_TRANSMIT_MARK);
 }
 
 struct SecondaryMenuOption RFSet[7] = {
-    "SSB Power", variableOption, &ssbPower, NULL, (void *)UpdatePower,
-    "CW Power", variableOption, &cwPower, NULL, (void *)UpdatePower,
+    "SSB Power", variableOption, &ssbPower, NULL, (void *)UpdateSSBPower,
+    "CW Power", variableOption, &cwPower, NULL, (void *)UpdateCWPower,
     "Gain",variableOption, &gain, NULL, NULL,
     "RX Attenuation",variableOption, &rxAtten, NULL, (void *)UpdateRatten,
     "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,

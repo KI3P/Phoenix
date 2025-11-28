@@ -170,6 +170,7 @@
  */
 
 #include "SDT.h"
+#include <TimeLib.h>
 
 // Create an IntervalTimer object for driving the state machines
 IntervalTimer timer1ms;
@@ -183,10 +184,18 @@ void tick1ms(void){
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
 }
 
+time_t getTeensy3Time() {
+    return Teensy3Clock.get();
+}
+
 void setup(void){
     Serial.begin(115200);
     SerialUSB1.begin(38400); // For CAT control
     Serial.println("T41 SDT Setup");
+
+    // get TIME from real time clock with 3V backup battery
+    setSyncProvider(getTeensy3Time);
+
     //Configure the pins for the auto shutdown
     pinMode(BEGIN_TEENSY_SHUTDOWN, INPUT);  // HI received here tells Teensy to start shutdown routine
     pinMode(SHUTDOWN_COMPLETE, OUTPUT);     // HI sent here tells ATTiny85 to cut the power
