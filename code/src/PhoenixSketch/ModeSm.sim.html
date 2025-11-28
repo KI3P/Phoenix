@@ -222,25 +222,19 @@ state CALIBRATION_STATES {
 
         CALIBRATE_FREQUENCY : CALIBRATE_FREQUENCY
 
-        CALIBRATE_FREQUENCY : enter / #123; CalibrateFrequencyEnter()#59; #125;
-
-        CALIBRATE_FREQUENCY : exit / #123; CalibrateFrequencyExit()#59; #125;
+        CALIBRATE_FREQUENCY : enter / #123; UpdateHardwareState()#59; #125;
 
         CALIBRATE_RX_IQ
 
         CALIBRATE_RX_IQ : CALIBRATE_RX_IQ
 
-        CALIBRATE_RX_IQ : enter / #123; CalibrateRXIQEnter()#59; #125;
-
-        CALIBRATE_RX_IQ : exit / #123; CalibrateRXIQExit()#59; #125;
+        CALIBRATE_RX_IQ : enter / #123; UpdateHardwareState()#59; #125;
 
         CALIBRATE_TX_IQ_SPACE
 
         CALIBRATE_TX_IQ_SPACE : CALIBRATE_TX_IQ_SPACE
 
-        CALIBRATE_TX_IQ_SPACE : enter / #123; CalibrateTXIQEnter()#59; #125;
-
-        CALIBRATE_TX_IQ_SPACE : exit / #123; CalibrateTXIQExit()#59; #125;
+        CALIBRATE_TX_IQ_SPACE : enter / #123; UpdateHardwareState()#59; #125;
 
         state "$exit_pt.done" as CALIBRATION_STATES.(ExitPoint)(done)
 
@@ -248,17 +242,19 @@ state CALIBRATION_STATES {
 
         CALIBRATE_TX_IQ_MARK : CALIBRATE_TX_IQ_MARK
 
-        CALIBRATE_TX_IQ_MARK : enter / #123; CalibrateTXIQEnter()#59; #125;
-
-        CALIBRATE_TX_IQ_MARK : exit / #123; CalibrateTXIQExit()#59; #125;
+        CALIBRATE_TX_IQ_MARK : enter / #123; UpdateHardwareState()#59; #125;
 
         CALIBRATE_POWER_SPACE
 
         CALIBRATE_POWER_SPACE : CALIBRATE_POWER_SPACE
 
+        CALIBRATE_POWER_SPACE : enter / #123; UpdateHardwareState()#59; #125;
+
         CALIBRATE_POWER_MARK
 
         CALIBRATE_POWER_MARK : CALIBRATE_POWER_MARK
+
+        CALIBRATE_POWER_MARK : enter / #123; UpdateHardwareState()#59; #125;
 
 }
 
@@ -268,17 +264,13 @@ state NORMAL_STATES {
 
         SSB_RECEIVE : SSB_RECEIVE
 
-        SSB_RECEIVE : enter / #123; ModeSSBReceiveEnter()#59; #125;
-
-        SSB_RECEIVE : exit / #123; ModeSSBReceiveExit()#59; #125;
+        SSB_RECEIVE : enter / #123; UpdateHardwareState()#59; #125;
 
         CW_RECEIVE
 
         CW_RECEIVE : CW_RECEIVE
 
-        CW_RECEIVE : enter / #123; ModeCWReceiveEnter()#59; #125;
-
-        CW_RECEIVE : exit / #123; ModeCWReceiveExit()#59; #125;
+        CW_RECEIVE : enter / #123; UpdateHardwareState()#59; #125;
 
         CW_RECEIVE : 1. do / #123; markCount_ms = 0#59; #125;
 
@@ -286,17 +278,13 @@ state NORMAL_STATES {
 
         SSB_TRANSMIT : SSB_TRANSMIT
 
-        SSB_TRANSMIT : enter / #123; ModeSSBTransmitEnter()#59; #125;
-
-        SSB_TRANSMIT : exit / #123; ModeSSBTransmitExit()#59; #125;
+        SSB_TRANSMIT : enter / #123; UpdateHardwareState()#59; #125;
 
         CW_TRANSMIT_MARK
 
         CW_TRANSMIT_MARK : CW_TRANSMIT_MARK
 
-        CW_TRANSMIT_MARK : enter / #123; ModeCWTransmitMarkEnter()#59; #125;
-
-        CW_TRANSMIT_MARK : exit / #123; ModeCWTransmitMarkExit()#59; #125;
+        CW_TRANSMIT_MARK : enter / #123; UpdateHardwareState()#59; #125;
 
         CW_TRANSMIT_SPACE
 
@@ -306,19 +294,15 @@ state NORMAL_STATES {
 
         CW_TRANSMIT_SPACE : enter / #123; spaceCount_ms = 0#59; #125;
 
-        CW_TRANSMIT_SPACE : exit / #123; ModeCWTransmitSpaceExit()#59; #125;
-
         CW_TRANSMIT_SPACE : 1. do / #123; spaceCount_ms++#59; #125;
 
         CW_TRANSMIT_DIT_MARK
 
         CW_TRANSMIT_DIT_MARK : CW_TRANSMIT_DIT_MARK
 
-        CW_TRANSMIT_DIT_MARK : enter / #123; ModeCWTransmitMarkEnter()#59; #125;
+        CW_TRANSMIT_DIT_MARK : enter / #123; UpdateHardwareState()#59; #125;
 
         CW_TRANSMIT_DIT_MARK : enter / #123; markCount_ms = 0#59; #125;
-
-        CW_TRANSMIT_DIT_MARK : exit / #123; ModeCWTransmitMarkExit()#59; #125;
 
         CW_TRANSMIT_DIT_MARK : 1. do / #123; markCount_ms++#59;\nspaceCount_ms = 0#59; #125;
 
@@ -338,19 +322,15 @@ state NORMAL_STATES {
 
         CW_TRANSMIT_KEYER_WAIT : enter / #123; spaceCount_ms = 0#59; #125;
 
-        CW_TRANSMIT_KEYER_WAIT : exit / #123; ModeCWTransmitSpaceExit()#59; #125;
-
         CW_TRANSMIT_KEYER_WAIT : 1. do / #123; spaceCount_ms++#59;\nmarkCount_ms = 0#59; #125;
 
         CW_TRANSMIT_DAH_MARK
 
         CW_TRANSMIT_DAH_MARK : CW_TRANSMIT_DAH_MARK
 
-        CW_TRANSMIT_DAH_MARK : enter / #123; ModeCWTransmitMarkEnter()#59; #125;
+        CW_TRANSMIT_DAH_MARK : enter / #123; UpdateHardwareState()#59; #125;
 
         CW_TRANSMIT_DAH_MARK : enter / #123; markCount_ms = 0#59; #125;
-
-        CW_TRANSMIT_DAH_MARK : exit / #123; ModeCWTransmitMarkExit()#59; #125;
 
         CW_TRANSMIT_DAH_MARK : 1. do / #123; markCount_ms++#59;\nspaceCount_ms = 0#59; #125;
 
@@ -869,22 +849,15 @@ evaluateGuard = null;
         } // end of behavior for CALIBRATE_FREQUENCY
         
         // CALIBRATE_FREQUENCY behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateFrequencyEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateFrequencyEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateFrequencyEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CALIBRATE_FREQUENCY
     }
     
     #CALIBRATE_FREQUENCY_exit()
     {
-        // CALIBRATE_FREQUENCY behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateFrequencyExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateFrequencyExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateFrequencyExit();");
-        } // end of behavior for CALIBRATE_FREQUENCY
-        
         // CALIBRATE_FREQUENCY behavior
         // uml: exit / { this.tracer?.exitState('CALIBRATE_FREQUENCY'); }
         {
@@ -931,6 +904,13 @@ evaluateGuard = null;
         {
             // Step 1: execute action `this.tracer?.enterState('CALIBRATE_POWER_MARK');`
             this.tracer?.enterState('CALIBRATE_POWER_MARK');
+        } // end of behavior for CALIBRATE_POWER_MARK
+        
+        // CALIBRATE_POWER_MARK behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CALIBRATE_POWER_MARK
     }
     
@@ -981,6 +961,13 @@ evaluateGuard = null;
         {
             // Step 1: execute action `this.tracer?.enterState('CALIBRATE_POWER_SPACE');`
             this.tracer?.enterState('CALIBRATE_POWER_SPACE');
+        } // end of behavior for CALIBRATE_POWER_SPACE
+        
+        // CALIBRATE_POWER_SPACE behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CALIBRATE_POWER_SPACE
     }
     
@@ -1056,22 +1043,15 @@ evaluateGuard = null;
         } // end of behavior for CALIBRATE_RX_IQ
         
         // CALIBRATE_RX_IQ behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateRXIQEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateRXIQEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateRXIQEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CALIBRATE_RX_IQ
     }
     
     #CALIBRATE_RX_IQ_exit()
     {
-        // CALIBRATE_RX_IQ behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateRXIQExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateRXIQExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateRXIQExit();");
-        } // end of behavior for CALIBRATE_RX_IQ
-        
         // CALIBRATE_RX_IQ behavior
         // uml: exit / { this.tracer?.exitState('CALIBRATE_RX_IQ'); }
         {
@@ -1121,22 +1101,15 @@ evaluateGuard = null;
         } // end of behavior for CALIBRATE_TX_IQ_MARK
         
         // CALIBRATE_TX_IQ_MARK behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CALIBRATE_TX_IQ_MARK
     }
     
     #CALIBRATE_TX_IQ_MARK_exit()
     {
-        // CALIBRATE_TX_IQ_MARK behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQExit();");
-        } // end of behavior for CALIBRATE_TX_IQ_MARK
-        
         // CALIBRATE_TX_IQ_MARK behavior
         // uml: exit / { this.tracer?.exitState('CALIBRATE_TX_IQ_MARK'); }
         {
@@ -1185,22 +1158,15 @@ evaluateGuard = null;
         } // end of behavior for CALIBRATE_TX_IQ_SPACE
         
         // CALIBRATE_TX_IQ_SPACE behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CALIBRATE_TX_IQ_SPACE
     }
     
     #CALIBRATE_TX_IQ_SPACE_exit()
     {
-        // CALIBRATE_TX_IQ_SPACE behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "CalibrateTXIQExit();");
-        } // end of behavior for CALIBRATE_TX_IQ_SPACE
-        
         // CALIBRATE_TX_IQ_SPACE behavior
         // uml: exit / { this.tracer?.exitState('CALIBRATE_TX_IQ_SPACE'); }
         {
@@ -1406,22 +1372,15 @@ evaluateGuard = null;
         } // end of behavior for CW_RECEIVE
         
         // CW_RECEIVE behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWReceiveEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWReceiveEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWReceiveEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CW_RECEIVE
     }
     
     #CW_RECEIVE_exit()
     {
-        // CW_RECEIVE behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWReceiveExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWReceiveExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWReceiveExit();");
-        } // end of behavior for CW_RECEIVE
-        
         // CW_RECEIVE behavior
         // uml: exit / { this.tracer?.exitState('CW_RECEIVE'); }
         {
@@ -1545,10 +1504,10 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_DAH_MARK
         
         // CW_TRANSMIT_DAH_MARK behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CW_TRANSMIT_DAH_MARK
         
         // CW_TRANSMIT_DAH_MARK behavior
@@ -1561,13 +1520,6 @@ evaluateGuard = null;
     
     #CW_TRANSMIT_DAH_MARK_exit()
     {
-        // CW_TRANSMIT_DAH_MARK behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();");
-        } // end of behavior for CW_TRANSMIT_DAH_MARK
-        
         // CW_TRANSMIT_DAH_MARK behavior
         // uml: exit / { this.tracer?.exitState('CW_TRANSMIT_DAH_MARK'); }
         {
@@ -1624,10 +1576,10 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_DIT_MARK
         
         // CW_TRANSMIT_DIT_MARK behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CW_TRANSMIT_DIT_MARK
         
         // CW_TRANSMIT_DIT_MARK behavior
@@ -1640,13 +1592,6 @@ evaluateGuard = null;
     
     #CW_TRANSMIT_DIT_MARK_exit()
     {
-        // CW_TRANSMIT_DIT_MARK behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();");
-        } // end of behavior for CW_TRANSMIT_DIT_MARK
-        
         // CW_TRANSMIT_DIT_MARK behavior
         // uml: exit / { this.tracer?.exitState('CW_TRANSMIT_DIT_MARK'); }
         {
@@ -1785,13 +1730,6 @@ evaluateGuard = null;
     #CW_TRANSMIT_KEYER_WAIT_exit()
     {
         // CW_TRANSMIT_KEYER_WAIT behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitSpaceExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitSpaceExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitSpaceExit();");
-        } // end of behavior for CW_TRANSMIT_KEYER_WAIT
-        
-        // CW_TRANSMIT_KEYER_WAIT behavior
         // uml: exit / { this.tracer?.exitState('CW_TRANSMIT_KEYER_WAIT'); }
         {
             // Step 1: execute action `this.tracer?.exitState('CW_TRANSMIT_KEYER_WAIT');`
@@ -1889,22 +1827,15 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_MARK
         
         // CW_TRANSMIT_MARK behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for CW_TRANSMIT_MARK
     }
     
     #CW_TRANSMIT_MARK_exit()
     {
-        // CW_TRANSMIT_MARK behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitMarkExit();");
-        } // end of behavior for CW_TRANSMIT_MARK
-        
         // CW_TRANSMIT_MARK behavior
         // uml: exit / { this.tracer?.exitState('CW_TRANSMIT_MARK'); }
         {
@@ -1969,13 +1900,6 @@ evaluateGuard = null;
     
     #CW_TRANSMIT_SPACE_exit()
     {
-        // CW_TRANSMIT_SPACE behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitSpaceExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitSpaceExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeCWTransmitSpaceExit();");
-        } // end of behavior for CW_TRANSMIT_SPACE
-        
         // CW_TRANSMIT_SPACE behavior
         // uml: exit / { this.tracer?.exitState('CW_TRANSMIT_SPACE'); }
         {
@@ -2053,22 +1977,15 @@ evaluateGuard = null;
         } // end of behavior for SSB_RECEIVE
         
         // SSB_RECEIVE behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBReceiveEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBReceiveEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBReceiveEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for SSB_RECEIVE
     }
     
     #SSB_RECEIVE_exit()
     {
-        // SSB_RECEIVE behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBReceiveExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBReceiveExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBReceiveExit();");
-        } // end of behavior for SSB_RECEIVE
-        
         // SSB_RECEIVE behavior
         // uml: exit / { this.tracer?.exitState('SSB_RECEIVE'); }
         {
@@ -2138,22 +2055,15 @@ evaluateGuard = null;
         } // end of behavior for SSB_TRANSMIT
         
         // SSB_TRANSMIT behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBTransmitEnter();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBTransmitEnter();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBTransmitEnter();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateHardwareState();");
         } // end of behavior for SSB_TRANSMIT
     }
     
     #SSB_TRANSMIT_exit()
     {
-        // SSB_TRANSMIT behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBTransmitExit();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBTransmitExit();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ModeSSBTransmitExit();");
-        } // end of behavior for SSB_TRANSMIT
-        
         // SSB_TRANSMIT behavior
         // uml: exit / { this.tracer?.exitState('SSB_TRANSMIT'); }
         {

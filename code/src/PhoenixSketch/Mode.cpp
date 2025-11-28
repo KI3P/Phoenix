@@ -2,36 +2,9 @@
 
 // This file contains the entry and exit functions called upon changing states
 
-void ModeSSBReceiveEnter(void){
+void UpdateHardwareState(void){
     UpdateRFHardwareState();
     UpdateAudioIOState();
-}
-
-void ModeSSBReceiveExit(void){    
-}
-
-void ModeSSBTransmitEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-
-void ModeSSBTransmitExit(void){
-}
-
-void ModeCWReceiveEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-
-void ModeCWReceiveExit(void){    
-}
-
-void ModeCWTransmitMarkEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-
-void ModeCWTransmitMarkExit(void){    
 }
 
 void ModeCWTransmitSpaceEnter(void){
@@ -42,50 +15,5 @@ void ModeCWTransmitSpaceEnter(void){
     if (digitalRead(KEY2) == 0) {
         SetInterrupt(iKEY2_PRESSED);
     }
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
+    UpdateHardwareState();
 }
-
-void ModeCWTransmitSpaceExit(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-
-void TriggerCalibrateFrequency(void){
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_FREQUENCY);
-}
-void TriggerCalibrateExit(void){
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_EXIT);
-}
-void TriggerCalibrateRXIQ(void){
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);
-}
-void TriggerCalibrateTXIQ(void){
-    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);
-}
-
-void CalibrateFrequencyEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-void CalibrateFrequencyExit(void){}
-void CalibrateTXIQEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-void CalibrateTXIQExit(void){}
-void CalibrateRXIQEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-void CalibrateRXIQExit(void){}
-void CalibrateCWPAEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-void CalibrateCWPAExit(void){}
-void CalibrateSSBPAEnter(void){
-    UpdateRFHardwareState();
-    UpdateAudioIOState();
-}
-void CalibrateSSBPAExit(void){}

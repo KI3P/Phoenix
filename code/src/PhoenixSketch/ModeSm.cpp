@@ -512,22 +512,15 @@ static void CALIBRATE_FREQUENCY_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CALIBRATE_FREQUENCY;
     
     // CALIBRATE_FREQUENCY behavior
-    // uml: enter / { CalibrateFrequencyEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `CalibrateFrequencyEnter();`
-        CalibrateFrequencyEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CALIBRATE_FREQUENCY
 }
 
 static void CALIBRATE_FREQUENCY_exit(ModeSm* sm)
 {
-    // CALIBRATE_FREQUENCY behavior
-    // uml: exit / { CalibrateFrequencyExit(); }
-    {
-        // Step 1: execute action `CalibrateFrequencyExit();`
-        CalibrateFrequencyExit();
-    } // end of behavior for CALIBRATE_FREQUENCY
-    
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
@@ -560,6 +553,13 @@ static void CALIBRATE_FREQUENCY_calibrate_exit(ModeSm* sm)
 static void CALIBRATE_POWER_MARK_enter(ModeSm* sm)
 {
     sm->state_id = ModeSm_StateId_CALIBRATE_POWER_MARK;
+    
+    // CALIBRATE_POWER_MARK behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for CALIBRATE_POWER_MARK
 }
 
 static void CALIBRATE_POWER_MARK_exit(ModeSm* sm)
@@ -595,6 +595,13 @@ static void CALIBRATE_POWER_MARK_ptt_released(ModeSm* sm)
 static void CALIBRATE_POWER_SPACE_enter(ModeSm* sm)
 {
     sm->state_id = ModeSm_StateId_CALIBRATE_POWER_SPACE;
+    
+    // CALIBRATE_POWER_SPACE behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for CALIBRATE_POWER_SPACE
 }
 
 static void CALIBRATE_POWER_SPACE_exit(ModeSm* sm)
@@ -653,22 +660,15 @@ static void CALIBRATE_RX_IQ_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CALIBRATE_RX_IQ;
     
     // CALIBRATE_RX_IQ behavior
-    // uml: enter / { CalibrateRXIQEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `CalibrateRXIQEnter();`
-        CalibrateRXIQEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CALIBRATE_RX_IQ
 }
 
 static void CALIBRATE_RX_IQ_exit(ModeSm* sm)
 {
-    // CALIBRATE_RX_IQ behavior
-    // uml: exit / { CalibrateRXIQExit(); }
-    {
-        // Step 1: execute action `CalibrateRXIQExit();`
-        CalibrateRXIQExit();
-    } // end of behavior for CALIBRATE_RX_IQ
-    
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
@@ -703,22 +703,15 @@ static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CALIBRATE_TX_IQ_MARK;
     
     // CALIBRATE_TX_IQ_MARK behavior
-    // uml: enter / { CalibrateTXIQEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `CalibrateTXIQEnter();`
-        CalibrateTXIQEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CALIBRATE_TX_IQ_MARK
 }
 
 static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm)
 {
-    // CALIBRATE_TX_IQ_MARK behavior
-    // uml: exit / { CalibrateTXIQExit(); }
-    {
-        // Step 1: execute action `CalibrateTXIQExit();`
-        CalibrateTXIQExit();
-    } // end of behavior for CALIBRATE_TX_IQ_MARK
-    
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
@@ -752,22 +745,15 @@ static void CALIBRATE_TX_IQ_SPACE_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CALIBRATE_TX_IQ_SPACE;
     
     // CALIBRATE_TX_IQ_SPACE behavior
-    // uml: enter / { CalibrateTXIQEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `CalibrateTXIQEnter();`
-        CalibrateTXIQEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CALIBRATE_TX_IQ_SPACE
 }
 
 static void CALIBRATE_TX_IQ_SPACE_exit(ModeSm* sm)
 {
-    // CALIBRATE_TX_IQ_SPACE behavior
-    // uml: exit / { CalibrateTXIQExit(); }
-    {
-        // Step 1: execute action `CalibrateTXIQExit();`
-        CalibrateTXIQExit();
-    } // end of behavior for CALIBRATE_TX_IQ_SPACE
-    
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
@@ -938,22 +924,15 @@ static void CW_RECEIVE_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CW_RECEIVE;
     
     // CW_RECEIVE behavior
-    // uml: enter / { ModeCWReceiveEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `ModeCWReceiveEnter();`
-        ModeCWReceiveEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CW_RECEIVE
 }
 
 static void CW_RECEIVE_exit(ModeSm* sm)
 {
-    // CW_RECEIVE behavior
-    // uml: exit / { ModeCWReceiveExit(); }
-    {
-        // Step 1: execute action `ModeCWReceiveExit();`
-        ModeCWReceiveExit();
-    } // end of behavior for CW_RECEIVE
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1059,10 +1038,10 @@ static void CW_TRANSMIT_DAH_MARK_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CW_TRANSMIT_DAH_MARK;
     
     // CW_TRANSMIT_DAH_MARK behavior
-    // uml: enter / { ModeCWTransmitMarkEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `ModeCWTransmitMarkEnter();`
-        ModeCWTransmitMarkEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CW_TRANSMIT_DAH_MARK
     
     // CW_TRANSMIT_DAH_MARK behavior
@@ -1075,13 +1054,6 @@ static void CW_TRANSMIT_DAH_MARK_enter(ModeSm* sm)
 
 static void CW_TRANSMIT_DAH_MARK_exit(ModeSm* sm)
 {
-    // CW_TRANSMIT_DAH_MARK behavior
-    // uml: exit / { ModeCWTransmitMarkExit(); }
-    {
-        // Step 1: execute action `ModeCWTransmitMarkExit();`
-        ModeCWTransmitMarkExit();
-    } // end of behavior for CW_TRANSMIT_DAH_MARK
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1124,10 +1096,10 @@ static void CW_TRANSMIT_DIT_MARK_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
     
     // CW_TRANSMIT_DIT_MARK behavior
-    // uml: enter / { ModeCWTransmitMarkEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `ModeCWTransmitMarkEnter();`
-        ModeCWTransmitMarkEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CW_TRANSMIT_DIT_MARK
     
     // CW_TRANSMIT_DIT_MARK behavior
@@ -1140,13 +1112,6 @@ static void CW_TRANSMIT_DIT_MARK_enter(ModeSm* sm)
 
 static void CW_TRANSMIT_DIT_MARK_exit(ModeSm* sm)
 {
-    // CW_TRANSMIT_DIT_MARK behavior
-    // uml: exit / { ModeCWTransmitMarkExit(); }
-    {
-        // Step 1: execute action `ModeCWTransmitMarkExit();`
-        ModeCWTransmitMarkExit();
-    } // end of behavior for CW_TRANSMIT_DIT_MARK
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1256,13 +1221,6 @@ static void CW_TRANSMIT_KEYER_WAIT_enter(ModeSm* sm)
 
 static void CW_TRANSMIT_KEYER_WAIT_exit(ModeSm* sm)
 {
-    // CW_TRANSMIT_KEYER_WAIT behavior
-    // uml: exit / { ModeCWTransmitSpaceExit(); }
-    {
-        // Step 1: execute action `ModeCWTransmitSpaceExit();`
-        ModeCWTransmitSpaceExit();
-    } // end of behavior for CW_TRANSMIT_KEYER_WAIT
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1345,22 +1303,15 @@ static void CW_TRANSMIT_MARK_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
     
     // CW_TRANSMIT_MARK behavior
-    // uml: enter / { ModeCWTransmitMarkEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `ModeCWTransmitMarkEnter();`
-        ModeCWTransmitMarkEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for CW_TRANSMIT_MARK
 }
 
 static void CW_TRANSMIT_MARK_exit(ModeSm* sm)
 {
-    // CW_TRANSMIT_MARK behavior
-    // uml: exit / { ModeCWTransmitMarkExit(); }
-    {
-        // Step 1: execute action `ModeCWTransmitMarkExit();`
-        ModeCWTransmitMarkExit();
-    } // end of behavior for CW_TRANSMIT_MARK
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1410,13 +1361,6 @@ static void CW_TRANSMIT_SPACE_enter(ModeSm* sm)
 
 static void CW_TRANSMIT_SPACE_exit(ModeSm* sm)
 {
-    // CW_TRANSMIT_SPACE behavior
-    // uml: exit / { ModeCWTransmitSpaceExit(); }
-    {
-        // Step 1: execute action `ModeCWTransmitSpaceExit();`
-        ModeCWTransmitSpaceExit();
-    } // end of behavior for CW_TRANSMIT_SPACE
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1478,22 +1422,15 @@ static void SSB_RECEIVE_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_SSB_RECEIVE;
     
     // SSB_RECEIVE behavior
-    // uml: enter / { ModeSSBReceiveEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `ModeSSBReceiveEnter();`
-        ModeSSBReceiveEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for SSB_RECEIVE
 }
 
 static void SSB_RECEIVE_exit(ModeSm* sm)
 {
-    // SSB_RECEIVE behavior
-    // uml: exit / { ModeSSBReceiveExit(); }
-    {
-        // Step 1: execute action `ModeSSBReceiveExit();`
-        ModeSSBReceiveExit();
-    } // end of behavior for SSB_RECEIVE
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
@@ -1547,22 +1484,15 @@ static void SSB_TRANSMIT_enter(ModeSm* sm)
     sm->state_id = ModeSm_StateId_SSB_TRANSMIT;
     
     // SSB_TRANSMIT behavior
-    // uml: enter / { ModeSSBTransmitEnter(); }
+    // uml: enter / { UpdateHardwareState(); }
     {
-        // Step 1: execute action `ModeSSBTransmitEnter();`
-        ModeSSBTransmitEnter();
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
     } // end of behavior for SSB_TRANSMIT
 }
 
 static void SSB_TRANSMIT_exit(ModeSm* sm)
 {
-    // SSB_TRANSMIT behavior
-    // uml: exit / { ModeSSBTransmitExit(); }
-    {
-        // Step 1: execute action `ModeSSBTransmitExit();`
-        ModeSSBTransmitExit();
-    } // end of behavior for SSB_TRANSMIT
-    
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
