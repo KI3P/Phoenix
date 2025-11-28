@@ -500,7 +500,7 @@ TEST(Loop, CalibrationSSBPATransition){
 
     // Trigger calibration power mode (SSB and CW PA calibration now use same state)
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 }
 
 TEST(Loop, CalibrationCWPATransition){
@@ -509,7 +509,7 @@ TEST(Loop, CalibrationCWPATransition){
 
     // Trigger calibration power mode (SSB and CW PA calibration now use same state)
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 }
 
 TEST(Loop, CalibrationExitTransition){

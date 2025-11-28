@@ -415,12 +415,14 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFTransmit;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_MARK):{
             rfHardwareState = RFCWMark;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT):{
@@ -562,6 +564,8 @@ void UpdateTuneState(void){
             tuneState = TuneSSBTX;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
+        case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_MARK):
@@ -575,12 +579,6 @@ void UpdateTuneState(void){
             tuneState = TuneCalReceiveIQ;
             break;
         }
-        //case (ModeSm_StateId_CALIBRATE_TX_IQ):
-        //case (ModeSm_StateId_CALIBRATE_CW_PA):
-        //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
-        //    break;
-        //}
-
         default:{
             Debug("Unhandled modeSM.state_id state in UpdateTuneState!");
             char strbuf[10];

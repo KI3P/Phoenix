@@ -102,6 +102,19 @@ void SaveDataToStorage(bool savetosd){
     }
 
     doc["keyerFlip"] = ED.keyerFlip;
+    doc["PA100Wactive"] = ED.PA100Wactive;
+
+    // Power calibration arrays
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        doc["PowerCal_20W_Psat_mW"][i] = ED.PowerCal_20W_Psat_mW[i];
+        doc["PowerCal_20W_kindex"][i] = ED.PowerCal_20W_kindex[i];
+        doc["PowerCal_20W_att_offset_dB"][i] = ED.PowerCal_20W_att_offset_dB[i];
+        doc["PowerCal_100W_Psat_mW"][i] = ED.PowerCal_100W_Psat_mW[i];
+        doc["PowerCal_100W_kindex"][i] = ED.PowerCal_100W_kindex[i];
+        doc["PowerCal_100W_att_offset_dB"][i] = ED.PowerCal_100W_att_offset_dB[i];
+    }
+
+    doc["PowerCal_20W_to_100W_threshold_W"] = ED.PowerCal_20W_to_100W_threshold_W;
 
     // Write this JSON object to filename on the LittleFS
     // Delete existing file, otherwise data is appended to the file
@@ -375,6 +388,41 @@ void RestoreDataFromStorage(void){
     }
 
     ED.keyerFlip = doc["keyerFlip"] | ED.keyerFlip;
+    ED.PA100Wactive = doc["PA100Wactive"] | ED.PA100Wactive;
+
+    // Restore power calibration arrays
+    if (doc["PowerCal_20W_Psat_mW"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_Psat_mW[i] = doc["PowerCal_20W_Psat_mW"][i] | ED.PowerCal_20W_Psat_mW[i];
+        }
+    }
+    if (doc["PowerCal_20W_kindex"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_kindex[i] = doc["PowerCal_20W_kindex"][i] | ED.PowerCal_20W_kindex[i];
+        }
+    }
+    if (doc["PowerCal_20W_att_offset_dB"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_att_offset_dB[i] = doc["PowerCal_20W_att_offset_dB"][i] | ED.PowerCal_20W_att_offset_dB[i];
+        }
+    }
+    if (doc["PowerCal_100W_Psat_mW"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_Psat_mW[i] = doc["PowerCal_100W_Psat_mW"][i] | ED.PowerCal_100W_Psat_mW[i];
+        }
+    }
+    if (doc["PowerCal_100W_kindex"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
+        }
+    }
+    if (doc["PowerCal_100W_att_offset_dB"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_att_offset_dB[i] = doc["PowerCal_100W_att_offset_dB"][i] | ED.PowerCal_100W_att_offset_dB[i];
+        }
+    }
+
+    ED.PowerCal_20W_to_100W_threshold_W = doc["PowerCal_20W_to_100W_threshold_W"] | ED.PowerCal_20W_to_100W_threshold_W;
 
     Serial.println("Config data restored successfully");
 }
@@ -560,6 +608,42 @@ void RestoreDataFromSDCard(void){
     }
 
     ED.keyerFlip = doc["keyerFlip"] | ED.keyerFlip;
+    ED.PA100Wactive = doc["PA100Wactive"] | ED.PA100Wactive;
+
+    // Restore power calibration arrays
+    if (doc["PowerCal_20W_Psat_mW"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_Psat_mW[i] = doc["PowerCal_20W_Psat_mW"][i] | ED.PowerCal_20W_Psat_mW[i];
+        }
+    }
+    if (doc["PowerCal_20W_kindex"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_kindex[i] = doc["PowerCal_20W_kindex"][i] | ED.PowerCal_20W_kindex[i];
+        }
+    }
+    if (doc["PowerCal_20W_att_offset_dB"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_att_offset_dB[i] = doc["PowerCal_20W_att_offset_dB"][i] | ED.PowerCal_20W_att_offset_dB[i];
+        }
+    }
+    if (doc["PowerCal_100W_Psat_mW"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_Psat_mW[i] = doc["PowerCal_100W_Psat_mW"][i] | ED.PowerCal_100W_Psat_mW[i];
+        }
+    }
+    if (doc["PowerCal_100W_kindex"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
+        }
+    }
+    if (doc["PowerCal_100W_att_offset_dB"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_att_offset_dB[i] = doc["PowerCal_100W_att_offset_dB"][i] | ED.PowerCal_100W_att_offset_dB[i];
+        }
+    }
+
+    ED.PowerCal_20W_to_100W_threshold_W = doc["PowerCal_20W_to_100W_threshold_W"] | ED.PowerCal_20W_to_100W_threshold_W;
+
     // Save the data to the EEPROM so that it matches
     SaveDataToStorage(false);
     Serial.println("Config data restored successfully");

@@ -149,7 +149,7 @@ void ScrollAndSelectCalibratePower(void){
     loop(); MyDelay(10);
 
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 }
 
 /**
@@ -281,7 +281,7 @@ TEST_F(CalibrationTest, SelectCalibratePowerAndExit) {
 /**
  * Test power calibration state transitions
  * Verifies:
- * - Entry into power calibration puts us in CALIBRATE_POWER UI state and CALIBRATE_TX_IQ_SPACE mode state
+ * - Entry into power calibration puts us in CALIBRATE_POWER UI state and CALIBRATE_POWER_SPACE mode state
  * - PTT press transitions from SPACE to MARK state
  * - PTT release transitions from MARK back to SPACE state
  * - HOME button exits to home screen and SSB_RECEIVE mode
@@ -306,7 +306,7 @@ TEST_F(CalibrationTest, PowerCalibrationStateTransitions) {
 
     // Verify we're in the correct initial calibration state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
     Serial.println("1-In power calibration SPACE state");
 
     // Press PTT to transition to MARK state
@@ -316,7 +316,7 @@ TEST_F(CalibrationTest, PowerCalibrationStateTransitions) {
 
     // Verify transition to MARK state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK);
     Serial.println("2-In power calibration MARK state");
 
     // Release PTT to transition back to SPACE state
@@ -326,7 +326,7 @@ TEST_F(CalibrationTest, PowerCalibrationStateTransitions) {
 
     // Verify transition back to SPACE state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
     Serial.println("3-Back in power calibration SPACE state");
 
     // Press PTT again to verify we can re-enter MARK state
@@ -335,7 +335,7 @@ TEST_F(CalibrationTest, PowerCalibrationStateTransitions) {
     loop(); MyDelay(10);
 
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK);
     Serial.println("4-In power calibration MARK state again");
 
     // Release PTT to return to SPACE state before exiting
@@ -344,7 +344,7 @@ TEST_F(CalibrationTest, PowerCalibrationStateTransitions) {
     loop(); MyDelay(10);
 
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
     Serial.println("5-Back in SPACE state before exit");
 
     // Exit to home screen from SPACE state
@@ -382,7 +382,7 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTransmitAttInPowerCal) {
 
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Get the current band and store initial transmit attenuation value
     int32_t currentBand = ED.currentBand[ED.activeVFO];
@@ -472,7 +472,7 @@ TEST_F(CalibrationTest, FilterEncoderChangesMeasuredPowerInPowerCal) {
 
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Store initial measured power value
     float32_t initialPower = measuredPower;
@@ -806,7 +806,7 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
 
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Reset state from any previous tests
     PAselect = 0; // PA20W
@@ -868,7 +868,7 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
 
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Reset state from any previous tests
     PAselect = 1; // PA100W
