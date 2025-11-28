@@ -265,6 +265,7 @@ void UpdateAudioIOState(void){
         return;
     }
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CALIBRATE_RX_IQ):
@@ -313,7 +314,8 @@ void UpdateAudioIOState(void){
             MuteMixerChannels(&modeSelectOutL);
             MuteMixerChannels(&modeSelectOutR);
             break;
-        }            
+        }
+        case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
             // IQ from receive stops
             Q_in_L.end(); 

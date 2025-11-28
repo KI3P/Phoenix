@@ -702,6 +702,18 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     EXPECT_NEAR(attenuations_dB[2], 20.0, 0.00001);
     EXPECT_NEAR(powers_W[2], 75.2, 0.00001);
 
+    // After recording the third point, the system automatically calculates the fit
+    // and transitions to offset mode. The fit routine queues button 12, so we need
+    // to process it with another loop() call.
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+
+    // Exit offset mode back to power calibration
+    SetButton(12); // FILTER button toggles between power cal and offset mode
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+
     // Recording another data point should record at index 0 and set Npoints to 1
     ED.XAttenSSB[currentBand] = 5.0;
     measuredPower = 10.1;
@@ -830,15 +842,23 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    // Invoke the fit routine
-    SetButton(ZOOM);
-    SetInterrupt(iBUTTON_PRESSED);
+    // After recording the third point, the system automatically calculates the fit
+    // and queues button 12 to transition to offset mode. Process it with another loop() call.
     loop(); MyDelay(10);
 
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
     EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]],14790,50);
     EXPECT_NEAR(ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
+
+    // After the fit, the system should have automatically transitioned to offset mode
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+
+    // Exit offset mode back to power calibration
+    SetButton(12); // FILTER button toggles between power cal and offset mode
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Exit back to home screen
     SetButton(HOME_SCREEN);
@@ -892,15 +912,23 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    // Invoke the fit routine
-    SetButton(ZOOM);
-    SetInterrupt(iBUTTON_PRESSED);
+    // After recording the third point, the system automatically calculates the fit
+    // and queues button 12 to transition to offset mode. Process it with another loop() call.
     loop(); MyDelay(10);
 
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
     EXPECT_NEAR(ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]],77050,600);
     EXPECT_NEAR(ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
+
+    // After the fit, the system should have automatically transitioned to offset mode
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+
+    // Exit offset mode back to power calibration
+    SetButton(12); // FILTER button toggles between power cal and offset mode
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Exit back to home screen
     SetButton(HOME_SCREEN);
@@ -1420,6 +1448,7 @@ TEST_F(PowerCalibrationTest, PredictPowerLevel_SSB_AppliesOffset) {
     float32_t powerSSB = PredictPowerLevel(10.0f, 0, 1);
 
     // SSB should have lower power due to the 3dB offset (effective attenuation is higher)
+    // The offset represents how much less attenuation is needed in SSB mode
     EXPECT_LT(powerSSB, powerCW);
 
     // Reset offset

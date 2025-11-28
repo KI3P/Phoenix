@@ -273,5 +273,55 @@ TEST(ModeSm, EnterCalibrateReceiveIQFromReceiveStates){
     ModeSm_start(&modeSM);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_RX_IQ);
-} 
+}
+
+// Navigate from power calibration to offset mode
+TEST(ModeSm, NavigateFromPowerCalToOffsetMode){
+    ModeSm_start(&modeSM);
+    // First enter power calibration mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+    // Dispatch OFFSET_START event to enter offset mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_OFFSET_START);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+}
+
+// Navigate from offset mode back to power calibration
+TEST(ModeSm, NavigateFromOffsetModeToPowerCal){
+    ModeSm_start(&modeSM);
+    // First enter power calibration mode then offset mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_OFFSET_START);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+    // Dispatch OFFSET_END event to return to power calibration
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_OFFSET_END);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+}
+
+// Navigate between offset space and offset mark states
+TEST(ModeSm, NavigateBetweenOffsetSpaceAndOffsetMark){
+    ModeSm_start(&modeSM);
+    // Enter offset mode via power calibration
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_OFFSET_START);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+    // Press PTT to enter offset mark state
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_MARK);
+    // Release PTT to return to offset space state
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+}
+
+// Exit from offset mode directly to SSB receive
+TEST(ModeSm, ExitOffsetModeToSSBReceive){
+    ModeSm_start(&modeSM);
+    // Enter offset mode via power calibration
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_OFFSET_START);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+    // Dispatch CALIBRATE_EXIT event to exit to SSB receive
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_EXIT);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
 

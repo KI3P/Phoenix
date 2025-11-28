@@ -162,6 +162,7 @@ int8_t GetBand(int64_t freq){
  * Return the predicted output power given an attenuation setting, PA selection
  * and mode selection (SSB or CW). The output power is given by the equation:
  *   Pout [W] ​= Psat [mW] tanh( k 10^{-Attenuation [dB]/10}​ ) / 1000
+ * This function is only used in testing
  * 
  * @param atten Attenuation setting in dB
  * @param PAsel 0 for 20W, 1 for 100W
@@ -181,21 +182,22 @@ float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode){
     if (PAsel == 0){
         Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){
+        if (mode == 1){ // SSB
             Aoff = ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]];
         } else {
-            Aoff = 0;
+            Aoff = 0; // CW
         }
     } else {
         Psat = ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){
+        if (mode == 1){ // SSB
             Aoff = ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]];
         } else {
-            Aoff = 0;
+            Aoff = 0; // CW
         }
     }
-
+    // The CW power is higher than the SSB power. So when we're in SSB mode, increase
+    // the applied attenuation by the offset value
     float32_t a = pow(10.0f,-(atten_dB + Aoff)/10.0f);
     float32_t P_mW = Psat * tanhf( k * a );
     return P_mW;
@@ -210,7 +212,7 @@ float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode){
  * @param Power_W Desired power in W
  * @param mode 1 for SSB, 0 for CW
  * @param *PAsel Pointer to PA setting, we set this to 1 if 100W amp is needed
- * @return Attenuation setting in dB (float32_t
+ * @return Attenuation setting in dB (float32_t)
  */
 float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
     if (Power_W < 0){
@@ -230,22 +232,23 @@ float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
     if (*PAsel == 0){
         Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){
+        if (mode == 1){ // SSB
             Aoff = ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]];
         } else {
-            Aoff = 0;
+            Aoff = 0; // CW
         }
     } else {
         Psat = ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){
+        if (mode == 1){ // SSB
             Aoff = ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]];
         } else {
-            Aoff = 0;
+            Aoff = 0; // CW
         }
     }
-
-    return (-Aoff-10.0*log10f((1.0/k)*atanhf(Power_W*1000.0/Psat)));
+    // The CW power is higher than the SSB power for the same attenuation value. 
+    // So when we're in SSB mode, reduce the applied attenuation by the offset value
+    return ((-10.0*log10f((1.0/k)*atanhf(Power_W*1000.0/Psat))) - Aoff);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

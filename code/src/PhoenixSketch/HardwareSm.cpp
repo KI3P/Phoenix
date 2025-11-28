@@ -403,6 +403,7 @@ void UpdateRFHardwareState(void){
     // Several transceiver states map to the same RF board state. Handle this mapping
     // and call the function to handle the new RF board state.
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
         case (ModeSm_StateId_CW_RECEIVE):
@@ -410,6 +411,7 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFReceive;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             rfHardwareState = RFTransmit;
@@ -552,6 +554,7 @@ void HandleTuneState(TuneState tuneState){
  */
 void UpdateTuneState(void){
     switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CW_RECEIVE):
@@ -559,6 +562,7 @@ void UpdateTuneState(void){
             tuneState = TuneReceive;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             tuneState = TuneSSBTX;

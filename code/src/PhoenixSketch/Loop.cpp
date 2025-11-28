@@ -376,7 +376,10 @@ void HandleButtonPress(int32_t button){
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE) ||
-        (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT))
+        (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) || 
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_TX_IQ_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK))
         return;
 
     switch (uiSM.state_id){
@@ -780,6 +783,17 @@ void HandleButtonPress(int32_t button){
                 case (ZOOM):{
                     // Calculate best fit to data
                     CalculatePowerCurveFit();
+                    break;
+                }
+                case (12):{
+                    if (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_SPACE){
+                        // Change to offset measurement mode
+                        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START);
+                    }
+                    else if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
+                        // Change to offset measurement mode
+                        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
+                    }
                     break;
                 }
                 case (15):{

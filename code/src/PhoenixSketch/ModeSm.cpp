@@ -27,6 +27,22 @@ static void CALIBRATE_FREQUENCY_exit(ModeSm* sm);
 
 static void CALIBRATE_FREQUENCY_calibrate_exit(ModeSm* sm);
 
+static void CALIBRATE_OFFSET_MARK_enter(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_MARK_exit(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_MARK_ptt_released(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_SPACE_enter(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_SPACE_exit(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_SPACE_calibrate_exit(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_SPACE_offset_end(ModeSm* sm);
+
+static void CALIBRATE_OFFSET_SPACE_ptt_pressed(ModeSm* sm);
+
 static void CALIBRATE_POWER_MARK_enter(ModeSm* sm);
 
 static void CALIBRATE_POWER_MARK_exit(ModeSm* sm);
@@ -38,6 +54,8 @@ static void CALIBRATE_POWER_SPACE_enter(ModeSm* sm);
 static void CALIBRATE_POWER_SPACE_exit(ModeSm* sm);
 
 static void CALIBRATE_POWER_SPACE_calibrate_exit(ModeSm* sm);
+
+static void CALIBRATE_POWER_SPACE_offset_start(ModeSm* sm);
 
 static void CALIBRATE_POWER_SPACE_ptt_pressed(ModeSm* sm);
 
@@ -209,6 +227,28 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             }
             break;
         
+        // STATE: CALIBRATE_OFFSET_MARK
+        case ModeSm_StateId_CALIBRATE_OFFSET_MARK:
+            switch (event_id)
+            {
+                case ModeSm_EventId_PTT_RELEASED: CALIBRATE_OFFSET_MARK_ptt_released(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: CALIBRATE_OFFSET_SPACE
+        case ModeSm_StateId_CALIBRATE_OFFSET_SPACE:
+            switch (event_id)
+            {
+                case ModeSm_EventId_OFFSET_END: CALIBRATE_OFFSET_SPACE_offset_end(sm); break;
+                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_OFFSET_SPACE_calibrate_exit(sm); break;
+                case ModeSm_EventId_PTT_PRESSED: CALIBRATE_OFFSET_SPACE_ptt_pressed(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
         // STATE: CALIBRATE_POWER_MARK
         case ModeSm_StateId_CALIBRATE_POWER_MARK:
             switch (event_id)
@@ -223,8 +263,9 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
         case ModeSm_StateId_CALIBRATE_POWER_SPACE:
             switch (event_id)
             {
-                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_POWER_SPACE_calibrate_exit(sm); break;
                 case ModeSm_EventId_PTT_PRESSED: CALIBRATE_POWER_SPACE_ptt_pressed(sm); break;
+                case ModeSm_EventId_OFFSET_START: CALIBRATE_POWER_SPACE_offset_start(sm); break;
+                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_POWER_SPACE_calibrate_exit(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -423,6 +464,10 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state)
             
             case ModeSm_StateId_CALIBRATE_FREQUENCY: CALIBRATE_FREQUENCY_exit(sm); break;
             
+            case ModeSm_StateId_CALIBRATE_OFFSET_MARK: CALIBRATE_OFFSET_MARK_exit(sm); break;
+            
+            case ModeSm_StateId_CALIBRATE_OFFSET_SPACE: CALIBRATE_OFFSET_SPACE_exit(sm); break;
+            
             case ModeSm_StateId_CALIBRATE_POWER_MARK: CALIBRATE_POWER_MARK_exit(sm); break;
             
             case ModeSm_StateId_CALIBRATE_POWER_SPACE: CALIBRATE_POWER_SPACE_exit(sm); break;
@@ -547,6 +592,131 @@ static void CALIBRATE_FREQUENCY_calibrate_exit(ModeSm* sm)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// event handlers for state CALIBRATE_OFFSET_MARK
+////////////////////////////////////////////////////////////////////////////////
+
+static void CALIBRATE_OFFSET_MARK_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_CALIBRATE_OFFSET_MARK;
+    
+    // CALIBRATE_OFFSET_MARK behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for CALIBRATE_OFFSET_MARK
+}
+
+static void CALIBRATE_OFFSET_MARK_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
+}
+
+static void CALIBRATE_OFFSET_MARK_ptt_released(ModeSm* sm)
+{
+    // CALIBRATE_OFFSET_MARK behavior
+    // uml: PTT_RELEASED TransitionTo(CALIBRATE_OFFSET_SPACE)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_OFFSET_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_OFFSET_SPACE`.
+        CALIBRATE_OFFSET_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_OFFSET_MARK
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state CALIBRATE_OFFSET_SPACE
+////////////////////////////////////////////////////////////////////////////////
+
+static void CALIBRATE_OFFSET_SPACE_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_CALIBRATE_OFFSET_SPACE;
+    
+    // CALIBRATE_OFFSET_SPACE behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for CALIBRATE_OFFSET_SPACE
+}
+
+static void CALIBRATE_OFFSET_SPACE_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
+}
+
+static void CALIBRATE_OFFSET_SPACE_calibrate_exit(ModeSm* sm)
+{
+    // CALIBRATE_OFFSET_SPACE behavior
+    // uml: CALIBRATE_EXIT TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_OFFSET_SPACE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATION_STATES.<ExitPoint>(done)`.
+        // CALIBRATION_STATES.<ExitPoint>(done) is a pseudo state and cannot have an `enter` trigger.
+        
+        // Finish transition by calling pseudo state transition function.
+        CALIBRATION_STATES_ExitPoint_done__transition(sm);
+        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+    } // end of behavior for CALIBRATE_OFFSET_SPACE
+    
+    // No ancestor handles this event.
+}
+
+static void CALIBRATE_OFFSET_SPACE_offset_end(ModeSm* sm)
+{
+    // CALIBRATE_OFFSET_SPACE behavior
+    // uml: OFFSET_END TransitionTo(CALIBRATE_POWER_SPACE)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_OFFSET_SPACE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
+        CALIBRATE_POWER_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_OFFSET_SPACE
+    
+    // No ancestor handles this event.
+}
+
+static void CALIBRATE_OFFSET_SPACE_ptt_pressed(ModeSm* sm)
+{
+    // CALIBRATE_OFFSET_SPACE behavior
+    // uml: PTT_PRESSED TransitionTo(CALIBRATE_OFFSET_MARK)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_OFFSET_SPACE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_OFFSET_MARK`.
+        CALIBRATE_OFFSET_MARK_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_OFFSET_SPACE
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // event handlers for state CALIBRATE_POWER_MARK
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -625,6 +795,26 @@ static void CALIBRATE_POWER_SPACE_calibrate_exit(ModeSm* sm)
         // Finish transition by calling pseudo state transition function.
         CALIBRATION_STATES_ExitPoint_done__transition(sm);
         return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+    } // end of behavior for CALIBRATE_POWER_SPACE
+    
+    // No ancestor handles this event.
+}
+
+static void CALIBRATE_POWER_SPACE_offset_start(ModeSm* sm)
+{
+    // CALIBRATE_POWER_SPACE behavior
+    // uml: OFFSET_START TransitionTo(CALIBRATE_OFFSET_SPACE)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_POWER_SPACE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_OFFSET_SPACE`.
+        CALIBRATE_OFFSET_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
     } // end of behavior for CALIBRATE_POWER_SPACE
     
     // No ancestor handles this event.
@@ -1524,6 +1714,8 @@ char const * ModeSm_state_id_to_string(ModeSm_StateId id)
         case ModeSm_StateId_ROOT: return "ROOT";
         case ModeSm_StateId_CALIBRATION_STATES: return "CALIBRATION_STATES";
         case ModeSm_StateId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
+        case ModeSm_StateId_CALIBRATE_OFFSET_MARK: return "CALIBRATE_OFFSET_MARK";
+        case ModeSm_StateId_CALIBRATE_OFFSET_SPACE: return "CALIBRATE_OFFSET_SPACE";
         case ModeSm_StateId_CALIBRATE_POWER_MARK: return "CALIBRATE_POWER_MARK";
         case ModeSm_StateId_CALIBRATE_POWER_SPACE: return "CALIBRATE_POWER_SPACE";
         case ModeSm_StateId_CALIBRATE_RX_IQ: return "CALIBRATE_RX_IQ";
@@ -1558,6 +1750,8 @@ char const * ModeSm_event_id_to_string(ModeSm_EventId id)
         case ModeSm_EventId_DO: return "DO";
         case ModeSm_EventId_KEY_PRESSED: return "KEY_PRESSED";
         case ModeSm_EventId_KEY_RELEASED: return "KEY_RELEASED";
+        case ModeSm_EventId_OFFSET_END: return "OFFSET_END";
+        case ModeSm_EventId_OFFSET_START: return "OFFSET_START";
         case ModeSm_EventId_PTT_PRESSED: return "PTT_PRESSED";
         case ModeSm_EventId_PTT_RELEASED: return "PTT_RELEASED";
         case ModeSm_EventId_TO_CW_MODE: return "TO_CW_MODE";
