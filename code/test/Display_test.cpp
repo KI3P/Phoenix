@@ -898,14 +898,14 @@ TEST_F(DisplayTest, RFSetMenu_SSBPower_Configuration) {
     // Access the SSB power variable parameter from RFSet[0]
     extern struct SecondaryMenuOption RFSet[7];
     extern VariableParameter ssbPower;
-    extern void UpdatePower(void);
+    extern void UpdateSSBPower(void);
 
     // Verify menu option is configured correctly
     EXPECT_STREQ(RFSet[0].label, "SSB Power");
     EXPECT_EQ(RFSet[0].action, variableOption);
     EXPECT_EQ(RFSet[0].varPam, &ssbPower);
     EXPECT_EQ(RFSet[0].func, nullptr);
-    EXPECT_EQ(RFSet[0].postUpdateFunc, (void *)UpdatePower);
+    EXPECT_EQ(RFSet[0].postUpdateFunc, (void *)UpdateSSBPower);
 
     // Verify variable parameter configuration
     EXPECT_EQ(ssbPower.type, TYPE_F32);
@@ -978,14 +978,14 @@ TEST_F(DisplayTest, RFSetMenu_CWPower_Configuration) {
 
     extern struct SecondaryMenuOption RFSet[7];
     extern VariableParameter cwPower;
-    extern void UpdatePower(void);
+    extern void UpdateCWPower(void);
 
     // Verify menu option is configured correctly
     EXPECT_STREQ(RFSet[1].label, "CW Power");
     EXPECT_EQ(RFSet[1].action, variableOption);
     EXPECT_EQ(RFSet[1].varPam, &cwPower);
     EXPECT_EQ(RFSet[1].func, nullptr);
-    EXPECT_EQ(RFSet[1].postUpdateFunc, (void *)UpdatePower);
+    EXPECT_EQ(RFSet[1].postUpdateFunc, (void *)UpdateCWPower);
 
     // Verify variable parameter configuration
     EXPECT_EQ(cwPower.type, TYPE_F32);

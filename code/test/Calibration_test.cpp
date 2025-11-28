@@ -697,9 +697,8 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    // Verify third data point was recorded and Npoints wrapped to 0
-    // (Npoints increments to 3, then wraps back to 0)
-    EXPECT_EQ(Npoints, 0);
+    // Verify third data point was recorded
+    EXPECT_EQ(Npoints, 3);
     EXPECT_NEAR(attenuations_dB[2], 20.0, 0.00001);
     EXPECT_NEAR(powers_W[2], 75.2, 0.00001);
 
@@ -1656,7 +1655,7 @@ TEST_F(SetPowerTest, SetPower_LowPower_SSB) {
     float32_t target_power = 5.0f;  // 5 watts
 
     // Call SetPower
-    SetPower(target_power);
+    SetPower(target_power,ModeSm_StateId_SSB_TRANSMIT);
 
     // Verify that PA100Wactive is false (should use 20W PA)
     EXPECT_FALSE(ED.PA100Wactive);
@@ -1689,7 +1688,7 @@ TEST_F(SetPowerTest, SetPower_HighPower_SSB) {
     float32_t target_power = 50.0f;  // 50 watts
 
     // Call SetPower
-    SetPower(target_power);
+    SetPower(target_power,ModeSm_StateId_SSB_TRANSMIT);
 
     // Verify that PA100Wactive is true (should use 100W PA)
     EXPECT_TRUE(ED.PA100Wactive);
@@ -1722,7 +1721,7 @@ TEST_F(SetPowerTest, SetPower_LowPower_CW) {
     float32_t target_power = 5.0f;  // 5 watts
 
     // Call SetPower
-    SetPower(target_power);
+    SetPower(target_power,ModeSm_StateId_CW_TRANSMIT_MARK);
 
     // Verify that PA100Wactive is false (should use 20W PA)
     EXPECT_FALSE(ED.PA100Wactive);
@@ -1755,7 +1754,7 @@ TEST_F(SetPowerTest, SetPower_HighPower_CW) {
     float32_t target_power = 50.0f;  // 50 watts
 
     // Call SetPower
-    SetPower(target_power);
+    SetPower(target_power,ModeSm_StateId_CW_TRANSMIT_MARK);
 
     // Verify that PA100Wactive is true (should use 100W PA)
     EXPECT_TRUE(ED.PA100Wactive);
@@ -1789,7 +1788,7 @@ TEST_F(SetPowerTest, SetPower_ThresholdPower_SSB) {
     float32_t target_power = 10.0f;  // Exactly at threshold
 
     // Call SetPower
-    SetPower(target_power);
+    SetPower(target_power,ModeSm_StateId_SSB_TRANSMIT);
 
     // Verify that PA100Wactive is true (should use 100W PA at threshold)
     EXPECT_TRUE(ED.PA100Wactive);
@@ -1809,14 +1808,14 @@ TEST_F(SetPowerTest, SetPower_DifferentBands) {
     // Test on 20M band
     ED.currentBand[ED.activeVFO] = BAND_20M;
     float32_t power_20m = 5.0f;
-    SetPower(power_20m);
+    SetPower(power_20m,ModeSm_StateId_SSB_TRANSMIT);
     float32_t atten_20m = ED.XAttenSSB[BAND_20M];
     ConsumeInterrupt();
 
     // Test on 40M band
     ED.currentBand[ED.activeVFO] = BAND_40M;
     float32_t power_40m = 8.0f;
-    SetPower(power_40m);
+    SetPower(power_40m,ModeSm_StateId_SSB_TRANSMIT);
     float32_t atten_40m = ED.XAttenSSB[BAND_40M];
     ConsumeInterrupt();
 
@@ -2026,7 +2025,7 @@ TEST_F(MenuSetPowerTest, UpdatePower_PASelectionChanges) {
     ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = 5.0f;
 
     // Call SetPower to set initial state
-    SetPower(5.0f);
+    SetPower(5.0f,ModeSm_StateId_SSB_TRANSMIT);
     EXPECT_FALSE(ED.PA100Wactive);
     ConsumeInterrupt();
 
