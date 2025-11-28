@@ -1353,10 +1353,10 @@ static void DrawPowerInstructionsPane(void);
 
 // Pane instances
 static Pane PanePowerAtt =      {310,50,100,40,DrawPowerAttPane,1};
-static Pane PanePowerPower =    {310,100,200,40,DrawPowerPowerPane,1};
+static Pane PanePowerPower =    {310,100,220,40,DrawPowerPowerPane,1};
 static Pane PanePowerData =     {320,150,200,90,DrawPowerDataPane,1};
 static Pane PanePowerAdjust =   {3,250,300,230,DrawPowerAdjustPane,1};
-static Pane PanePowerTable =    {320,250,200,230,DrawPowerTablePane,1};
+static Pane PanePowerTable =    {300,250,200,230,DrawPowerTablePane,1};
 static Pane PanePowerInstructions = {530,7,260,470,DrawPowerInstructionsPane,1};
 
 // Array of all panes for iteration
@@ -1369,6 +1369,7 @@ static Pane* PowerWindowPanes[NUMBER_OF_POWER_PANES] = {&PanePowerAdjust,&PanePo
 int8_t PAselect = PA20W;
 float32_t measuredPower = 0.0;
 float32_t targetPower = 0.0;
+uint8_t powerUnit = 1; // 1=W, 0=dBm
 
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
@@ -1393,12 +1394,29 @@ void CalculatePowerCurveFit(void){
     }
     Debug("Invoking change to offset measurement");
     if (PAselect){
-        measuredPower = 30.0; // do the offset calibration at 30W
+        if (powerUnit)
+            measuredPower = 20.0; // do the offset calibration at 20W
+        else
+            measuredPower = 10*log10f(20.0*1000); // dBm units
         targetPower = measuredPower;
     } else {
-        measuredPower = 5.0; // do the offset calibration at 5W
+        if (powerUnit)
+            measuredPower = 1.0; // do the offset calibration at 1W
+        else
+            measuredPower = 10*log10f(1.0*1000); // dBm units
         targetPower = measuredPower;
     }
+    int8_t p;
+    float32_t startAtt;
+    if (powerUnit)
+        startAtt = CalculateAttenuation(measuredPower,1,&p);
+    else
+        startAtt = CalculateAttenuation(pow(10.0,measuredPower/10.0)/1000.0,1,&p);
+    Debug("Starting SSB/CW offset with atten = "+String(startAtt));
+    if (p != PAselect)
+        Debug("p should equal PAselect! MainBoard_DisplayCalibration.cpp");
+    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = startAtt;
+
     SetButton(12);
     SetInterrupt(iBUTTON_PRESSED);
     PanePowerAtt.stale = true;
@@ -1408,11 +1426,17 @@ void CalculatePowerCurveFit(void){
 void ChangeCalibrationPASelection(void){
     if (PAselect == PA100W){
         PAselect = PA20W;
-        measuredPower = 10.0;
+        if (powerUnit)
+            measuredPower = 10.0;
+        else
+            measuredPower = 10*log10f(10.0*1000); // dBm units
         targetPower = measuredPower;
     }else{
         PAselect = PA100W;
-        measuredPower = 75.0;
+        if (powerUnit)
+            measuredPower = 75.0;
+        else
+            measuredPower = 10*log10f(75.0*1000); // dBm units
         targetPower = measuredPower;
     }
     Npoints = 0;
@@ -1425,11 +1449,17 @@ void RecordPowerDataPoint(void){
             if (Npoints >= sizeof(powers_W)/sizeof(powers_W[0]))
                 Npoints = 0;
             attenuations_dB[Npoints] = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-            powers_W[Npoints] = measuredPower;
+            if (powerUnit)
+                powers_W[Npoints] = measuredPower;
+            else
+                powers_W[Npoints] = pow(10.0f,measuredPower/10.0f)/1000.0f;
             Npoints++;
             // Change the target power by factor of 6 dB
             if (Npoints < 3){
-                targetPower = targetPower / 4.0;
+                if (powerUnit)
+                    targetPower = targetPower / 4.0;
+                else
+                    targetPower = targetPower - 6.0;
                 measuredPower = targetPower;
             }else{
                 // We have recorded all three points, calculate the power curve
@@ -1442,15 +1472,22 @@ void RecordPowerDataPoint(void){
             // The ED.XAttenSSB[ED.currentBand[ED.activeVFO]] is the actual attenuation
             
             // How much attenuation would the CW-derived curve need to produce this power level?
-            float32_t cwatt = CalculateAttenuation(measuredPower, 0, &PAselect);
-            Debug("CW would need " + String(cwatt) + "dB of att to produce P[W] = " + String(measuredPower));
+            float32_t cwatt;
+            if (powerUnit){
+                cwatt = CalculateAttenuation(measuredPower, 0, &PAselect);
+                Debug("CW would need " + String(cwatt) + "dB of att to produce P[W] = " + String(measuredPower));
+            } else {
+                cwatt = CalculateAttenuation(pow(10.0f,measuredPower/10.0f)/1000.0f, 0, &PAselect);
+                Debug("CW would need " + String(cwatt) + "dB of att to produce P[W] = " + String(pow(10.0f,measuredPower/10.0f)/1000.0f));
+            }
             Debug("Attenuator setting is [dB] = " + String(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]));
             float32_t offs = cwatt - ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
             Debug("Therefore offset is [dB] = " + String(offs));
             if (PAselect)
                 ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]] = offs;
             else
-                ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]] = offs;
+                ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]] = offs;
+            PanePowerTable.stale = true;
             break;
         }
         default:
@@ -1498,8 +1535,22 @@ static void DrawPowerDataPane(void){
 
 }
 
-uint8_t incindexPower = 0;
-const float32_t powerincvals[] = {0.1, 0.01};
+uint8_t incindexPower = 1;
+const float32_t powerincvals[] = {1, 0.1, 0.01};
+
+void ChangePowerUnits(void){
+    if (powerUnit){
+        powerUnit = 0;
+        targetPower = 10*log10f(targetPower*1000.0f);
+        measuredPower = 10*log10f(measuredPower*1000.0f);
+    } else {
+        powerUnit = 1;
+        targetPower = pow(10.0f,targetPower/10.0f)/1000.0f;
+        measuredPower = pow(10.0f,measuredPower/10.0f)/1000.0f;
+    }
+    PanePowerPower.stale = true;
+}
+
 /**
  * @brief Toggle power calibration adjustment increment
  * @note Switches between 0.1 and 0.01 step sizes
@@ -1540,10 +1591,13 @@ static void DrawPowerPowerPane(void){
     tft.setFontScale((enum RA8875tsize)1);
     tft.setTextColor(RA8875_WHITE);
 
-    tft.fillRect(PanePowerPower.x0-tft.getFontWidth()*7, PanePowerPower.y0, PanePowerPower.width+tft.getFontWidth()*15, PanePowerPower.height, RA8875_BLACK);
+    tft.fillRect(PanePowerPower.x0-tft.getFontWidth()*7, PanePowerPower.y0, PanePowerPower.width+tft.getFontWidth()*7, PanePowerPower.height, RA8875_BLACK);
 
     tft.setCursor(PanePowerPower.x0,PanePowerPower.y0);
-    sprintf(buff,"%3.2fW  ",measuredPower);
+    if (powerUnit)
+        sprintf(buff,"%3.2fW ",measuredPower);
+    else
+        sprintf(buff,"%2.1fdBm ",measuredPower);
     tft.print(buff);
     tft.setTextColor(RA8875_MAGENTA);
     sprintf(buff,"%3.2f",targetPower);
@@ -1595,6 +1649,7 @@ static void DrawPowerAttPane(void){
 static int8_t oldPincind = -1;
 static int32_t oldPband = 754;
 static int8_t oldpasel = 5;
+static uint8_t oldpu = 3;
 static ModeSm_StateId oldmode = ModeSm_StateId_NORMAL_STATES;
 /**
  * @brief Render the power current band adjustment values pane
@@ -1605,12 +1660,14 @@ static void DrawPowerAdjustPane(void){
     if ((oldPincind != incindexPower) || 
         (oldPband != ED.currentBand[ED.activeVFO]) || 
         (oldpasel != PAselect) ||
-        (oldmode != modeSM.state_id))
+        (oldmode != modeSM.state_id) ||
+        (oldpu != powerUnit))
         PanePowerAdjust.stale = true;
     oldPincind = incindexPower;
     oldPband = ED.currentBand[ED.activeVFO];
     oldpasel = PAselect;
     oldmode = modeSM.state_id;
+    oldpu = powerUnit;
 
     if (!PanePowerAdjust.stale) return;
     tft.fillRect(PanePowerAdjust.x0, PanePowerAdjust.y0, PanePowerAdjust.width, PanePowerAdjust.height, RA8875_BLACK);
@@ -1619,7 +1676,7 @@ static void DrawPowerAdjustPane(void){
     int16_t x0 = PanePowerAdjust.x0+3;
     int16_t y0 = PanePowerAdjust.y0+3;
     int16_t delta = 0;
-    int16_t lineD = 40;
+    int16_t lineD = 35;
 
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
@@ -1665,6 +1722,14 @@ static void DrawPowerAdjustPane(void){
     sprintf(buff,"%3.2f",powerincvals[incindexPower]);
     tft.print(buff);
 
+    delta += lineD;
+    tft.setCursor(x0,y0+delta);
+    tft.print("Units:");
+    tft.setCursor(x0+160,y0+delta);
+    if (powerUnit)
+        tft.print("W");
+    else
+        tft.print("dBm");
     PanePowerAdjust.stale = false;
 }
 
@@ -1728,6 +1793,9 @@ static void DrawPowerTablePane(void){
     tft.print("Psat");
     tft.setCursor(PanePowerTable.x0+120, PanePowerTable.y0+3);
     tft.print("k");
+    tft.setCursor(PanePowerTable.x0+160, PanePowerTable.y0+3);
+    tft.print("Offset");
+
 
     for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
         int16_t y = PanePowerTable.y0 + 20 + (k - FIRST_BAND)*17;
@@ -1748,6 +1816,14 @@ static void DrawPowerTablePane(void){
         else
             sprintf(buff,"%2.1f",ED.PowerCal_20W_kindex[k]);
         tft.print(buff);
+
+        tft.setCursor(PanePowerTable.x0+170, y);
+        if (PAselect)
+            sprintf(buff,"%2.1f",ED.PowerCal_100W_att_offset_dB[k]);
+        else
+            sprintf(buff,"%2.1f",ED.PowerCal_20W_att_offset_dB[k]);
+        tft.print(buff);
+
     }
     PanePowerTable.stale = false;
 }
@@ -1788,7 +1864,7 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print(" a further 6dB");
+    tft.print("  a further 6dB");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
@@ -1796,7 +1872,7 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print(" output power");
+    tft.print("  output power");
 
     delta += 2*lineD;
     tft.setCursor(x0, y0+delta);
@@ -1826,6 +1902,11 @@ static void DrawPowerInstructionsPane(void){
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("* Filter encoder adjusts power.");
+
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("* Button 14 changes W/dBm choice.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
@@ -1863,10 +1944,16 @@ void DrawCalibratePower(void){
         tft.print("Power calibration");
 
         if (PAselect == 0){
-            measuredPower = 10.0;
+            if (powerUnit)
+                measuredPower = 10.0;
+            else
+                measuredPower = 10*log10(10.0*1000.0);
             targetPower = measuredPower;
         } else {
-            measuredPower = 75.0;
+            if (powerUnit)
+                measuredPower = 75.0;
+            else
+                measuredPower = 10*log10(75.0*1000.0);
             targetPower = measuredPower;
         }
         // Mark all the panes stale to force a screen refresh

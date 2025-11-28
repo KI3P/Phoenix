@@ -26,6 +26,7 @@ void PerformSignalProcessing(void){
             ReceiveProcessing(nullptr);
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);

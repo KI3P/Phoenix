@@ -349,6 +349,7 @@ void RecordPowerDataPoint(void); // forward declare from MainBoard_DisplayCalibr
 void CalculatePowerCurveFit(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangePowerIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangeCalibrationPASelection(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ChangePowerUnits(void); // forward declare from MainBoard_DisplayCalibration.cpp
 
 /**
  * Process button press events from the front panel.
@@ -794,6 +795,10 @@ void HandleButtonPress(int32_t button){
                         // Change to offset measurement mode
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
+                    break;
+                }
+                case (14):{
+                    ChangePowerUnits();
                     break;
                 }
                 case (15):{
