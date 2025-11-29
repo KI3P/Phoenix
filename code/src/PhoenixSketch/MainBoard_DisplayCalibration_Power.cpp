@@ -42,6 +42,7 @@ uint8_t powerUnit = 1; // 1=W, 0=dBm
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
 uint32_t Npoints = 0;
+static uint8_t powerCalibrationStepCount = 0; // Tracks how many times RecordPowerDataPoint has been called
 
 void CalculatePowerCurveFit(void){
     Debug("Invoked power curve fit");
@@ -102,7 +103,9 @@ void ChangeCalibrationPASelection(void){
     // This ensures the PA selection gets applied to the hardware
     ForceUpdateRFHardwareState();
     Npoints = 0;
+    powerCalibrationStepCount = 0; // Reset step counter when changing PA
     PanePowerData.stale = true;
+    PanePowerInstructions.stale = true;
 }
 
 void RecordPowerDataPoint(void){
@@ -116,6 +119,8 @@ void RecordPowerDataPoint(void){
             else
                 powers_W[Npoints] = pow(10.0f,measuredPower/10.0f)/1000.0f;
             Npoints++;
+            powerCalibrationStepCount++; // Increment step counter
+            PanePowerInstructions.stale = true; // Update instructions display
             // Change the target power by factor of 6 dB
             if (Npoints < 3){
                 if (powerUnit)
@@ -130,7 +135,7 @@ void RecordPowerDataPoint(void){
             break;
         }
         case ModeSm_StateId_CALIBRATE_OFFSET_SPACE:{
-            // The measuredPower is what we're actually reading            
+            // The measuredPower is what we're actually reading
             float32_t factor;
             float32_t powr_W = measuredPower;
             if (powerUnit == 0){
@@ -149,6 +154,8 @@ void RecordPowerDataPoint(void){
                 ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
             else
                 ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
+            powerCalibrationStepCount++; // Increment step counter
+            PanePowerInstructions.stale = true; // Update instructions display
             break;
         }
         default:
@@ -526,6 +533,7 @@ static void DrawPowerTablePane(void){
 /**
  * @brief Render the power calibration instructions pane
  * @note Displays step-by-step calibration procedure
+ * @note Shows green checkmarks for completed steps
  */
 static void DrawPowerInstructionsPane(void){
     if (!PanePowerInstructions.stale) return;
@@ -542,20 +550,41 @@ static void DrawPowerInstructionsPane(void){
     tft.setFontScale((enum RA8875tsize)0);
     int16_t delta = 40;
     int16_t lineD = 20;
-    
+
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("1-Record power level at 0dB atten");
-    
+    if (powerCalibrationStepCount >= 1){
+        tft.setTextColor(RA8875_GREEN);
+        tft.print("\x76"); // Checkmark character
+        tft.setTextColor(RA8875_WHITE);
+        tft.print("-Record power level at 0dB atten");
+    } else {
+        tft.print("1-Record power level at 0dB atten");
+    }
+
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("2-Adjust atten to drop pow by 6dB");
-    
+    if (powerCalibrationStepCount >= 2){
+        tft.setTextColor(RA8875_GREEN);
+        tft.print("\x76"); // Checkmark character
+        tft.setTextColor(RA8875_WHITE);
+        tft.print("-Adjust atten to drop pow by 6dB");
+    } else {
+        tft.print("2-Adjust atten to drop pow by 6dB");
+    }
+
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("3-Adjust atten to drop power by");
+    if (powerCalibrationStepCount >= 3){
+        tft.setTextColor(RA8875_GREEN);
+        tft.print("\x76"); // Checkmark character
+        tft.setTextColor(RA8875_WHITE);
+        tft.print("-Adjust atten to drop power by");
+    } else {
+        tft.print("3-Adjust atten to drop power by");
+    }
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
@@ -563,7 +592,14 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("4-Record measured power");
+    if (powerCalibrationStepCount >= 4){
+        tft.setTextColor(RA8875_GREEN);
+        tft.print("\x76"); // Checkmark character
+        tft.setTextColor(RA8875_WHITE);
+        tft.print("-Record measured power");
+    } else {
+        tft.print("4-Record measured power");
+    }
     
     delta += 2*lineD;
     tft.setCursor(x0, y0+delta);
@@ -647,6 +683,8 @@ void DrawCalibratePower(void){
                 measuredPower = 10*log10(75.0*1000.0);
             targetPower = measuredPower;
         }
+        // Reset calibration step counter on entry
+        powerCalibrationStepCount = 0;
         // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
             PowerWindowPanes[i]->stale = true;
