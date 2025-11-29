@@ -22,6 +22,7 @@ enum TuneState {
 
 ModeSm_StateId GetRFHardwarePreviousState(void);
 void UpdateRFHardwareState(void);
+void ForceUpdateRFHardwareState(void);
 void HandleRFHardwareStateChange(RFHardwareState newState);
 errno_t InitializeRFHardware(void);
 void UpdateTuneState(void);

@@ -975,6 +975,27 @@ void PlayIQData(DataBlock *data){
     Q_out_RMS = tval*Q_out_RMS + (1-tval)*buffer_rms_Q;
 }
 
+float32_t TXgainDSP;
+void TXGain(DataBlock *data){
+    // Apply the gain to the I channel
+    float32_t gain_dB;
+    if (ED.PA100Wactive)
+        gain_dB = ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]];
+    else
+        gain_dB = ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]];
+    bool PAsel;
+    float32_t txGain_dB = CalculateSSBTXGain(ED.powerOutSSB[ED.currentBand[ED.activeVFO]],&PAsel);
+    // ED.PA100Wactive is set by the hardware state machine updates. Just check for consistency
+    if (PAsel != ED.PA100Wactive)
+        Debug("Error! Hardware state machine is inconsistent with DSP chain. (DSP.cpp)");
+    TXgainDSP = gain_dB+txGain_dB;
+    // gain_dB: the band-dependent gain factor needed to get this band to the setpoint
+    // txGain_dB: the gain factor needed to adjust from the setpoint to the 
+    // requested power
+    float32_t amp_factor = powf(10.0f,(TXgainDSP)/20.0);
+    arm_scale_f32(data->I, amp_factor, data->I, data->N);
+}
+
 /**
  * Read a block of samples from the microphone and perform transmit signal processing
  */
@@ -992,6 +1013,7 @@ DataBlock * TransmitProcessing(const char *fname){
     TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
+    TXGain(&data); // apply the DSP gain factor
     arm_copy_f32(data.I,data.Q,256);
     TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
     HilbertTransform(&data,&TXfilters); // 128

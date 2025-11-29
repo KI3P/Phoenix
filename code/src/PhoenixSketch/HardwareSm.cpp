@@ -214,10 +214,20 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             SelectRXMode();
             // Wait for the relay to switch. This takes about 6 ms. Wait a little longer
             MyDelay(20);
-            SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
+            SetTXAttenuation( 31.5 );
             break;
         }
         case RFTransmit:{
+            // We are in SSB mode. The DSP chain uses g to set gain, we can ignore it. Here we
+            // just determine whether to switch in the 100W PA.
+            if (modeSM.state_id != ModeSm_StateId_CALIBRATE_OFFSET_MARK &&
+                modeSM.state_id != ModeSm_StateId_CALIBRATE_TX_IQ_MARK) {
+                // Normal SSB transmit: calculate gain and PA selection
+                CalculateSSBTXGain(ED.powerOutSSB[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+            }
+            // In calibration modes, ED.PA100Wactive is already set correctly
+            // and we don't need to calculate gain
+
             // Get all the receive hardware out of the path
             RXBypassBPF(); // BPF out of RX path
             // Set calFeedbackState to LO
@@ -226,7 +236,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
 
             // Start configuring the transmit chain
             // Set GPB state to appropriate value
-            SetTXAttenuation( ED.XAttenSSB[ED.currentBand[ED.activeVFO]] );
+            SetTXAttenuation( 0 ); // Always 0 in SSB mode. Gain is set in DSP chain.
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
             // Set cwState to LO
@@ -257,11 +267,24 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
         case RFCWMark:{
             // If we come from the RFCWSpace state, we only have to change one thing
             if (oldrfHardwareState != RFCWSpace){
+                float32_t att_dB;
+                if (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) {
+                    // In power calibration mode, use manual attenuation setting
+                    // and don't override PA selection
+                    att_dB = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+                } else {
+                    // Normal operation: calculate attenuation based on power level
+                    att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                }
+
                 RXBypassBPF(); // BPF out of RX path
                 // Set calFeedbackState to LO
                 DisableCalFeedback();
                 // Set GPB state to appropriate value
-                SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
+                if ((att_dB >= 0) && (att_dB < 32))
+                    SetTXAttenuation( att_dB );
+                else
+                    SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
                 // Set clockEnableSSB to LO
                 DisableSSBVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
@@ -293,11 +316,24 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
         case RFCWSpace:{
             // If we come from the RFCWMark state, we only have to change one thing
             if (oldrfHardwareState != RFCWMark){
+                float32_t att_dB;
+                if (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_SPACE) {
+                    // In power calibration mode, use manual attenuation setting
+                    // and don't override PA selection
+                    att_dB = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+                } else {
+                    // Normal operation: calculate attenuation based on power level
+                    att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                }
+
                 RXBypassBPF(); // BPF out of RX path
                 // Set calFeedbackState to LO
                 DisableCalFeedback();
                 // Set GPB state to appropriate value
-                SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
+                if ((att_dB >= 0) && (att_dB < 32))
+                    SetTXAttenuation( att_dB );
+                else
+                    SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
                 // Set clockEnableSSB to LO
                 DisableSSBVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
@@ -453,6 +489,18 @@ void UpdateRFHardwareState(void){
     }
     HandleRFHardwareStateChange(rfHardwareState);
     previousRadioState = modeSM.state_id;
+}
+
+/**
+ * @brief Force an RF hardware state update even if the mode state hasn't changed
+ * @note Used when hardware parameters (like PA selection) change without a mode transition
+ * @note Temporarily resets previousRadioState to force HandleRFHardwareStateChange() to run
+ */
+void ForceUpdateRFHardwareState(void){
+    ModeSm_StateId savedState = previousRadioState;
+    previousRadioState = ModeSm_StateId_ROOT; // Force the update
+    UpdateRFHardwareState();
+    // previousRadioState is set by UpdateRFHardwareState, no need to restore it
 }
 
 // Functions we need to invoke when tuning for calibration

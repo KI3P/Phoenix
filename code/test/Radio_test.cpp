@@ -112,7 +112,7 @@ void CheckThatStateIsSSBTransmit(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)    
-    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[band])); // TX attenuation
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 0); // TX attenuation should always be zero in SSB mode
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     CheckThatHardwareRegisterMatchesActualHardware();
@@ -132,7 +132,10 @@ void CheckThatStateIsCWTransmitMark(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be 1 (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 0); // SSB VFO should be LO (off)
-    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenCW[band])); // TX attenuation (CW mode)
+    // TX attenuation in CW mode is calculated from power setting, not directly from ED.XAttenCW
+    bool PAsel;
+    float32_t expected_atten = CalculateCWAttenuation(ED.powerOutCW[band], &PAsel);
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*expected_atten)); // TX attenuation (CW mode)
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     CheckThatHardwareRegisterMatchesActualHardware();
@@ -152,7 +155,10 @@ void CheckThatStateIsCWTransmitSpace(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on for power reduction)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be 1 (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 0); // SSB VFO should be LO (off)
-    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenCW[band])); // TX attenuation (CW mode)
+    // TX attenuation in CW mode is calculated from power setting, not directly from ED.XAttenCW
+    bool PAsel;
+    float32_t expected_atten = CalculateCWAttenuation(ED.powerOutCW[band], &PAsel);
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*expected_atten)); // TX attenuation (CW mode)
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     CheckThatHardwareRegisterMatchesActualHardware();
@@ -516,7 +522,7 @@ TEST(Radio, RadioStateRunThrough) {
 }
 
 
-// Test that entering TX IQ calibration saves XAttenSSB, and exiting restores them
+// Test that entering TX IQ calibration saves XAttenCW, and exiting restores them
 TEST(Radio, CalibrateTXIQ_SavesAndRestoresAttenuation) {
     // Set up the queues and start the clock
     Q_in_L.setChannel(0);
@@ -552,17 +558,17 @@ TEST(Radio, CalibrateTXIQ_SavesAndRestoresAttenuation) {
     ClearSavedParams();
 
     // Set up known initial values
-    float originalXAttenSSB[NUMBER_OF_BANDS];
+    float originalXAttenCW[NUMBER_OF_BANDS];
 
     for (int i = 0; i < NUMBER_OF_BANDS; i++) {
-        ED.XAttenSSB[i] = (float)(i * 1.5);
-        originalXAttenSSB[i] = ED.XAttenSSB[i];
+        ED.XAttenCW[i] = (float)(i * 1.5);
+        originalXAttenCW[i] = ED.XAttenCW[i];
     }
 
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
 
-    // Enter TX IQ calibration - this should save equalizers and XAttenSSB
+    // Enter TX IQ calibration - this should save equalizers and XAttenCW
     SetInterrupt(iCALIBRATE_TX_IQ);
     loop();
 
@@ -570,15 +576,15 @@ TEST(Radio, CalibrateTXIQ_SavesAndRestoresAttenuation) {
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
 
     // Verify all arrays were saved
-    EXPECT_TRUE(IsArraySaved(0));  // XAttenSSB
+    EXPECT_TRUE(IsArraySaved(0));  // XAttenCW
 
     // Modify values during calibration
     for (int i = 0; i < NUMBER_OF_BANDS; i++) {
-        ED.XAttenSSB[i] = 31.5f;
+        ED.XAttenCW[i] = 31.5f;
     }
 
     // Verify they were changed
-    EXPECT_FLOAT_EQ(ED.XAttenSSB[0], 31.5f);
+    EXPECT_FLOAT_EQ(ED.XAttenCW[0], 31.5f);
 
     // Exit calibration by pressing HOME_SCREEN button
     SetButton(HOME_SCREEN);
@@ -587,7 +593,7 @@ TEST(Radio, CalibrateTXIQ_SavesAndRestoresAttenuation) {
 
     // Verify original values were restored
     for (int i = 0; i < NUMBER_OF_BANDS; i++) {
-        EXPECT_FLOAT_EQ(ED.XAttenSSB[i], originalXAttenSSB[i]) << "XAttenSSB[" << i << "] not restored";
+        EXPECT_FLOAT_EQ(ED.XAttenCW[i], originalXAttenCW[i]) << "XAttenCW[" << i << "] not restored";
     }
 }
 

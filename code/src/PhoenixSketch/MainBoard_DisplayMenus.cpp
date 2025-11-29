@@ -238,11 +238,11 @@ VariableParameter txAttenCW = {
     .limits = {.f32 = {.min = 0.0f, .max=31.5f, .step=0.5f}}
 };
 
-VariableParameter txAttenSSB = {
-    .variable = NULL,
-    .type = TYPE_F32,
-    .limits = {.f32 = {.min = 0.0f, .max=31.5f, .step=0.5f}}
-};
+//VariableParameter txAttenSSB = {
+//    .variable = NULL,
+//    .type = TYPE_F32,
+//    .limits = {.f32 = {.min = 0.0f, .max=31.5f, .step=0.5f}}
+//};
 
 VariableParameter antenna = {
     .variable = NULL,
@@ -256,6 +256,7 @@ VariableParameter antenna = {
  */
 void UpdateRatten(void){
     SetRXAttenuation(*(float32_t *)rxAtten.variable);
+    SetInterrupt(iPOWER_CHANGE);
 }
 
 /**
@@ -263,37 +264,44 @@ void UpdateRatten(void){
  * Called after txAttenCW variable is modified via menu.
  */
 void UpdateTXAttenCW(void){
-    SetTXAttenuation(*(float32_t *)txAttenCW.variable);
-}
-
-/**
- * Post-update callback to apply TX attenuation value for SSB mode.
- * Called after txAttenSSB variable is modified via menu.
- */
-void UpdateTXAttenSSB(void){
-    SetTXAttenuation(*(float32_t *)txAttenSSB.variable);
+    // ED.Xatten[band] was changed. Change the set power so they are consistent
+    float32_t att_dB = *(float32_t *)txAttenCW.variable;
+    float32_t p = CalculateCWPowerLevel(att_dB,ED.PA100Wactive);
+    if ((p >= 0) && (p <= 100*1000)){
+        ED.powerOutCW[ED.currentBand[ED.activeVFO]] = p*1000;
+        Debug("TXAtten "+String(att_dB)+"dB gives power [W]:"+String(p));
+    } else {
+        Debug("Updating TXAtten resulted in invalid power [W]:"+String(p));
+    }
+    SetInterrupt(iPOWER_CHANGE);
 }
 
 void UpdateSSBPower(void){
     float32_t setPower = *(float32_t *)ssbPower.variable;
+    // Gain is calculated by DSP chain... do nothing here
     Debug("SSB set power is " + String(setPower));
-    SetPower(setPower,ModeSm_StateId_SSB_TRANSMIT);
 }
 
 void UpdateCWPower(void){
-    float32_t setPower = *(float32_t *)cwPower.variable;
-    Debug("CW set power is " + String(setPower));
-    SetPower(setPower,ModeSm_StateId_CW_TRANSMIT_MARK);
+    float32_t setPower_W = *(float32_t *)cwPower.variable;
+    bool psel;
+    float32_t att_dB = CalculateCWAttenuation(setPower_W,&psel);
+    if ((att_dB >= 0) && (att_dB < 32)){
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = att_dB;
+        Debug("Power "+String(setPower_W)+"W gives attenuation [dB]:"+String(att_dB));
+    } else {
+        Debug("Updating power resulted in invalid atten [dB]:"+String(att_dB));
+    }
+    SetInterrupt(iPOWER_CHANGE);
 }
 
-struct SecondaryMenuOption RFSet[7] = {
-    "SSB Power", variableOption, &ssbPower, NULL, (void *)UpdateSSBPower,
-    "CW Power", variableOption, &cwPower, NULL, (void *)UpdateCWPower,
-    "Gain",variableOption, &gain, NULL, NULL,
+struct SecondaryMenuOption RFSet[6] = {
+    "TX SSB Power", variableOption, &ssbPower, NULL, (void *)UpdateSSBPower,
+    "TX CW Power", variableOption, &cwPower, NULL, (void *)UpdateCWPower,
     "RX Attenuation",variableOption, &rxAtten, NULL, (void *)UpdateRatten,
-    "TX Attenuation (CW)",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
-    "TX Attenuation (SSB)",variableOption, &txAttenSSB, NULL, (void *)UpdateTXAttenSSB,
     "Antenna",variableOption, &antenna, NULL, (void *)UpdateTuneState,
+    "[__RX DSP Gain]",variableOption, &gain, NULL, NULL,
+    "[__TX Attenuation(CW)]",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
 };
 
 // CW Options menu
@@ -572,7 +580,7 @@ void UpdateArrayVariables(void){
     cwPower.variable = &ED.powerOutCW[ED.currentBand[ED.activeVFO]];
     rxAtten.variable = &ED.RAtten[ED.currentBand[ED.activeVFO]];
     txAttenCW.variable = &ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-    txAttenSSB.variable = &ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
+    //txAttenSSB.variable = &ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];

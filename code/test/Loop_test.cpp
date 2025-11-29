@@ -645,7 +645,11 @@ TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
     // The sequence should have multiple buffer entries with time gaps
     // RFReceive sequence: CWoff, DisableCWVFOOutput, SetTXAttenuation(31.5), TXBypassBPF,
     // SelectXVTR, Bypass100WPA, **10ms delay**, RXSelectBPF, UpdateTuneState, SetRXAttenuation,
-    // EnableSSBVFOOutput, DisableCalFeedback, **10ms delay**, SelectRXMode, **20ms delay**, SetTXAttenuation
+    // EnableSSBVFOOutput, SelectTXSSBModulation, DisableCalFeedback, **10ms delay**, SelectRXMode, **20ms delay**, SetTXAttenuation(31.5)
+    //
+    // Note: The final SetTXAttenuation(31.5) doesn't create a buffer entry because it's the same
+    // value as the earlier SetTXAttenuation(31.5), so the third 20ms delay is not visible in the buffer.
+    // Therefore we only expect to see 2 delays in the buffer (10ms, 10ms).
 
     // Verify we have multiple buffer entries (should be 10+ hardware operations)
     EXPECT_GE(buffer.count, 10);
@@ -660,11 +664,12 @@ TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
         }
     }
 
-    // Should have 3 delay points in the RFReceive sequence (10ms, 10ms, 20ms)
-    EXPECT_EQ(delay_indices.size(), 3);
+    // Should have 2 delay points visible in the RFReceive sequence (10ms, 10ms)
+    // The third 20ms delay exists but is not visible because no buffer entry follows it
+    EXPECT_EQ(delay_indices.size(), 2);
 
-    // Verify the delays are approximately correct (10ms, 10ms, 20ms)
-    if (delay_indices.size() >= 3) {
+    // Verify the delays are approximately correct (both should be ~10ms)
+    if (delay_indices.size() >= 2) {
         // First delay: 10ms
         uint32_t time_gap = buffer.entries[delay_indices[0]].timestamp - buffer.entries[delay_indices[0]-1].timestamp;
         EXPECT_GE(time_gap, 8000);  // At least 8ms
@@ -674,11 +679,6 @@ TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
         time_gap = buffer.entries[delay_indices[1]].timestamp - buffer.entries[delay_indices[1]-1].timestamp;
         EXPECT_GE(time_gap, 8000);  // At least 8ms
         EXPECT_LE(time_gap, 12000); // At most 12ms
-
-        // Third delay: 20ms
-        time_gap = buffer.entries[delay_indices[2]].timestamp - buffer.entries[delay_indices[2]-1].timestamp;
-        EXPECT_GE(time_gap, 18000); // At least 18ms
-        EXPECT_LE(time_gap, 22000); // At most 22ms
     }
 }
 
@@ -975,18 +975,17 @@ TEST(Loop, HardwareStateMachineDelayOrderingVerification) {
         }
     }
 
-    // Verify we have the expected 3 delays for receive sequence (10ms, 10ms, 20ms)
-    EXPECT_EQ(delay_boundaries.size(), 3);
+    // Verify we have the expected 2 visible delays for receive sequence (10ms, 10ms)
+    // Note: The third 20ms delay exists but is not visible in the buffer because
+    // the final SetTXAttenuation(31.5) doesn't create a buffer entry (same value as earlier)
+    EXPECT_EQ(delay_boundaries.size(), 2);
 
-    if (delay_boundaries.size() >= 3) {
+    if (delay_boundaries.size() >= 2) {
         // First delay should occur after initial power-down operations
         EXPECT_GE(delay_boundaries[0], 5); // At least 5 operations before first delay
 
         // Second delay should occur after receive path setup
         EXPECT_GT(delay_boundaries[1], delay_boundaries[0] + 3); // At least 3 ops between delays
-
-        // Third delay should occur before final TX attenuation setting
-        EXPECT_GE(delay_boundaries[2], delay_boundaries[1] + 1); // At least 1 op between delays
     }
 }
 

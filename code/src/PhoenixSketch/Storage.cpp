@@ -87,7 +87,6 @@ void SaveDataToStorage(bool savetosd){
         doc["IQXAmpCorrectionFactor"][i] = ED.IQXAmpCorrectionFactor[i];
         doc["IQXPhaseCorrectionFactor"][i] = ED.IQXPhaseCorrectionFactor[i];
         doc["XAttenCW"][i] = ED.XAttenCW[i];
-        doc["XAttenSSB"][i] = ED.XAttenSSB[i];
         doc["RAtten"][i] = ED.RAtten[i];
         doc["antennaSelection"][i] = ED.antennaSelection[i];
         doc["SWR_F_SlopeAdj"][i] = ED.SWR_F_SlopeAdj[i];
@@ -108,10 +107,10 @@ void SaveDataToStorage(bool savetosd){
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         doc["PowerCal_20W_Psat_mW"][i] = ED.PowerCal_20W_Psat_mW[i];
         doc["PowerCal_20W_kindex"][i] = ED.PowerCal_20W_kindex[i];
-        doc["PowerCal_20W_att_offset_dB"][i] = ED.PowerCal_20W_att_offset_dB[i];
         doc["PowerCal_100W_Psat_mW"][i] = ED.PowerCal_100W_Psat_mW[i];
         doc["PowerCal_100W_kindex"][i] = ED.PowerCal_100W_kindex[i];
-        doc["PowerCal_100W_att_offset_dB"][i] = ED.PowerCal_100W_att_offset_dB[i];
+        doc["PowerCal_20W_DSP_Gain_correction_dB"][i] = ED.PowerCal_20W_DSP_Gain_correction_dB[i];
+        doc["PowerCal_100W_DSP_Gain_correction_dB"][i] = ED.PowerCal_100W_DSP_Gain_correction_dB[i];
     }
 
     doc["PowerCal_20W_to_100W_threshold_W"] = ED.PowerCal_20W_to_100W_threshold_W;
@@ -340,11 +339,6 @@ void RestoreDataFromStorage(void){
             ED.XAttenCW[i] = doc["XAttenCW"][i] | ED.XAttenCW[i];
         }
     }
-    if (doc["XAttenSSB"].is<JsonArray>()) {
-        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-            ED.XAttenSSB[i] = doc["XAttenSSB"][i] | ED.XAttenSSB[i];
-        }
-    }
     if (doc["RAtten"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.RAtten[i] = doc["RAtten"][i] | ED.RAtten[i];
@@ -401,11 +395,6 @@ void RestoreDataFromStorage(void){
             ED.PowerCal_20W_kindex[i] = doc["PowerCal_20W_kindex"][i] | ED.PowerCal_20W_kindex[i];
         }
     }
-    if (doc["PowerCal_20W_att_offset_dB"].is<JsonArray>()) {
-        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-            ED.PowerCal_20W_att_offset_dB[i] = doc["PowerCal_20W_att_offset_dB"][i] | ED.PowerCal_20W_att_offset_dB[i];
-        }
-    }
     if (doc["PowerCal_100W_Psat_mW"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.PowerCal_100W_Psat_mW[i] = doc["PowerCal_100W_Psat_mW"][i] | ED.PowerCal_100W_Psat_mW[i];
@@ -416,9 +405,14 @@ void RestoreDataFromStorage(void){
             ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
         }
     }
-    if (doc["PowerCal_100W_att_offset_dB"].is<JsonArray>()) {
+    if (doc["PowerCal_20W_DSP_Gain_correction_dB"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-            ED.PowerCal_100W_att_offset_dB[i] = doc["PowerCal_100W_att_offset_dB"][i] | ED.PowerCal_100W_att_offset_dB[i];
+            ED.PowerCal_20W_DSP_Gain_correction_dB[i] = doc["PowerCal_20W_DSP_Gain_correction_dB"][i] | ED.PowerCal_20W_DSP_Gain_correction_dB[i];
+        }
+    }
+    if (doc["PowerCal_100W_DSP_Gain_correction_dB"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_DSP_Gain_correction_dB[i] = doc["PowerCal_100W_DSP_Gain_correction_dB"][i] | ED.PowerCal_100W_DSP_Gain_correction_dB[i];
         }
     }
 
@@ -560,11 +554,6 @@ void RestoreDataFromSDCard(void){
             ED.XAttenCW[i] = doc["XAttenCW"][i] | ED.XAttenCW[i];
         }
     }
-    if (doc["XAttenSSB"].is<JsonArray>()) {
-        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-            ED.XAttenSSB[i] = doc["XAttenSSB"][i] | ED.XAttenSSB[i];
-        }
-    }
     if (doc["RAtten"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.RAtten[i] = doc["RAtten"][i] | ED.RAtten[i];
@@ -621,11 +610,6 @@ void RestoreDataFromSDCard(void){
             ED.PowerCal_20W_kindex[i] = doc["PowerCal_20W_kindex"][i] | ED.PowerCal_20W_kindex[i];
         }
     }
-    if (doc["PowerCal_20W_att_offset_dB"].is<JsonArray>()) {
-        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-            ED.PowerCal_20W_att_offset_dB[i] = doc["PowerCal_20W_att_offset_dB"][i] | ED.PowerCal_20W_att_offset_dB[i];
-        }
-    }
     if (doc["PowerCal_100W_Psat_mW"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.PowerCal_100W_Psat_mW[i] = doc["PowerCal_100W_Psat_mW"][i] | ED.PowerCal_100W_Psat_mW[i];
@@ -636,9 +620,14 @@ void RestoreDataFromSDCard(void){
             ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
         }
     }
-    if (doc["PowerCal_100W_att_offset_dB"].is<JsonArray>()) {
+    if (doc["PowerCal_20W_DSP_Gain_correction_dB"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-            ED.PowerCal_100W_att_offset_dB[i] = doc["PowerCal_100W_att_offset_dB"][i] | ED.PowerCal_100W_att_offset_dB[i];
+            ED.PowerCal_20W_DSP_Gain_correction_dB[i] = doc["PowerCal_20W_DSP_Gain_correction_dB"][i] | ED.PowerCal_20W_DSP_Gain_correction_dB[i];
+        }
+    }
+    if (doc["PowerCal_100W_DSP_Gain_correction_dB"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_DSP_Gain_correction_dB[i] = doc["PowerCal_100W_DSP_Gain_correction_dB"][i] | ED.PowerCal_100W_DSP_Gain_correction_dB[i];
         }
     }
 
@@ -736,13 +725,6 @@ void PrintEDToSerial(void){
     }
     Serial.println();
 
-    Serial.print("XAttenSSB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.XAttenSSB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
     Serial.print("IQAmpCorrectionFactor: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         sprintf(buff,"%4.3f",ED.IQAmpCorrectionFactor[i]);
@@ -804,13 +786,6 @@ void PrintEDToSerial(void){
     }
     Serial.println();
 
-    Serial.print("PowerCal_20W_att_offset_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_att_offset_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
     Serial.print("PowerCal_100W_Psat_mW: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.PowerCal_100W_Psat_mW[i]);
@@ -825,9 +800,16 @@ void PrintEDToSerial(void){
     }
     Serial.println();
 
-    Serial.print("PowerCal_100W_att_offset_dB: ");
+    Serial.print("PowerCal_20W_DSP_Gain_correction_dB: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_att_offset_dB[i]);
+        Serial.print(ED.PowerCal_20W_DSP_Gain_correction_dB[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("PowerCal_100W_DSP_Gain_correction_dB: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.PowerCal_100W_DSP_Gain_correction_dB[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();

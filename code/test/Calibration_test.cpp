@@ -15,7 +15,6 @@
 // External declarations for power calibration internal state
 // These are static variables in MainBoard_DisplayCalibration.cpp
 extern float32_t measuredPower;
-extern uint8_t PAselect;
 extern uint32_t Npoints;
 extern uint8_t incindexPower;
 extern float32_t attenuations_dB[3];
@@ -367,7 +366,7 @@ TEST_F(CalibrationTest, PowerCalibrationStateTransitions) {
 
 /**
  * Test volume encoder changes transmit attenuation in power calibration
- * The volume encoder controls ED.XAttenSSB[currentBand] with 0.5 dB steps
+ * The volume encoder controls ED.XAttenCW[currentBand] with 0.5 dB steps
  */
 TEST_F(CalibrationTest, VolumeEncoderChangesTransmitAttInPowerCal) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
@@ -386,7 +385,7 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTransmitAttInPowerCal) {
 
     // Get the current band and store initial transmit attenuation value
     int32_t currentBand = ED.currentBand[ED.activeVFO];
-    float32_t initialAtten = ED.XAttenSSB[currentBand];
+    float32_t initialAtten = ED.XAttenCW[currentBand];
 
     // Expected increment value (0.5 dB for transmit attenuation)
     const float32_t expectedIncrement = 0.5;
@@ -395,14 +394,14 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTransmitAttInPowerCal) {
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
 
-    float32_t attenAfterIncrease = ED.XAttenSSB[currentBand];
+    float32_t attenAfterIncrease = ED.XAttenCW[currentBand];
     EXPECT_NEAR(attenAfterIncrease, initialAtten + expectedIncrement, 0.00001);
 
     // Test decrementing the transmit attenuation by rotating volume encoder counter-clockwise
     SetInterrupt(iVOLUME_DECREASE);
     loop(); MyDelay(10);
 
-    float32_t attenAfterDecrease = ED.XAttenSSB[currentBand];
+    float32_t attenAfterDecrease = ED.XAttenCW[currentBand];
     EXPECT_NEAR(attenAfterDecrease, initialAtten, 0.00001);
 
     // Test multiple increments
@@ -411,7 +410,7 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTransmitAttInPowerCal) {
         loop(); MyDelay(10);
     }
 
-    float32_t attenAfterMultipleIncrements = ED.XAttenSSB[currentBand];
+    float32_t attenAfterMultipleIncrements = ED.XAttenCW[currentBand];
     EXPECT_NEAR(attenAfterMultipleIncrements, initialAtten + 5 * expectedIncrement, 0.00001);
 
     // Test multiple decrements
@@ -420,30 +419,30 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTransmitAttInPowerCal) {
         loop(); MyDelay(10);
     }
 
-    float32_t attenAfterMultipleDecrements = ED.XAttenSSB[currentBand];
+    float32_t attenAfterMultipleDecrements = ED.XAttenCW[currentBand];
     EXPECT_NEAR(attenAfterMultipleDecrements, initialAtten, 0.00001);
 
     // Test upper limit (max value is 31.5)
-    ED.XAttenSSB[currentBand] = 31.0;
+    ED.XAttenCW[currentBand] = 31.0;
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 31.5, 0.00001);
+    EXPECT_NEAR(ED.XAttenCW[currentBand], 31.5, 0.00001);
 
     // Try to increment beyond max - should be clamped at 31.5
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 31.5, 0.00001);
+    EXPECT_NEAR(ED.XAttenCW[currentBand], 31.5, 0.00001);
 
     // Test lower limit (min value is 0.0)
-    ED.XAttenSSB[currentBand] = 0.5;
+    ED.XAttenCW[currentBand] = 0.5;
     SetInterrupt(iVOLUME_DECREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 0.0, 0.00001);
+    EXPECT_NEAR(ED.XAttenCW[currentBand], 0.0, 0.00001);
 
     // Try to decrement beyond min - should be clamped at 0.0
     SetInterrupt(iVOLUME_DECREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 0.0, 0.00001);
+    EXPECT_NEAR(ED.XAttenCW[currentBand], 0.0, 0.00001);
 
     // Exit back to home screen
     SetButton(HOME_SCREEN);
@@ -611,8 +610,8 @@ TEST_F(CalibrationTest, Button16ChangesPASelectionInPowerCal) {
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
 
     // Initial PA selection should be PA20W (0)
-    uint8_t initialPAsel = PAselect;
-    EXPECT_EQ(initialPAsel, 0); // PA20W
+    bool initialPAsel = ED.PA100Wactive;
+    EXPECT_EQ(initialPAsel, false); // PA20W
 
     // Press button 16 to change PA selection
     SetButton(16);
@@ -620,7 +619,7 @@ TEST_F(CalibrationTest, Button16ChangesPASelectionInPowerCal) {
     loop(); MyDelay(10);
 
     // Should switch to PA100W (1)
-    EXPECT_EQ(PAselect, 1); // PA100W
+    EXPECT_EQ(ED.PA100Wactive, true); // PA100W
 
     // Press button 16 again to toggle back
     SetButton(16);
@@ -628,7 +627,7 @@ TEST_F(CalibrationTest, Button16ChangesPASelectionInPowerCal) {
     loop(); MyDelay(10);
 
     // Should switch back to PA20W (0)
-    EXPECT_EQ(PAselect, 0); // PA20W
+    EXPECT_EQ(ED.PA100Wactive, false); // PA20W
 
     // Exit back to home screen
     SetButton(HOME_SCREEN);
@@ -663,7 +662,7 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
 
     // Set some known values for attenuation and power
     int32_t currentBand = ED.currentBand[ED.activeVFO];
-    ED.XAttenSSB[currentBand] = 10.5;
+    ED.XAttenCW[currentBand] = 10.5;
     measuredPower = 25.3;
 
     // Record first data point
@@ -677,7 +676,7 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     EXPECT_NEAR(powers_W[0], 25.3, 0.00001);
 
     // Change values and record second data point
-    ED.XAttenSSB[currentBand] = 15.0;
+    ED.XAttenCW[currentBand] = 15.0;
     measuredPower = 50.7;
 
     SetButton(MENU_OPTION_SELECT);
@@ -690,7 +689,7 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     EXPECT_NEAR(powers_W[1], 50.7, 0.00001);
 
     // Record third data point
-    ED.XAttenSSB[currentBand] = 20.0;
+    ED.XAttenCW[currentBand] = 20.0;
     measuredPower = 75.2;
 
     SetButton(MENU_OPTION_SELECT);
@@ -715,7 +714,7 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Recording another data point should record at index 0 and set Npoints to 1
-    ED.XAttenSSB[currentBand] = 5.0;
+    ED.XAttenCW[currentBand] = 5.0;
     measuredPower = 10.1;
 
     SetButton(MENU_OPTION_SELECT);
@@ -820,23 +819,23 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Reset state from any previous tests
-    PAselect = 0; // PA20W
+    ED.PA100Wactive = false; // PA20W
     Npoints = 0;  // Start with empty buffer
 
     // Load the data points into the data buffer
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 3.0;
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 3.0;
     measuredPower = 14.79108388;
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 16.5;
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 16.5;
     measuredPower = 5.2480746;
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 24.0;
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 24.0;
     measuredPower = 1.04712855;
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
@@ -890,23 +889,23 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
 
     // Reset state from any previous tests
-    PAselect = 1; // PA100W
+    ED.PA100Wactive = true; // PA100W
     Npoints = 0;  // Start with empty buffer
 
     // Load the data points into the data buffer
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 3.0;
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 3.0;
     measuredPower = 77.62471166;
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 16.5;
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 16.5;
     measuredPower = 27.54228703;
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 24.0;
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 24.0;
     measuredPower = 5.49540874;
     SetButton(MENU_OPTION_SELECT);
     SetInterrupt(iBUTTON_PRESSED);
@@ -998,7 +997,7 @@ void CheckThatStateIsCalTransmitIQ(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[ED.currentBand[ED.activeVFO]]));  // RX attenuation
-    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*ED.XAttenSSB[ED.currentBand[ED.activeVFO]]));  // TX attenuation
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 0);  // TX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     // Now check that the GPIO registers match the hardware register
     CheckThatHardwareRegisterMatchesActualHardware();
@@ -1029,6 +1028,9 @@ void CheckThatRegisterStateIsReceive(){
 
 TEST_F(CalibrationTest, CalibrateTransmitIQState) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    // Reset PA selection to ensure test isolation
+    ED.PA100Wactive = false;
 
     Serial.println("1-Entering TX IQ space state");
 
@@ -1256,7 +1258,7 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTXIQAmp) {
 
 TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-
+    extern float32_t attLevel;
     // Navigate to the Transmit IQ calibration state
     ScrollAndSelectCalibrateTransmitIQ();
 
@@ -1271,7 +1273,7 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
 
     // Get the current band and store initial XAttenSSB value
     int32_t currentBand = ED.currentBand[ED.activeVFO];
-    float32_t initialAtten = ED.XAttenSSB[currentBand];
+    float32_t initialAtten = attLevel;
 
     // Expected increment value (0.5 for transmit attenuation)
     const float32_t expectedIncrement = 0.5;
@@ -1280,14 +1282,15 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     SetInterrupt(iFINETUNE_INCREASE);
     loop(); MyDelay(10);
 
-    float32_t attenAfterIncrease = ED.XAttenSSB[currentBand];
+    float32_t attenAfterIncrease = attLevel;
     EXPECT_NEAR(attenAfterIncrease, initialAtten + expectedIncrement, 0.00001);
+    EXPECT_NEAR(attLevel,GetTXAttenuation(),0.51);
 
     // Test decrementing the transmit attenuation by rotating finetune encoder counter-clockwise
     SetInterrupt(iFINETUNE_DECREASE);
     loop(); MyDelay(10);
 
-    float32_t attenAfterDecrease = ED.XAttenSSB[currentBand];
+    float32_t attenAfterDecrease = attLevel;
     EXPECT_NEAR(attenAfterDecrease, initialAtten, 0.00001);
 
     // Test multiple increments
@@ -1296,7 +1299,7 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
         loop(); MyDelay(10);
     }
 
-    float32_t attenAfterMultipleIncrements = ED.XAttenSSB[currentBand];
+    float32_t attenAfterMultipleIncrements = attLevel;
     EXPECT_NEAR(attenAfterMultipleIncrements, initialAtten + 5 * expectedIncrement, 0.00001);
 
     // Test multiple decrements
@@ -1305,32 +1308,34 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
         loop(); MyDelay(10);
     }
 
-    float32_t attenAfterMultipleDecrements = ED.XAttenSSB[currentBand];
+    float32_t attenAfterMultipleDecrements = attLevel;
     EXPECT_NEAR(attenAfterMultipleDecrements, initialAtten, 0.00001);
+    EXPECT_NEAR(attLevel,GetTXAttenuation(),0.51);
 
     // Test upper limit (max value is 31.5)
     // Set to a value close to max
-    ED.XAttenSSB[currentBand] = 31.0;
+    attLevel = 31.0;
     SetInterrupt(iFINETUNE_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 31.5, 0.00001);
+    EXPECT_NEAR(attLevel, 31.5, 0.00001);
 
     // Try to increment beyond max - should be clamped at 31.5
     SetInterrupt(iFINETUNE_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 31.5, 0.00001);
+    EXPECT_NEAR(attLevel, 31.5, 0.00001);
 
     // Test lower limit (min value is 0.0)
     // Set to a value close to min
-    ED.XAttenSSB[currentBand] = 0.5;
+    attLevel = 0.5;
     SetInterrupt(iFINETUNE_DECREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 0.0, 0.00001);
+    EXPECT_NEAR(attLevel, 0.0, 0.00001);
 
     // Try to decrement beyond min - should be clamped at 0.0
     SetInterrupt(iFINETUNE_DECREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.XAttenSSB[currentBand], 0.0, 0.00001);
+    EXPECT_NEAR(attLevel, 0.0, 0.00001);
+    EXPECT_NEAR(attLevel,GetTXAttenuation(),0.51);
 
     // Exit back to home screen
     SetButton(HOME_SCREEN);
@@ -1359,732 +1364,3 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
         loop(); MyDelay(10);
     }
 }*/
-
-/**
- * Test fixture for Power Calibration function tests
- * These tests verify the mathematical correctness of PredictPowerLevel and CalculateAttenuation
- */
-class PowerCalibrationTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        // Initialize minimal environment for power calculation tests
-        InitializeStorage();
-
-        // Set known calibration values for testing
-        // Using default values from SDT.h for 20W PA
-        ED.PowerCal_20W_Psat_mW[BAND_20M] = 14680.0f;
-        ED.PowerCal_20W_kindex[BAND_20M] = 16.2f;
-        ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
-
-        // Default values for 100W PA
-        ED.PowerCal_100W_Psat_mW[BAND_20M] = 86000.0f;
-        ED.PowerCal_100W_kindex[BAND_20M] = 10.0f;
-        ED.PowerCal_100W_att_offset_dB[BAND_20M] = 0.0f;
-
-        // Threshold for PA selection
-        ED.PowerCal_20W_to_100W_threshold_W = 10.0f;
-
-        // Set active band to 20M for testing
-        ED.currentBand[ED.activeVFO] = BAND_20M;
-    }
-};
-
-/**
- * Test PredictPowerLevel returns zero for negative attenuation
- */
-TEST_F(PowerCalibrationTest, PredictPowerLevel_RejectsNegativeAttenuation) {
-    float32_t power = PredictPowerLevel(-1.0f, 0, 0);
-    EXPECT_EQ(power, 0.0f);
-}
-
-/**
- * Test PredictPowerLevel returns zero for out-of-range attenuation
- */
-TEST_F(PowerCalibrationTest, PredictPowerLevel_RejectsExcessiveAttenuation) {
-    float32_t power = PredictPowerLevel(32.0f, 0, 0);
-    EXPECT_EQ(power, 0.0f);
-}
-
-/**
- * Test PredictPowerLevel with zero attenuation approaches saturation power
- */
-TEST_F(PowerCalibrationTest, PredictPowerLevel_ZeroAttenuation_20W_CW) {
-    // With zero attenuation, output should approach Psat
-    float32_t power = PredictPowerLevel(0.0f, 0, 0);
-    // At zero attenuation: tanh(k) = tanh(16.2) ≈ 1.0
-    EXPECT_NEAR(power, ED.PowerCal_20W_Psat_mW[BAND_20M], 1.0f);
-}
-
-/**
- * Test PredictPowerLevel with maximum attenuation gives very low power
- */
-TEST_F(PowerCalibrationTest, PredictPowerLevel_MaxAttenuation_20W_CW) {
-    // With maximum attenuation (31.5 dB), output should be very small
-    float32_t power = PredictPowerLevel(31.5f, 0, 0);
-    // At 31.5 dB attenuation, power should be much less than 1W (1000 mW)
-    EXPECT_LT(power, 1000.0f);
-}
-
-/**
- * Test PredictPowerLevel for 100W PA
- */
-TEST_F(PowerCalibrationTest, PredictPowerLevel_ZeroAttenuation_100W_CW) {
-    float32_t power = PredictPowerLevel(0.0f, 1, 0);
-    // At zero attenuation: tanh(k) = tanh(10.0) ≈ 1.0
-    EXPECT_NEAR(power, ED.PowerCal_100W_Psat_mW[BAND_20M], 1.0f);
-}
-
-/**
- * Test PredictPowerLevel SSB mode applies offset
- */
-TEST_F(PowerCalibrationTest, PredictPowerLevel_SSB_AppliesOffset) {
-    // Set a non-zero offset for SSB mode
-    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 3.0f;
-
-    // Get power for CW (no offset)
-    float32_t powerCW = PredictPowerLevel(10.0f, 0, 0);
-
-    // Get power for SSB (with offset)
-    float32_t powerSSB = PredictPowerLevel(10.0f, 0, 1);
-
-    // SSB should have lower power due to the 3dB offset (effective attenuation is higher)
-    // The offset represents how much less attenuation is needed in SSB mode
-    EXPECT_LT(powerSSB, powerCW);
-
-    // Reset offset
-    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
-}
-
-/**
- * Test CalculateAttenuation returns zero for negative power
- */
-TEST_F(PowerCalibrationTest, CalculateAttenuation_RejectsNegativePower) {
-    int8_t PAsel = 0;
-    float32_t atten = CalculateAttenuation(-1.0f, 0, &PAsel);
-    EXPECT_EQ(atten, 0.0f);
-}
-
-/**
- * Test CalculateAttenuation returns zero for excessive power
- */
-TEST_F(PowerCalibrationTest, CalculateAttenuation_RejectsExcessivePower) {
-    int8_t PAsel = 0;
-    float32_t atten = CalculateAttenuation(101.0f, 0, &PAsel);
-    EXPECT_EQ(atten, 0.0f);
-}
-
-/**
- * Test CalculateAttenuation selects correct PA for low power
- */
-TEST_F(PowerCalibrationTest, CalculateAttenuation_SelectsLowPA_ForLowPower) {
-    int8_t PAsel = 0;
-    CalculateAttenuation(5.0f, 0, &PAsel);
-    EXPECT_EQ(PAsel, 0);  // Should select 20W PA for 5W
-}
-
-/**
- * Test CalculateAttenuation selects correct PA for high power
- */
-TEST_F(PowerCalibrationTest, CalculateAttenuation_SelectsHighPA_ForHighPower) {
-    int8_t PAsel = 0;
-    CalculateAttenuation(15.0f, 0, &PAsel);
-    EXPECT_EQ(PAsel, 1);  // Should select 100W PA for 15W
-}
-
-/**
- * Test CalculateAttenuation at threshold power
- */
-TEST_F(PowerCalibrationTest, CalculateAttenuation_ThresholdPower_SelectsHighPA) {
-    int8_t PAsel = 0;
-    CalculateAttenuation(10.0f, 0, &PAsel);
-    EXPECT_EQ(PAsel, 1);  // Should select 100W PA at exactly 10W threshold
-}
-
-/**
- * Test that PredictPowerLevel and CalculateAttenuation are inverses (20W PA, CW)
- * Note: Only test attenuations that result in power below the PA selection threshold
- */
-TEST_F(PowerCalibrationTest, InverseFunctions_20W_CW) {
-    // Test attenuation values that keep power below 10W threshold
-    // Higher attenuations to avoid PA auto-selection issues
-    float32_t test_attenuations[] = {15.0f, 20.0f, 25.0f, 31.5f};
-
-    for (float32_t atten : test_attenuations) {
-        // Predict power from attenuation
-        float32_t power_mW = PredictPowerLevel(atten, 0, 0);
-        float32_t power_W = power_mW / 1000.0f;
-
-        // Calculate attenuation from power
-        int8_t PAsel = 0;
-        float32_t calculated_atten = CalculateAttenuation(power_W, 0, &PAsel);
-
-        // Should get back the original attenuation (within tolerance)
-        // Use larger tolerance for numerical precision issues
-        EXPECT_NEAR(calculated_atten, atten, 0.1f)
-            << "Failed for attenuation=" << atten
-            << ", power=" << power_W << "W";
-
-        // Should select the correct PA
-        EXPECT_EQ(PAsel, 0) << "Wrong PA selected for " << power_W << "W";
-    }
-}
-
-/**
- * Test that PredictPowerLevel and CalculateAttenuation are inverses (100W PA, CW)
- * Note: Only test attenuations that result in power above the PA selection threshold
- */
-TEST_F(PowerCalibrationTest, InverseFunctions_100W_CW) {
-    // Test attenuation values that result in power above 10W threshold
-    // so PA auto-selection picks 100W PA
-    float32_t test_attenuations[] = {5.0f, 10.0f, 15.0f};
-
-    for (float32_t atten : test_attenuations) {
-        // Predict power from attenuation
-        float32_t power_mW = PredictPowerLevel(atten, 1, 0);
-        float32_t power_W = power_mW / 1000.0f;
-
-        // Calculate attenuation from power
-        int8_t PAsel = 0;
-        float32_t calculated_atten = CalculateAttenuation(power_W, 0, &PAsel);
-
-        // Should get back the original attenuation (within tolerance)
-        // Use larger tolerance for numerical precision issues
-        EXPECT_NEAR(calculated_atten, atten, 0.1f)
-            << "Failed for attenuation=" << atten
-            << ", power=" << power_W << "W";
-
-        // For high power outputs, should select 100W PA
-        if (power_W >= ED.PowerCal_20W_to_100W_threshold_W) {
-            EXPECT_EQ(PAsel, 1) << "Wrong PA selected for " << power_W << "W";
-        }
-    }
-}
-
-/**
- * Test that PredictPowerLevel and CalculateAttenuation are inverses (SSB mode)
- * Note: Use higher attenuations to keep power below PA selection threshold
- */
-TEST_F(PowerCalibrationTest, InverseFunctions_20W_SSB) {
-    // Set a non-zero offset for SSB
-    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 2.5f;
-
-    // Test attenuation values that keep power below 10W threshold
-    // Higher attenuations to avoid PA auto-selection issues
-    float32_t test_attenuations[] = {15.0f, 20.0f, 25.0f};
-
-    for (float32_t atten : test_attenuations) {
-        // Predict power from attenuation (SSB mode)
-        float32_t power_mW = PredictPowerLevel(atten, 0, 1);
-        float32_t power_W = power_mW / 1000.0f;
-
-        // Calculate attenuation from power (SSB mode)
-        int8_t PAsel = 0;
-        float32_t calculated_atten = CalculateAttenuation(power_W, 1, &PAsel);
-
-        // Should get back the original attenuation (within tolerance)
-        // Use larger tolerance for numerical precision issues
-        EXPECT_NEAR(calculated_atten, atten, 0.1f)
-            << "Failed for attenuation=" << atten
-            << ", power=" << power_W << "W";
-    }
-
-    // Reset offset
-    ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
-}
-
-/**
- * Test power prediction for realistic operating scenarios
- */
-TEST_F(PowerCalibrationTest, RealisticOperatingScenarios) {
-    // Scenario 1: Low power QRP operation (5W)
-    int8_t PAsel = 0;
-    float32_t atten_5W = CalculateAttenuation(5.0f, 0, &PAsel);
-    float32_t power_5W = PredictPowerLevel(atten_5W, PAsel, 0);
-    EXPECT_NEAR(power_5W / 1000.0f, 5.0f, 0.05f);
-    EXPECT_EQ(PAsel, 0);  // Should use 20W PA
-
-    // Scenario 2: Medium power operation (50W)
-    PAsel = 0;
-    float32_t atten_50W = CalculateAttenuation(50.0f, 0, &PAsel);
-    float32_t power_50W = PredictPowerLevel(atten_50W, PAsel, 0);
-    EXPECT_NEAR(power_50W / 1000.0f, 50.0f, 0.5f);
-    EXPECT_EQ(PAsel, 1);  // Should use 100W PA
-
-    // Scenario 3: High power operation (100W)
-    PAsel = 0;
-    float32_t atten_100W = CalculateAttenuation(80.0f, 0, &PAsel);
-    float32_t power_100W = PredictPowerLevel(atten_100W, PAsel, 0);
-    EXPECT_NEAR(power_100W / 1000.0f, 80.0f, 0.8f);
-    EXPECT_EQ(PAsel, 1);  // Should use 100W PA
-}
-
-/**
- * Test that higher attenuation always produces lower power
- */
-TEST_F(PowerCalibrationTest, MonotonicBehavior) {
-    float32_t power_0dB = PredictPowerLevel(0.0f, 0, 0);
-    float32_t power_10dB = PredictPowerLevel(10.0f, 0, 0);
-    float32_t power_20dB = PredictPowerLevel(20.0f, 0, 0);
-    float32_t power_31_5dB = PredictPowerLevel(31.5f, 0, 0);
-
-    // Power should decrease monotonically with increasing attenuation
-    EXPECT_GT(power_0dB, power_10dB);
-    EXPECT_GT(power_10dB, power_20dB);
-    EXPECT_GT(power_20dB, power_31_5dB);
-}
-
-/**
- * Test fixture for SetPower function tests
- * These tests verify the menu callback and hardware integration
- */
-class SetPowerTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        // Initialize minimal environment for SetPower tests
-        InitializeStorage();
-        InitializeFrontPanel();
-        InitializeRFHardware();
-
-        // Start the mode state machines
-        ModeSm_start(&modeSM);
-        UISm_start(&uiSM);
-
-        // Set known calibration values for testing
-        ED.PowerCal_20W_Psat_mW[BAND_20M] = 14680.0f;
-        ED.PowerCal_20W_kindex[BAND_20M] = 16.2f;
-        ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
-
-        ED.PowerCal_100W_Psat_mW[BAND_20M] = 86000.0f;
-        ED.PowerCal_100W_kindex[BAND_20M] = 10.0f;
-        ED.PowerCal_100W_att_offset_dB[BAND_20M] = 0.0f;
-
-        ED.PowerCal_20W_to_100W_threshold_W = 10.0f;
-
-        // Set active band to 20M for testing
-        ED.currentBand[ED.activeVFO] = BAND_20M;
-
-        // Clear any pending interrupts
-        ConsumeInterrupt();
-    }
-
-    void TearDown() override {
-        // Clean up after each test
-        ConsumeInterrupt();
-    }
-};
-
-/**
- * Test SetPower correctly sets attenuation for low power (20W PA) in SSB mode
- */
-TEST_F(SetPowerTest, SetPower_LowPower_SSB) {
-    // Set mode to SSB receive
-    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-
-    // Set a low power that should use the 20W PA
-    float32_t target_power = 5.0f;  // 5 watts
-
-    // Call SetPower
-    SetPower(target_power,ModeSm_StateId_SSB_TRANSMIT);
-
-    // Verify that PA100Wactive is false (should use 20W PA)
-    EXPECT_FALSE(ED.PA100Wactive);
-
-    // Verify that XAttenSSB was set for the current band
-    float32_t atten_set = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-
-    // Attenuation should be within valid range
-    EXPECT_GE(atten_set, 0.0f);
-    EXPECT_LE(atten_set, 31.5f);
-
-    // Verify that the power change interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-
-    // Verify that the attenuation produces approximately the target power
-    int8_t PAsel = 0;
-    float32_t predicted_power_mW = PredictPowerLevel(atten_set, PAsel, 1); // SSB mode
-    float32_t predicted_power_W = predicted_power_mW / 1000.0f;
-    EXPECT_NEAR(predicted_power_W, target_power, 0.1f);
-}
-
-/**
- * Test SetPower correctly sets attenuation for high power (100W PA) in SSB mode
- */
-TEST_F(SetPowerTest, SetPower_HighPower_SSB) {
-    // Set mode to SSB receive
-    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-
-    // Set a high power that should use the 100W PA
-    float32_t target_power = 50.0f;  // 50 watts
-
-    // Call SetPower
-    SetPower(target_power,ModeSm_StateId_SSB_TRANSMIT);
-
-    // Verify that PA100Wactive is true (should use 100W PA)
-    EXPECT_TRUE(ED.PA100Wactive);
-
-    // Verify that XAttenSSB was set for the current band
-    float32_t atten_set = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-
-    // Attenuation should be within valid range
-    EXPECT_GE(atten_set, 0.0f);
-    EXPECT_LE(atten_set, 31.5f);
-
-    // Verify that the power change interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-
-    // Verify that the attenuation produces approximately the target power
-    int8_t PAsel = 1;
-    float32_t predicted_power_mW = PredictPowerLevel(atten_set, PAsel, 1); // SSB mode
-    float32_t predicted_power_W = predicted_power_mW / 1000.0f;
-    EXPECT_NEAR(predicted_power_W, target_power, 0.5f);
-}
-
-/**
- * Test SetPower correctly sets attenuation for low power (20W PA) in CW mode
- */
-TEST_F(SetPowerTest, SetPower_LowPower_CW) {
-    // Set mode to CW receive (not SSB)
-    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
-
-    // Set a low power that should use the 20W PA
-    float32_t target_power = 5.0f;  // 5 watts
-
-    // Call SetPower
-    SetPower(target_power,ModeSm_StateId_CW_TRANSMIT_MARK);
-
-    // Verify that PA100Wactive is false (should use 20W PA)
-    EXPECT_FALSE(ED.PA100Wactive);
-
-    // Verify that XAttenCW was set for the current band (not XAttenSSB)
-    float32_t atten_set = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-
-    // Attenuation should be within valid range
-    EXPECT_GE(atten_set, 0.0f);
-    EXPECT_LE(atten_set, 31.5f);
-
-    // Verify that the power change interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-
-    // Verify that the attenuation produces approximately the target power
-    int8_t PAsel = 0;
-    float32_t predicted_power_mW = PredictPowerLevel(atten_set, PAsel, 0); // CW mode
-    float32_t predicted_power_W = predicted_power_mW / 1000.0f;
-    EXPECT_NEAR(predicted_power_W, target_power, 0.1f);
-}
-
-/**
- * Test SetPower correctly sets attenuation for high power (100W PA) in CW mode
- */
-TEST_F(SetPowerTest, SetPower_HighPower_CW) {
-    // Set mode to CW receive (not SSB)
-    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
-
-    // Set a high power that should use the 100W PA
-    float32_t target_power = 50.0f;  // 50 watts
-
-    // Call SetPower
-    SetPower(target_power,ModeSm_StateId_CW_TRANSMIT_MARK);
-
-    // Verify that PA100Wactive is true (should use 100W PA)
-    EXPECT_TRUE(ED.PA100Wactive);
-
-    // Verify that XAttenCW was set for the current band (not XAttenSSB)
-    float32_t atten_set = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-
-    // Attenuation should be within valid range
-    EXPECT_GE(atten_set, 0.0f);
-    EXPECT_LE(atten_set, 31.5f);
-
-    // Verify that the power change interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-
-    // Verify that the attenuation produces approximately the target power
-    int8_t PAsel = 1;
-    float32_t predicted_power_mW = PredictPowerLevel(atten_set, PAsel, 0); // CW mode
-    float32_t predicted_power_W = predicted_power_mW / 1000.0f;
-    EXPECT_NEAR(predicted_power_W, target_power, 0.5f);
-}
-
-/**
- * Test SetPower at PA selection threshold (10W)
- * Verify it selects the 100W PA at exactly 10W
- */
-TEST_F(SetPowerTest, SetPower_ThresholdPower_SSB) {
-    // Set mode to SSB receive
-    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-
-    // Set power at the threshold
-    float32_t target_power = 10.0f;  // Exactly at threshold
-
-    // Call SetPower
-    SetPower(target_power,ModeSm_StateId_SSB_TRANSMIT);
-
-    // Verify that PA100Wactive is true (should use 100W PA at threshold)
-    EXPECT_TRUE(ED.PA100Wactive);
-
-    // Verify that the power change interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-}
-
-/**
- * Test SetPower across different bands
- * Verify it updates the correct band-specific attenuation
- */
-TEST_F(SetPowerTest, SetPower_DifferentBands) {
-    // Set mode to SSB receive
-    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-
-    // Test on 20M band
-    ED.currentBand[ED.activeVFO] = BAND_20M;
-    float32_t power_20m = 5.0f;
-    SetPower(power_20m,ModeSm_StateId_SSB_TRANSMIT);
-    float32_t atten_20m = ED.XAttenSSB[BAND_20M];
-    ConsumeInterrupt();
-
-    // Test on 40M band
-    ED.currentBand[ED.activeVFO] = BAND_40M;
-    float32_t power_40m = 8.0f;
-    SetPower(power_40m,ModeSm_StateId_SSB_TRANSMIT);
-    float32_t atten_40m = ED.XAttenSSB[BAND_40M];
-    ConsumeInterrupt();
-
-    // Verify that different bands have different attenuations
-    // (assuming calibration differs across bands, or powers differ)
-    EXPECT_GE(atten_20m, 0.0f);
-    EXPECT_GE(atten_40m, 0.0f);
-
-    // Verify 20M band attenuation wasn't overwritten
-    EXPECT_EQ(ED.XAttenSSB[BAND_20M], atten_20m);
-}
-
-/**
- * Test fixture for menu-based SetPower tests
- * These tests verify the UpdatePower callback is correctly invoked from the menu system
- */
-class MenuSetPowerTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        // Initialize test environment
-        Q_in_L.setChannel(0);
-        Q_in_R.setChannel(1);
-        Q_in_L.clear();
-        Q_in_R.clear();
-        Q_in_L_Ex.setChannel(0);
-        Q_in_R_Ex.setChannel(1);
-        Q_in_L_Ex.clear();
-        Q_in_R_Ex.clear();
-        StartMillis();
-
-        // Radio startup code
-        InitializeStorage();
-        InitializeFrontPanel();
-        InitializeSignalProcessing();
-        InitializeAudio();
-        InitializeDisplay();
-        InitializeRFHardware();
-
-        // Start the mode state machines
-        modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
-        modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
-        ModeSm_start(&modeSM);
-        ED.agc = AGCOff;
-        ED.nrOptionSelect = NROff;
-        uiSM.vars.splashDuration_ms = 1;
-        UISm_start(&uiSM);
-        UpdateAudioIOState();
-
-        // Set known calibration values
-        ED.PowerCal_20W_Psat_mW[BAND_20M] = 14680.0f;
-        ED.PowerCal_20W_kindex[BAND_20M] = 16.2f;
-        ED.PowerCal_20W_att_offset_dB[BAND_20M] = 0.0f;
-
-        ED.PowerCal_100W_Psat_mW[BAND_20M] = 86000.0f;
-        ED.PowerCal_100W_kindex[BAND_20M] = 10.0f;
-        ED.PowerCal_100W_att_offset_dB[BAND_20M] = 0.0f;
-
-        ED.PowerCal_20W_to_100W_threshold_W = 10.0f;
-
-        // Set active band to 20M
-        ED.currentBand[ED.activeVFO] = BAND_20M;
-
-        // Reset menu indices
-        extern size_t primaryMenuIndex;
-        extern size_t secondaryMenuIndex;
-        primaryMenuIndex = 0;
-        secondaryMenuIndex = 0;
-
-        // Start the 1ms timer interrupt to simulate hardware timer
-        start_timer1ms();
-    }
-
-    void TearDown() override {
-        // Clean up after each test
-        stop_timer1ms();
-    }
-};
-
-/**
- * Helper function to navigate to RF menu
- */
-void SelectRFMenu(void) {
-    // Check initial state
-    loop(); MyDelay(10);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-
-    // Enter main menu
-    SetButton(MAIN_MENU_UP);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_MAIN_MENU);
-
-    // Select first menu option (RF Options)
-    SetButton(MENU_OPTION_SELECT);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-
-    // Verify we're on the RF secondary menu
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_SECONDARY_MENU);
-    extern struct PrimaryMenuOption primaryMenu[8];
-    extern size_t primaryMenuIndex;
-    EXPECT_STREQ(primaryMenu[primaryMenuIndex].label, "RF Options");
-}
-
-/**
- * Test UpdatePower is correctly invoked when SSB Power is changed via menu
- */
-TEST_F(MenuSetPowerTest, UpdatePower_InvokedFromSSBPowerMenu) {
-    // Ensure we're in SSB receive mode
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-
-    // Navigate to RF menu
-    SelectRFMenu();
-
-    // We should now be on the SSB Power option (first item in RF menu)
-    // Store initial SSB power and attenuation
-    float32_t initial_power = ED.powerOutSSB[ED.currentBand[ED.activeVFO]];
-    float32_t initial_atten = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-
-    // Select SSB Power to enter UPDATE state
-    SetButton(MENU_OPTION_SELECT);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_UPDATE);
-
-    // Increment the power value
-    SetInterrupt(iFILTER_INCREASE);
-    loop(); MyDelay(10);
-
-    // Verify that powerOutSSB was incremented
-    float32_t new_power = ED.powerOutSSB[ED.currentBand[ED.activeVFO]];
-    EXPECT_GT(new_power, initial_power);
-
-    // Verify that XAttenSSB was updated (UpdatePower was called)
-    float32_t new_atten = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-    EXPECT_NE(new_atten, initial_atten);
-
-    // Verify that iPOWER_CHANGE interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-    ConsumeInterrupt();
-
-    // Exit back to home screen
-    SetButton(HOME_SCREEN);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    loop(); MyDelay(10);
-
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-}
-
-/**
- * Test UpdatePower is correctly invoked when CW Power is changed via menu
- */
-TEST_F(MenuSetPowerTest, UpdatePower_InvokedFromCWPowerMenu) {
-    // Switch to CW receive mode
-    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
-
-    // Navigate to RF menu
-    SelectRFMenu();
-
-    // Navigate to CW Power option (second item in RF menu)
-    IncrementSecondaryMenu();
-
-    // Store initial CW power and attenuation
-    float32_t initial_power = ED.powerOutCW[ED.currentBand[ED.activeVFO]];
-    float32_t initial_atten = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-
-    // Select CW Power to enter UPDATE state
-    SetButton(MENU_OPTION_SELECT);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_UPDATE);
-
-    // Increment the power value
-    SetInterrupt(iFILTER_INCREASE);
-    loop(); MyDelay(10);
-
-    // Verify that powerOutCW was incremented
-    float32_t new_power = ED.powerOutCW[ED.currentBand[ED.activeVFO]];
-    EXPECT_GT(new_power, initial_power);
-
-    // Verify that XAttenCW was updated (UpdatePower was called)
-    float32_t new_atten = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-    EXPECT_NE(new_atten, initial_atten);
-
-    // Verify that iPOWER_CHANGE interrupt was set
-    EXPECT_EQ(GetInterrupt(), iPOWER_CHANGE);
-    ConsumeInterrupt();
-
-    // Exit back to home screen
-    SetButton(HOME_SCREEN);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    loop(); MyDelay(10);
-
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-}
-
-/**
- * Test that PA selection changes correctly when power crosses threshold via menu
- */
-TEST_F(MenuSetPowerTest, UpdatePower_PASelectionChanges) {
-    // Ensure we're in SSB receive mode
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
-
-    // Set initial power below threshold
-    ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = 5.0f;
-
-    // Call SetPower to set initial state
-    SetPower(5.0f,ModeSm_StateId_SSB_TRANSMIT);
-    EXPECT_FALSE(ED.PA100Wactive);
-    ConsumeInterrupt();
-
-    // Navigate to RF menu and select SSB Power
-    SelectRFMenu();
-    SetButton(MENU_OPTION_SELECT);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_UPDATE);
-
-    // Increment power multiple times to cross the 10W threshold
-    for (int i = 0; i < 12; i++) {  // Increment by 0.5W each time, 12 times = 6W increase
-        SetInterrupt(iFILTER_INCREASE);
-        loop(); MyDelay(10);
-        ConsumeInterrupt();
-    }
-
-    // Verify that power is now above threshold
-    float32_t final_power = ED.powerOutSSB[ED.currentBand[ED.activeVFO]];
-    EXPECT_GE(final_power, 10.0f);
-
-    // Verify that PA selection switched to 100W PA
-    EXPECT_TRUE(ED.PA100Wactive);
-
-    // Exit back to home screen
-    SetButton(HOME_SCREEN);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    loop(); MyDelay(10);
-
-    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
-}
-

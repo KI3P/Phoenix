@@ -1306,9 +1306,9 @@ void UpdateRFGainSetting(void){
         case ModeSm_StateId_CW_RECEIVE:
             comp = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
             break;
-        case ModeSm_StateId_SSB_RECEIVE:
-            comp = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-            break;
+        //case ModeSm_StateId_SSB_RECEIVE:
+        //    comp = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
+        //    break;
         default:
             comp = oldTAtten;
             break;

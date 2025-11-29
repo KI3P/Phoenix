@@ -739,7 +739,7 @@ void HandleButtonPress(int32_t button){
             switch (button){
                 case HOME_SCREEN:{
                     // Restore the equalizers from the save
-                    RestoreArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
+                    RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -812,7 +812,7 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case HOME_SCREEN:{
-                    RestoreArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
+                    RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -942,6 +942,8 @@ void IncrementEqualizerSelection(void);
 void DecrementEqualizerSelection(void);
 void IncrementCalibrationPower(void);
 void DecrementCalibrationPower(void);
+void IncrementCalibrationTransmitAtt(void);
+void DecrementCalibrationTransmitAtt(void);
 
 /**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
@@ -1207,11 +1209,11 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iVOLUME_INCREASE):{
-                    IncrementTransmitAtt();
+                    IncrementCalibrationTransmitAtt();
                     break;
                 }
                 case (iVOLUME_DECREASE):{
-                    DecrementTransmitAtt();
+                    DecrementCalibrationTransmitAtt();
                     break;
                 }
                 default:
@@ -1302,13 +1304,13 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iCALIBRATE_TX_IQ):{
-            SaveArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
+            SaveArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_TX_IQ);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);  
             break;
         }
         case (iCALIBRATE_POWER):{
-            SaveArray(0,ED.XAttenSSB,sizeof(ED.XAttenSSB));
+            SaveArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_POWER);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);     
             break;

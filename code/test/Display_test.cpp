@@ -896,12 +896,12 @@ TEST_F(DisplayTest, RFSetMenu_SSBPower_Configuration) {
 
 
     // Access the SSB power variable parameter from RFSet[0]
-    extern struct SecondaryMenuOption RFSet[7];
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter ssbPower;
     extern void UpdateSSBPower(void);
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[0].label, "SSB Power");
+    EXPECT_STREQ(RFSet[0].label, "TX SSB Power");
     EXPECT_EQ(RFSet[0].action, variableOption);
     EXPECT_EQ(RFSet[0].varPam, &ssbPower);
     EXPECT_EQ(RFSet[0].func, nullptr);
@@ -919,9 +919,9 @@ TEST_F(DisplayTest, RFSetMenu_SSBPower_Configuration) {
  * Verifies SSB power can be adjusted within limits
  */
 TEST_F(DisplayTest, RFSetMenu_SSBPower_IncrementDecrement) {
-    
 
-    extern struct SecondaryMenuOption RFSet[7];
+
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter ssbPower;
     extern void UpdateArrayVariables(void);
 
@@ -976,12 +976,12 @@ TEST_F(DisplayTest, RFSetMenu_SSBPower_Boundaries) {
 TEST_F(DisplayTest, RFSetMenu_CWPower_Configuration) {
 
 
-    extern struct SecondaryMenuOption RFSet[7];
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter cwPower;
     extern void UpdateCWPower(void);
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[1].label, "CW Power");
+    EXPECT_STREQ(RFSet[1].label, "TX CW Power");
     EXPECT_EQ(RFSet[1].action, variableOption);
     EXPECT_EQ(RFSet[1].varPam, &cwPower);
     EXPECT_EQ(RFSet[1].func, nullptr);
@@ -1023,17 +1023,17 @@ TEST_F(DisplayTest, RFSetMenu_CWPower_IncrementDecrement) {
  * Verifies gain variable parameter is configured correctly
  */
 TEST_F(DisplayTest, RFSetMenu_Gain_Configuration) {
-    
 
-    extern struct SecondaryMenuOption RFSet[7];
+
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter gain;
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[2].label, "Gain");
-    EXPECT_EQ(RFSet[2].action, variableOption);
-    EXPECT_EQ(RFSet[2].varPam, &gain);
-    EXPECT_EQ(RFSet[2].func, nullptr);
-    EXPECT_EQ(RFSet[2].postUpdateFunc, nullptr);
+    EXPECT_STREQ(RFSet[4].label, "[__RX DSP Gain]");
+    EXPECT_EQ(RFSet[4].action, variableOption);
+    EXPECT_EQ(RFSet[4].varPam, &gain);
+    EXPECT_EQ(RFSet[4].func, nullptr);
+    EXPECT_EQ(RFSet[4].postUpdateFunc, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(gain.type, TYPE_F32);
@@ -1078,16 +1078,16 @@ TEST_F(DisplayTest, RFSetMenu_Gain_IncrementDecrement) {
  * Verifies RX attenuation variable parameter is configured correctly
  */
 TEST_F(DisplayTest, RFSetMenu_RXAttenuation_Configuration) {
-    
 
-    extern struct SecondaryMenuOption RFSet[7];
+
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter rxAtten;
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[3].label, "RX Attenuation");
-    EXPECT_EQ(RFSet[3].action, variableOption);
-    EXPECT_EQ(RFSet[3].varPam, &rxAtten);
-    EXPECT_EQ(RFSet[3].func, nullptr);
+    EXPECT_STREQ(RFSet[2].label, "RX Attenuation");
+    EXPECT_EQ(RFSet[2].action, variableOption);
+    EXPECT_EQ(RFSet[2].varPam, &rxAtten);
+    EXPECT_EQ(RFSet[2].func, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(rxAtten.type, TYPE_F32);
@@ -1125,16 +1125,16 @@ TEST_F(DisplayTest, RFSetMenu_RXAttenuation_IncrementDecrement) {
  * Verifies TX CW attenuation variable parameter is configured correctly
  */
 TEST_F(DisplayTest, RFSetMenu_TXAttenuationCW_Configuration) {
-    
 
-    extern struct SecondaryMenuOption RFSet[7];
+
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter txAttenCW;
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[4].label, "TX Attenuation (CW)");
-    EXPECT_EQ(RFSet[4].action, variableOption);
-    EXPECT_EQ(RFSet[4].varPam, &txAttenCW);
-    EXPECT_EQ(RFSet[4].func, nullptr);
+    EXPECT_STREQ(RFSet[5].label, "[__TX Attenuation(CW)]");
+    EXPECT_EQ(RFSet[5].action, variableOption);
+    EXPECT_EQ(RFSet[5].varPam, &txAttenCW);
+    EXPECT_EQ(RFSet[5].func, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(txAttenCW.type, TYPE_F32);
@@ -1168,67 +1168,20 @@ TEST_F(DisplayTest, RFSetMenu_TXAttenuationCW_IncrementDecrement) {
 }
 
 /**
- * Test RFSet menu - TX Attenuation (SSB) option
- * Verifies TX SSB attenuation variable parameter is configured correctly
- */
-TEST_F(DisplayTest, RFSetMenu_TXAttenuationSSB_Configuration) {
-    
-
-    extern struct SecondaryMenuOption RFSet[7];
-    extern VariableParameter txAttenSSB;
-
-    // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[5].label, "TX Attenuation (SSB)");
-    EXPECT_EQ(RFSet[5].action, variableOption);
-    EXPECT_EQ(RFSet[5].varPam, &txAttenSSB);
-    EXPECT_EQ(RFSet[5].func, nullptr);
-
-    // Verify variable parameter configuration
-    EXPECT_EQ(txAttenSSB.type, TYPE_F32);
-    EXPECT_EQ(txAttenSSB.limits.f32.min, 0);
-    EXPECT_EQ(txAttenSSB.limits.f32.max, 31.5);
-    EXPECT_EQ(txAttenSSB.limits.f32.step, 0.5);
-}
-
-/**
- * Test RFSet menu - TX Attenuation (SSB) increment/decrement
- * Verifies TX SSB attenuation can be adjusted within limits
- */
-TEST_F(DisplayTest, RFSetMenu_TXAttenuationSSB_IncrementDecrement) {
-    
-
-    extern VariableParameter txAttenSSB;
-    extern void UpdateArrayVariables(void);
-
-    UpdateArrayVariables();
-
-    // Set initial attenuation value
-    ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = 8;
-
-    // Increment attenuation
-    IncrementVariable(&txAttenSSB);
-    EXPECT_EQ(ED.XAttenSSB[ED.currentBand[ED.activeVFO]], 8.5);
-
-    // Decrement attenuation
-    DecrementVariable(&txAttenSSB);
-    EXPECT_EQ(ED.XAttenSSB[ED.currentBand[ED.activeVFO]], 8);
-}
-
-/**
  * Test RFSet menu - Antenna option
  * Verifies antenna variable parameter is configured correctly
  */
 TEST_F(DisplayTest, RFSetMenu_Antenna_Configuration) {
-    
 
-    extern struct SecondaryMenuOption RFSet[7];
+
+    extern struct SecondaryMenuOption RFSet[6];
     extern VariableParameter antenna;
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[6].label, "Antenna");
-    EXPECT_EQ(RFSet[6].action, variableOption);
-    EXPECT_EQ(RFSet[6].varPam, &antenna);
-    EXPECT_EQ(RFSet[6].func, nullptr);
+    EXPECT_STREQ(RFSet[3].label, "Antenna");
+    EXPECT_EQ(RFSet[3].action, variableOption);
+    EXPECT_EQ(RFSet[3].varPam, &antenna);
+    EXPECT_EQ(RFSet[3].func, nullptr);
 
     // Verify variable parameter configuration
     EXPECT_EQ(antenna.type, TYPE_I32);

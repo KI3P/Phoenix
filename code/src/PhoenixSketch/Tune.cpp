@@ -158,18 +158,26 @@ int8_t GetBand(int64_t freq){
  *    Pout ​= Psat tanh( k 10^{-A/10}​ )
  */
 
+// Model function
+float32_t attenToPower_mW(float32_t att_dB, float32_t P_sat_mW, float32_t k) {
+    return P_sat_mW * tanh(k * powf(10.0f, -att_dB / 10.0f));
+}
+
+float32_t powerToAtten_dB(float32_t power_mW, float32_t P_sat_mW, float32_t k) {
+    return -10.0*log10f((1.0/k)*atanhf(power_mW/P_sat_mW));
+}
+
 /**
- * Return the predicted output power given an attenuation setting, PA selection
- * and mode selection (SSB or CW). The output power is given by the equation:
+ * Return the calculated output power given an attenuation setting and PA selection. 
+ * The output power is given by the equation:
  *   Pout [W] ​= Psat [mW] tanh( k 10^{-Attenuation [dB]/10}​ ) / 1000
- * This function is only used in testing
+ * This function is only used in testing and only works for CW mode
  * 
  * @param atten Attenuation setting in dB
  * @param PAsel 0 for 20W, 1 for 100W
- * @param mode 1 for SSB, 0 for CW
  * @return Output power in mW
  */
-float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode){
+float32_t CalculateCWPowerLevel(float32_t atten_dB, int8_t PAsel){
     if (atten_dB < 0){
         Debug("Atten must be positive!");
         return 0;
@@ -178,43 +186,28 @@ float32_t PredictPowerLevel(float32_t atten_dB, int8_t PAsel, int8_t mode){
         Debug("Atten must be <31.5!");
         return 0;
     }
-    float32_t Psat,k,Aoff;
+    float32_t Psat,k;
     if (PAsel == 0){
         Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){ // SSB
-            Aoff = ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]];
-        } else {
-            Aoff = 0; // CW
-        }
     } else {
         Psat = ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){ // SSB
-            Aoff = ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]];
-        } else {
-            Aoff = 0; // CW
-        }
     }
-    // The CW power is higher than the SSB power. So when we're in SSB mode, increase
-    // the applied attenuation by the offset value
-    float32_t a = pow(10.0f,-(atten_dB + Aoff)/10.0f);
-    float32_t P_mW = Psat * tanhf( k * a );
+    float32_t P_mW = attenToPower_mW(atten_dB,Psat,k);
     return P_mW;
 }
 
-
 /**
  * Return the attenuation setting necessary to produce the requested output power 
- * given a mode selection (SSB or CW). The attenuation is given by the equation:
+ * in CW mode. The attenuation is given by the equation:
  *    Atten [dB] ​= -10*log10( 1/k * arctanh( ​Power [W]/(Psat [mW] *1000) ) )
  * 
  * @param Power_W Desired power in W
- * @param mode 1 for SSB, 0 for CW
  * @param *PAsel Pointer to PA setting, we set this to 1 if 100W amp is needed
  * @return Attenuation setting in dB (float32_t)
  */
-float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
+float32_t CalculateCWAttenuation(float32_t Power_W, bool *PAsel){
     if (Power_W < 0){
         Debug("Power must be positive!");
         return 0;
@@ -224,42 +217,53 @@ float32_t CalculateAttenuation(float32_t Power_W, int8_t mode, int8_t *PAsel){
         return 0;
     }
     if (Power_W >= ED.PowerCal_20W_to_100W_threshold_W){
-        *PAsel = 1;
+        *PAsel = true;
     } else {
-        *PAsel = 0;
+        *PAsel = false;
     }
-    float32_t Psat,k,Aoff;
-    if (*PAsel == 0){
-        Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
-        k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){ // SSB
-            Aoff = ED.PowerCal_20W_att_offset_dB[ED.currentBand[ED.activeVFO]];
-        } else {
-            Aoff = 0; // CW
-        }
-    } else {
+    float32_t Psat,k;
+    if (*PAsel){
         Psat = ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]];
         k = ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]];
-        if (mode == 1){ // SSB
-            Aoff = ED.PowerCal_100W_att_offset_dB[ED.currentBand[ED.activeVFO]];
-        } else {
-            Aoff = 0; // CW
-        }
+    } else {
+        Psat = ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]];
+        k = ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]];
     }
-    // The CW power is higher than the SSB power for the same attenuation value. 
-    // So when we're in SSB mode, reduce the applied attenuation by the offset value
-    return ((-10.0*log10f((1.0/k)*atanhf(Power_W*1000.0/Psat))) - Aoff);
+    return powerToAtten_dB(Power_W*1000.0,Psat,k);
+}
+
+/**
+ * Return the gain required to produce the requested output power in SSB mode.
+ * @param power_W The desired setpoint in W
+ * @param *PAsel Pointer to PA setting, we set this to 1 if 100W amp is needed
+ * @return The gain in dB
+ */
+float32_t CalculateSSBTXGain(float32_t Power_W, bool *PAsel){
+    if (Power_W < 0){
+        Debug("Power must be positive!");
+        return 0;
+    }
+    if (Power_W > 100){
+        Debug("Power must be <100!");
+        return 0;
+    }
+    if (Power_W >= ED.PowerCal_20W_to_100W_threshold_W){
+        *PAsel = true;
+    } else {
+        *PAsel = false;
+    }
+    float32_t gain_dB;
+    if (ED.PA100Wactive)
+        gain_dB = 10.0*log10f(Power_W / SSB_100W_CAL_POWER_POINT_W);
+    else
+        gain_dB = 10.0*log10f(Power_W / SSB_20W_CAL_POWER_POINT_W);
+    return gain_dB;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions used to fit hyperbolic tan function to saturation curve
 // Model: P_out = P_sat * tanh(k * 10^(-Att/10))
 ///////////////////////////////////////////////////////////////////////////////
-
-// Model function
-float32_t model(float32_t att, float32_t P_sat, float32_t k) {
-    return P_sat * tanh(k * powf(10.0f, -att / 10.0f));
-}
 
 // Gauss-Newton least squares fit
 FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n, 
@@ -325,7 +329,7 @@ FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n,
     // Calculate RMS error
     float32_t sse = 0;
     for (int32_t i = 0; i < n; i++) {
-        float32_t err = pout[i] - model(att[i], P_sat, k);
+        float32_t err = pout[i] - attenToPower_mW(att[i], P_sat, k);
         sse += err * err;
     }
     
@@ -363,42 +367,4 @@ FitResult FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
     Serial.print(  "| RMS Error  | "); Serial.print(fit.rms_error); Serial.println(" mW |");
 
     return fit;
-}
-
-void SetPower(float32_t power_W, ModeSm_StateId targetState){   
-    int8_t mode;
-    switch (targetState){
-        case ModeSm_StateId_SSB_TRANSMIT:
-            mode = 1;
-            break;
-        case ModeSm_StateId_CW_TRANSMIT_MARK:
-            mode = 0;
-            break;
-        default:
-            return;
-            break;
-    }
-
-    // Calculate the necessary attenuation:
-    int8_t PAsel;
-    float32_t att = CalculateAttenuation(power_W, mode, &PAsel);
-    Debug("Attenuation is " + String(att));
-    Debug("PAsel is " + String(PAsel));
-    ED.PA100Wactive = (bool)PAsel;
-
-    switch (targetState){
-        case ModeSm_StateId_SSB_TRANSMIT:
-            ED.XAttenSSB[ED.currentBand[ED.activeVFO]] = att;
-            Debug("SSB XAtten is " + String(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]));
-            break;
-        case ModeSm_StateId_CW_TRANSMIT_MARK:
-            ED.XAttenCW[ED.currentBand[ED.activeVFO]] = att;
-            Debug("CW XAtten is " + String(ED.XAttenCW[ED.currentBand[ED.activeVFO]]));
-            break;
-        default:
-            Debug("You should never be able to get here! SetPower function.");
-            break;
-    }
-    // Now invoke the hardware state machine change to make these changes
-    SetInterrupt(iPOWER_CHANGE);
 }

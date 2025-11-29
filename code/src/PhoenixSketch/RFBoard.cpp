@@ -216,7 +216,7 @@ void SetFrequencyCorrectionFactor(int32_t corr){
  *        EGPIOWRITEFAIL if unable to write to GPIO bank.
  */
 errno_t InitAttenuation(void){
-    errno_t err = TXAttenuatorCreate(ED.XAttenSSB[ED.currentBand[ED.activeVFO]]);
+    errno_t err = TXAttenuatorCreate(0.0f);
     if (err != ESUCCESS){
         // it might be somehow possible that writing to the TX attenuator would fail
         // while writing to the RX attenuator would succeed. If this is the case,
