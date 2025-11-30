@@ -77,10 +77,10 @@ void CalculatePowerCurveFit(void){
         ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
     }
     ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-    SetButton(12); // cause entry to CALIBRATE_OFFSET_SPACE state on next loop
-    SetInterrupt(iBUTTON_PRESSED);
+    // User must press button 12 to transition to CALIBRATE_OFFSET_SPACE state
     PanePowerAtt.stale = true;
     PanePowerPower.stale = true;
+    PanePowerInstructions.stale = true;
 }
 
 void ChangeCalibrationPASelection(void){
@@ -130,8 +130,11 @@ void RecordPowerDataPoint(void){
                 measuredPower = targetPower;
             }else{
                 // We have recorded all three points, calculate the power curve
+                // But do NOT automatically transition state - user must press button 12
                 CalculatePowerCurveFit();
             }
+            // Note: User can re-measure points or press button 12 to advance
+            PanePowerData.stale = true;
             break;
         }
         case ModeSm_StateId_CALIBRATE_OFFSET_SPACE:{
@@ -156,10 +159,7 @@ void RecordPowerDataPoint(void){
                 ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
             powerCalibrationStepCount++; // Increment step counter
             PanePowerInstructions.stale = true; // Update instructions display
-
-            SetButton(12); // cause entry to CALIBRATE_POWER_SPACE state on next loop
-            SetInterrupt(iBUTTON_PRESSED);
-
+            // User must press button to change measurement mode
             break;
         }
         default:
@@ -619,11 +619,15 @@ static void DrawPowerInstructionsPane(void){
     delta += 2*lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("After step 3, the power curve is");
+    tft.print("After step 3, press button 12 to");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("automatically calculated.");
+    tft.print("proceed to step 4, or remeasure");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("data points in steps 1 through 3.");
 
     
     delta += 2*lineD;
@@ -645,6 +649,11 @@ static void DrawPowerInstructionsPane(void){
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("* Button 15 changes increment.");
+
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("* Button 12 changes measure mode.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);

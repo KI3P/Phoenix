@@ -827,6 +827,10 @@ void HandleButtonPress(int32_t button){
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
                     UpdateRFHardwareState();
                     ResetPowerCal();
+                    // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
+                    if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
+                        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
+                    }
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
@@ -838,6 +842,10 @@ void HandleButtonPress(int32_t button){
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
                     UpdateRFHardwareState();
                     ResetPowerCal();
+                    // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
+                    if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
+                        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
+                    }
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }

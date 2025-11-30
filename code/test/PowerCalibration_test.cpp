@@ -815,3 +815,359 @@ TEST_F(PowerCalibrationTest, FitPowerCurve_RealWorldData) {
     printf("\n");
 }
 
+/**
+ * Test fixture for complete power calibration walkthrough
+ * Simulates a user performing the full calibration procedure across all bands
+ */
+class PowerCalibrationWalkthroughTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Initialize test environment
+        Q_in_L.setChannel(0);
+        Q_in_R.setChannel(1);
+        Q_in_L.clear();
+        Q_in_R.clear();
+        Q_in_L_Ex.setChannel(0);
+        Q_in_R_Ex.setChannel(1);
+        Q_in_L_Ex.clear();
+        Q_in_R_Ex.clear();
+        StartMillis();
+
+        // Radio startup code
+        InitializeStorage();
+        InitializeFrontPanel();
+        InitializeSignalProcessing();
+        InitializeAudio();
+        InitializeDisplay();
+        InitializeRFHardware();
+
+        // Start the mode state machines
+        modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+        modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+        ModeSm_start(&modeSM);
+        ED.agc = AGCOff;
+        ED.nrOptionSelect = NROff;
+        uiSM.vars.splashDuration_ms = 1;
+        UISm_start(&uiSM);
+        UpdateAudioIOState();
+
+        // Reset menu indices
+        extern size_t primaryMenuIndex;
+        extern size_t secondaryMenuIndex;
+        primaryMenuIndex = 0;
+        secondaryMenuIndex = 0;
+
+        // Start the 1ms timer interrupt to simulate hardware timer
+        start_timer1ms();
+    }
+
+    void TearDown() override {
+        // Clean up after each test
+        stop_timer1ms();
+    }
+
+    /**
+     * Navigate to power calibration through the menu system
+     * Simulates: Home -> Main Menu -> Calibration -> Power
+     */
+    void NavigateToPowerCalibration(void) {
+        extern size_t primaryMenuIndex;
+        extern size_t secondaryMenuIndex;
+
+        // Start from home screen
+        loop(); MyDelay(10);
+        EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+
+        // Press MAIN_MENU_UP button to enter main menu
+        SetButton(MAIN_MENU_UP);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+        EXPECT_EQ(uiSM.state_id, UISm_StateId_MAIN_MENU);
+
+        // Navigate to "Calibration" menu (index 6 in primaryMenu)
+        // Primary menu order: RF Options(0), CW Options(1), Microphone(2),
+        //                     Audio Options(3), Display(4), EEPROM(5),
+        //                     Calibration(6), Diagnostics(7)
+        // Use FILTER encoder to scroll through main menu
+        for (int i = 0; i < 6; i++) {
+            SetInterrupt(iFILTER_INCREASE);
+            loop(); MyDelay(10);
+        }
+        EXPECT_EQ(primaryMenuIndex, 6u);  // Should be on Calibration menu
+
+        // Press MENU_OPTION_SELECT to enter the Calibration submenu
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+        EXPECT_EQ(uiSM.state_id, UISm_StateId_SECONDARY_MENU);
+
+        // Navigate to "Power" option (index 4 in CalOptions)
+        // CalOptions order: S meter level(0), Frequency(1), Receive IQ(2),
+        //                   Transmit IQ(3), Power(4)
+        // Use FILTER encoder to scroll through secondary menu
+        for (int i = 0; i < 4; i++) {
+            SetInterrupt(iFILTER_INCREASE);
+            loop(); MyDelay(10);
+        }
+        EXPECT_EQ(secondaryMenuIndex, 4u);  // Should be on Power option
+
+        // Press MENU_OPTION_SELECT to trigger the Power calibration
+        // This will:
+        //   1. Transition to UPDATE state
+        //   2. Call StartPowerCal() which queues iCALIBRATE_POWER interrupt
+        //   3. Transition back to HOME state
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        // At this point we're back at HOME, but iCALIBRATE_POWER interrupt is queued
+        // Run loop again to process the queued interrupt
+        loop(); MyDelay(10);
+
+        // Should now be in power calibration mode
+        EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_POWER);
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+    }
+
+    /**
+     * Perform the 4-step power calibration for a single band
+     * @param A1-A4: Attenuation values in dB for steps 1-4
+     * @param P1-P4: Power values in dBm for steps 1-4
+     */
+    void CalibrateBand(float32_t A1, float32_t P1,
+                       float32_t A2, float32_t P2,
+                       float32_t A3, float32_t P3,
+                       float32_t A4, float32_t P4) {
+        // Step 1: Record power at 0 dB attenuation
+        // Set attenuation to A1 (should be 0)
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = A1;
+        SetTXAttenuation(A1);
+
+        // Set measured power to P1 (in dBm, convert to W)
+        measuredPower = pow(10.0f, P1 / 10.0f) / 1000.0f;  // Convert dBm to W
+
+        // Press SELECT button to record point 1
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        EXPECT_EQ(Npoints, 1u);
+
+        // Step 2: Adjust attenuation to drop power by 6dB
+        // Set attenuation to A2
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = A2;
+        SetTXAttenuation(A2);
+
+        // Set measured power to P2
+        measuredPower = pow(10.0f, P2 / 10.0f) / 1000.0f;
+
+        // Press SELECT button to record point 2
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        EXPECT_EQ(Npoints, 2u);
+
+        // Step 3: Adjust attenuation to drop power by another 6dB
+        // Set attenuation to A3
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = A3;
+        SetTXAttenuation(A3);
+
+        // Set measured power to P3
+        measuredPower = pow(10.0f, P3 / 10.0f) / 1000.0f;
+
+        // Press SELECT button to record point 3
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        EXPECT_EQ(Npoints, 3u);
+
+        // Curve fit should have been calculated automatically after 3 points
+        // Press button 12 to proceed to SSB gain calibration (step 4)
+        SetButton(12);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+
+        // Step 4: Record measured power for SSB calibration
+        // Set attenuation to A4 (should be 0)
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = A4;
+        SetTXAttenuation(A4);
+
+        // Set measured power to P4
+        measuredPower = pow(10.0f, P4 / 10.0f) / 1000.0f;
+
+        // Press SELECT button to record SSB calibration point
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        // Press button 12 to return to power calibration mode
+        //SetButton(12);
+        //SetInterrupt(iBUTTON_PRESSED);
+        //loop(); MyDelay(10);
+
+        //EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+    }
+
+    /**
+     * Change to the next band (band up)
+     */
+    void ChangeBandUp(void) {
+        SetButton(BAND_UP);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+
+        // Reset calibration for new band
+        Npoints = 0;
+    }
+};
+
+/**
+ * Complete power calibration walkthrough test
+ *
+ * This test simulates a user performing the full power calibration routine
+ * for all amateur radio bands from 160m through 6m. It follows the exact
+ * procedure a user would follow, including:
+ * - Navigating to the power calibration screen from the home screen
+ * - Performing the 4-step calibration procedure for each band
+ * - Recording attenuation and power measurements at each step
+ * - Advancing through bands using the band up button
+ *
+ * The test validates that calibration values are correctly stored and that
+ * the curve fitting produces reasonable results for each band.
+ */
+TEST_F(PowerCalibrationWalkthroughTest, CompleteCalibrationAllBands) {
+    // Test data: Band, A1, P1, A2, P2, A3, P3, A4, P4, Expected P_sat, Expected k
+    struct BandCalData {
+        int bandIndex;
+        const char* bandName;
+        float32_t A1, P1, A2, P2, A3, P3, A4, P4;
+        float32_t expected_Psat_mW;  // Expected P_sat from curve fit
+        float32_t expected_k;        // Expected k from curve fit
+    };
+
+    BandCalData calData[] = {
+        {BAND_160M, "160m", 0.0f, 40.7f, 21.5f, 34.0f, 28.0f, 28.0f, 0.0f, 39.0f, 11748.0f, 30.81f},
+        {BAND_80M,  "80m",  0.0f, 40.8f, 11.5f, 34.3f, 18.5f, 27.9f, 0.0f, 31.7f, 12060.0f,  3.22f},
+        {BAND_60M,  "60m",  0.0f, 41.7f, 12.0f, 34.0f, 18.0f, 28.1f, 0.0f, 33.2f, 14926.0f,  2.70f},
+        {BAND_40M,  "40m",  0.0f, 41.7f, 20.0f, 34.0f, 27.0f, 27.7f, 0.0f, 38.6f, 14791.0f, 17.26f},
+        {BAND_30M,  "30m",  0.0f, 40.2f, 17.0f, 34.0f, 24.0f, 27.7f, 0.0f, 35.9f, 10471.0f, 12.34f},
+        {BAND_20M,  "20m",  0.0f, 39.9f, 11.5f, 33.9f, 18.0f, 28.0f, 0.0f, 30.8f,  9785.0f,  3.64f},
+        {BAND_17M,  "17m",  0.0f, 40.6f, 12.0f, 33.9f, 18.5f, 28.0f, 0.0f, 30.4f, 11504.0f,  3.46f},
+        {BAND_15M,  "15m",  0.0f, 39.6f, 14.5f, 33.9f, 21.0f, 28.1f, 0.0f, 26.1f,  9119.0f,  7.84f},
+        {BAND_12M,  "12m",  0.0f, 39.7f, 12.5f, 33.8f, 19.0f, 28.2f, 0.0f, 30.4f,  9333.0f,  4.73f},
+        {BAND_10M,  "10m",  0.0f, 37.2f, 16.5f, 34.0f, 23.5f, 28.0f, 0.0f, 32.9f,  5246.0f, 23.52f},
+        {BAND_6M,   "6m",   0.0f, 39.0f,  7.0f, 34.0f, 13.5f, 28.0f, 0.0f, 20.5f,  8818.0f,  1.48f},
+    };
+
+    // Set starting band to 160m
+    ED.currentBand[ED.activeVFO] = BAND_160M;
+
+    // Navigate to power calibration screen
+    NavigateToPowerCalibration();
+
+    printf("\n=== Power Calibration Walkthrough Test ===\n\n");
+    printf("Simulating user calibration procedure for all bands...\n\n");
+
+    // Calibrate each band
+    for (size_t i = 0; i < sizeof(calData) / sizeof(calData[0]); i++) {
+        BandCalData& data = calData[i];
+
+        printf("Calibrating %s band...\n", data.bandName);
+
+        // Verify we're on the correct band
+        EXPECT_EQ(ED.currentBand[ED.activeVFO], data.bandIndex)
+            << "Expected to be on band " << data.bandName;
+
+        // Perform 4-step calibration
+        CalibrateBand(data.A1, data.P1, data.A2, data.P2,
+                     data.A3, data.P3, data.A4, data.P4);
+
+        // Verify calibration values were stored
+        EXPECT_GT(ED.PowerCal_20W_Psat_mW[data.bandIndex], 0.0f)
+            << "P_sat not set for " << data.bandName;
+        EXPECT_GT(ED.PowerCal_20W_kindex[data.bandIndex], 0.0f)
+            << "k index not set for " << data.bandName;
+
+        // Verify calibration values match expected results from curve fit
+        // Use 1% tolerance for P_sat (allows for numerical precision)
+        EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[data.bandIndex], data.expected_Psat_mW,
+                    data.expected_Psat_mW * 0.01f)
+            << "P_sat mismatch for " << data.bandName
+            << ": expected " << data.expected_Psat_mW
+            << " mW, got " << ED.PowerCal_20W_Psat_mW[data.bandIndex] << " mW";
+
+        // Use 1% tolerance for k index
+        EXPECT_NEAR(ED.PowerCal_20W_kindex[data.bandIndex], data.expected_k,
+                    data.expected_k * 0.01f)
+            << "k index mismatch for " << data.bandName
+            << ": expected " << data.expected_k
+            << ", got " << ED.PowerCal_20W_kindex[data.bandIndex];
+
+        printf("  P_sat = %.2f mW (expected %.2f), k = %.2f (expected %.2f), Gain_corr = %.2f dB\n",
+               ED.PowerCal_20W_Psat_mW[data.bandIndex],
+               data.expected_Psat_mW,
+               ED.PowerCal_20W_kindex[data.bandIndex],
+               data.expected_k,
+               ED.PowerCal_20W_DSP_Gain_correction_dB[data.bandIndex]);
+
+        // Move to next band (except for the last one)
+        if (i < sizeof(calData) / sizeof(calData[0]) - 1) {
+            ChangeBandUp();
+            loop(); MyDelay(10);
+        }
+    }
+
+    printf("\nCalibration complete for all bands.\n");
+
+    // Exit calibration and return to home screen
+    // The HOME_SCREEN button triggers iCALIBRATE_EXIT which performs the full exit sequence
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(50);  // Give extra time for state transitions
+
+    // Consume the interrupt that was queued
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    printf("\nReturned to home screen.\n");
+
+    // Final verification: Check all bands have correct calibration values
+    printf("\n=== Final Calibration Validation ===\n\n");
+    printf("%-6s | %10s | %10s | %10s | %10s\n",
+           "Band", "P_sat[mW]", "Expected", "k", "Expected");
+    printf("-------|------------|------------|------------|------------\n");
+
+    for (size_t i = 0; i < sizeof(calData) / sizeof(calData[0]); i++) {
+        BandCalData& data = calData[i];
+
+        printf("%-6s | %10.2f | %10.2f | %10.2f | %10.2f\n",
+               data.bandName,
+               ED.PowerCal_20W_Psat_mW[data.bandIndex],
+               data.expected_Psat_mW,
+               ED.PowerCal_20W_kindex[data.bandIndex],
+               data.expected_k);
+
+        // Final validation that all parameters are within tolerance
+        EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[data.bandIndex], data.expected_Psat_mW,
+                    data.expected_Psat_mW * 0.01f)
+            << "Final check: P_sat out of tolerance for " << data.bandName;
+
+        EXPECT_NEAR(ED.PowerCal_20W_kindex[data.bandIndex], data.expected_k,
+                    data.expected_k * 0.01f)
+            << "Final check: k out of tolerance for " << data.bandName;
+
+        // Verify DSP gain correction was also set (not checking exact value as it depends on SSB cal point)
+        EXPECT_NE(ED.PowerCal_20W_DSP_Gain_correction_dB[data.bandIndex], -3.0f)
+            << "Final check: DSP gain correction not updated for " << data.bandName;
+    }
+
+    printf("\nAll calibration parameters validated successfully.\n");
+    printf("\n=== Calibration Walkthrough Test Complete ===\n\n");
+}
+

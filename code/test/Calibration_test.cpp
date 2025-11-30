@@ -701,9 +701,13 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     EXPECT_NEAR(attenuations_dB[2], 20.0, 0.00001);
     EXPECT_NEAR(powers_W[2], 75.2, 0.00001);
 
-    // After recording the third point, the system automatically calculates the fit
-    // and transitions to offset mode. The fit routine queues button 12, so we need
-    // to process it with another loop() call.
+    // After recording the third point, curve fit is automatically calculated
+    // but we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+
+    // User must manually press button 12 to transition to offset mode
+    SetButton(12);
+    SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
 
@@ -841,16 +845,21 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    // After recording the third point, the system automatically calculates the fit
-    // and queues button 12 to transition to offset mode. Process it with another loop() call.
-    loop(); MyDelay(10);
-
+    // After recording the third point, curve fit is automatically calculated
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
     EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]],14790,50);
     EXPECT_NEAR(ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
 
-    // After the fit, the system should have automatically transitioned to offset mode
+    // But we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+
+    // User must manually press button 12 to transition to offset mode
+    SetButton(12);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Now we should have transitioned to offset mode
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
 
     // Exit offset mode back to power calibration
@@ -911,16 +920,21 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
 
-    // After recording the third point, the system automatically calculates the fit
-    // and queues button 12 to transition to offset mode. Process it with another loop() call.
-    loop(); MyDelay(10);
-
+    // After recording the third point, curve fit is automatically calculated
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
     EXPECT_NEAR(ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]],77050,600);
     EXPECT_NEAR(ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
 
-    // After the fit, the system should have automatically transitioned to offset mode
+    // But we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+
+    // User must manually press button 12 to transition to offset mode
+    SetButton(12);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Now we should have transitioned to offset mode
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
 
     // Exit offset mode back to power calibration
