@@ -350,6 +350,7 @@ void CalculatePowerCurveFit(void); // forward declare from MainBoard_DisplayCali
 void ChangePowerIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangeCalibrationPASelection(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangePowerUnits(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ResetPowerCal(void); // forward declare from MainBoard_DisplayCalibration.cpp
 
 /**
  * Process button press events from the front panel.
@@ -825,6 +826,7 @@ void HandleButtonPress(int32_t button){
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
                     UpdateRFHardwareState();
+                    ResetPowerCal();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
@@ -835,6 +837,7 @@ void HandleButtonPress(int32_t button){
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
                     UpdateRFHardwareState();
+                    ResetPowerCal();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }

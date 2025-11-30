@@ -24,7 +24,7 @@ static Pane PanePowerAtt =      {310,50,100,40,DrawPowerAttPane,1};
 static Pane PanePowerPower =    {310,100,220,40,DrawPowerPowerPane,1};
 static Pane PanePowerData =     {320,150,200,90,DrawPowerDataPane,1};
 static Pane PanePowerAdjust =   {3,250,300,230,DrawPowerAdjustPane,1};
-static Pane PanePowerTable =    {300,250,200,230,DrawPowerTablePane,1};
+static Pane PanePowerTable =    {300,250,210,230,DrawPowerTablePane,1};
 static Pane PanePowerInstructions = {530,7,260,470,DrawPowerInstructionsPane,1};
 
 // Array of all panes for iteration
@@ -156,6 +156,10 @@ void RecordPowerDataPoint(void){
                 ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
             powerCalibrationStepCount++; // Increment step counter
             PanePowerInstructions.stale = true; // Update instructions display
+
+            SetButton(12); // cause entry to CALIBRATE_POWER_SPACE state on next loop
+            SetInterrupt(iBUTTON_PRESSED);
+
             break;
         }
         default:
@@ -257,6 +261,7 @@ void IncrementCalibrationTransmitAtt(void){
     if (ED.XAttenCW[currentBand] > 31.5)
         ED.XAttenCW[currentBand] = 31.5;
     PanePowerAtt.stale = true;
+    SetTXAttenuation(ED.XAttenCW[currentBand]);
 }
 
 /**
@@ -271,6 +276,7 @@ void DecrementCalibrationTransmitAtt(void){
     if (ED.XAttenCW[currentBand] < 0.0)
         ED.XAttenCW[currentBand] = 0.0;
     PanePowerAtt.stale = true;
+    SetTXAttenuation(ED.XAttenCW[currentBand]);
 }
 
 float32_t oldpow = -5.0;
@@ -495,8 +501,8 @@ static void DrawPowerTablePane(void){
     tft.print("Psat");
     tft.setCursor(PanePowerTable.x0+120, PanePowerTable.y0+3);
     tft.print("k");
-    tft.setCursor(PanePowerTable.x0+160, PanePowerTable.y0+3);
-    tft.print("Correction");
+    tft.setCursor(PanePowerTable.x0+170, PanePowerTable.y0+3);
+    tft.print("Gain");
 
 
     for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
@@ -652,6 +658,29 @@ static void DrawPowerInstructionsPane(void){
     PanePowerInstructions.stale = false;
 }
 
+void ResetPowerCal(void){
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
+    if (ED.PA100Wactive){
+        if (powerUnit)
+            measuredPower = 75.0;
+        else
+            measuredPower = 10*log10f(75.0*1000); // dBm units
+        targetPower = measuredPower;        
+    }else{
+        if (powerUnit)
+            measuredPower = 10.0;
+        else
+            measuredPower = 10*log10f(10.0*1000); // dBm units
+        targetPower = measuredPower;
+    }
+    Npoints = 0;
+    powerCalibrationStepCount = 0;
+    // Mark all the panes stale to force a screen refresh
+    for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
+        PowerWindowPanes[i]->stale = true;
+    }
+}
+
 /**
  * @brief Main power calibration screen rendering function
  * @note Called from DrawDisplay() when in CALIBRATE_POWER UI state
@@ -685,6 +714,13 @@ void DrawCalibratePower(void){
         }
         // Reset calibration step counter on entry
         powerCalibrationStepCount = 0;
+        Npoints = 0;
+        
+        // Make all the attenuations zero so we start off right
+        for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
+            ED.XAttenCW[k] = 0.0;
+        SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
+
         // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
             PowerWindowPanes[i]->stale = true;

@@ -497,7 +497,6 @@ void UpdateRFHardwareState(void){
  * @note Temporarily resets previousRadioState to force HandleRFHardwareStateChange() to run
  */
 void ForceUpdateRFHardwareState(void){
-    ModeSm_StateId savedState = previousRadioState;
     previousRadioState = ModeSm_StateId_ROOT; // Force the update
     UpdateRFHardwareState();
     // previousRadioState is set by UpdateRFHardwareState, no need to restore it
