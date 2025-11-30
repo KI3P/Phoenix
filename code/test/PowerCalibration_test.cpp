@@ -15,6 +15,7 @@ extern uint32_t Npoints;
 extern uint8_t incindexPower;
 extern float32_t attenuations_dB[3];
 extern float32_t powers_W[3];
+extern uint8_t powerCalibrationStepCount;
 
 // Timer variables for interrupt simulation
 static std::atomic<bool> timer_running{false};
@@ -938,6 +939,14 @@ protected:
                        float32_t A2, float32_t P2,
                        float32_t A3, float32_t P3,
                        float32_t A4, float32_t P4) {
+        // Verify we're starting in CALIBRATE_POWER_SPACE state
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE)
+            << "Should be in CALIBRATE_POWER_SPACE state at start of calibration";
+
+        // Step counter should be 0 at the start (in CALIBRATE_POWER_SPACE)
+        EXPECT_EQ(powerCalibrationStepCount, 0u)
+            << "Step counter should be 0 when starting calibration in CALIBRATE_POWER_SPACE";
+
         // Step 1: Record power at 0 dB attenuation
         // Set attenuation to A1 (should be 0)
         ED.XAttenCW[ED.currentBand[ED.activeVFO]] = A1;
@@ -951,7 +960,8 @@ protected:
         SetInterrupt(iBUTTON_PRESSED);
         loop(); MyDelay(10);
 
-        EXPECT_EQ(Npoints, 1u);
+        EXPECT_EQ(Npoints, 1u) << "Should have recorded 1 data point after step 1";
+        EXPECT_EQ(powerCalibrationStepCount, 1u) << "Step counter should be 1 after recording first point";
 
         // Step 2: Adjust attenuation to drop power by 6dB
         // Set attenuation to A2
@@ -966,7 +976,8 @@ protected:
         SetInterrupt(iBUTTON_PRESSED);
         loop(); MyDelay(10);
 
-        EXPECT_EQ(Npoints, 2u);
+        EXPECT_EQ(Npoints, 2u) << "Should have recorded 2 data points after step 2";
+        EXPECT_EQ(powerCalibrationStepCount, 2u) << "Step counter should be 2 after recording second point";
 
         // Step 3: Adjust attenuation to drop power by another 6dB
         // Set attenuation to A3
@@ -981,7 +992,8 @@ protected:
         SetInterrupt(iBUTTON_PRESSED);
         loop(); MyDelay(10);
 
-        EXPECT_EQ(Npoints, 3u);
+        EXPECT_EQ(Npoints, 3u) << "Should have recorded 3 data points after step 3";
+        EXPECT_EQ(powerCalibrationStepCount, 3u) << "Step counter should be 3 after recording third point";
 
         // Curve fit should have been calculated automatically after 3 points
         // Press button 12 to proceed to SSB gain calibration (step 4)
@@ -989,7 +1001,13 @@ protected:
         SetInterrupt(iBUTTON_PRESSED);
         loop(); MyDelay(10);
 
-        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE)
+            << "Should transition to CALIBRATE_OFFSET_SPACE after button 12";
+
+        // After transition to OFFSET_SPACE, step counter should remain at 3
+        // ResetPowerCal() preserves the counter when in OFFSET_SPACE
+        EXPECT_EQ(powerCalibrationStepCount, 3u)
+            << "Step counter should remain at 3 after entering CALIBRATE_OFFSET_SPACE (steps 1-3 stay checked)";
 
         // Step 4: Record measured power for SSB calibration
         // Set attenuation to A4 (should be 0)
@@ -1003,6 +1021,10 @@ protected:
         SetButton(MENU_OPTION_SELECT);
         SetInterrupt(iBUTTON_PRESSED);
         loop(); MyDelay(10);
+
+        // Now step counter should be set to 4 (step 4 completed)
+        EXPECT_EQ(powerCalibrationStepCount, 4u)
+            << "Step counter should be 4 after recording offset measurement in CALIBRATE_OFFSET_SPACE";
 
         // Press button 12 to return to power calibration mode
         //SetButton(12);
@@ -1020,8 +1042,14 @@ protected:
         SetInterrupt(iBUTTON_PRESSED);
         loop(); MyDelay(10);
 
-        // Reset calibration for new band
-        Npoints = 0;
+        // The button handler calls ResetPowerCal() and transitions states as needed
+        // Verify we're back in POWER_SPACE with counter reset
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE)
+            << "Should be in POWER_SPACE after band change";
+        EXPECT_EQ(powerCalibrationStepCount, 0u)
+            << "Step counter should be reset to 0 after band change";
+        EXPECT_EQ(Npoints, 0u)
+            << "Npoints should be reset to 0 after band change";
     }
 };
 
@@ -1169,5 +1197,174 @@ TEST_F(PowerCalibrationWalkthroughTest, CompleteCalibrationAllBands) {
 
     printf("\nAll calibration parameters validated successfully.\n");
     printf("\n=== Calibration Walkthrough Test Complete ===\n\n");
+}
+
+/**
+ * Test that re-measuring data points doesn't incorrectly increment step counter
+ *
+ * This test verifies the fix for the issue where re-measuring the first three
+ * data points would cause step 4 to be incorrectly checked off because
+ * powerCalibrationStepCount was incrementing on each measurement.
+ */
+TEST_F(PowerCalibrationWalkthroughTest, RemeasuringDataPoints_StepCounterStaysCorrect) {
+    // Navigate to power calibration
+    NavigateToPowerCalibration();
+
+    printf("\n=== Testing Re-measurement of Data Points ===\n\n");
+
+    // Verify initial state
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+    EXPECT_EQ(powerCalibrationStepCount, 0u);
+    EXPECT_EQ(Npoints, 0u);
+
+    printf("Initial state: stepCount=%u, Npoints=%u\n", powerCalibrationStepCount, Npoints);
+
+    // Record first data point
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0f;
+    SetTXAttenuation(0.0f);
+    measuredPower = 10.0f;  // 10W
+
+    SetButton(MENU_OPTION_SELECT);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(Npoints, 1u);
+    EXPECT_EQ(powerCalibrationStepCount, 1u) << "Step counter should be 1 after first measurement";
+    printf("After 1st measurement: stepCount=%u, Npoints=%u\n", powerCalibrationStepCount, Npoints);
+
+    // Record second data point
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 6.0f;
+    SetTXAttenuation(6.0f);
+    measuredPower = 2.5f;  // ~6dB down
+
+    SetButton(MENU_OPTION_SELECT);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(Npoints, 2u);
+    EXPECT_EQ(powerCalibrationStepCount, 2u) << "Step counter should be 2 after second measurement";
+    printf("After 2nd measurement: stepCount=%u, Npoints=%u\n", powerCalibrationStepCount, Npoints);
+
+    // Record third data point
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 12.0f;
+    SetTXAttenuation(12.0f);
+    measuredPower = 0.625f;  // ~12dB down from original
+
+    SetButton(MENU_OPTION_SELECT);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(Npoints, 3u);
+    EXPECT_EQ(powerCalibrationStepCount, 3u) << "Step counter should be 3 after third measurement";
+    printf("After 3rd measurement: stepCount=%u, Npoints=%u\n", powerCalibrationStepCount, Npoints);
+
+    // Now re-measure the first data point (simulating user wanting to redo it)
+    printf("\nRe-measuring first data point...\n");
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0f;
+    SetTXAttenuation(0.0f);
+    measuredPower = 10.1f;  // Slightly different measurement
+
+    SetButton(MENU_OPTION_SELECT);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    // Npoints wraps to 1, but step counter is capped at 3
+    // The key point is that powerCalibrationStepCount should NOT increment beyond 3
+    EXPECT_EQ(powerCalibrationStepCount, 3u) << "Step counter should stay at 3 (capped) after re-measurement";
+    printf("After re-measurement: stepCount=%u, Npoints=%u\n", powerCalibrationStepCount, Npoints);
+
+    // Re-measure second point
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 6.0f;
+    SetTXAttenuation(6.0f);
+    measuredPower = 2.6f;
+
+    SetButton(MENU_OPTION_SELECT);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(powerCalibrationStepCount, 3u) << "Step counter should remain capped at 3 even after multiple re-measurements";
+    printf("After 2nd re-measurement: stepCount=%u, Npoints=%u\n", powerCalibrationStepCount, Npoints);
+
+    // The critical test: verify we're still in POWER_SPACE and step 4 is NOT checked
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE)
+        << "Should still be in CALIBRATE_POWER_SPACE";
+    EXPECT_EQ(powerCalibrationStepCount, 3u)
+        << "Step counter should be capped at 3 - step 4 should NOT be marked as complete";
+
+    printf("\n✓ Verified: Step counter caps at 3 during measurements in CALIBRATE_POWER_SPACE\n");
+    printf("  This means step 4 will NOT be incorrectly checked off\n\n");
+}
+
+/**
+ * Test state transitions between CALIBRATE_POWER_SPACE and CALIBRATE_OFFSET_SPACE
+ *
+ * This test verifies that:
+ * 1. Button 12 transitions from POWER_SPACE to OFFSET_SPACE
+ * 2. Button 12 transitions from OFFSET_SPACE back to POWER_SPACE
+ * 3. Step counter resets to 0 when returning to POWER_SPACE
+ */
+TEST_F(PowerCalibrationWalkthroughTest, StateTransitions_StepCounterResetsCorrectly) {
+    // Navigate to power calibration
+    NavigateToPowerCalibration();
+
+    printf("\n=== Testing State Transitions and Step Counter Reset ===\n\n");
+
+    // Verify initial state
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+    EXPECT_EQ(powerCalibrationStepCount, 0u);
+    printf("Initial state: CALIBRATE_POWER_SPACE, stepCount=%u\n", powerCalibrationStepCount);
+
+    // Record 3 data points quickly
+    for (int i = 0; i < 3; i++) {
+        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = i * 6.0f;
+        SetTXAttenuation(i * 6.0f);
+        measuredPower = 10.0f / pow(2.0f, i * 2.0f);  // Roughly -6dB each step
+
+        SetButton(MENU_OPTION_SELECT);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+    }
+
+    EXPECT_EQ(Npoints, 3u);
+    EXPECT_EQ(powerCalibrationStepCount, 3u) << "Step counter should be 3 after recording 3 points";
+    printf("After 3 measurements: Npoints=%u, stepCount=%u\n", Npoints, powerCalibrationStepCount);
+
+    // Press button 12 to transition to OFFSET_SPACE
+    printf("\nPressing button 12 to enter CALIBRATE_OFFSET_SPACE...\n");
+    SetButton(12);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+    // ResetPowerCal() preserves the counter when in OFFSET_SPACE
+    EXPECT_EQ(powerCalibrationStepCount, 3u) << "Step counter should remain at 3 (steps 1-3 stay checked)";
+    printf("Entered CALIBRATE_OFFSET_SPACE, stepCount=%u\n", powerCalibrationStepCount);
+
+    // Record offset measurement
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0f;
+    SetTXAttenuation(0.0f);
+    measuredPower = 3.0f;
+
+    SetButton(MENU_OPTION_SELECT);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(powerCalibrationStepCount, 4u) << "Step counter should be 4 after recording offset";
+    printf("After recording offset: stepCount=%u\n", powerCalibrationStepCount);
+
+    // Press button 12 again to return to POWER_SPACE
+    printf("\nPressing button 12 to return to CALIBRATE_POWER_SPACE...\n");
+    SetButton(12);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+    EXPECT_EQ(powerCalibrationStepCount, 0u) << "Step counter should RESET to 0 when returning to POWER_SPACE";
+    EXPECT_EQ(Npoints, 0u) << "Npoints should also reset when returning to POWER_SPACE";
+    printf("Returned to CALIBRATE_POWER_SPACE, stepCount=%u, Npoints=%u\n",
+           powerCalibrationStepCount, Npoints);
+
+    printf("\n✓ Verified: Step counter resets to 0 when transitioning back to CALIBRATE_POWER_SPACE\n");
+    printf("  This allows user to re-do the calibration from step 1\n\n");
 }
 

@@ -22,7 +22,7 @@ static void DrawPowerInstructionsPane(void);
 // Pane instances
 static Pane PanePowerAtt =      {310,50,100,40,DrawPowerAttPane,1};
 static Pane PanePowerPower =    {310,100,220,40,DrawPowerPowerPane,1};
-static Pane PanePowerData =     {320,150,200,90,DrawPowerDataPane,1};
+static Pane PanePowerData =     {290,150,230,90,DrawPowerDataPane,1};
 static Pane PanePowerAdjust =   {3,250,300,230,DrawPowerAdjustPane,1};
 static Pane PanePowerTable =    {300,250,210,230,DrawPowerTablePane,1};
 static Pane PanePowerInstructions = {530,7,260,470,DrawPowerInstructionsPane,1};
@@ -42,7 +42,7 @@ uint8_t powerUnit = 1; // 1=W, 0=dBm
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
 uint32_t Npoints = 0;
-static uint8_t powerCalibrationStepCount = 0; // Tracks how many times RecordPowerDataPoint has been called
+uint8_t powerCalibrationStepCount = 0; // Tracks step completion state for instruction display
 
 void CalculatePowerCurveFit(void){
     Debug("Invoked power curve fit");
@@ -117,7 +117,13 @@ void RecordPowerDataPoint(void){
             else
                 powers_W[Npoints] = pow(10.0f,measuredPower/10.0f)/1000.0f;
             Npoints++;
-            powerCalibrationStepCount++; // Increment step counter
+
+            // Update step counter, but cap at 3 (don't go to step 4 until in OFFSET_SPACE)
+            // This allows re-measurement without incorrectly showing step 4 as complete
+            if (powerCalibrationStepCount < 3) {
+                powerCalibrationStepCount++;
+            }
+
             PanePowerInstructions.stale = true; // Update instructions display
             // Change the target power by factor of 6 dB
             if (Npoints < 3){
@@ -155,7 +161,8 @@ void RecordPowerDataPoint(void){
                 ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
             else
                 ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
-            powerCalibrationStepCount++; // Increment step counter
+            // Set step counter to 4 when offset measurement is recorded
+            powerCalibrationStepCount = 4;
             PanePowerInstructions.stale = true; // Update instructions display
             // User must press button to change measurement mode
             break;
@@ -188,20 +195,60 @@ static void DrawPowerDataPane(void){
 
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
-
-    tft.setCursor(PanePowerData.x0+5, PanePowerData.y0+3);
+    
+    const int16_t col1x = 5;
+    const int16_t col2x = 35;
+    const int16_t col3x = 90;
+    const int16_t col4x = 145;
+    
+    tft.setCursor(PanePowerData.x0+col2x, PanePowerData.y0+3);
+    tft.print("Step");
+    tft.setCursor(PanePowerData.x0+col3x, PanePowerData.y0+3);
     tft.print("Atten");
-    tft.setCursor(PanePowerData.x0+70, PanePowerData.y0+3);
+    tft.setCursor(PanePowerData.x0+col4x, PanePowerData.y0+3);
     tft.print("Power");
 
-    for (size_t k=0; k<Npoints; k++){
+    tft.drawFastHLine(PanePowerData.x0+30,PanePowerData.y0+70,180,RA8875_WHITE);
+    for (size_t k=0; k<=4; k++){
         int16_t y = PanePowerData.y0 + 20 + k*17;
-        tft.setCursor(PanePowerData.x0+5, y);
-        tft.print(attenuations_dB[k]);
 
-        tft.setCursor(PanePowerData.x0+70, y);
-        sprintf(buff,"%3.2f",powers_W[k]);
-        tft.print(buff);
+        tft.setCursor(PanePowerData.x0+col1x, y);
+        if (k < powerCalibrationStepCount){
+            // Draw a check mark
+            //tft.print("\x76"); // Checkmark character
+            tft.print("✓"); // Checkmark character
+        }
+        if ((k == powerCalibrationStepCount) && (k < 4)){
+            // Draw an arrow indicating that you're on this step
+            tft.print("→"); // right arrow character
+        }
+        if ((k == 4) && (k == powerCalibrationStepCount)){
+            // completed all four steps
+            tft.print("✓"); // Checkmark character
+        }
+
+        tft.setCursor(PanePowerData.x0+col2x, y);
+        tft.print((int32_t)k+1);
+
+        if (k < Npoints){
+            tft.setCursor(PanePowerData.x0+col3x, y);
+            tft.print(attenuations_dB[k]);
+
+            tft.setCursor(PanePowerData.x0+col4x, y);
+            sprintf(buff,"%3.2f",powers_W[k]);
+            tft.print(buff);
+        }
+        if ((k == 4) && (k == powerCalibrationStepCount)){
+            tft.setCursor(PanePowerData.x0+col3x, y);
+            tft.print(0);
+
+            tft.setCursor(PanePowerData.x0+col4x, y);
+            if (powerUnit)
+                sprintf(buff,"%3.2f",measuredPower);
+            else
+                sprintf(buff,"%3.2f",pow(10.0f,measuredPower/10.0f)/1000.0f);
+            tft.print(buff);
+        }
 
     }
     PanePowerData.stale = false;
@@ -557,6 +604,7 @@ static void DrawPowerInstructionsPane(void){
 
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
+    // Use powerCalibrationStepCount to track all steps 1-4
     if (powerCalibrationStepCount >= 1){
         tft.setTextColor(RA8875_GREEN);
         tft.print("\x76"); // Checkmark character
@@ -596,6 +644,7 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
+    // Step 4 is only checked when powerCalibrationStepCount reaches 4 (in CALIBRATE_OFFSET_SPACE)
     if (powerCalibrationStepCount >= 4){
         tft.setTextColor(RA8875_GREEN);
         tft.print("\x76"); // Checkmark character
@@ -668,6 +717,11 @@ static void DrawPowerInstructionsPane(void){
 void ResetPowerCal(void){
     switch (modeSM.state_id){
         case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
+            // Reset step counter and data points when in POWER_SPACE
+            // This happens when returning from OFFSET_SPACE or changing bands
+            powerCalibrationStepCount = 0;
+            Npoints = 0;
+
             if (ED.PA100Wactive){
                 if (powerUnit)
                     measuredPower = CW_100W_CAL_POWER_POINT_W;
@@ -681,6 +735,15 @@ void ResetPowerCal(void){
             }
             break;
         case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
+            // When entering OFFSET_SPACE from POWER_SPACE, counter is 3 - preserve it
+            // When changing bands while in OFFSET_SPACE, counter is 4 - reset it
+            if (powerCalibrationStepCount >= 4) {
+                // Band change case: we completed step 4, reset for new band
+                powerCalibrationStepCount = 0;
+            }
+            // Otherwise preserve counter at 3 when entering OFFSET_SPACE
+            Npoints = 0;
+
             if (ED.PA100Wactive){
                 if (powerUnit)
                     measuredPower = SSB_100W_CAL_POWER_POINT_W;
@@ -701,9 +764,7 @@ void ResetPowerCal(void){
             break;
     }
     ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-    targetPower = measuredPower;        
-    Npoints = 0;
-    powerCalibrationStepCount = 0;
+    targetPower = measuredPower;
     // Mark all the panes stale to force a screen refresh
     for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
         PowerWindowPanes[i]->stale = true;
