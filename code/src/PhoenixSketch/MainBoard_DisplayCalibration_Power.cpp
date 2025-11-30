@@ -56,7 +56,7 @@ void CalculatePowerCurveFit(void){
         ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
     } else {
-        f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 15000.0f,10.0f);
+        f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 15000.0f,6.0f);
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
     }

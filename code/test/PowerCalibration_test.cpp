@@ -679,3 +679,139 @@ TEST_F(PowerCalibrationTest, FitPowerCurve_DifferentInitialGuesses) {
     EXPECT_NEAR(result1.k, k_true, 0.5f);
 }
 
+/**
+ * Test FitPowerCurve with real-world hardware measurements
+ *
+ * This test uses actual power calibration data collected from a real radio
+ * across all amateur radio bands. It evaluates how well the curve fitting
+ * works with real-world data that includes measurement noise and hardware
+ * variations.
+ *
+ * For each band, we have 4 measurements:
+ * - A0, P0: Attenuation and power at maximum output (0 dB attenuation)
+ * - A1, P1: First measurement point (typically -6 dB from max)
+ * - A2, P2: Second measurement point (typically -12 dB from max)
+ * - A3, P3: Third measurement (SSB level calibration point)
+ *
+ * The first three points are used for curve fitting, and the fourth is
+ * for SSB gain calibration.
+ */
+TEST_F(PowerCalibrationTest, FitPowerCurve_RealWorldData) {
+    // Real-world measurement data from actual hardware
+    // Format: Band name, A0, P0, A1, P1, A2, P2, A3, P3
+    struct BandMeasurement {
+        const char* band_name;
+        float32_t att_dB[3];     // Attenuations: A0, A1, A2
+        float32_t power_dBm[3];    // Powers: P0, P1, P2
+        float32_t ssb_att_dB;    // A3
+        float32_t ssb_power_W;   // P3
+    };
+
+    BandMeasurement measurements[] = {
+        {"160m", {0.0f, 21.5f, 28.0f}, {40.7f, 34.0f, 28.0f}, 0.0f, 39.0f},
+        {"80m",  {0.0f, 11.5f, 18.5f}, {40.8f, 34.3f, 27.9f}, 0.0f, 31.7f},
+        {"60m",  {0.0f, 12.0f, 18.0f}, {41.7f, 34.0f, 28.1f}, 0.0f, 33.2f},
+        {"40m",  {0.0f, 20.0f, 27.0f}, {41.7f, 34.0f, 27.7f}, 0.0f, 38.6f},
+        {"30m",  {0.0f, 17.0f, 24.0f}, {40.2f, 34.0f, 27.7f}, 0.0f, 35.9f},
+        {"20m",  {0.0f, 11.5f, 18.0f}, {39.9f, 33.9f, 28.0f}, 0.0f, 30.8f},
+        {"17m",  {0.0f, 12.0f, 18.5f}, {40.6f, 33.9f, 28.0f}, 0.0f, 30.4f},
+        {"15m",  {0.0f, 14.5f, 21.0f}, {39.6f, 33.9f, 28.1f}, 0.0f, 26.1f},
+        {"12m",  {0.0f, 12.5f, 19.0f}, {39.7f, 33.8f, 28.2f}, 0.0f, 30.4f},
+        {"10m",  {0.0f, 16.5f, 23.5f}, {37.2f, 34.0f, 28.0f}, 0.0f, 32.9f},
+        {"6m",   {0.0f,  7.0f, 13.5f}, {39.0f, 34.0f, 28.0f}, 0.0f, 20.5f},
+    };
+
+    printf("\n=== Real-World Power Curve Fit Evaluation ===\n\n");
+    printf("%-6s | %8s | %6s | %5s | %9s | %9s\n",
+           "Band", "P_sat[mW]", "k", "Iters", "RMS[mW]", "RMS[%%]");
+    printf("-------|----------|--------|-------|-----------|----------\n");
+
+    int num_bands = sizeof(measurements) / sizeof(measurements[0]);
+
+    // Open CSV file for output
+    FILE* csv_file = fopen("power_calibration_fits.csv", "w");
+    if (csv_file) {
+        fprintf(csv_file, "Band,A0,P0,A1,P1,A2,P2,P_sat_mW,k,iterations,rms_error_mW,rms_percent\n");
+    }
+
+    // Store fit results for summary table
+    struct FitSummary {
+        const char* band_name;
+        float32_t P_sat_mW;
+        float32_t k;
+        float32_t rms_percent;
+    };
+    FitSummary fit_summary[11];  // 11 bands
+
+    for (int i = 0; i < num_bands; i++) {
+        BandMeasurement& m = measurements[i];
+
+        // Convert power from Watts to milliwatts for fitting
+        float32_t power_mW[3];
+        for (int j = 0; j < 3; j++) {
+            power_mW[j] = pow(10.0,m.power_dBm[j]/10);
+        }
+
+        // Perform curve fit
+        // Initial guesses: P_sat ~15W, k ~10 (typical for this PA)
+        FitResult fit = FitPowerCurve(m.att_dB, power_mW, 3, 15000.0f, 6.0f);
+
+        // Calculate RMS error as percentage of max power
+        float32_t max_power_mW = power_mW[0];
+        float32_t rms_percent = (fit.rms_error / max_power_mW) * 100.0f;
+
+        // Store for summary
+        fit_summary[i].band_name = m.band_name;
+        fit_summary[i].P_sat_mW = fit.P_sat ;
+        fit_summary[i].k = fit.k;
+        fit_summary[i].rms_percent = rms_percent;
+
+        // Write to CSV file
+        if (csv_file) {
+            fprintf(csv_file, "%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%.2f,%.2f\n",
+                    m.band_name,
+                    m.att_dB[0], power_mW[0],
+                    m.att_dB[1], power_mW[1],
+                    m.att_dB[2], power_mW[2],
+                    fit.P_sat, fit.k, fit.iterations,
+                    fit.rms_error, rms_percent);
+        }
+
+        // Print results
+        printf("%-6s | %8.2f | %6.2f | %5d | %9.2f | %8.2f%%\n",
+               m.band_name,
+               fit.P_sat,
+               fit.k,
+               fit.iterations,
+               fit.rms_error,
+               rms_percent);
+
+        // Basic sanity checks
+        EXPECT_GT(fit.P_sat, 0.0f) << "Band " << m.band_name << ": P_sat must be positive";
+        EXPECT_LT(fit.P_sat, 100000.0f) << "Band " << m.band_name << ": P_sat unreasonably high";
+        EXPECT_GT(fit.k, 0.0f) << "Band " << m.band_name << ": k must be positive";
+
+        // Validate fit quality - RMS error should be less than 1% of max power
+        EXPECT_LT(rms_percent, 1.0f) << "Band " << m.band_name << ": RMS error exceeds 1% threshold";
+    }
+
+    // Close CSV file
+    if (csv_file) {
+        fclose(csv_file);
+        printf("\nData written to: power_calibration_fits.csv\n");
+    }
+
+    // Print summary table
+    printf("\n=== Fit Parameters Summary ===\n\n");
+    printf("%-6s | %10s | %10s | %10s\n", "Band", "P_sat[mW]", "k", "RMS[%%]");
+    printf("-------|------------|------------|------------\n");
+    for (int i = 0; i < num_bands; i++) {
+        printf("%-6s | %10.2f | %10.2f | %9.2f%%\n",
+               fit_summary[i].band_name,
+               fit_summary[i].P_sat_mW,
+               fit_summary[i].k,
+               fit_summary[i].rms_percent);
+    }
+    printf("\n");
+}
+

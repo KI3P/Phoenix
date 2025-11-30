@@ -343,7 +343,7 @@ FitResult fitTanhModel(float32_t* att, float32_t* pout, int32_t n,
 }
 
 FitResult FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
-                    float32_t P_sat_init = 15000.0f, float32_t k_init = 10.0f) {    
+                    float32_t P_sat_init = 15000.0f, float32_t k_init = 6.0f) {    
     // Initial guesses for P_sat_init and k_init are close for 20W amp case
     char buff[100];
     Serial.println("Fit to data points:");
