@@ -60,24 +60,22 @@ void CalculatePowerCurveFit(void){
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
     }
-    Debug("Switching to SSB gain measurement");
+    // Reset back to the 0dB power measurement in case the user wants to do it again
+    // User must press button 12 to transition to CALIBRATE_OFFSET_SPACE state
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
+    SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
     if (ED.PA100Wactive){
         if (powerUnit)
-            measuredPower = SSB_100W_CAL_POWER_POINT_W;
+            measuredPower = CW_100W_CAL_POWER_POINT_W;
         else
-            measuredPower = 10*log10f(SSB_100W_CAL_POWER_POINT_W*1000); // dBm units
-        targetPower = measuredPower;
-        ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
-    } else {
+            measuredPower = 10*log10f(CW_100W_CAL_POWER_POINT_W*1000); // dBm units
+    }else{
         if (powerUnit)
-            measuredPower = SSB_20W_CAL_POWER_POINT_W;
+            measuredPower = CW_20W_CAL_POWER_POINT_W;
         else
-            measuredPower = 10*log10f(SSB_20W_CAL_POWER_POINT_W*1000); // dBm units
-        targetPower = measuredPower;
-        ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
+            measuredPower = 10*log10f(CW_20W_CAL_POWER_POINT_W*1000); // dBm units
     }
-    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-    // User must press button 12 to transition to CALIBRATE_OFFSET_SPACE state
+    targetPower = measuredPower;
     PanePowerAtt.stale = true;
     PanePowerPower.stale = true;
     PanePowerInstructions.stale = true;
@@ -86,16 +84,16 @@ void CalculatePowerCurveFit(void){
 void ChangeCalibrationPASelection(void){
     if (ED.PA100Wactive){
         if (powerUnit)
-            measuredPower = 10.0;
+            measuredPower = CW_20W_CAL_POWER_POINT_W;
         else
-            measuredPower = 10*log10f(10.0*1000); // dBm units
+            measuredPower = 10*log10f(CW_20W_CAL_POWER_POINT_W*1000); // dBm units
         targetPower = measuredPower;
         ED.PA100Wactive = false;
     }else{
         if (powerUnit)
-            measuredPower = 75.0;
+            measuredPower = CW_100W_CAL_POWER_POINT_W;
         else
-            measuredPower = 10*log10f(75.0*1000); // dBm units
+            measuredPower = 10*log10f(CW_100W_CAL_POWER_POINT_W*1000); // dBm units
         targetPower = measuredPower;
         ED.PA100Wactive = true;
     }
@@ -668,20 +666,42 @@ static void DrawPowerInstructionsPane(void){
 }
 
 void ResetPowerCal(void){
-    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-    if (ED.PA100Wactive){
-        if (powerUnit)
-            measuredPower = 75.0;
-        else
-            measuredPower = 10*log10f(75.0*1000); // dBm units
-        targetPower = measuredPower;        
-    }else{
-        if (powerUnit)
-            measuredPower = 10.0;
-        else
-            measuredPower = 10*log10f(10.0*1000); // dBm units
-        targetPower = measuredPower;
+    switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
+            if (ED.PA100Wactive){
+                if (powerUnit)
+                    measuredPower = CW_100W_CAL_POWER_POINT_W;
+                else
+                    measuredPower = 10*log10f(CW_100W_CAL_POWER_POINT_W*1000); // dBm units
+            }else{
+                if (powerUnit)
+                    measuredPower = CW_20W_CAL_POWER_POINT_W;
+                else
+                    measuredPower = 10*log10f(CW_20W_CAL_POWER_POINT_W*1000); // dBm units
+            }
+            break;
+        case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
+            if (ED.PA100Wactive){
+                if (powerUnit)
+                    measuredPower = SSB_100W_CAL_POWER_POINT_W;
+                else
+                    measuredPower = 10*log10f(SSB_100W_CAL_POWER_POINT_W*1000); // dBm units
+                targetPower = measuredPower;
+                ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
+            } else {
+                if (powerUnit)
+                    measuredPower = SSB_20W_CAL_POWER_POINT_W;
+                else
+                    measuredPower = 10*log10f(SSB_20W_CAL_POWER_POINT_W*1000); // dBm units
+                targetPower = measuredPower;
+                ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
+            }
+            break;
+        default:
+            break;
     }
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
+    targetPower = measuredPower;        
     Npoints = 0;
     powerCalibrationStepCount = 0;
     // Mark all the panes stale to force a screen refresh
@@ -710,15 +730,15 @@ void DrawCalibratePower(void){
 
         if (ED.PA100Wactive == 0){
             if (powerUnit)
-                measuredPower = 10.0;
+                measuredPower = CW_20W_CAL_POWER_POINT_W;
             else
-                measuredPower = 10*log10(10.0*1000.0);
+                measuredPower = 10*log10(CW_20W_CAL_POWER_POINT_W*1000.0);
             targetPower = measuredPower;
         } else {
             if (powerUnit)
-                measuredPower = 75.0;
+                measuredPower = CW_100W_CAL_POWER_POINT_W;
             else
-                measuredPower = 10*log10(75.0*1000.0);
+                measuredPower = 10*log10(CW_100W_CAL_POWER_POINT_W*1000.0);
             targetPower = measuredPower;
         }
         // Reset calibration step counter on entry

@@ -319,10 +319,14 @@ void DrawFreqBandModPane(void) {
     tft.setTextColor(RA8875_GREEN);
     tft.setCursor(PaneFreqBandMod.x0+3*PaneFreqBandMod.width/4, PaneFreqBandMod.y0);
 
-    if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE) {
-        tft.print("CW ");
-    } else {
-        tft.print("SSB ");
+    switch (modeSM.state_id){
+        case ModeSm_StateId_SSB_RECEIVE:
+        case ModeSm_StateId_SSB_TRANSMIT:
+            tft.print("SSB ");
+            break;
+        default:
+            tft.print("CW ");
+            break;
     }
 
     tft.setTextColor(RA8875_CYAN);

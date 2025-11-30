@@ -796,6 +796,8 @@ void HandleButtonPress(int32_t button){
                         // Change to offset measurement mode
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
+                    ResetPowerCal();
+                    UpdateRFHardwareState();
                     break;
                 }
                 case (14):{
@@ -825,8 +827,8 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
-                    UpdateRFHardwareState();
                     ResetPowerCal();
+                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
@@ -840,8 +842,8 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
-                    UpdateRFHardwareState();
                     ResetPowerCal();
+                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);

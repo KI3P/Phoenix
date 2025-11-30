@@ -236,6 +236,9 @@ enum MorseStates { state0,
 
 #define SSB_20W_CAL_POWER_POINT_W  3.0f
 #define SSB_100W_CAL_POWER_POINT_W 15.0f
+#define CW_20W_CAL_POWER_POINT_W  10.0f
+#define CW_100W_CAL_POWER_POINT_W 75.0f
+
 
 /** Radio configuration parameters that are kept in persistent storage */
 extern struct config_t {
