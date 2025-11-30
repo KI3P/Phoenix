@@ -164,6 +164,7 @@ void RecordPowerDataPoint(void){
             // Set step counter to 4 when offset measurement is recorded
             powerCalibrationStepCount = 4;
             PanePowerInstructions.stale = true; // Update instructions display
+            PanePowerData.stale = true;
             // User must press button to change measurement mode
             break;
         }
@@ -215,22 +216,34 @@ static void DrawPowerDataPane(void){
         tft.setCursor(PanePowerData.x0+col1x, y);
         if (k < powerCalibrationStepCount){
             // Draw a check mark
-            //tft.print("\x76"); // Checkmark character
-            tft.print("✓"); // Checkmark character
+            tft.setTextColor(RA8875_GREEN);
+            tft.print("v"); // Checkmark character
+            tft.setTextColor(RA8875_WHITE);
         }
-        if ((k == powerCalibrationStepCount) && (k < 4)){
+        if ((k == powerCalibrationStepCount) && (k < 3)){
             // Draw an arrow indicating that you're on this step
-            tft.print("→"); // right arrow character
+            tft.print(">"); // right arrow character
         }
+        // Only draw the arrow here if we transition to OFFSET mode
+        if ((modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE) && (k == 3)){
+            tft.print(">"); // right arrow character
+        }
+        
         if ((k == 4) && (k == powerCalibrationStepCount)){
+            y = PanePowerData.y0 + 20 + (k-1)*17;
             // completed all four steps
-            tft.print("✓"); // Checkmark character
+            tft.setTextColor(RA8875_GREEN);
+            tft.print("v"); // Checkmark character
+            tft.setTextColor(RA8875_WHITE);
         }
 
-        tft.setCursor(PanePowerData.x0+col2x, y);
-        tft.print((int32_t)k+1);
+        if (k < 4){
+            tft.setCursor(PanePowerData.x0+col2x, y);
+            tft.print((int32_t)k+1);
+        }
 
-        if (k < Npoints){
+        if ((k < Npoints) || (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE)){
+            // Draw attenuation and power for points 1 to 3
             tft.setCursor(PanePowerData.x0+col3x, y);
             tft.print(attenuations_dB[k]);
 
