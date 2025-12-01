@@ -214,6 +214,7 @@ void CalculateSSBPoint(void){
  */
 void RecordPowerButtonPressed(void){
     PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RECORD_DATA_POINT);
+    PanePowerData.stale = true;
 }
 
 /**
@@ -324,6 +325,17 @@ static void DrawPowerDataPane(void){
             y = PanePowerData.y0 + 20 + 3*17;
             tft.setCursor(PanePowerData.x0+col1x, y);
             tft.print(">"); // right arrow character
+            for (size_t k=0; k<3; k++){
+                y = PanePowerData.y0 + 20 + k*17;
+                tft.setCursor(PanePowerData.x0+col1x, y);
+                // Draw a check mark
+                tft.setTextColor(RA8875_GREEN);
+                tft.print("v"); // Checkmark character
+                tft.setTextColor(RA8875_WHITE);
+            }
+            break;
+        }
+        case PowerCalSm_StateId_POWERCOMPLETE:{
             for (size_t k=0; k<3; k++){
                 y = PanePowerData.y0 + 20 + k*17;
                 tft.setCursor(PanePowerData.x0+col1x, y);
