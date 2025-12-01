@@ -31,6 +31,8 @@ static void CALIBRATE_OFFSET_MARK_enter(ModeSm* sm);
 
 static void CALIBRATE_OFFSET_MARK_exit(ModeSm* sm);
 
+static void CALIBRATE_OFFSET_MARK_offset_end(ModeSm* sm);
+
 static void CALIBRATE_OFFSET_MARK_ptt_released(ModeSm* sm);
 
 static void CALIBRATE_OFFSET_SPACE_enter(ModeSm* sm);
@@ -46,6 +48,8 @@ static void CALIBRATE_OFFSET_SPACE_ptt_pressed(ModeSm* sm);
 static void CALIBRATE_POWER_MARK_enter(ModeSm* sm);
 
 static void CALIBRATE_POWER_MARK_exit(ModeSm* sm);
+
+static void CALIBRATE_POWER_MARK_offset_end(ModeSm* sm);
 
 static void CALIBRATE_POWER_MARK_ptt_released(ModeSm* sm);
 
@@ -232,6 +236,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             switch (event_id)
             {
                 case ModeSm_EventId_PTT_RELEASED: CALIBRATE_OFFSET_MARK_ptt_released(sm); break;
+                case ModeSm_EventId_OFFSET_END: CALIBRATE_OFFSET_MARK_offset_end(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -241,9 +246,9 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
         case ModeSm_StateId_CALIBRATE_OFFSET_SPACE:
             switch (event_id)
             {
-                case ModeSm_EventId_OFFSET_END: CALIBRATE_OFFSET_SPACE_offset_end(sm); break;
                 case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_OFFSET_SPACE_calibrate_exit(sm); break;
                 case ModeSm_EventId_PTT_PRESSED: CALIBRATE_OFFSET_SPACE_ptt_pressed(sm); break;
+                case ModeSm_EventId_OFFSET_END: CALIBRATE_OFFSET_SPACE_offset_end(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -254,6 +259,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             switch (event_id)
             {
                 case ModeSm_EventId_PTT_RELEASED: CALIBRATE_POWER_MARK_ptt_released(sm); break;
+                case ModeSm_EventId_OFFSET_END: CALIBRATE_POWER_MARK_offset_end(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -612,6 +618,26 @@ static void CALIBRATE_OFFSET_MARK_exit(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
+static void CALIBRATE_OFFSET_MARK_offset_end(ModeSm* sm)
+{
+    // CALIBRATE_OFFSET_MARK behavior
+    // uml: OFFSET_END TransitionTo(CALIBRATE_POWER_SPACE)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_OFFSET_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
+        CALIBRATE_POWER_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_OFFSET_MARK
+    
+    // No ancestor handles this event.
+}
+
 static void CALIBRATE_OFFSET_MARK_ptt_released(ModeSm* sm)
 {
     // CALIBRATE_OFFSET_MARK behavior
@@ -735,6 +761,26 @@ static void CALIBRATE_POWER_MARK_enter(ModeSm* sm)
 static void CALIBRATE_POWER_MARK_exit(ModeSm* sm)
 {
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
+}
+
+static void CALIBRATE_POWER_MARK_offset_end(ModeSm* sm)
+{
+    // CALIBRATE_POWER_MARK behavior
+    // uml: OFFSET_END TransitionTo(CALIBRATE_POWER_SPACE)
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_POWER_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
+        CALIBRATE_POWER_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CALIBRATE_POWER_MARK
+    
+    // No ancestor handles this event.
 }
 
 static void CALIBRATE_POWER_MARK_ptt_released(ModeSm* sm)

@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include "SDT.h"
+#include "PowerCalSm.h"
 
 #include <thread>
 #include <chrono>
@@ -19,6 +20,7 @@ extern uint32_t Npoints;
 extern uint8_t incindexPower;
 extern float32_t attenuations_dB[3];
 extern float32_t powers_W[3];
+extern PowerCalSm powerSM;
 
 // Timer variables for interrupt simulation
 static std::atomic<bool> timer_running{false};
@@ -710,25 +712,7 @@ TEST_F(CalibrationTest, MenuSelectRecordsPowerDataPointInPowerCal) {
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
-
-    // Exit offset mode back to power calibration
-    SetButton(12); // FILTER button toggles between power cal and offset mode
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
-
-    // Recording another data point should record at index 0 and set Npoints to 1
-    ED.XAttenCW[currentBand] = 5.0;
-    measuredPower = 10.1;
-
-    SetButton(MENU_OPTION_SELECT);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-
-    // Verify Npoints is now 1 and first entry was overwritten
-    EXPECT_EQ(Npoints, 1);
-    EXPECT_NEAR(attenuations_dB[0], 5.0, 0.00001);
-    EXPECT_NEAR(powers_W[0], 10.1, 0.00001);
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_SSBPOINT);
 
     // Exit back to home screen
     SetButton(HOME_SCREEN);
@@ -862,13 +846,7 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
     // Now we should have transitioned to offset mode
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
 
-    // Exit offset mode back to power calibration
-    SetButton(12); // FILTER button toggles between power cal and offset mode
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
-
-    // Exit back to home screen
+    // Exit back to home screen (no need to return to power space first)
     SetButton(HOME_SCREEN);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);
@@ -937,13 +915,7 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
     // Now we should have transitioned to offset mode
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
 
-    // Exit offset mode back to power calibration
-    SetButton(12); // FILTER button toggles between power cal and offset mode
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
-
-    // Exit back to home screen
+    // Exit back to home screen (no need to return to power space first)
     SetButton(HOME_SCREEN);
     SetInterrupt(iBUTTON_PRESSED);
     loop(); MyDelay(10);

@@ -376,13 +376,17 @@ CALIBRATE_POWER_SPACE --> CALIBRATION_STATES.(ExitPoint)(done) : CALIBRATE_EXIT
 
 CALIBRATE_POWER_MARK --> CALIBRATE_POWER_SPACE : PTT_RELEASED
 
+CALIBRATE_POWER_MARK --> CALIBRATE_POWER_SPACE : OFFSET_END
+
 CALIBRATE_OFFSET_MARK --> CALIBRATE_OFFSET_SPACE : PTT_RELEASED
 
-CALIBRATE_OFFSET_SPACE --> CALIBRATE_POWER_SPACE : OFFSET_END
+CALIBRATE_OFFSET_MARK --> CALIBRATE_POWER_SPACE : OFFSET_END
 
 CALIBRATE_OFFSET_SPACE --> CALIBRATION_STATES.(ExitPoint)(done) : CALIBRATE_EXIT
 
 CALIBRATE_OFFSET_SPACE --> CALIBRATE_OFFSET_MARK : PTT_PRESSED
+
+CALIBRATE_OFFSET_SPACE --> CALIBRATE_POWER_SPACE : OFFSET_END
 
 NORMAL_STATES --> CALIBRATE_FREQUENCY : CALIBRATE_FREQUENCY
 
@@ -539,12 +543,12 @@ evaluateGuard = null;
             // ROOT.<InitialState> is a pseudo state and cannot have an `enter` trigger.
             
             // ROOT.<InitialState> behavior
-            // uml: / { this.tracer?.edgeTransition("edge35"); } TransitionTo(NORMAL_STATES)
+            // uml: / { this.tracer?.edgeTransition("edge37"); } TransitionTo(NORMAL_STATES)
             {
                 // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge35");`.
-                this.tracer?.edgeTransition("edge35");
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge37");`.
+                this.tracer?.edgeTransition("edge37");
                 
                 // Step 3: Enter/move towards transition target `NORMAL_STATES`.
                 this.#NORMAL_STATES_enter();
@@ -585,6 +589,7 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case ModeSm.EventId.PTT_RELEASED: this.#CALIBRATE_OFFSET_MARK_ptt_released(); break;
+                    case ModeSm.EventId.OFFSET_END: this.#CALIBRATE_OFFSET_MARK_offset_end(); break;
                 }
                 break;
             
@@ -592,9 +597,9 @@ evaluateGuard = null;
             case ModeSm.StateId.CALIBRATE_OFFSET_SPACE:
                 switch (eventId)
                 {
-                    case ModeSm.EventId.OFFSET_END: this.#CALIBRATE_OFFSET_SPACE_offset_end(); break;
                     case ModeSm.EventId.CALIBRATE_EXIT: this.#CALIBRATE_OFFSET_SPACE_calibrate_exit(); break;
                     case ModeSm.EventId.PTT_PRESSED: this.#CALIBRATE_OFFSET_SPACE_ptt_pressed(); break;
+                    case ModeSm.EventId.OFFSET_END: this.#CALIBRATE_OFFSET_SPACE_offset_end(); break;
                 }
                 break;
             
@@ -603,6 +608,7 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case ModeSm.EventId.PTT_RELEASED: this.#CALIBRATE_POWER_MARK_ptt_released(); break;
+                    case ModeSm.EventId.OFFSET_END: this.#CALIBRATE_POWER_MARK_offset_end(); break;
                 }
                 break;
             
@@ -975,16 +981,37 @@ evaluateGuard = null;
         this.stateId = ModeSm.StateId.CALIBRATION_STATES;
     }
     
-    #CALIBRATE_OFFSET_MARK_ptt_released()
+    #CALIBRATE_OFFSET_MARK_offset_end()
     {
         // CALIBRATE_OFFSET_MARK behavior
-        // uml: PTT_RELEASED / { this.tracer?.edgeTransition("edge10"); } TransitionTo(CALIBRATE_OFFSET_SPACE)
+        // uml: OFFSET_END / { this.tracer?.edgeTransition("edge12"); } TransitionTo(CALIBRATE_POWER_SPACE)
         {
             // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
             this.#CALIBRATE_OFFSET_MARK_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
-            this.tracer?.edgeTransition("edge10");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
+            this.tracer?.edgeTransition("edge12");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
+            this.#CALIBRATE_POWER_SPACE_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for CALIBRATE_OFFSET_MARK
+        
+        // No ancestor handles this event.
+    }
+    
+    #CALIBRATE_OFFSET_MARK_ptt_released()
+    {
+        // CALIBRATE_OFFSET_MARK behavior
+        // uml: PTT_RELEASED / { this.tracer?.edgeTransition("edge11"); } TransitionTo(CALIBRATE_OFFSET_SPACE)
+        {
+            // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+            this.#CALIBRATE_OFFSET_MARK_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
+            this.tracer?.edgeTransition("edge11");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_OFFSET_SPACE`.
             this.#CALIBRATE_OFFSET_SPACE_enter();
@@ -1035,13 +1062,13 @@ evaluateGuard = null;
     #CALIBRATE_OFFSET_SPACE_calibrate_exit()
     {
         // CALIBRATE_OFFSET_SPACE behavior
-        // uml: CALIBRATE_EXIT / { this.tracer?.edgeTransition("edge12"); } TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
+        // uml: CALIBRATE_EXIT / { this.tracer?.edgeTransition("edge13"); } TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
         {
             // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
             this.#CALIBRATE_OFFSET_SPACE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
-            this.tracer?.edgeTransition("edge12");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
+            this.tracer?.edgeTransition("edge13");
             
             // Step 3: Enter/move towards transition target `CALIBRATION_STATES.<ExitPoint>(done)`.
             // CALIBRATION_STATES.<ExitPoint>(done) is a pseudo state and cannot have an `enter` trigger.
@@ -1057,13 +1084,13 @@ evaluateGuard = null;
     #CALIBRATE_OFFSET_SPACE_offset_end()
     {
         // CALIBRATE_OFFSET_SPACE behavior
-        // uml: OFFSET_END / { this.tracer?.edgeTransition("edge11"); } TransitionTo(CALIBRATE_POWER_SPACE)
+        // uml: OFFSET_END / { this.tracer?.edgeTransition("edge15"); } TransitionTo(CALIBRATE_POWER_SPACE)
         {
             // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
             this.#CALIBRATE_OFFSET_SPACE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
-            this.tracer?.edgeTransition("edge11");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge15");`.
+            this.tracer?.edgeTransition("edge15");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
             this.#CALIBRATE_POWER_SPACE_enter();
@@ -1078,13 +1105,13 @@ evaluateGuard = null;
     #CALIBRATE_OFFSET_SPACE_ptt_pressed()
     {
         // CALIBRATE_OFFSET_SPACE behavior
-        // uml: PTT_PRESSED / { this.tracer?.edgeTransition("edge13"); } TransitionTo(CALIBRATE_OFFSET_MARK)
+        // uml: PTT_PRESSED / { this.tracer?.edgeTransition("edge14"); } TransitionTo(CALIBRATE_OFFSET_MARK)
         {
             // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
             this.#CALIBRATE_OFFSET_SPACE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
-            this.tracer?.edgeTransition("edge13");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
+            this.tracer?.edgeTransition("edge14");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_OFFSET_MARK`.
             this.#CALIBRATE_OFFSET_MARK_enter();
@@ -1130,6 +1157,27 @@ evaluateGuard = null;
         } // end of behavior for CALIBRATE_POWER_MARK
         
         this.stateId = ModeSm.StateId.CALIBRATION_STATES;
+    }
+    
+    #CALIBRATE_POWER_MARK_offset_end()
+    {
+        // CALIBRATE_POWER_MARK behavior
+        // uml: OFFSET_END / { this.tracer?.edgeTransition("edge10"); } TransitionTo(CALIBRATE_POWER_SPACE)
+        {
+            // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+            this.#CALIBRATE_POWER_MARK_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
+            this.tracer?.edgeTransition("edge10");
+            
+            // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
+            this.#CALIBRATE_POWER_SPACE_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for CALIBRATE_POWER_MARK
+        
+        // No ancestor handles this event.
     }
     
     #CALIBRATE_POWER_MARK_ptt_released()
@@ -1479,13 +1527,13 @@ evaluateGuard = null;
     #NORMAL_STATES_calibrate_frequency()
     {
         // NORMAL_STATES behavior
-        // uml: CALIBRATE_FREQUENCY / { this.tracer?.edgeTransition("edge14"); } TransitionTo(CALIBRATE_FREQUENCY)
+        // uml: CALIBRATE_FREQUENCY / { this.tracer?.edgeTransition("edge16"); } TransitionTo(CALIBRATE_FREQUENCY)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#exitUpToStateHandler(ModeSm.StateId.ROOT);
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
-            this.tracer?.edgeTransition("edge14");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
+            this.tracer?.edgeTransition("edge16");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_FREQUENCY`.
             this.#CALIBRATION_STATES_enter();
@@ -1501,13 +1549,13 @@ evaluateGuard = null;
     #NORMAL_STATES_calibrate_power()
     {
         // NORMAL_STATES behavior
-        // uml: CALIBRATE_POWER / { this.tracer?.edgeTransition("edge17"); } TransitionTo(CALIBRATE_POWER_SPACE)
+        // uml: CALIBRATE_POWER / { this.tracer?.edgeTransition("edge19"); } TransitionTo(CALIBRATE_POWER_SPACE)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#exitUpToStateHandler(ModeSm.StateId.ROOT);
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
-            this.tracer?.edgeTransition("edge17");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge19");`.
+            this.tracer?.edgeTransition("edge19");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_POWER_SPACE`.
             this.#CALIBRATION_STATES_enter();
@@ -1523,13 +1571,13 @@ evaluateGuard = null;
     #NORMAL_STATES_calibrate_rx_iq()
     {
         // NORMAL_STATES behavior
-        // uml: CALIBRATE_RX_IQ / { this.tracer?.edgeTransition("edge15"); } TransitionTo(CALIBRATE_RX_IQ)
+        // uml: CALIBRATE_RX_IQ / { this.tracer?.edgeTransition("edge17"); } TransitionTo(CALIBRATE_RX_IQ)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#exitUpToStateHandler(ModeSm.StateId.ROOT);
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge15");`.
-            this.tracer?.edgeTransition("edge15");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
+            this.tracer?.edgeTransition("edge17");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_RX_IQ`.
             this.#CALIBRATION_STATES_enter();
@@ -1545,13 +1593,13 @@ evaluateGuard = null;
     #NORMAL_STATES_calibrate_tx_iq()
     {
         // NORMAL_STATES behavior
-        // uml: CALIBRATE_TX_IQ / { this.tracer?.edgeTransition("edge16"); } TransitionTo(CALIBRATE_TX_IQ_SPACE)
+        // uml: CALIBRATE_TX_IQ / { this.tracer?.edgeTransition("edge18"); } TransitionTo(CALIBRATE_TX_IQ_SPACE)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#exitUpToStateHandler(ModeSm.StateId.ROOT);
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
-            this.tracer?.edgeTransition("edge16");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
+            this.tracer?.edgeTransition("edge18");
             
             // Step 3: Enter/move towards transition target `CALIBRATE_TX_IQ_SPACE`.
             this.#CALIBRATION_STATES_enter();
@@ -1567,12 +1615,12 @@ evaluateGuard = null;
     #NORMAL_STATES_InitialState_transition()
     {
         // NORMAL_STATES.<InitialState> behavior
-        // uml: / { this.tracer?.edgeTransition("edge34"); } TransitionTo(SSB_RECEIVE)
+        // uml: / { this.tracer?.edgeTransition("edge36"); } TransitionTo(SSB_RECEIVE)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge34");`.
-            this.tracer?.edgeTransition("edge34");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge36");`.
+            this.tracer?.edgeTransition("edge36");
             
             // Step 3: Enter/move towards transition target `SSB_RECEIVE`.
             this.#SSB_RECEIVE_enter();
@@ -1621,13 +1669,13 @@ evaluateGuard = null;
     #CW_RECEIVE_dah_pressed()
     {
         // CW_RECEIVE behavior
-        // uml: DAH_PRESSED / { this.tracer?.edgeTransition("edge22"); } TransitionTo(CW_TRANSMIT_DAH_MARK)
+        // uml: DAH_PRESSED / { this.tracer?.edgeTransition("edge24"); } TransitionTo(CW_TRANSMIT_DAH_MARK)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_RECEIVE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge22");`.
-            this.tracer?.edgeTransition("edge22");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge24");`.
+            this.tracer?.edgeTransition("edge24");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_DAH_MARK`.
             this.#CW_TRANSMIT_DAH_MARK_enter();
@@ -1642,13 +1690,13 @@ evaluateGuard = null;
     #CW_RECEIVE_dit_pressed()
     {
         // CW_RECEIVE behavior
-        // uml: DIT_PRESSED / { this.tracer?.edgeTransition("edge23"); } TransitionTo(CW_TRANSMIT_DIT_MARK)
+        // uml: DIT_PRESSED / { this.tracer?.edgeTransition("edge25"); } TransitionTo(CW_TRANSMIT_DIT_MARK)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_RECEIVE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge23");`.
-            this.tracer?.edgeTransition("edge23");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge25");`.
+            this.tracer?.edgeTransition("edge25");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_DIT_MARK`.
             this.#CW_TRANSMIT_DIT_MARK_enter();
@@ -1675,13 +1723,13 @@ evaluateGuard = null;
     #CW_RECEIVE_key_pressed()
     {
         // CW_RECEIVE behavior
-        // uml: KEY_PRESSED / { this.tracer?.edgeTransition("edge21"); } TransitionTo(CW_TRANSMIT_MARK)
+        // uml: KEY_PRESSED / { this.tracer?.edgeTransition("edge23"); } TransitionTo(CW_TRANSMIT_MARK)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_RECEIVE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge21");`.
-            this.tracer?.edgeTransition("edge21");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge23");`.
+            this.tracer?.edgeTransition("edge23");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_MARK`.
             this.#CW_TRANSMIT_MARK_enter();
@@ -1696,13 +1744,13 @@ evaluateGuard = null;
     #CW_RECEIVE_to_ssb_mode()
     {
         // CW_RECEIVE behavior
-        // uml: TO_SSB_MODE / { this.tracer?.edgeTransition("edge20"); } TransitionTo(SSB_RECEIVE)
+        // uml: TO_SSB_MODE / { this.tracer?.edgeTransition("edge22"); } TransitionTo(SSB_RECEIVE)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_RECEIVE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge20");`.
-            this.tracer?.edgeTransition("edge20");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge22");`.
+            this.tracer?.edgeTransition("edge22");
             
             // Step 3: Enter/move towards transition target `SSB_RECEIVE`.
             this.#SSB_RECEIVE_enter();
@@ -1767,14 +1815,14 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_DAH_MARK
         
         // CW_TRANSMIT_DAH_MARK behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "markCount_ms >= 3*ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_DAH_MARK","do [markCount_ms >= 3*ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_SPACE)")] / { this.tracer?.edgeTransition("edge33"); } TransitionTo(CW_TRANSMIT_KEYER_SPACE)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "markCount_ms >= 3*ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_DAH_MARK","do [markCount_ms >= 3*ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_SPACE)")] / { this.tracer?.edgeTransition("edge35"); } TransitionTo(CW_TRANSMIT_KEYER_SPACE)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "markCount_ms >= 3*ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_DAH_MARK","do [markCount_ms >= 3*ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_SPACE)"))
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_DAH_MARK_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge33");`.
-            this.tracer?.edgeTransition("edge33");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge35");`.
+            this.tracer?.edgeTransition("edge35");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_KEYER_SPACE`.
             this.#CW_TRANSMIT_KEYER_SPACE_enter();
@@ -1839,14 +1887,14 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_DIT_MARK
         
         // CW_TRANSMIT_DIT_MARK behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "markCount_ms >= ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_DIT_MARK","do [markCount_ms >= ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_SPACE)")] / { this.tracer?.edgeTransition("edge28"); } TransitionTo(CW_TRANSMIT_KEYER_SPACE)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "markCount_ms >= ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_DIT_MARK","do [markCount_ms >= ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_SPACE)")] / { this.tracer?.edgeTransition("edge30"); } TransitionTo(CW_TRANSMIT_KEYER_SPACE)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "markCount_ms >= ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_DIT_MARK","do [markCount_ms >= ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_SPACE)"))
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_DIT_MARK_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge28");`.
-            this.tracer?.edgeTransition("edge28");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge30");`.
+            this.tracer?.edgeTransition("edge30");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_KEYER_SPACE`.
             this.#CW_TRANSMIT_KEYER_SPACE_enter();
@@ -1911,14 +1959,14 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_KEYER_SPACE
         
         // CW_TRANSMIT_KEYER_SPACE behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_KEYER_SPACE","do [spaceCount_ms >= ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_WAIT)")] / { this.tracer?.edgeTransition("edge29"); } TransitionTo(CW_TRANSMIT_KEYER_WAIT)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_KEYER_SPACE","do [spaceCount_ms >= ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_WAIT)")] / { this.tracer?.edgeTransition("edge31"); } TransitionTo(CW_TRANSMIT_KEYER_WAIT)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= ditDuration_ms") || this.evaluateGuard("CW_TRANSMIT_KEYER_SPACE","do [spaceCount_ms >= ditDuration_ms] TransitionTo(CW_TRANSMIT_KEYER_WAIT)"))
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_KEYER_SPACE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge29");`.
-            this.tracer?.edgeTransition("edge29");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge31");`.
+            this.tracer?.edgeTransition("edge31");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_KEYER_WAIT`.
             this.#CW_TRANSMIT_KEYER_WAIT_enter();
@@ -1969,13 +2017,13 @@ evaluateGuard = null;
     #CW_TRANSMIT_KEYER_WAIT_dah_pressed()
     {
         // CW_TRANSMIT_KEYER_WAIT behavior
-        // uml: DAH_PRESSED / { this.tracer?.edgeTransition("edge32"); } TransitionTo(CW_TRANSMIT_DAH_MARK)
+        // uml: DAH_PRESSED / { this.tracer?.edgeTransition("edge34"); } TransitionTo(CW_TRANSMIT_DAH_MARK)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_KEYER_WAIT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge32");`.
-            this.tracer?.edgeTransition("edge32");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge34");`.
+            this.tracer?.edgeTransition("edge34");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_DAH_MARK`.
             this.#CW_TRANSMIT_DAH_MARK_enter();
@@ -1990,13 +2038,13 @@ evaluateGuard = null;
     #CW_TRANSMIT_KEYER_WAIT_dit_pressed()
     {
         // CW_TRANSMIT_KEYER_WAIT behavior
-        // uml: DIT_PRESSED / { this.tracer?.edgeTransition("edge31"); } TransitionTo(CW_TRANSMIT_DIT_MARK)
+        // uml: DIT_PRESSED / { this.tracer?.edgeTransition("edge33"); } TransitionTo(CW_TRANSMIT_DIT_MARK)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_KEYER_WAIT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge31");`.
-            this.tracer?.edgeTransition("edge31");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge33");`.
+            this.tracer?.edgeTransition("edge33");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_DIT_MARK`.
             this.#CW_TRANSMIT_DIT_MARK_enter();
@@ -2018,14 +2066,14 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_KEYER_WAIT
         
         // CW_TRANSMIT_KEYER_WAIT behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= waitDuration_ms") || this.evaluateGuard("CW_TRANSMIT_KEYER_WAIT","do [spaceCount_ms >= waitDuration_ms] TransitionTo(CW_RECEIVE)")] / { this.tracer?.edgeTransition("edge30"); } TransitionTo(CW_RECEIVE)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= waitDuration_ms") || this.evaluateGuard("CW_TRANSMIT_KEYER_WAIT","do [spaceCount_ms >= waitDuration_ms] TransitionTo(CW_RECEIVE)")] / { this.tracer?.edgeTransition("edge32"); } TransitionTo(CW_RECEIVE)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= waitDuration_ms") || this.evaluateGuard("CW_TRANSMIT_KEYER_WAIT","do [spaceCount_ms >= waitDuration_ms] TransitionTo(CW_RECEIVE)"))
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_KEYER_WAIT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge30");`.
-            this.tracer?.edgeTransition("edge30");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge32");`.
+            this.tracer?.edgeTransition("edge32");
             
             // Step 3: Enter/move towards transition target `CW_RECEIVE`.
             this.#CW_RECEIVE_enter();
@@ -2076,13 +2124,13 @@ evaluateGuard = null;
     #CW_TRANSMIT_MARK_key_released()
     {
         // CW_TRANSMIT_MARK behavior
-        // uml: KEY_RELEASED / { this.tracer?.edgeTransition("edge25"); } TransitionTo(CW_TRANSMIT_SPACE)
+        // uml: KEY_RELEASED / { this.tracer?.edgeTransition("edge27"); } TransitionTo(CW_TRANSMIT_SPACE)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_MARK_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge25");`.
-            this.tracer?.edgeTransition("edge25");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge27");`.
+            this.tracer?.edgeTransition("edge27");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_SPACE`.
             this.#CW_TRANSMIT_SPACE_enter();
@@ -2147,14 +2195,14 @@ evaluateGuard = null;
         } // end of behavior for CW_TRANSMIT_SPACE
         
         // CW_TRANSMIT_SPACE behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= waitDuration_ms") || this.evaluateGuard("CW_TRANSMIT_SPACE","do [spaceCount_ms >= waitDuration_ms] TransitionTo(CW_RECEIVE)")] / { this.tracer?.edgeTransition("edge27"); } TransitionTo(CW_RECEIVE)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= waitDuration_ms") || this.evaluateGuard("CW_TRANSMIT_SPACE","do [spaceCount_ms >= waitDuration_ms] TransitionTo(CW_RECEIVE)")] / { this.tracer?.edgeTransition("edge29"); } TransitionTo(CW_RECEIVE)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "spaceCount_ms >= waitDuration_ms") || this.evaluateGuard("CW_TRANSMIT_SPACE","do [spaceCount_ms >= waitDuration_ms] TransitionTo(CW_RECEIVE)"))
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_SPACE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge27");`.
-            this.tracer?.edgeTransition("edge27");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge29");`.
+            this.tracer?.edgeTransition("edge29");
             
             // Step 3: Enter/move towards transition target `CW_RECEIVE`.
             this.#CW_RECEIVE_enter();
@@ -2169,13 +2217,13 @@ evaluateGuard = null;
     #CW_TRANSMIT_SPACE_key_pressed()
     {
         // CW_TRANSMIT_SPACE behavior
-        // uml: KEY_PRESSED / { this.tracer?.edgeTransition("edge26"); } TransitionTo(CW_TRANSMIT_MARK)
+        // uml: KEY_PRESSED / { this.tracer?.edgeTransition("edge28"); } TransitionTo(CW_TRANSMIT_MARK)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#CW_TRANSMIT_SPACE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge26");`.
-            this.tracer?.edgeTransition("edge26");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge28");`.
+            this.tracer?.edgeTransition("edge28");
             
             // Step 3: Enter/move towards transition target `CW_TRANSMIT_MARK`.
             this.#CW_TRANSMIT_MARK_enter();
@@ -2226,13 +2274,13 @@ evaluateGuard = null;
     #SSB_RECEIVE_ptt_pressed()
     {
         // SSB_RECEIVE behavior
-        // uml: PTT_PRESSED / { this.tracer?.edgeTransition("edge19"); } TransitionTo(SSB_TRANSMIT)
+        // uml: PTT_PRESSED / { this.tracer?.edgeTransition("edge21"); } TransitionTo(SSB_TRANSMIT)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#SSB_RECEIVE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge19");`.
-            this.tracer?.edgeTransition("edge19");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge21");`.
+            this.tracer?.edgeTransition("edge21");
             
             // Step 3: Enter/move towards transition target `SSB_TRANSMIT`.
             this.#SSB_TRANSMIT_enter();
@@ -2247,13 +2295,13 @@ evaluateGuard = null;
     #SSB_RECEIVE_to_cw_mode()
     {
         // SSB_RECEIVE behavior
-        // uml: TO_CW_MODE / { this.tracer?.edgeTransition("edge18"); } TransitionTo(CW_RECEIVE)
+        // uml: TO_CW_MODE / { this.tracer?.edgeTransition("edge20"); } TransitionTo(CW_RECEIVE)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#SSB_RECEIVE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
-            this.tracer?.edgeTransition("edge18");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge20");`.
+            this.tracer?.edgeTransition("edge20");
             
             // Step 3: Enter/move towards transition target `CW_RECEIVE`.
             this.#CW_RECEIVE_enter();
@@ -2304,13 +2352,13 @@ evaluateGuard = null;
     #SSB_TRANSMIT_ptt_released()
     {
         // SSB_TRANSMIT behavior
-        // uml: PTT_RELEASED / { this.tracer?.edgeTransition("edge24"); } TransitionTo(SSB_RECEIVE)
+        // uml: PTT_RELEASED / { this.tracer?.edgeTransition("edge26"); } TransitionTo(SSB_RECEIVE)
         {
             // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
             this.#SSB_TRANSMIT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge24");`.
-            this.tracer?.edgeTransition("edge24");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge26");`.
+            this.tracer?.edgeTransition("edge26");
             
             // Step 3: Enter/move towards transition target `SSB_RECEIVE`.
             this.#SSB_RECEIVE_enter();

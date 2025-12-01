@@ -345,12 +345,13 @@ void ChangeRXIQIncrement(void); // forward declare from MainBoard_DisplayCalibra
 void ChangeTXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ToggleRXTXEqualizerEdit(void); // from MainBoard_DisplayEqualizer.cpp
 void AdjustEqualizerIncrement(void); // from MainBoard_DisplayEqualizer.cpp
-void RecordPowerDataPoint(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void RecordPowerButtonPressed(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void CalculatePowerCurveFit(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangePowerIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangeCalibrationPASelection(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangePowerUnits(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ResetPowerCal(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void ChangePowerCalibrationPhase(void); // forward declare from MainBoard_DisplayCalibration.cpp
 
 /**
  * Process button press events from the front panel.
@@ -779,25 +780,16 @@ void HandleButtonPress(int32_t button){
             switch (button){
                 case (MENU_OPTION_SELECT):{
                     // Capture data point
-                    RecordPowerDataPoint();
+                    RecordPowerButtonPressed();
                     break;
                 }
                 case (ZOOM):{
-                    // Calculate best fit to data
-                    CalculatePowerCurveFit();
+                    // Reset and begin again
+                    ResetPowerCal();
                     break;
                 }
                 case (12):{
-                    if (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_SPACE){
-                        // Change to offset measurement mode
-                        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START);
-                    }
-                    else if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
-                        // Change to offset measurement mode
-                        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
-                    }
-                    ResetPowerCal();
-                    UpdateRFHardwareState();
+                    ChangePowerCalibrationPhase();
                     break;
                 }
                 case (14):{

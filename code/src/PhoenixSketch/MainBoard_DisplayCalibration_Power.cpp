@@ -1,6 +1,7 @@
 #include "SDT.h"
 #include "MainBoard_Display.h"
 #include <RA8875.h>
+#include "PowerCalSm.h"
 
 // External references to objects defined in MainBoard_Display.cpp
 extern RA8875 tft;
@@ -8,6 +9,7 @@ extern RA8875 tft;
 ///////////////////////////////////////////////////////////////////////////////
 // POWER CALIBRATION SECTION
 ///////////////////////////////////////////////////////////////////////////////
+PowerCalSm powerSM;
 static char buff[100];
 
 static const int8_t NUMBER_OF_POWER_PANES = 6;
@@ -32,9 +34,6 @@ static Pane* PowerWindowPanes[NUMBER_OF_POWER_PANES] = {&PanePowerAdjust,&PanePo
                                     &PanePowerInstructions, &PanePowerAtt,
                                     &PanePowerData, &PanePowerPower};
 
-//#define PA20W  0
-//#define PA100W 1
-//int8_t PAselect = PA20W;
 float32_t measuredPower = 0.0;
 float32_t targetPower = 0.0;
 uint8_t powerUnit = 1; // 1=W, 0=dBm
@@ -42,8 +41,11 @@ uint8_t powerUnit = 1; // 1=W, 0=dBm
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
 uint32_t Npoints = 0;
-uint8_t powerCalibrationStepCount = 0; // Tracks step completion state for instruction display
 
+/**
+ * Automatically called upon entry to the PowerCalSm_StateId_POWERCOMPLETE state
+ * attenuations_dB and powers_W have been populated by prior steps
+ */
 void CalculatePowerCurveFit(void){
     Debug("Invoked power curve fit");
     float32_t powers_mW[3];
@@ -60,10 +62,27 @@ void CalculatePowerCurveFit(void){
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
     }
-    // Reset back to the 0dB power measurement in case the user wants to do it again
-    // User must press button 12 to transition to CALIBRATE_OFFSET_SPACE state
+}
+
+/**
+ * Reset the power calibration measurement state machine to the start state. This
+ * invokes the Reset function.
+ */
+void ResetPowerCal(void){
+    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RESET);
+}
+
+/**
+ * Begin the measurement sequence with the power at 0dB of attenuation, CW
+ */
+void Reset(void){
     ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
     SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
+    // Make sure we are in CALIBRATE_POWER_SPACE state
+    ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END); // this updates the hardware state
+    if (modeSM.state_id != ModeSm_StateId_CALIBRATE_POWER_SPACE)
+        Debug("Error (MainBoard_DisplayCalibration_Power.cpp)! Should be in POWER_SPACE. Instead in "+String(modeSM.state_id));
+
     if (ED.PA100Wactive){
         if (powerUnit)
             measuredPower = CW_100W_CAL_POWER_POINT_W;
@@ -76,11 +95,16 @@ void CalculatePowerCurveFit(void){
             measuredPower = 10*log10f(CW_20W_CAL_POWER_POINT_W*1000); // dBm units
     }
     targetPower = measuredPower;
-    PanePowerAtt.stale = true;
-    PanePowerPower.stale = true;
-    PanePowerInstructions.stale = true;
+    Npoints = 0;
+    // Mark all the panes stale to force a screen refresh
+    for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
+        PowerWindowPanes[i]->stale = true;
+    }
 }
 
+/**
+ * Called by Loop.cpp when button 16 is pressed.
+ */
 void ChangeCalibrationPASelection(void){
     if (ED.PA100Wactive){
         if (powerUnit)
@@ -100,12 +124,102 @@ void ChangeCalibrationPASelection(void){
     // Force hardware update even though we're staying in the same calibration state
     // This ensures the PA selection gets applied to the hardware
     ForceUpdateRFHardwareState();
-    Npoints = 0;
-    powerCalibrationStepCount = 0; // Reset step counter when changing PA
-    PanePowerData.stale = true;
-    PanePowerInstructions.stale = true;
+    // Force us back to start state
+    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RESET);
 }
 
+/**
+ * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement 
+ * to CALIBRATE_OFFSET measurement when curve fit is complete. If we are not in the
+ * POWERCOMPLETE state, ignore this button press.
+ */
+void ChangePowerCalibrationPhase(void){
+    if (powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE){
+        // Issue the event that causes state to change to SSBPOINT measurement
+        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_CURVE_COMPLETE);
+        // Change to offset measurement mode
+        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START);
+        UpdateRFHardwareState();
+    }
+}
+
+/**
+ * Called upon entry to second and third power point measurements
+ */
+void StartPowerPoint(void){
+    // We are starting a new power curve point. Change the target power by factor of 6 dB
+    if (powerUnit)
+        targetPower = targetPower / 4.0;
+    else
+        targetPower = targetPower - 6.0;
+    measuredPower = targetPower;
+}
+
+/**
+ * Called upon entry to the SSBPOINT state when the CURVE_COMPLETE event is issued after
+ * button 12 is pressed.
+ */
+void StartSSBPoint(void){
+    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
+    SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
+    // Move to CALIBRATE_OFFSET_SPACE state
+    ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START); // this updates the hardware state
+    // Update target power and measured power
+    if (ED.PA100Wactive){
+        if (powerUnit)
+            measuredPower = SSB_100W_CAL_POWER_POINT_W;
+        else
+            measuredPower = 10*log10f(SSB_100W_CAL_POWER_POINT_W*1000); // dBm units
+        targetPower = measuredPower;
+        ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
+    } else {
+        if (powerUnit)
+            measuredPower = SSB_20W_CAL_POWER_POINT_W;
+        else
+            measuredPower = 10*log10f(SSB_20W_CAL_POWER_POINT_W*1000); // dBm units
+        targetPower = measuredPower;
+        ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
+    }
+}
+
+static float32_t powr_W;
+/**
+ * Called upon entry to the MeasurementComplete mode when the record data point button is pressed
+ */
+void CalculateSSBPoint(void){
+    // The measuredPower is what we're actually reading
+    float32_t factor;
+    powr_W = measuredPower;
+    if (powerUnit == 0){
+        powr_W = pow(10.0f,measuredPower/10.0f)/1000.0f;
+    }
+    if (ED.PA100Wactive){
+        factor = SSB_100W_CAL_POWER_POINT_W / powr_W;
+    } else {
+        factor = SSB_20W_CAL_POWER_POINT_W / powr_W;
+    }
+
+    Debug("Factor = " + String(factor));
+    float32_t corr = 10*log10f(factor);
+    Debug("Therefore gain correction is [dB] = " + String(corr));
+    if (ED.PA100Wactive)
+        ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
+    else
+        ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
+
+}
+
+/**
+ * Called when the MENU SELECT button is pressed. Issues an event to the state machine
+ */
+void RecordPowerButtonPressed(void){
+    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RECORD_DATA_POINT);
+}
+
+/**
+ * Called when exiting the PowerPoint1, PowerPoint2, PowerPoint3, and SSBPoint states.
+ * Invoked when the RECORD_DATA_POINT event is issued
+ */
 void RecordPowerDataPoint(void){
     switch (modeSM.state_id){
         case ModeSm_StateId_CALIBRATE_POWER_SPACE:{
@@ -117,55 +231,12 @@ void RecordPowerDataPoint(void){
             else
                 powers_W[Npoints] = pow(10.0f,measuredPower/10.0f)/1000.0f;
             Npoints++;
-
-            // Update step counter, but cap at 3 (don't go to step 4 until in OFFSET_SPACE)
-            // This allows re-measurement without incorrectly showing step 4 as complete
-            if (powerCalibrationStepCount < 3) {
-                powerCalibrationStepCount++;
-            }
-
-            PanePowerInstructions.stale = true; // Update instructions display
-            // Change the target power by factor of 6 dB
-            if (Npoints < 3){
-                if (powerUnit)
-                    targetPower = targetPower / 4.0;
-                else
-                    targetPower = targetPower - 6.0;
-                measuredPower = targetPower;
-            }else{
-                // We have recorded all three points, calculate the power curve
-                // But do NOT automatically transition state - user must press button 12
-                CalculatePowerCurveFit();
-            }
-            // Note: User can re-measure points or press button 12 to advance
-            PanePowerData.stale = true;
             break;
         }
         case ModeSm_StateId_CALIBRATE_OFFSET_SPACE:{
-            // The measuredPower is what we're actually reading
-            float32_t factor;
-            float32_t powr_W = measuredPower;
-            if (powerUnit == 0){
-                powr_W = pow(10.0f,measuredPower/10.0f)/1000.0f;
-            }
-            if (ED.PA100Wactive){
-                factor = SSB_100W_CAL_POWER_POINT_W / powr_W;
-            } else {
-                factor = SSB_20W_CAL_POWER_POINT_W / powr_W;
-            }
-
-            Debug("Factor = " + String(factor));
-            float32_t corr = 10*log10f(factor);
-            Debug("Therefore gain correction is [dB] = " + String(corr));
-            if (ED.PA100Wactive)
-                ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
-            else
-                ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
-            // Set step counter to 4 when offset measurement is recorded
-            powerCalibrationStepCount = 4;
-            PanePowerInstructions.stale = true; // Update instructions display
-            PanePowerData.stale = true;
-            // User must press button to change measurement mode
+            // Do nothing when measuring the SSB power point -- we only record one
+            // data point which is kept in measuredPower and is handled by the 
+            // CalculateSSBPoint function.
             break;
         }
         default:
@@ -174,7 +245,7 @@ void RecordPowerDataPoint(void){
 }
 
 float32_t GetPowDataSum(void){
-    float32_t powsum = 0;
+    float32_t powsum = abs(measuredPower);
     for (size_t k=0; k<Npoints; k++){
         powsum += abs(powers_W[k]);
     }
@@ -208,41 +279,82 @@ static void DrawPowerDataPane(void){
     tft.print("Atten");
     tft.setCursor(PanePowerData.x0+col4x, PanePowerData.y0+3);
     tft.print("Power");
-
     tft.drawFastHLine(PanePowerData.x0+30,PanePowerData.y0+70,180,RA8875_WHITE);
-    for (size_t k=0; k<=4; k++){
-        int16_t y = PanePowerData.y0 + 20 + k*17;
+    int16_t y;
 
-        tft.setCursor(PanePowerData.x0+col1x, y);
-        if (k < powerCalibrationStepCount){
-            // Draw a check mark
-            tft.setTextColor(RA8875_GREEN);
-            tft.print("v"); // Checkmark character
-            tft.setTextColor(RA8875_WHITE);
-        }
-        if ((k == powerCalibrationStepCount) && (k < 3)){
-            // Draw an arrow indicating that you're on this step
+    // Draw the arrow to indicate which measurement we're updating and check marks
+    // for the completed measurements
+    switch (powerSM.state_id){
+        case PowerCalSm_StateId_POWERPOINT1:{
+            y = PanePowerData.y0 + 20 + 0*17;
+            tft.setCursor(PanePowerData.x0+col1x, y);
             tft.print(">"); // right arrow character
+            break;
         }
-        // Only draw the arrow here if we transition to OFFSET mode
-        if ((modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE) && (k == 3)){
+        case PowerCalSm_StateId_POWERPOINT2:{
+            y = PanePowerData.y0 + 20 + 1*17;
+            tft.setCursor(PanePowerData.x0+col1x, y);
             tft.print(">"); // right arrow character
+            // Mark the prior rows as complete
+            for (size_t k=0; k<1; k++){
+                y = PanePowerData.y0 + 20 + k*17;
+                tft.setCursor(PanePowerData.x0+col1x, y);
+                // Draw a check mark
+                tft.setTextColor(RA8875_GREEN);
+                tft.print("v"); // Checkmark character
+                tft.setTextColor(RA8875_WHITE);
+            }
+            break;
         }
-        
-        if ((k == 4) && (k == powerCalibrationStepCount)){
-            y = PanePowerData.y0 + 20 + (k-1)*17;
-            // completed all four steps
-            tft.setTextColor(RA8875_GREEN);
-            tft.print("v"); // Checkmark character
-            tft.setTextColor(RA8875_WHITE);
+        case PowerCalSm_StateId_POWERPOINT3:{
+            y = PanePowerData.y0 + 20 + 2*17;
+            tft.setCursor(PanePowerData.x0+col1x, y);
+            tft.print(">"); // right arrow character
+            for (size_t k=0; k<2; k++){
+                y = PanePowerData.y0 + 20 + k*17;
+                tft.setCursor(PanePowerData.x0+col1x, y);
+                // Draw a check mark
+                tft.setTextColor(RA8875_GREEN);
+                tft.print("v"); // Checkmark character
+                tft.setTextColor(RA8875_WHITE);
+            }
+            break;
         }
+        case PowerCalSm_StateId_SSBPOINT:{
+            y = PanePowerData.y0 + 20 + 3*17;
+            tft.setCursor(PanePowerData.x0+col1x, y);
+            tft.print(">"); // right arrow character
+            for (size_t k=0; k<3; k++){
+                y = PanePowerData.y0 + 20 + k*17;
+                tft.setCursor(PanePowerData.x0+col1x, y);
+                // Draw a check mark
+                tft.setTextColor(RA8875_GREEN);
+                tft.print("v"); // Checkmark character
+                tft.setTextColor(RA8875_WHITE);
+            }
+            break;
+        }
+        case PowerCalSm_StateId_MEASUREMENTCOMPLETE:{
+            for (size_t k=0; k<4; k++){
+                y = PanePowerData.y0 + 20 + k*17;
+                tft.setCursor(PanePowerData.x0+col1x, y);
+                // Draw a check mark
+                tft.setTextColor(RA8875_GREEN);
+                tft.print("v"); // Checkmark character
+                tft.setTextColor(RA8875_WHITE);
+            }
+            break;
+        }
+        default:
+            break;
+    }
 
-        if (k < 4){
-            tft.setCursor(PanePowerData.x0+col2x, y);
-            tft.print((int32_t)k+1);
-        }
-
-        if ((k < Npoints) || (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE)){
+    // Draw the steps and the curve fit data points captured so far
+    for (size_t k=0; k<4; k++){
+        y = PanePowerData.y0 + 20 + k*17;
+        tft.setCursor(PanePowerData.x0+col2x, y);
+        tft.print((int32_t)k+1);
+        if (k < Npoints){
             // Draw attenuation and power for points 1 to 3
             tft.setCursor(PanePowerData.x0+col3x, y);
             tft.print(attenuations_dB[k]);
@@ -251,21 +363,16 @@ static void DrawPowerDataPane(void){
             sprintf(buff,"%3.2f",powers_W[k]);
             tft.print(buff);
         }
-        if ((k == 4) && (k == powerCalibrationStepCount)){
-            tft.setCursor(PanePowerData.x0+col3x, y);
-            tft.print(0);
-
-            tft.setCursor(PanePowerData.x0+col4x, y);
-            if (powerUnit)
-                sprintf(buff,"%3.2f",measuredPower);
-            else
-                sprintf(buff,"%3.2f",pow(10.0f,measuredPower/10.0f)/1000.0f);
-            tft.print(buff);
-        }
-
+    }
+    // Draw the SSB power point if we have completed the measurements
+    if (powerSM.state_id == PowerCalSm_StateId_MEASUREMENTCOMPLETE){
+        tft.setCursor(PanePowerData.x0+col3x, y);
+        tft.print(0);
+        tft.setCursor(PanePowerData.x0+col4x, y);
+        sprintf(buff,"%3.2f",powr_W);
+        tft.print(buff);
     }
     PanePowerData.stale = false;
-
 }
 
 uint8_t incindexPower = 1;
@@ -617,39 +724,18 @@ static void DrawPowerInstructionsPane(void){
 
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    // Use powerCalibrationStepCount to track all steps 1-4
-    if (powerCalibrationStepCount >= 1){
-        tft.setTextColor(RA8875_GREEN);
-        tft.print("\x76"); // Checkmark character
-        tft.setTextColor(RA8875_WHITE);
-        tft.print("-Record power level at 0dB atten");
-    } else {
-        tft.print("1-Record power level at 0dB atten");
-    }
+    tft.print("1-Record power level at 0dB atten");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    if (powerCalibrationStepCount >= 2){
-        tft.setTextColor(RA8875_GREEN);
-        tft.print("\x76"); // Checkmark character
-        tft.setTextColor(RA8875_WHITE);
-        tft.print("-Adjust atten to drop pow by 6dB");
-    } else {
-        tft.print("2-Adjust atten to drop pow by 6dB");
-    }
+    tft.print("2-Adjust atten to drop pow by 6dB");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    if (powerCalibrationStepCount >= 3){
-        tft.setTextColor(RA8875_GREEN);
-        tft.print("\x76"); // Checkmark character
-        tft.setTextColor(RA8875_WHITE);
-        tft.print("-Adjust atten to drop power by");
-    } else {
-        tft.print("3-Adjust atten to drop power by");
-    }
+    tft.print("3-Adjust atten to drop power by");
+    
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
@@ -657,15 +743,7 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    // Step 4 is only checked when powerCalibrationStepCount reaches 4 (in CALIBRATE_OFFSET_SPACE)
-    if (powerCalibrationStepCount >= 4){
-        tft.setTextColor(RA8875_GREEN);
-        tft.print("\x76"); // Checkmark character
-        tft.setTextColor(RA8875_WHITE);
-        tft.print("-Record measured power");
-    } else {
-        tft.print("4-Record measured power");
-    }
+    tft.print("4-Record measured power");
     
     delta += 2*lineD;
     tft.setCursor(x0, y0+delta);
@@ -676,6 +754,7 @@ static void DrawPowerInstructionsPane(void){
     //Limits:("                                 ");
     tft.print("by pressing SELECT(0) button.");
     
+
     delta += 2*lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
@@ -683,13 +762,13 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("proceed to step 4, or remeasure");
+    tft.print("proceed to step 4, or press ZOOM");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
-    tft.print("data points in steps 1 through 3.");
+    tft.print("to re-measure data points.");
 
-    
+
     delta += 2*lineD;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
@@ -699,6 +778,11 @@ static void DrawPowerInstructionsPane(void){
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("* Filter encoder adjusts power.");
+
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("* Zoom resets back to step 1.");
 
     delta += lineD;
     tft.setCursor(x0, y0+delta);
@@ -725,63 +809,6 @@ static void DrawPowerInstructionsPane(void){
     tft.print("* Press Home to save and exit.");
 
     PanePowerInstructions.stale = false;
-}
-
-void ResetPowerCal(void){
-    switch (modeSM.state_id){
-        case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
-            // Reset step counter and data points when in POWER_SPACE
-            // This happens when returning from OFFSET_SPACE or changing bands
-            powerCalibrationStepCount = 0;
-            Npoints = 0;
-
-            if (ED.PA100Wactive){
-                if (powerUnit)
-                    measuredPower = CW_100W_CAL_POWER_POINT_W;
-                else
-                    measuredPower = 10*log10f(CW_100W_CAL_POWER_POINT_W*1000); // dBm units
-            }else{
-                if (powerUnit)
-                    measuredPower = CW_20W_CAL_POWER_POINT_W;
-                else
-                    measuredPower = 10*log10f(CW_20W_CAL_POWER_POINT_W*1000); // dBm units
-            }
-            break;
-        case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
-            // When entering OFFSET_SPACE from POWER_SPACE, counter is 3 - preserve it
-            // When changing bands while in OFFSET_SPACE, counter is 4 - reset it
-            if (powerCalibrationStepCount >= 4) {
-                // Band change case: we completed step 4, reset for new band
-                powerCalibrationStepCount = 0;
-            }
-            // Otherwise preserve counter at 3 when entering OFFSET_SPACE
-            Npoints = 0;
-
-            if (ED.PA100Wactive){
-                if (powerUnit)
-                    measuredPower = SSB_100W_CAL_POWER_POINT_W;
-                else
-                    measuredPower = 10*log10f(SSB_100W_CAL_POWER_POINT_W*1000); // dBm units
-                targetPower = measuredPower;
-                ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
-            } else {
-                if (powerUnit)
-                    measuredPower = SSB_20W_CAL_POWER_POINT_W;
-                else
-                    measuredPower = 10*log10f(SSB_20W_CAL_POWER_POINT_W*1000); // dBm units
-                targetPower = measuredPower;
-                ED.PowerCal_20W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = -3.0;
-            }
-            break;
-        default:
-            break;
-    }
-    ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-    targetPower = measuredPower;
-    // Mark all the panes stale to force a screen refresh
-    for (size_t i = 0; i < NUMBER_OF_POWER_PANES; i++){
-        PowerWindowPanes[i]->stale = true;
-    }
 }
 
 /**
@@ -815,9 +842,8 @@ void DrawCalibratePower(void){
                 measuredPower = 10*log10(CW_100W_CAL_POWER_POINT_W*1000.0);
             targetPower = measuredPower;
         }
-        // Reset calibration step counter on entry
-        powerCalibrationStepCount = 0;
-        Npoints = 0;
+        // Start the power cal state machine, which resets state
+        PowerCalSm_start(&powerSM);
         
         // Make all the attenuations zero so we start off right
         for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
