@@ -40,6 +40,9 @@ uint8_t powerUnit = 1; // 1=W, 0=dBm
 
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
+static float32_t Pf_W[3];
+static float32_t Pr_W[3];
+static float32_t SWR[3];
 uint32_t Npoints = 0;
 
 /**
@@ -61,6 +64,13 @@ void CalculatePowerCurveFit(void){
         f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 15000.0f,6.0f);
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+    }
+    Serial.println("| P_meas [W] | P_f [W] | P_r [W] | SWR |");
+    Serial.println("|------------|---------|---------|-----|");
+    for (size_t k=0; k<3; k++){
+        sprintf(buff,"| %5.4f | %5.4f | %5.4f | %5.4f |",
+                    powers_W[k],Pf_W[k],Pr_W[k],SWR[k]);
+        Serial.println(buff);
     }
 }
 
@@ -231,6 +241,10 @@ void RecordPowerDataPoint(void){
                 powers_W[Npoints] = measuredPower;
             else
                 powers_W[Npoints] = pow(10.0f,measuredPower/10.0f)/1000.0f;
+            // Record the P_f[W], P_r[W], and SWR values
+            Pf_W[Npoints] = ReadForwardPower();
+            Pr_W[Npoints] = ReadReflectedPower();
+            SWR[Npoints] = ReadSWR();
             Npoints++;
             break;
         }
@@ -280,7 +294,7 @@ static void DrawPowerDataPane(void){
     tft.print("Atten");
     tft.setCursor(PanePowerData.x0+col4x, PanePowerData.y0+3);
     tft.print("Power");
-    tft.drawFastHLine(PanePowerData.x0+30,PanePowerData.y0+70,180,RA8875_WHITE);
+    tft.drawFastHLine(PanePowerData.x0+30,PanePowerData.y0+72,180,RA8875_WHITE);
     int16_t y;
 
     // Draw the arrow to indicate which measurement we're updating and check marks
@@ -858,8 +872,14 @@ void DrawCalibratePower(void){
         PowerCalSm_start(&powerSM);
         
         // Make all the attenuations zero so we start off right
-        for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
+        // Make the SWR offset adjustments zero as well
+        for (size_t k = FIRST_BAND; k<=LAST_BAND; k++){
             ED.XAttenCW[k] = 0.0;
+            ED.SWR_F_SlopeAdj[k] = 0.0;
+            ED.SWR_R_SlopeAdj[k] = 0.0;
+            ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
+            ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
+        }
         SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
 
         // Mark all the panes stale to force a screen refresh

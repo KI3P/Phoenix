@@ -288,7 +288,7 @@ void UpdateCWPower(void){
     float32_t att_dB = CalculateCWAttenuation(setPower_W,&psel);
     if ((att_dB >= 0) && (att_dB < 32)){
         ED.XAttenCW[ED.currentBand[ED.activeVFO]] = att_dB;
-        Debug("Power "+String(setPower_W)+"W gives attenuation [dB]:"+String(att_dB));
+        //Debug("Power "+String(setPower_W)+"W gives attenuation [dB]:"+String(att_dB));
     } else {
         Debug("Updating power resulted in invalid atten [dB]:"+String(att_dB));
     }

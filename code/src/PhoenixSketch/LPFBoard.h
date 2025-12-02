@@ -96,6 +96,12 @@ void SelectAntenna(uint8_t antenna);
 errno_t InitAntennaControl(void);
 
 /**
+ * @brief Retrieve SWR and power values from the SWR bridge.
+ * @note Values are stored in internal variables and retrieved using ReadSWR function (etc.)
+ */
+void PerformSWRBridgeReading(void);
+
+/**
  * @brief Read Standing Wave Ratio (SWR) from directional coupler
  * @return SWR value as a ratio (e.g., 1.5 for 1.5:1 SWR)
  * @note Calculated from forward and reflected power measurements

@@ -550,29 +550,29 @@ static float32_t swr;
  *
  * @note Call this function periodically during transmit to update measurements
  */
-void read_SWR() {
-  // Step 1. Measure the peak forward and Reverse voltages
-  adcF_sRaw = (float32_t)swrADC.readADCsingle(0);
-  adcR_sRaw = (float32_t)swrADC.readADCsingle(1);
+void PerformSWRBridgeReading(void) {
+    // Step 1. Measure the peak forward and Reverse voltages
+    adcF_sRaw = (float32_t)swrADC.readADCsingle(0);
+    adcR_sRaw = (float32_t)swrADC.readADCsingle(1);
 
-  adcF_sRaw = 0.1 * adcF_sRaw + 0.9 * adcF_sRawOld;  //Running average
-  adcR_sRaw = 0.1 * adcR_sRaw + 0.9 * adcR_sRawOld;
-  adcF_sRawOld = adcF_sRaw;
-  adcR_sRawOld = adcR_sRaw;
+    adcF_sRaw = 0.1 * adcF_sRaw + 0.9 * adcF_sRawOld;  //Running average
+    adcR_sRaw = 0.1 * adcR_sRaw + 0.9 * adcR_sRawOld;
+    adcF_sRawOld = adcF_sRaw;
+    adcR_sRawOld = adcR_sRaw;
 
-  //Convert ADC reading to mV
-  adcF_sRaw = adcF_sRaw * VREF_MV / 4096.;
-  adcR_sRaw = adcR_sRaw * VREF_MV / 4096.;
+    // Convert ADC reading to mV
+    float32_t adcF_sRaw_mV = adcF_sRaw * VREF_MV / 4096.;
+    float32_t adcR_sRaw_mV = adcR_sRaw * VREF_MV / 4096.;
 
-  Pf_dBm = adcF_sRaw/(25 + ED.SWR_F_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
-  Pr_dBm = adcR_sRaw/(25 + ED.SWR_R_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+    // Convert to power in dBm, then to Watts
+    Pf_dBm = adcF_sRaw_mV/(25 + ED.SWR_F_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+    Pr_dBm = adcR_sRaw_mV/(25 + ED.SWR_R_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+    Pf_W = (float32_t)pow(10.0f,Pf_dBm/10.0f)/1000.0f;
+    Pr_W = (float32_t)pow(10.0f,Pr_dBm/10.0f)/1000.0f;
 
-  // Convert to input voltage squared as read by ADC converted to before attenuation
-  Pf_W = (float32_t)pow(10,Pf_dBm/10)/1000;
-  Pr_W = (float32_t)pow(10,Pr_dBm/10)/1000;
-
-  float32_t A = pow(Pr_W / Pf_W, 0.5);
-  swr = (1.0 + A) / (1.0 - A);
+    // Finally, calculate the standing wave ratio
+    float32_t A = pow(Pr_W / Pf_W, 0.5);
+    swr = (1.0 + A) / (1.0 - A);
 }
 
 /**

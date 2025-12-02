@@ -37,6 +37,22 @@ void PerformSignalProcessing(void){
             break;
         }
     }
+    // Read the SWR in all the possible transmit states
+    switch (modeSM.state_id){
+        case (ModeSm_StateId_CALIBRATE_POWER_MARK):
+        case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
+        case (ModeSm_StateId_SSB_TRANSMIT):
+        case (ModeSm_StateId_CW_TRANSMIT_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
+        case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):{
+            PerformSWRBridgeReading();
+            break;
+        }
+        default:{
+            break;
+        }
+    }
 }
 
 /**
