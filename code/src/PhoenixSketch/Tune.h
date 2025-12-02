@@ -66,4 +66,8 @@ float32_t CalculateCWPowerLevel(float32_t atten_dB, int8_t PAsel);
 float32_t CalculateCWAttenuation(float32_t Power_W, bool *PAsel);
 float32_t CalculateSSBTXGain(float32_t Power_W, bool *PAsel);
 
+// Low-level conversion functions for power calibration
+float32_t attenToPower_mW(float32_t att_dB, float32_t P_sat_mW, float32_t k);
+float32_t powerToAtten_dB(float32_t power_mW, float32_t P_sat_mW, float32_t k);
+
 #endif // TUNE_H

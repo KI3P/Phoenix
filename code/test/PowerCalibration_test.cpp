@@ -484,6 +484,189 @@ TEST_F(PowerCalibrationTest, CalculateCWAttenuation_InvalidInputs) {
 }
 
 /**
+ * Test that CalculateCWAttenuation returns attenuation within valid range (0 to 31.5 dB)
+ * This test ensures the function handles all edge cases including power exceeding P_sat
+ */
+TEST_F(PowerCalibrationTest, CalculateCWAttenuation_AttenuationLimits) {
+    bool PAsel;
+    float32_t atten;
+
+    // Test 20W PA scenarios (P_sat = 14.68W for 20M band)
+
+    // Very low power - should give high attenuation, but not exceed 31.5 dB
+    atten = CalculateCWAttenuation(0.1f, &PAsel);
+    EXPECT_FALSE(PAsel);  // Should select 20W PA
+    EXPECT_GE(atten, 0.0f) << "Attenuation should not be negative";
+    EXPECT_LE(atten, 31.5f) << "Attenuation should not exceed 31.5 dB";
+
+    // Low power
+    atten = CalculateCWAttenuation(0.5f, &PAsel);
+    EXPECT_FALSE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // Mid-range power
+    atten = CalculateCWAttenuation(5.0f, &PAsel);
+    EXPECT_FALSE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // High power within 20W PA range (below 10W threshold)
+    atten = CalculateCWAttenuation(9.5f, &PAsel);
+    EXPECT_FALSE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // Power at threshold - should still use 20W PA (< 10W)
+    atten = CalculateCWAttenuation(9.9f, &PAsel);
+    EXPECT_FALSE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // Note: 14.68W (P_sat for 20W PA) is above 10W threshold, so it uses 100W PA
+    // Testing with powers above 10W is handled in the 100W PA section below
+
+    // Power exceeding 20W PA's P_sat but below threshold (not practically possible
+    // since P_sat=14.68W > threshold=10W, but test the clamping logic)
+    // This case is actually handled by the 100W PA since power > 10W
+
+    // Test 100W PA scenarios (P_sat = 86W for 20M band)
+
+    // Low power on 100W PA
+    atten = CalculateCWAttenuation(15.0f, &PAsel);
+    EXPECT_TRUE(PAsel);  // Should select 100W PA (above 10W threshold)
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // Mid-range power
+    atten = CalculateCWAttenuation(50.0f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // High power, approaching P_sat
+    atten = CalculateCWAttenuation(80.0f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // Power very close to P_sat (86W)
+    atten = CalculateCWAttenuation(85.5f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+
+    // Power equal to P_sat - should return 0 dB
+    atten = CalculateCWAttenuation(86.0f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_NEAR(atten, 0.0f, 0.1f) << "Attenuation at P_sat should be ~0 dB";
+    EXPECT_LE(atten, 31.5f);
+
+    // Power exceeding P_sat - should clamp to 0 dB
+    atten = CalculateCWAttenuation(95.0f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+    EXPECT_NEAR(atten, 0.0f, 0.1f) << "Attenuation above P_sat should be clamped to ~0 dB";
+
+    // Maximum valid power (100W) - should also clamp to 0 dB
+    atten = CalculateCWAttenuation(100.0f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_GE(atten, 0.0f);
+    EXPECT_LE(atten, 31.5f);
+    EXPECT_NEAR(atten, 0.0f, 0.1f) << "Attenuation at 100W should be clamped to ~0 dB";
+}
+
+/**
+ * Test attenuation limits across a wide range of power values
+ * This is a comprehensive sweep test to ensure no corner cases are missed
+ */
+TEST_F(PowerCalibrationTest, CalculateCWAttenuation_AttenuationLimits_Sweep) {
+    bool PAsel;
+    float32_t atten;
+
+    // Sweep through power values for 20W PA (0.01W to 10W)
+    for (float32_t power = 0.01f; power <= 10.0f; power += 0.5f) {
+        atten = CalculateCWAttenuation(power, &PAsel);
+        EXPECT_FALSE(PAsel) << "PA selection failed at power " << power << "W";
+        EXPECT_GE(atten, 0.0f) << "Attenuation is negative at power " << power << "W";
+        EXPECT_LE(atten, 31.5f) << "Attenuation exceeds 31.5 dB at power " << power << "W";
+        EXPECT_FALSE(std::isnan(atten)) << "Attenuation is NaN at power " << power << "W";
+        EXPECT_FALSE(std::isinf(atten)) << "Attenuation is infinite at power " << power << "W";
+    }
+
+    // Sweep through power values for 100W PA (10W to 100W)
+    for (float32_t power = 10.0f; power <= 100.0f; power += 5.0f) {
+        atten = CalculateCWAttenuation(power, &PAsel);
+        EXPECT_TRUE(PAsel) << "PA selection failed at power " << power << "W";
+        EXPECT_GE(atten, 0.0f) << "Attenuation is negative at power " << power << "W";
+        EXPECT_LE(atten, 31.5f) << "Attenuation exceeds 31.5 dB at power " << power << "W";
+        EXPECT_FALSE(std::isnan(atten)) << "Attenuation is NaN at power " << power << "W";
+        EXPECT_FALSE(std::isinf(atten)) << "Attenuation is infinite at power " << power << "W";
+    }
+}
+
+/**
+ * Test edge cases at exactly 0 dB and 31.5 dB boundaries
+ */
+TEST_F(PowerCalibrationTest, CalculateCWAttenuation_BoundaryConditions) {
+    bool PAsel;
+    float32_t atten;
+
+    // Note: 20W PA P_sat (14.68W) is above 10W threshold, so it uses 100W PA
+    // Cannot directly test 20W PA at its P_sat since it would trigger 100W PA selection
+
+    // For 100W PA: Test that power at P_sat gives ~0 dB attenuation
+    atten = CalculateCWAttenuation(86.0f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    EXPECT_NEAR(atten, 0.0f, 0.1f) << "Power at P_sat should give ~0 dB attenuation";
+
+    // Test minimum power (should give maximum attenuation, clamped to 31.5 dB)
+    atten = CalculateCWAttenuation(0.001f, &PAsel);
+    EXPECT_FALSE(PAsel);
+    EXPECT_LE(atten, 31.5f) << "Even minimum power should not exceed 31.5 dB attenuation";
+    EXPECT_GT(atten, 20.0f) << "Minimum power should give high attenuation";
+
+    // Test that the function handles the full dynamic range
+    // P_sat * tanh(k * 10^(-31.5/10)) should be the minimum achievable power
+    // For 20W PA: k=16.2, P_sat=14680 mW
+    // Min power = 14680 * tanh(16.2 * 10^(-31.5/10)) = 14680 * tanh(16.2 * 0.000708) ≈ 0.12W
+    // Any power below this should clamp attenuation to 31.5 dB
+    atten = CalculateCWAttenuation(0.01f, &PAsel);
+    EXPECT_FALSE(PAsel);
+    EXPECT_LE(atten, 31.5f);
+}
+
+/**
+ * Test monotonicity: increasing power should result in decreasing attenuation
+ */
+TEST_F(PowerCalibrationTest, CalculateCWAttenuation_Monotonicity) {
+    bool PAsel;
+
+    // Test for 20W PA
+    float32_t prev_atten = 31.5f;
+    for (float32_t power = 1.0f; power <= 9.0f; power += 1.0f) {
+        float32_t atten = CalculateCWAttenuation(power, &PAsel);
+        EXPECT_FALSE(PAsel);
+        EXPECT_LE(atten, prev_atten)
+            << "Attenuation should decrease (or stay same) as power increases: "
+            << "power=" << power << "W, atten=" << atten << " dB, prev=" << prev_atten << " dB";
+        prev_atten = atten;
+    }
+
+    // Test for 100W PA
+    prev_atten = 31.5f;
+    for (float32_t power = 15.0f; power <= 85.0f; power += 10.0f) {
+        float32_t atten = CalculateCWAttenuation(power, &PAsel);
+        EXPECT_TRUE(PAsel);
+        EXPECT_LE(atten, prev_atten)
+            << "Attenuation should decrease (or stay same) as power increases: "
+            << "power=" << power << "W, atten=" << atten << " dB, prev=" << prev_atten << " dB";
+        prev_atten = atten;
+    }
+}
+
+/**
  * Test roundtrip conversion: power -> attenuation -> power
  */
 TEST_F(PowerCalibrationTest, CW_PowerAttenuation_Roundtrip) {
@@ -504,6 +687,631 @@ TEST_F(PowerCalibrationTest, CW_PowerAttenuation_Roundtrip) {
 
     // Should recover the original power within 1% tolerance
     EXPECT_NEAR(recovered_power / 1000.0f, target_power, target_power * 0.01f);
+}
+
+// ============================================================================
+// attenToPower_mW Direct Unit Tests
+// ============================================================================
+
+/**
+ * Test attenToPower_mW returns power within valid range
+ * Power should be > 0 and <= P_sat for all valid attenuation values
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_PowerLimits) {
+    float32_t power;
+
+    // Test with 20W PA parameters (P_sat = 14680 mW, k = 16.2)
+    const float32_t P_sat_20W = 14680.0f;
+    const float32_t k_20W = 16.2f;
+
+    // Minimum attenuation (0 dB) - should give maximum power (close to P_sat)
+    power = attenToPower_mW(0.0f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f) << "Power should be positive at 0 dB attenuation";
+    EXPECT_LE(power, P_sat_20W) << "Power should not exceed P_sat at 0 dB";
+    EXPECT_GT(power, 14000.0f) << "Power at 0 dB should be close to P_sat";
+
+    // Low attenuation
+    power = attenToPower_mW(3.0f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_20W);
+
+    // Mid-range attenuation
+    power = attenToPower_mW(15.0f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_20W);
+
+    // High attenuation
+    power = attenToPower_mW(25.0f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_20W);
+
+    // Maximum attenuation (31.5 dB)
+    power = attenToPower_mW(31.5f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f) << "Power should still be positive at 31.5 dB";
+    EXPECT_LE(power, P_sat_20W);
+    EXPECT_LT(power, 200.0f) << "Power at 31.5 dB should be very low";
+
+    // Test with 100W PA parameters (P_sat = 86000 mW, k = 10.0)
+    const float32_t P_sat_100W = 86000.0f;
+    const float32_t k_100W = 10.0f;
+
+    // Minimum attenuation (0 dB)
+    power = attenToPower_mW(0.0f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_100W);
+    EXPECT_GT(power, 80000.0f) << "Power at 0 dB should be close to P_sat";
+
+    // Low attenuation
+    power = attenToPower_mW(3.0f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_100W);
+
+    // Mid-range attenuation
+    power = attenToPower_mW(15.0f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_100W);
+
+    // High attenuation
+    power = attenToPower_mW(25.0f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_100W);
+
+    // Maximum attenuation (31.5 dB)
+    power = attenToPower_mW(31.5f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat_100W);
+    EXPECT_LT(power, 650.0f) << "Power at 31.5 dB should be very low";
+}
+
+/**
+ * Test attenToPower_mW with sweep through attenuation range
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_PowerLimits_Sweep) {
+    float32_t power;
+    const float32_t P_sat_20W = 14680.0f;
+    const float32_t k_20W = 16.2f;
+    const float32_t P_sat_100W = 86000.0f;
+    const float32_t k_100W = 10.0f;
+
+    // Sweep through attenuation values for 20W PA (0 to 31.5 dB in 0.5 dB steps)
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 0.5f) {
+        power = attenToPower_mW(atten, P_sat_20W, k_20W);
+        EXPECT_GT(power, 0.0f) << "Power should be positive at attenuation " << atten << " dB";
+        EXPECT_LE(power, P_sat_20W) << "Power should not exceed P_sat at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isnan(power)) << "Power is NaN at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isinf(power)) << "Power is infinite at attenuation " << atten << " dB";
+    }
+
+    // Sweep through attenuation values for 100W PA (0 to 31.5 dB in 1 dB steps)
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 1.0f) {
+        power = attenToPower_mW(atten, P_sat_100W, k_100W);
+        EXPECT_GT(power, 0.0f) << "Power should be positive at attenuation " << atten << " dB";
+        EXPECT_LE(power, P_sat_100W) << "Power should not exceed P_sat at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isnan(power)) << "Power is NaN at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isinf(power)) << "Power is infinite at attenuation " << atten << " dB";
+    }
+}
+
+/**
+ * Test attenToPower_mW boundary conditions
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_BoundaryConditions) {
+    float32_t power;
+    const float32_t P_sat_20W = 14680.0f;
+    const float32_t k_20W = 16.2f;
+    const float32_t P_sat_100W = 86000.0f;
+    const float32_t k_100W = 10.0f;
+
+    // For 20W PA: Test that 0 dB gives power close to P_sat
+    power = attenToPower_mW(0.0f, P_sat_20W, k_20W);
+    EXPECT_NEAR(power, P_sat_20W, 100.0f) << "Power at 0 dB should be close to P_sat";
+
+    // For 100W PA: Test that 0 dB gives power close to P_sat
+    power = attenToPower_mW(0.0f, P_sat_100W, k_100W);
+    EXPECT_NEAR(power, P_sat_100W, 1000.0f) << "Power at 0 dB should be close to P_sat";
+
+    // Test maximum attenuation (31.5 dB) gives very low but positive power
+    power = attenToPower_mW(31.5f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f) << "Power at 31.5 dB should still be positive";
+    EXPECT_LT(power, 200.0f) << "Power at 31.5 dB should be very low (20W PA)";
+
+    power = attenToPower_mW(31.5f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f) << "Power at 31.5 dB should still be positive";
+    EXPECT_LT(power, 650.0f) << "Power at 31.5 dB should be very low (100W PA)";
+
+    // Test the physical model: at very high attenuation, power approaches 0
+    // but never reaches exactly 0 due to tanh function asymptotic behavior
+    power = attenToPower_mW(31.5f, P_sat_20W, k_20W);
+    EXPECT_GT(power, 0.0f);
+
+    power = attenToPower_mW(31.5f, P_sat_100W, k_100W);
+    EXPECT_GT(power, 0.0f);
+}
+
+/**
+ * Test attenToPower_mW monotonicity: increasing attenuation should decrease power
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_Monotonicity) {
+    const float32_t P_sat_20W = 14680.0f;
+    const float32_t k_20W = 16.2f;
+    const float32_t P_sat_100W = 86000.0f;
+    const float32_t k_100W = 10.0f;
+
+    // Test for 20W PA
+    float32_t prev_power = 15000.0f; // Start with value higher than P_sat
+    for (float32_t atten = 0.0f; atten <= 31.0f; atten += 1.0f) {
+        float32_t power = attenToPower_mW(atten, P_sat_20W, k_20W);
+        EXPECT_LE(power, prev_power)
+            << "Power should decrease (or stay same) as attenuation increases: "
+            << "atten=" << atten << " dB, power=" << power << " mW, prev=" << prev_power << " mW";
+        prev_power = power;
+    }
+
+    // Test for 100W PA
+    prev_power = 90000.0f; // Start with value higher than P_sat
+    for (float32_t atten = 0.0f; atten <= 31.0f; atten += 2.0f) {
+        float32_t power = attenToPower_mW(atten, P_sat_100W, k_100W);
+        EXPECT_LE(power, prev_power)
+            << "Power should decrease (or stay same) as attenuation increases: "
+            << "atten=" << atten << " dB, power=" << power << " mW, prev=" << prev_power << " mW";
+        prev_power = power;
+    }
+}
+
+/**
+ * Test attenToPower_mW never exceeds P_sat for any valid attenuation
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_NeverExceedsPsat) {
+    float32_t power;
+    const float32_t P_sat_20W = 14680.0f;
+    const float32_t k_20W = 16.2f;
+    const float32_t P_sat_100W = 86000.0f;
+    const float32_t k_100W = 10.0f;
+
+    // For 20W PA: Test every 0.1 dB from 0 to 31.5 dB
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 0.1f) {
+        power = attenToPower_mW(atten, P_sat_20W, k_20W);
+        EXPECT_LE(power, P_sat_20W)
+            << "Power (" << power << " mW) exceeds P_sat at attenuation " << atten << " dB";
+    }
+
+    // For 100W PA: Test every 0.5 dB from 0 to 31.5 dB
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 0.5f) {
+        power = attenToPower_mW(atten, P_sat_100W, k_100W);
+        EXPECT_LE(power, P_sat_100W)
+            << "Power (" << power << " mW) exceeds P_sat at attenuation " << atten << " dB";
+    }
+}
+
+/**
+ * Test attenToPower_mW with edge case parameters
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_EdgeCaseParameters) {
+    float32_t power;
+
+    // Test with very small k value (low drive ratio)
+    power = attenToPower_mW(10.0f, 14680.0f, 0.1f);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 14680.0f);
+
+    // Test with very large k value (high drive ratio)
+    power = attenToPower_mW(10.0f, 14680.0f, 100.0f);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 14680.0f);
+
+    // Test with very small P_sat
+    power = attenToPower_mW(10.0f, 100.0f, 16.2f);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 100.0f);
+
+    // Test with very large P_sat
+    power = attenToPower_mW(10.0f, 1000000.0f, 16.2f);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 1000000.0f);
+}
+
+/**
+ * Test attenToPower_mW physical model validation
+ * Formula: P_out = P_sat * tanh(k * 10^(-attenuation/10))
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_PhysicalModelValidation) {
+    const float32_t P_sat = 14680.0f;
+    const float32_t k = 16.2f;
+
+    // At 0 dB attenuation: P_out = P_sat * tanh(k * 1.0) = P_sat * tanh(k)
+    float32_t power_0dB = attenToPower_mW(0.0f, P_sat, k);
+    float32_t expected_0dB = P_sat * tanh(k);
+    EXPECT_NEAR(power_0dB, expected_0dB, 0.1f);
+
+    // At 10 dB attenuation: P_out = P_sat * tanh(k * 0.1)
+    float32_t power_10dB = attenToPower_mW(10.0f, P_sat, k);
+    float32_t expected_10dB = P_sat * tanh(k * 0.1f);
+    EXPECT_NEAR(power_10dB, expected_10dB, 0.1f);
+
+    // At 20 dB attenuation: P_out = P_sat * tanh(k * 0.01)
+    float32_t power_20dB = attenToPower_mW(20.0f, P_sat, k);
+    float32_t expected_20dB = P_sat * tanh(k * 0.01f);
+    EXPECT_NEAR(power_20dB, expected_20dB, 0.1f);
+
+    // Verify the mathematical relationship is correct
+    EXPECT_LT(power_10dB, power_0dB);
+    EXPECT_LT(power_20dB, power_10dB);
+}
+
+/**
+ * Test attenToPower_mW with invalid attenuation values
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_InvalidAttenuation) {
+    float32_t power;
+    const float32_t P_sat = 14680.0f;
+    const float32_t k = 16.2f;
+
+    // Negative attenuation - now returns 0 (input validation)
+    power = attenToPower_mW(-1.0f, P_sat, k);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0";
+
+    power = attenToPower_mW(-10.0f, P_sat, k);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0";
+
+    power = attenToPower_mW(-50.0f, P_sat, k);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0";
+
+    // Very large attenuation (beyond valid range but still positive)
+    // Function should still work since attenuation >= 0 and P_sat >= 0
+    power = attenToPower_mW(50.0f, P_sat, k);
+    EXPECT_GT(power, 0.0f) << "Power should still be positive at very high attenuation";
+    EXPECT_LE(power, P_sat);
+    EXPECT_LT(power, 10.0f) << "Power at 50 dB should be extremely low";
+
+    power = attenToPower_mW(100.0f, P_sat, k);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat);
+    EXPECT_LT(power, 1.0f) << "Power at 100 dB should be nearly zero";
+}
+
+/**
+ * Test attenToPower_mW with invalid P_sat values
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_InvalidPsat) {
+    float32_t power;
+    const float32_t k = 16.2f;
+
+    // Negative P_sat - now returns 0 (input validation)
+    power = attenToPower_mW(10.0f, -1000.0f, k);
+    EXPECT_EQ(power, 0.0f) << "Negative P_sat should return 0";
+
+    power = attenToPower_mW(0.0f, -14680.0f, k);
+    EXPECT_EQ(power, 0.0f) << "Negative P_sat should return 0";
+
+    // Zero P_sat - should return 0 (mathematically: 0 * tanh(...) = 0)
+    power = attenToPower_mW(10.0f, 0.0f, k);
+    EXPECT_EQ(power, 0.0f) << "Zero P_sat should result in zero power";
+
+    power = attenToPower_mW(0.0f, 0.0f, k);
+    EXPECT_EQ(power, 0.0f);
+
+    power = attenToPower_mW(31.5f, 0.0f, k);
+    EXPECT_EQ(power, 0.0f);
+
+    // Very small positive P_sat - should still work
+    power = attenToPower_mW(10.0f, 0.001f, k);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 0.001f);
+
+    // Infinity P_sat - mathematical edge case
+    power = attenToPower_mW(10.0f, INFINITY, k);
+    EXPECT_TRUE(std::isinf(power) || std::isnan(power)) << "Infinite P_sat should result in inf or NaN";
+}
+
+/**
+ * Test attenToPower_mW with invalid k values
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_InvalidK) {
+    float32_t power;
+    const float32_t P_sat = 14680.0f;
+
+    // Negative k - mathematically defined but physically nonsensical
+    // Formula: P_sat * tanh(k * 10^(-att/10))
+    // With k < 0: tanh(negative value) = negative
+    // Result: P_sat * (negative) = negative power
+    power = attenToPower_mW(10.0f, P_sat, -16.2f);
+    EXPECT_LT(power, 0.0f) << "Negative k produces negative power";
+    EXPECT_GE(power, -P_sat) << "Negative power should be >= -P_sat";
+
+    power = attenToPower_mW(10.0f, P_sat, -10.0f);
+    EXPECT_LT(power, 0.0f) << "Negative k results in negative power";
+    EXPECT_GE(power, -P_sat);
+
+    // Zero k - should return 0
+    // P_sat * tanh(0 * anything) = P_sat * tanh(0) = P_sat * 0 = 0
+    power = attenToPower_mW(10.0f, P_sat, 0.0f);
+    EXPECT_EQ(power, 0.0f) << "Zero k should result in zero power";
+
+    power = attenToPower_mW(0.0f, P_sat, 0.0f);
+    EXPECT_EQ(power, 0.0f);
+
+    power = attenToPower_mW(31.5f, P_sat, 0.0f);
+    EXPECT_EQ(power, 0.0f);
+
+    // Very small positive k
+    power = attenToPower_mW(10.0f, P_sat, 0.001f);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, P_sat);
+    EXPECT_LT(power, 100.0f) << "Very small k should give very low power";
+
+    // Infinity k - tanh(inf) = 1
+    power = attenToPower_mW(10.0f, P_sat, INFINITY);
+    EXPECT_NEAR(power, P_sat, 1.0f) << "Infinite k: tanh(inf) = 1, so power approaches P_sat";
+}
+
+/**
+ * Test attenToPower_mW with combinations of invalid parameters
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_InvalidParameterCombinations) {
+    float32_t power;
+
+    // All zero parameters
+    power = attenToPower_mW(0.0f, 0.0f, 0.0f);
+    EXPECT_EQ(power, 0.0f) << "All zero parameters should give zero power";
+
+    // Negative attenuation with negative P_sat - both invalid, returns 0
+    power = attenToPower_mW(-10.0f, -14680.0f, 16.2f);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0 (checked first)";
+
+    // Negative attenuation with negative k - attenuation check happens first, returns 0
+    power = attenToPower_mW(-10.0f, 14680.0f, -16.2f);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0";
+
+    // Very large attenuation with zero k
+    power = attenToPower_mW(1000.0f, 14680.0f, 0.0f);
+    EXPECT_EQ(power, 0.0f) << "Zero k always gives zero power regardless of attenuation";
+
+    // NaN inputs - should propagate NaN
+    power = attenToPower_mW(NAN, 14680.0f, 16.2f);
+    EXPECT_TRUE(std::isnan(power)) << "NaN attenuation should result in NaN power";
+
+    power = attenToPower_mW(10.0f, NAN, 16.2f);
+    EXPECT_TRUE(std::isnan(power)) << "NaN P_sat should result in NaN power";
+
+    power = attenToPower_mW(10.0f, 14680.0f, NAN);
+    EXPECT_TRUE(std::isnan(power)) << "NaN k should result in NaN power";
+}
+
+/**
+ * Test attenToPower_mW output sanity checks for invalid inputs
+ */
+TEST_F(PowerCalibrationTest, attenToPower_mW_InvalidInputsSanityCheck) {
+    float32_t power;
+
+    // Document expected behavior with input validation
+    // Function now validates att_dB >= 0 and P_sat_mW >= 0
+
+    // Negative attenuation - now returns 0 (input validation)
+    power = attenToPower_mW(-5.0f, 14680.0f, 16.2f);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation returns 0";
+    EXPECT_FALSE(std::isnan(power)) << "Should not produce NaN";
+    EXPECT_FALSE(std::isinf(power)) << "Should not produce infinity";
+
+    // Attenuation > 31.5 dB is still mathematically valid (positive attenuation)
+    power = attenToPower_mW(60.0f, 14680.0f, 16.2f);
+    EXPECT_FALSE(std::isnan(power)) << "High attenuation should not produce NaN";
+    EXPECT_FALSE(std::isinf(power)) << "High attenuation should not produce infinity";
+    EXPECT_GT(power, 0.0f) << "High attenuation should still give positive power";
+
+    // Very small k is mathematically valid
+    power = attenToPower_mW(10.0f, 14680.0f, 0.01f);
+    EXPECT_FALSE(std::isnan(power));
+    EXPECT_FALSE(std::isinf(power));
+    EXPECT_GT(power, 0.0f);
+
+    // Very large k is mathematically valid
+    power = attenToPower_mW(10.0f, 14680.0f, 1000.0f);
+    EXPECT_FALSE(std::isnan(power));
+    EXPECT_FALSE(std::isinf(power));
+    EXPECT_GT(power, 0.0f);
+
+    // Negative P_sat - now returns 0 (input validation)
+    power = attenToPower_mW(10.0f, -14680.0f, 16.2f);
+    EXPECT_EQ(power, 0.0f) << "Negative P_sat returns 0";
+    EXPECT_FALSE(std::isnan(power));
+    EXPECT_FALSE(std::isinf(power));
+}
+
+// ============================================================================
+// CalculateCWPowerLevel Tests (wrapper function)
+// ============================================================================
+
+/**
+ * Test that CalculateCWPowerLevel returns power within valid range
+ * Power should be > 0 and <= P_sat for all valid attenuation values
+ */
+TEST_F(PowerCalibrationTest, CalculateCWPowerLevel_PowerLimits) {
+    float32_t power;
+
+    // Test 20W PA scenarios (P_sat = 14.68W = 14680 mW for 20M band)
+
+    // Minimum attenuation (0 dB) - should give maximum power (close to P_sat)
+    power = CalculateCWPowerLevel(0.0f, 0);
+    EXPECT_GT(power, 0.0f) << "Power should be positive at 0 dB attenuation";
+    EXPECT_LE(power, 14680.0f) << "Power should not exceed P_sat at 0 dB";
+    EXPECT_GT(power, 14000.0f) << "Power at 0 dB should be close to P_sat (14680 mW)";
+
+    // Low attenuation
+    power = CalculateCWPowerLevel(3.0f, 0);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 14680.0f);
+
+    // Mid-range attenuation
+    power = CalculateCWPowerLevel(15.0f, 0);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 14680.0f);
+
+    // High attenuation
+    power = CalculateCWPowerLevel(25.0f, 0);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 14680.0f);
+
+    // Maximum attenuation (31.5 dB) - should give very low power but still positive
+    power = CalculateCWPowerLevel(31.5f, 0);
+    EXPECT_GT(power, 0.0f) << "Power should still be positive at 31.5 dB";
+    EXPECT_LE(power, 14680.0f);
+    EXPECT_LT(power, 200.0f) << "Power at 31.5 dB should be very low (~168 mW)";
+
+    // Test 100W PA scenarios (P_sat = 86W = 86000 mW for 20M band)
+
+    // Minimum attenuation (0 dB)
+    power = CalculateCWPowerLevel(0.0f, 1);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 86000.0f) << "Power should not exceed P_sat";
+    EXPECT_GT(power, 80000.0f) << "Power at 0 dB should be close to P_sat (86000 mW)";
+
+    // Low attenuation
+    power = CalculateCWPowerLevel(3.0f, 1);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 86000.0f);
+
+    // Mid-range attenuation
+    power = CalculateCWPowerLevel(15.0f, 1);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 86000.0f);
+
+    // High attenuation
+    power = CalculateCWPowerLevel(25.0f, 1);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 86000.0f);
+
+    // Maximum attenuation (31.5 dB)
+    power = CalculateCWPowerLevel(31.5f, 1);
+    EXPECT_GT(power, 0.0f);
+    EXPECT_LE(power, 86000.0f);
+    EXPECT_LT(power, 650.0f) << "Power at 31.5 dB should be very low (~609 mW)";
+}
+
+/**
+ * Test CalculateCWPowerLevel with sweep through attenuation range
+ */
+TEST_F(PowerCalibrationTest, CalculateCWPowerLevel_PowerLimits_Sweep) {
+    float32_t power;
+
+    // Sweep through attenuation values for 20W PA (0 to 31.5 dB in 0.5 dB steps)
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 0.5f) {
+        power = CalculateCWPowerLevel(atten, 0);
+        EXPECT_GT(power, 0.0f) << "Power should be positive at attenuation " << atten << " dB";
+        EXPECT_LE(power, 14680.0f) << "Power should not exceed P_sat at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isnan(power)) << "Power is NaN at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isinf(power)) << "Power is infinite at attenuation " << atten << " dB";
+    }
+
+    // Sweep through attenuation values for 100W PA (0 to 31.5 dB in 1 dB steps)
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 1.0f) {
+        power = CalculateCWPowerLevel(atten, 1);
+        EXPECT_GT(power, 0.0f) << "Power should be positive at attenuation " << atten << " dB";
+        EXPECT_LE(power, 86000.0f) << "Power should not exceed P_sat at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isnan(power)) << "Power is NaN at attenuation " << atten << " dB";
+        EXPECT_FALSE(std::isinf(power)) << "Power is infinite at attenuation " << atten << " dB";
+    }
+}
+
+/**
+ * Test edge cases at exactly 0 dB and 31.5 dB boundaries for power calculation
+ */
+TEST_F(PowerCalibrationTest, CalculateCWPowerLevel_BoundaryConditions) {
+    float32_t power;
+
+    // For 20W PA: Test that 0 dB gives power close to P_sat
+    power = CalculateCWPowerLevel(0.0f, 0);
+    EXPECT_NEAR(power, 14680.0f, 100.0f) << "Power at 0 dB should be close to P_sat";
+
+    // For 100W PA: Test that 0 dB gives power close to P_sat
+    power = CalculateCWPowerLevel(0.0f, 1);
+    EXPECT_NEAR(power, 86000.0f, 1000.0f) << "Power at 0 dB should be close to P_sat";
+
+    // Test maximum attenuation (31.5 dB) gives very low but positive power
+    power = CalculateCWPowerLevel(31.5f, 0);
+    EXPECT_GT(power, 0.0f) << "Power at 31.5 dB should still be positive";
+    EXPECT_LT(power, 200.0f) << "Power at 31.5 dB should be very low (20W PA: ~168 mW)";
+
+    power = CalculateCWPowerLevel(31.5f, 1);
+    EXPECT_GT(power, 0.0f) << "Power at 31.5 dB should still be positive";
+    EXPECT_LT(power, 650.0f) << "Power at 31.5 dB should be very low (100W PA: ~609 mW)";
+
+    // Test the physical model: at very high attenuation, power approaches 0
+    // but never reaches exactly 0 due to tanh function asymptotic behavior
+    power = CalculateCWPowerLevel(31.5f, 0);
+    EXPECT_GT(power, 0.0f);
+
+    power = CalculateCWPowerLevel(31.5f, 1);
+    EXPECT_GT(power, 0.0f);
+}
+
+/**
+ * Test monotonicity: increasing attenuation should result in decreasing power
+ */
+TEST_F(PowerCalibrationTest, CalculateCWPowerLevel_Monotonicity) {
+    // Test for 20W PA
+    float32_t prev_power = 15000.0f; // Start with value higher than any possible output
+    for (float32_t atten = 0.0f; atten <= 31.0f; atten += 1.0f) {
+        float32_t power = CalculateCWPowerLevel(atten, 0);
+        EXPECT_LE(power, prev_power)
+            << "Power should decrease (or stay same) as attenuation increases: "
+            << "atten=" << atten << " dB, power=" << power << " mW, prev=" << prev_power << " mW";
+        prev_power = power;
+    }
+
+    // Test for 100W PA
+    prev_power = 90000.0f; // Start with value higher than any possible output
+    for (float32_t atten = 0.0f; atten <= 31.0f; atten += 2.0f) {
+        float32_t power = CalculateCWPowerLevel(atten, 1);
+        EXPECT_LE(power, prev_power)
+            << "Power should decrease (or stay same) as attenuation increases: "
+            << "atten=" << atten << " dB, power=" << power << " mW, prev=" << prev_power << " mW";
+        prev_power = power;
+    }
+}
+
+/**
+ * Test that invalid attenuation values are handled correctly
+ */
+TEST_F(PowerCalibrationTest, CalculateCWPowerLevel_InvalidAttenuation) {
+    float32_t power;
+
+    // Negative attenuation should return 0
+    power = CalculateCWPowerLevel(-1.0f, 0);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0";
+
+    power = CalculateCWPowerLevel(-10.0f, 1);
+    EXPECT_EQ(power, 0.0f) << "Negative attenuation should return 0";
+
+    // Attenuation > 31.5 dB should return 0
+    power = CalculateCWPowerLevel(32.0f, 0);
+    EXPECT_EQ(power, 0.0f) << "Attenuation > 31.5 dB should return 0";
+
+    power = CalculateCWPowerLevel(40.0f, 1);
+    EXPECT_EQ(power, 0.0f) << "Attenuation > 31.5 dB should return 0";
+
+    power = CalculateCWPowerLevel(100.0f, 0);
+    EXPECT_EQ(power, 0.0f) << "Attenuation > 31.5 dB should return 0";
+}
+
+/**
+ * Test that power output never exceeds P_sat for any valid attenuation
+ */
+TEST_F(PowerCalibrationTest, CalculateCWPowerLevel_NeverExceedsPsat) {
+    float32_t power;
+
+    // For 20W PA: P_sat = 14680 mW
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 0.1f) {
+        power = CalculateCWPowerLevel(atten, 0);
+        EXPECT_LE(power, 14680.0f)
+            << "Power (" << power << " mW) exceeds P_sat at attenuation " << atten << " dB";
+    }
+
+    // For 100W PA: P_sat = 86000 mW
+    for (float32_t atten = 0.0f; atten <= 31.5f; atten += 0.5f) {
+        power = CalculateCWPowerLevel(atten, 1);
+        EXPECT_LE(power, 86000.0f)
+            << "Power (" << power << " mW) exceeds P_sat at attenuation " << atten << " dB";
+    }
 }
 
 /**

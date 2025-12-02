@@ -160,11 +160,30 @@ int8_t GetBand(int64_t freq){
 
 // Model function
 float32_t attenToPower_mW(float32_t att_dB, float32_t P_sat_mW, float32_t k) {
+    if (att_dB < 0){
+        Debug("Invalid negative attenuation provided to attenToPower_mW!");
+        return 0.0;
+    }
+    if (P_sat_mW < 0){
+        Debug("Invalid negative P_sat_mW provided to attenToPower_mW!");
+        return 0.0;
+    }
     return P_sat_mW * tanh(k * powf(10.0f, -att_dB / 10.0f));
 }
 
 float32_t powerToAtten_dB(float32_t power_mW, float32_t P_sat_mW, float32_t k) {
-    return -10.0*log10f((1.0/k)*atanhf(power_mW/P_sat_mW));
+    if (power_mW >= P_sat_mW)
+        return 0.0;
+
+    float32_t atten = -10.0*log10f((1.0/k)*atanhf(power_mW/P_sat_mW));
+
+    // Clamp attenuation to valid range [0, 31.5] dB
+    if (atten < 0.0)
+        return 0.0;
+    if (atten > 31.5)
+        return 31.5;
+
+    return atten;
 }
 
 /**
