@@ -182,6 +182,7 @@ IntervalTimer timer1ms;
 void tick1ms(void){
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
+    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
 }
 
 time_t getTeensy3Time() {

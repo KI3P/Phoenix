@@ -9,12 +9,16 @@
 #include <string.h> // for memset
 // #include "your_header_here.h"
 // Forward declarations
-void Reset(void);
+#include <stdint.h> // for count var
+typedef float float32_t;
+void ResetPowerCalibration(void);
 void StartPowerPoint(void);
 void StartSSBPoint(void);
 void RecordPowerDataPoint(void);
 void CalculatePowerCurveFit(void);
 void CalculateSSBPoint(void);
+float32_t ReadSWR(void);
+float32_t AdjustAttenuation(void);
 
 
 // This function is used when StateSmith doesn't know what the active leaf state is at
@@ -22,6 +26,12 @@ void CalculateSSBPoint(void);
 static void exit_up_to_state_handler(PowerCalSm* sm, PowerCalSm_StateId desired_state);
 
 static void ROOT_enter(PowerCalSm* sm);
+
+static void ACQUISITION_enter(PowerCalSm* sm);
+
+static void ACQUISITION_exit(PowerCalSm* sm);
+
+static void ACQUISITION_do(PowerCalSm* sm);
 
 static void MEASUREMENTCOMPLETE_enter(PowerCalSm* sm);
 
@@ -41,6 +51,8 @@ static void POWERPOINT1_enter(PowerCalSm* sm);
 
 static void POWERPOINT1_exit(PowerCalSm* sm);
 
+static void POWERPOINT1_auto(PowerCalSm* sm);
+
 static void POWERPOINT1_record_data_point(PowerCalSm* sm);
 
 static void POWERPOINT2_enter(PowerCalSm* sm);
@@ -58,6 +70,14 @@ static void POWERPOINT3_exit(PowerCalSm* sm);
 static void POWERPOINT3_record_data_point(PowerCalSm* sm);
 
 static void POWERPOINT3_reset(PowerCalSm* sm);
+
+static void READ_AND_ADJUST_enter(PowerCalSm* sm);
+
+static void READ_AND_ADJUST_exit(PowerCalSm* sm);
+
+static void READ_AND_ADJUST_curve_complete(PowerCalSm* sm);
+
+static void READ_AND_ADJUST_next_point(PowerCalSm* sm);
 
 static void SSBPOINT_enter(PowerCalSm* sm);
 
@@ -115,6 +135,16 @@ void PowerCalSm_dispatch_event(PowerCalSm* sm, PowerCalSm_EventId event_id)
             // No events handled by this state (or its ancestors).
             break;
         
+        // STATE: ACQUISITION
+        case PowerCalSm_StateId_ACQUISITION:
+            switch (event_id)
+            {
+                case PowerCalSm_EventId_DO: ACQUISITION_do(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
         // STATE: MeasurementComplete
         case PowerCalSm_StateId_MEASUREMENTCOMPLETE:
             switch (event_id)
@@ -141,6 +171,7 @@ void PowerCalSm_dispatch_event(PowerCalSm* sm, PowerCalSm_EventId event_id)
             switch (event_id)
             {
                 case PowerCalSm_EventId_RECORD_DATA_POINT: POWERPOINT1_record_data_point(sm); break;
+                case PowerCalSm_EventId_AUTO: POWERPOINT1_auto(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -168,6 +199,17 @@ void PowerCalSm_dispatch_event(PowerCalSm* sm, PowerCalSm_EventId event_id)
             }
             break;
         
+        // STATE: READ_AND_ADJUST
+        case PowerCalSm_StateId_READ_AND_ADJUST:
+            switch (event_id)
+            {
+                case PowerCalSm_EventId_NEXT_POINT: READ_AND_ADJUST_next_point(sm); break;
+                case PowerCalSm_EventId_CURVE_COMPLETE: READ_AND_ADJUST_curve_complete(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
         // STATE: SSBPoint
         case PowerCalSm_StateId_SSBPOINT:
             switch (event_id)
@@ -190,6 +232,8 @@ static void exit_up_to_state_handler(PowerCalSm* sm, PowerCalSm_StateId desired_
     {
         switch (sm->state_id)
         {
+            case PowerCalSm_StateId_ACQUISITION: ACQUISITION_exit(sm); break;
+            
             case PowerCalSm_StateId_MEASUREMENTCOMPLETE: MEASUREMENTCOMPLETE_exit(sm); break;
             
             case PowerCalSm_StateId_POWERCOMPLETE: POWERCOMPLETE_exit(sm); break;
@@ -199,6 +243,8 @@ static void exit_up_to_state_handler(PowerCalSm* sm, PowerCalSm_StateId desired_
             case PowerCalSm_StateId_POWERPOINT2: POWERPOINT2_exit(sm); break;
             
             case PowerCalSm_StateId_POWERPOINT3: POWERPOINT3_exit(sm); break;
+            
+            case PowerCalSm_StateId_READ_AND_ADJUST: READ_AND_ADJUST_exit(sm); break;
             
             case PowerCalSm_StateId_SSBPOINT: SSBPOINT_exit(sm); break;
             
@@ -215,6 +261,56 @@ static void exit_up_to_state_handler(PowerCalSm* sm, PowerCalSm_StateId desired_
 static void ROOT_enter(PowerCalSm* sm)
 {
     sm->state_id = PowerCalSm_StateId_ROOT;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state ACQUISITION
+////////////////////////////////////////////////////////////////////////////////
+
+static void ACQUISITION_enter(PowerCalSm* sm)
+{
+    sm->state_id = PowerCalSm_StateId_ACQUISITION;
+    
+    // ACQUISITION behavior
+    // uml: enter / { count_ms = 0; }
+    {
+        // Step 1: execute action `count_ms = 0;`
+        sm->vars.count_ms = 0; 
+    } // end of behavior for ACQUISITION
+}
+
+static void ACQUISITION_exit(PowerCalSm* sm)
+{
+    sm->state_id = PowerCalSm_StateId_ROOT;
+}
+
+static void ACQUISITION_do(PowerCalSm* sm)
+{
+    // ACQUISITION behavior
+    // uml: 1. do / { count_ms++; }
+    {
+        // Step 1: execute action `count_ms++;`
+        sm->vars.count_ms++;
+    } // end of behavior for ACQUISITION
+    
+    // ACQUISITION behavior
+    // uml: do [count_ms >= acquisitionDuration_ms] TransitionTo(READ_AND_ADJUST)
+    if (sm->vars.count_ms >= sm->vars.acquisitionDuration_ms)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        ACQUISITION_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `READ_AND_ADJUST`.
+        READ_AND_ADJUST_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for ACQUISITION
+    
+    // No ancestor handles this event.
 }
 
 
@@ -343,10 +439,10 @@ static void POWERPOINT1_enter(PowerCalSm* sm)
     sm->state_id = PowerCalSm_StateId_POWERPOINT1;
     
     // PowerPoint1 behavior
-    // uml: enter / { Reset(); }
+    // uml: enter / { ResetPowerCalibration(); }
     {
-        // Step 1: execute action `Reset();`
-        Reset();
+        // Step 1: execute action `ResetPowerCalibration();`
+        ResetPowerCalibration();
     } // end of behavior for PowerPoint1
 }
 
@@ -360,6 +456,26 @@ static void POWERPOINT1_exit(PowerCalSm* sm)
     } // end of behavior for PowerPoint1
     
     sm->state_id = PowerCalSm_StateId_ROOT;
+}
+
+static void POWERPOINT1_auto(PowerCalSm* sm)
+{
+    // PowerPoint1 behavior
+    // uml: AUTO TransitionTo(ACQUISITION)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        POWERPOINT1_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `ACQUISITION`.
+        ACQUISITION_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for PowerPoint1
+    
+    // No ancestor handles this event.
 }
 
 static void POWERPOINT1_record_data_point(PowerCalSm* sm)
@@ -522,6 +638,68 @@ static void POWERPOINT3_reset(PowerCalSm* sm)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// event handlers for state READ_AND_ADJUST
+////////////////////////////////////////////////////////////////////////////////
+
+static void READ_AND_ADJUST_enter(PowerCalSm* sm)
+{
+    sm->state_id = PowerCalSm_StateId_READ_AND_ADJUST;
+    
+    // READ_AND_ADJUST behavior
+    // uml: enter / { AdjustAttenuation(); }
+    {
+        // Step 1: execute action `AdjustAttenuation();`
+        AdjustAttenuation();
+    } // end of behavior for READ_AND_ADJUST
+}
+
+static void READ_AND_ADJUST_exit(PowerCalSm* sm)
+{
+    sm->state_id = PowerCalSm_StateId_ROOT;
+}
+
+static void READ_AND_ADJUST_curve_complete(PowerCalSm* sm)
+{
+    // READ_AND_ADJUST behavior
+    // uml: CURVE_COMPLETE TransitionTo(SSBPoint)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        READ_AND_ADJUST_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `SSBPoint`.
+        SSBPOINT_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for READ_AND_ADJUST
+    
+    // No ancestor handles this event.
+}
+
+static void READ_AND_ADJUST_next_point(PowerCalSm* sm)
+{
+    // READ_AND_ADJUST behavior
+    // uml: NEXT_POINT TransitionTo(ACQUISITION)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        READ_AND_ADJUST_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `ACQUISITION`.
+        ACQUISITION_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for READ_AND_ADJUST
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // event handlers for state SSBPOINT
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -595,11 +773,13 @@ char const * PowerCalSm_state_id_to_string(PowerCalSm_StateId id)
     switch (id)
     {
         case PowerCalSm_StateId_ROOT: return "ROOT";
+        case PowerCalSm_StateId_ACQUISITION: return "ACQUISITION";
         case PowerCalSm_StateId_MEASUREMENTCOMPLETE: return "MEASUREMENTCOMPLETE";
         case PowerCalSm_StateId_POWERCOMPLETE: return "POWERCOMPLETE";
         case PowerCalSm_StateId_POWERPOINT1: return "POWERPOINT1";
         case PowerCalSm_StateId_POWERPOINT2: return "POWERPOINT2";
         case PowerCalSm_StateId_POWERPOINT3: return "POWERPOINT3";
+        case PowerCalSm_StateId_READ_AND_ADJUST: return "READ_AND_ADJUST";
         case PowerCalSm_StateId_SSBPOINT: return "SSBPOINT";
         default: return "?";
     }
@@ -610,7 +790,10 @@ char const * PowerCalSm_event_id_to_string(PowerCalSm_EventId id)
 {
     switch (id)
     {
+        case PowerCalSm_EventId_AUTO: return "AUTO";
         case PowerCalSm_EventId_CURVE_COMPLETE: return "CURVE_COMPLETE";
+        case PowerCalSm_EventId_DO: return "DO";
+        case PowerCalSm_EventId_NEXT_POINT: return "NEXT_POINT";
         case PowerCalSm_EventId_RECORD_DATA_POINT: return "RECORD_DATA_POINT";
         case PowerCalSm_EventId_RESET: return "RESET";
         default: return "?";

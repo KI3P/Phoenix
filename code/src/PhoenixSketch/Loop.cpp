@@ -352,6 +352,7 @@ void ChangeCalibrationPASelection(void); // forward declare from MainBoard_Displ
 void ChangePowerUnits(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ResetPowerCal(void); // forward declare from MainBoard_DisplayCalibration.cpp
 void ChangePowerCalibrationPhase(void); // forward declare from MainBoard_DisplayCalibration.cpp
+void StartPowerAutoCal(void);
 
 /**
  * Process button press events from the front panel.
@@ -781,6 +782,10 @@ void HandleButtonPress(int32_t button){
                 case (MENU_OPTION_SELECT):{
                     // Capture data point
                     RecordPowerButtonPressed();
+                    break;
+                }
+                case (1):{
+                    StartPowerAutoCal();
                     break;
                 }
                 case (ZOOM):{
@@ -1316,6 +1321,8 @@ void ConsumeInterrupt(void){
         }
         case (iCALIBRATE_POWER):{
             SaveArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
+            // Start the power cal state machine
+            InitializePowerCalibration();
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_POWER);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);     
             break;

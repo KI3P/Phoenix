@@ -224,7 +224,7 @@ PowerPoint1
 
 PowerPoint1 : PowerPoint1
 
-PowerPoint1 : enter / #123; Reset()#59; #125;
+PowerPoint1 : enter / #123; ResetPowerCalibration()#59; #125;
 
 PowerPoint1 : exit / #123; RecordPowerDataPoint()#59; #125;
 
@@ -268,9 +268,25 @@ MeasurementComplete : enter / #123; CalculateSSBPoint()#59; #125;
 
 MeasurementComplete : exit / #123;  #125;
 
+ACQUISITION
+
+ACQUISITION : ACQUISITION
+
+ACQUISITION : enter / #123; count_ms = 0#59; #125;
+
+ACQUISITION : 1. do / #123; count_ms++#59; #125;
+
+READ_AND_ADJUST
+
+READ_AND_ADJUST : READ_AND_ADJUST
+
+READ_AND_ADJUST : enter / #123; AdjustAttenuation()#59; #125;
+
 ROOT.(InitialState) --> PowerPoint1
 
 PowerPoint1 --> PowerPoint2 : RECORD_DATA_POINT
+
+PowerPoint1 --> ACQUISITION : AUTO
 
 PowerPoint2 --> PowerPoint3 : RECORD_DATA_POINT
 
@@ -289,6 +305,12 @@ SSBPoint --> MeasurementComplete : RECORD_DATA_POINT
 SSBPoint --> PowerPoint1 : RESET
 
 MeasurementComplete --> PowerPoint1 : RESET
+
+ACQUISITION --> READ_AND_ADJUST : do [count_ms >= acquisitionDuration_ms]
+
+READ_AND_ADJUST --> ACQUISITION : NEXT_POINT
+
+READ_AND_ADJUST --> SSBPoint : CURVE_COMPLETE
 
 
 
@@ -333,28 +355,33 @@ class PowerCalSm
 evaluateGuard = null;
     static EventId = 
     {
-        CURVE_COMPLETE : 0,
-        RECORD_DATA_POINT : 1,
-        RESET : 2,
+        DO : 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
+        AUTO : 1,
+        CURVE_COMPLETE : 2,
+        NEXT_POINT : 3,
+        RECORD_DATA_POINT : 4,
+        RESET : 5,
     }
     static { Object.freeze(this.EventId); }
     
-    static EventIdCount = 3;
+    static EventIdCount = 6;
     static { Object.freeze(this.EventIdCount); }
     
     static StateId = 
     {
         ROOT : 0,
-        MEASUREMENTCOMPLETE : 1,
-        POWERCOMPLETE : 2,
-        POWERPOINT1 : 3,
-        POWERPOINT2 : 4,
-        POWERPOINT3 : 5,
-        SSBPOINT : 6,
+        ACQUISITION : 1,
+        MEASUREMENTCOMPLETE : 2,
+        POWERCOMPLETE : 3,
+        POWERPOINT1 : 4,
+        POWERPOINT2 : 5,
+        POWERPOINT3 : 6,
+        READ_AND_ADJUST : 7,
+        SSBPOINT : 8,
     }
     static { Object.freeze(this.StateId); }
     
-    static StateIdCount = 7;
+    static StateIdCount = 9;
     static { Object.freeze(this.StateIdCount); }
     
     // Used internally by state machine. Feel free to inspect, but don't modify.
@@ -402,6 +429,14 @@ evaluateGuard = null;
                 // No events handled by this state (or its ancestors).
                 break;
             
+            // STATE: ACQUISITION
+            case PowerCalSm.StateId.ACQUISITION:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#ACQUISITION_do(); break;
+                }
+                break;
+            
             // STATE: MeasurementComplete
             case PowerCalSm.StateId.MEASUREMENTCOMPLETE:
                 switch (eventId)
@@ -424,6 +459,7 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case PowerCalSm.EventId.RECORD_DATA_POINT: this.#POWERPOINT1_record_data_point(); break;
+                    case PowerCalSm.EventId.AUTO: this.#POWERPOINT1_auto(); break;
                 }
                 break;
             
@@ -442,6 +478,15 @@ evaluateGuard = null;
                 {
                     case PowerCalSm.EventId.RECORD_DATA_POINT: this.#POWERPOINT3_record_data_point(); break;
                     case PowerCalSm.EventId.RESET: this.#POWERPOINT3_reset(); break;
+                }
+                break;
+            
+            // STATE: READ_AND_ADJUST
+            case PowerCalSm.StateId.READ_AND_ADJUST:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.NEXT_POINT: this.#READ_AND_ADJUST_next_point(); break;
+                    case PowerCalSm.EventId.CURVE_COMPLETE: this.#READ_AND_ADJUST_curve_complete(); break;
                 }
                 break;
             
@@ -465,6 +510,8 @@ evaluateGuard = null;
         {
             switch (this.stateId)
             {
+                case PowerCalSm.StateId.ACQUISITION: this.#ACQUISITION_exit(); break;
+                
                 case PowerCalSm.StateId.MEASUREMENTCOMPLETE: this.#MEASUREMENTCOMPLETE_exit(); break;
                 
                 case PowerCalSm.StateId.POWERCOMPLETE: this.#POWERCOMPLETE_exit(); break;
@@ -474,6 +521,8 @@ evaluateGuard = null;
                 case PowerCalSm.StateId.POWERPOINT2: this.#POWERPOINT2_exit(); break;
                 
                 case PowerCalSm.StateId.POWERPOINT3: this.#POWERPOINT3_exit(); break;
+                
+                case PowerCalSm.StateId.READ_AND_ADJUST: this.#READ_AND_ADJUST_exit(); break;
                 
                 case PowerCalSm.StateId.SSBPOINT: this.#SSBPOINT_exit(); break;
                 
@@ -490,6 +539,71 @@ evaluateGuard = null;
     #ROOT_enter()
     {
         this.stateId = PowerCalSm.StateId.ROOT;
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state ACQUISITION
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #ACQUISITION_enter()
+    {
+        this.stateId = PowerCalSm.StateId.ACQUISITION;
+        
+        // ACQUISITION behavior
+        // uml: enter / { this.tracer?.enterState('ACQUISITION'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('ACQUISITION');`
+            this.tracer?.enterState('ACQUISITION');
+        } // end of behavior for ACQUISITION
+        
+        // ACQUISITION behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms = 0; "); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "count_ms = 0; ");`
+            this.tracer?.log("⚡ FSM would execute action: " + "count_ms = 0; ");
+        } // end of behavior for ACQUISITION
+    }
+    
+    #ACQUISITION_exit()
+    {
+        // ACQUISITION behavior
+        // uml: exit / { this.tracer?.exitState('ACQUISITION'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('ACQUISITION');`
+            this.tracer?.exitState('ACQUISITION');
+        } // end of behavior for ACQUISITION
+        
+        this.stateId = PowerCalSm.StateId.ROOT;
+    }
+    
+    #ACQUISITION_do()
+    {
+        // ACQUISITION behavior
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;");
+        } // end of behavior for ACQUISITION
+        
+        // ACQUISITION behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= acquisitionDuration_ms") || this.evaluateGuard("ACQUISITION","do [count_ms >= acquisitionDuration_ms] TransitionTo(READ_AND_ADJUST)")] / { this.tracer?.edgeTransition("edge12"); } TransitionTo(READ_AND_ADJUST)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= acquisitionDuration_ms") || this.evaluateGuard("ACQUISITION","do [count_ms >= acquisitionDuration_ms] TransitionTo(READ_AND_ADJUST)"))
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#ACQUISITION_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
+            this.tracer?.edgeTransition("edge12");
+            
+            // Step 3: Enter/move towards transition target `READ_AND_ADJUST`.
+            this.#READ_AND_ADJUST_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for ACQUISITION
+        
+        // No ancestor handles this event.
     }
     
     
@@ -537,13 +651,13 @@ evaluateGuard = null;
     #MEASUREMENTCOMPLETE_reset()
     {
         // MeasurementComplete behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge10"); } TransitionTo(PowerPoint1)
+        // uml: RESET / { this.tracer?.edgeTransition("edge11"); } TransitionTo(PowerPoint1)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#MEASUREMENTCOMPLETE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
-            this.tracer?.edgeTransition("edge10");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
+            this.tracer?.edgeTransition("edge11");
             
             // Step 3: Enter/move towards transition target `PowerPoint1`.
             this.#POWERPOINT1_enter();
@@ -600,13 +714,13 @@ evaluateGuard = null;
     #POWERCOMPLETE_curve_complete()
     {
         // PowerComplete behavior
-        // uml: CURVE_COMPLETE / { this.tracer?.edgeTransition("edge6"); } TransitionTo(SSBPoint)
+        // uml: CURVE_COMPLETE / { this.tracer?.edgeTransition("edge7"); } TransitionTo(SSBPoint)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#POWERCOMPLETE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
-            this.tracer?.edgeTransition("edge6");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge7");`.
+            this.tracer?.edgeTransition("edge7");
             
             // Step 3: Enter/move towards transition target `SSBPoint`.
             this.#SSBPOINT_enter();
@@ -621,13 +735,13 @@ evaluateGuard = null;
     #POWERCOMPLETE_reset()
     {
         // PowerComplete behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge7"); } TransitionTo(PowerPoint1)
+        // uml: RESET / { this.tracer?.edgeTransition("edge8"); } TransitionTo(PowerPoint1)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#POWERCOMPLETE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge7");`.
-            this.tracer?.edgeTransition("edge7");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge8");`.
+            this.tracer?.edgeTransition("edge8");
             
             // Step 3: Enter/move towards transition target `PowerPoint1`.
             this.#POWERPOINT1_enter();
@@ -656,10 +770,10 @@ evaluateGuard = null;
         } // end of behavior for PowerPoint1
         
         // PowerPoint1 behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "Reset();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ResetPowerCalibration();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "Reset();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "Reset();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ResetPowerCalibration();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "ResetPowerCalibration();");
         } // end of behavior for PowerPoint1
     }
     
@@ -680,6 +794,27 @@ evaluateGuard = null;
         } // end of behavior for PowerPoint1
         
         this.stateId = PowerCalSm.StateId.ROOT;
+    }
+    
+    #POWERPOINT1_auto()
+    {
+        // PowerPoint1 behavior
+        // uml: AUTO / { this.tracer?.edgeTransition("edge2"); } TransitionTo(ACQUISITION)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#POWERPOINT1_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge2");`.
+            this.tracer?.edgeTransition("edge2");
+            
+            // Step 3: Enter/move towards transition target `ACQUISITION`.
+            this.#ACQUISITION_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for PowerPoint1
+        
+        // No ancestor handles this event.
     }
     
     #POWERPOINT1_record_data_point()
@@ -749,13 +884,13 @@ evaluateGuard = null;
     #POWERPOINT2_record_data_point()
     {
         // PowerPoint2 behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge2"); } TransitionTo(PowerPoint3)
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge3"); } TransitionTo(PowerPoint3)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#POWERPOINT2_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge2");`.
-            this.tracer?.edgeTransition("edge2");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge3");`.
+            this.tracer?.edgeTransition("edge3");
             
             // Step 3: Enter/move towards transition target `PowerPoint3`.
             this.#POWERPOINT3_enter();
@@ -770,13 +905,13 @@ evaluateGuard = null;
     #POWERPOINT2_reset()
     {
         // PowerPoint2 behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge3"); } TransitionTo(PowerPoint1)
+        // uml: RESET / { this.tracer?.edgeTransition("edge4"); } TransitionTo(PowerPoint1)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#POWERPOINT2_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge3");`.
-            this.tracer?.edgeTransition("edge3");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge4");`.
+            this.tracer?.edgeTransition("edge4");
             
             // Step 3: Enter/move towards transition target `PowerPoint1`.
             this.#POWERPOINT1_enter();
@@ -834,13 +969,13 @@ evaluateGuard = null;
     #POWERPOINT3_record_data_point()
     {
         // PowerPoint3 behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge4"); } TransitionTo(PowerComplete)
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge5"); } TransitionTo(PowerComplete)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#POWERPOINT3_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge4");`.
-            this.tracer?.edgeTransition("edge4");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge5");`.
+            this.tracer?.edgeTransition("edge5");
             
             // Step 3: Enter/move towards transition target `PowerComplete`.
             this.#POWERCOMPLETE_enter();
@@ -855,13 +990,13 @@ evaluateGuard = null;
     #POWERPOINT3_reset()
     {
         // PowerPoint3 behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge5"); } TransitionTo(PowerPoint1)
+        // uml: RESET / { this.tracer?.edgeTransition("edge6"); } TransitionTo(PowerPoint1)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#POWERPOINT3_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge5");`.
-            this.tracer?.edgeTransition("edge5");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
+            this.tracer?.edgeTransition("edge6");
             
             // Step 3: Enter/move towards transition target `PowerPoint1`.
             this.#POWERPOINT1_enter();
@@ -869,6 +1004,84 @@ evaluateGuard = null;
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
         } // end of behavior for PowerPoint3
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state READ_AND_ADJUST
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #READ_AND_ADJUST_enter()
+    {
+        this.stateId = PowerCalSm.StateId.READ_AND_ADJUST;
+        
+        // READ_AND_ADJUST behavior
+        // uml: enter / { this.tracer?.enterState('READ_AND_ADJUST'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('READ_AND_ADJUST');`
+            this.tracer?.enterState('READ_AND_ADJUST');
+        } // end of behavior for READ_AND_ADJUST
+        
+        // READ_AND_ADJUST behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AdjustAttenuation();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AdjustAttenuation();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AdjustAttenuation();");
+        } // end of behavior for READ_AND_ADJUST
+    }
+    
+    #READ_AND_ADJUST_exit()
+    {
+        // READ_AND_ADJUST behavior
+        // uml: exit / { this.tracer?.exitState('READ_AND_ADJUST'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('READ_AND_ADJUST');`
+            this.tracer?.exitState('READ_AND_ADJUST');
+        } // end of behavior for READ_AND_ADJUST
+        
+        this.stateId = PowerCalSm.StateId.ROOT;
+    }
+    
+    #READ_AND_ADJUST_curve_complete()
+    {
+        // READ_AND_ADJUST behavior
+        // uml: CURVE_COMPLETE / { this.tracer?.edgeTransition("edge14"); } TransitionTo(SSBPoint)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#READ_AND_ADJUST_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
+            this.tracer?.edgeTransition("edge14");
+            
+            // Step 3: Enter/move towards transition target `SSBPoint`.
+            this.#SSBPOINT_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for READ_AND_ADJUST
+        
+        // No ancestor handles this event.
+    }
+    
+    #READ_AND_ADJUST_next_point()
+    {
+        // READ_AND_ADJUST behavior
+        // uml: NEXT_POINT / { this.tracer?.edgeTransition("edge13"); } TransitionTo(ACQUISITION)
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#READ_AND_ADJUST_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
+            this.tracer?.edgeTransition("edge13");
+            
+            // Step 3: Enter/move towards transition target `ACQUISITION`.
+            this.#ACQUISITION_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for READ_AND_ADJUST
         
         // No ancestor handles this event.
     }
@@ -919,13 +1132,13 @@ evaluateGuard = null;
     #SSBPOINT_record_data_point()
     {
         // SSBPoint behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge8"); } TransitionTo(MeasurementComplete)
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge9"); } TransitionTo(MeasurementComplete)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#SSBPOINT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge8");`.
-            this.tracer?.edgeTransition("edge8");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
+            this.tracer?.edgeTransition("edge9");
             
             // Step 3: Enter/move towards transition target `MeasurementComplete`.
             this.#MEASUREMENTCOMPLETE_enter();
@@ -940,13 +1153,13 @@ evaluateGuard = null;
     #SSBPOINT_reset()
     {
         // SSBPoint behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge9"); } TransitionTo(PowerPoint1)
+        // uml: RESET / { this.tracer?.edgeTransition("edge10"); } TransitionTo(PowerPoint1)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
             this.#SSBPOINT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
-            this.tracer?.edgeTransition("edge9");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
+            this.tracer?.edgeTransition("edge10");
             
             // Step 3: Enter/move towards transition target `PowerPoint1`.
             this.#POWERPOINT1_enter();
@@ -964,11 +1177,13 @@ evaluateGuard = null;
         switch (id)
         {
             case PowerCalSm.StateId.ROOT: return "ROOT";
+            case PowerCalSm.StateId.ACQUISITION: return "ACQUISITION";
             case PowerCalSm.StateId.MEASUREMENTCOMPLETE: return "MEASUREMENTCOMPLETE";
             case PowerCalSm.StateId.POWERCOMPLETE: return "POWERCOMPLETE";
             case PowerCalSm.StateId.POWERPOINT1: return "POWERPOINT1";
             case PowerCalSm.StateId.POWERPOINT2: return "POWERPOINT2";
             case PowerCalSm.StateId.POWERPOINT3: return "POWERPOINT3";
+            case PowerCalSm.StateId.READ_AND_ADJUST: return "READ_AND_ADJUST";
             case PowerCalSm.StateId.SSBPOINT: return "SSBPOINT";
             default: return "?";
         }
@@ -979,7 +1194,10 @@ evaluateGuard = null;
     {
         switch (id)
         {
+            case PowerCalSm.EventId.AUTO: return "AUTO";
             case PowerCalSm.EventId.CURVE_COMPLETE: return "CURVE_COMPLETE";
+            case PowerCalSm.EventId.DO: return "DO";
+            case PowerCalSm.EventId.NEXT_POINT: return "NEXT_POINT";
             case PowerCalSm.EventId.RECORD_DATA_POINT: return "RECORD_DATA_POINT";
             case PowerCalSm.EventId.RESET: return "RESET";
             default: return "?";
@@ -1020,7 +1238,7 @@ evaluateGuard = null;
             center: true
         });
 
-        const diagramEventNamesArray = ['CURVE_COMPLETE', 'RECORD_DATA_POINT', 'RESET', ];
+        const diagramEventNamesArray = ['do', 'AUTO', 'CURVE_COMPLETE', 'NEXT_POINT', 'RECORD_DATA_POINT', 'RESET', ];
 
         const leftPane = document.querySelector(".main");
         const rightPane = document.querySelector(".sidebar");

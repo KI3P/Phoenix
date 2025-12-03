@@ -11,30 +11,35 @@
 
 typedef enum PowerCalSm_EventId
 {
-    PowerCalSm_EventId_CURVE_COMPLETE = 0,
-    PowerCalSm_EventId_RECORD_DATA_POINT = 1,
-    PowerCalSm_EventId_RESET = 2
+    PowerCalSm_EventId_DO = 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
+    PowerCalSm_EventId_AUTO = 1,
+    PowerCalSm_EventId_CURVE_COMPLETE = 2,
+    PowerCalSm_EventId_NEXT_POINT = 3,
+    PowerCalSm_EventId_RECORD_DATA_POINT = 4,
+    PowerCalSm_EventId_RESET = 5
 } PowerCalSm_EventId;
 
 enum
 {
-    PowerCalSm_EventIdCount = 3
+    PowerCalSm_EventIdCount = 6
 };
 
 typedef enum PowerCalSm_StateId
 {
     PowerCalSm_StateId_ROOT = 0,
-    PowerCalSm_StateId_MEASUREMENTCOMPLETE = 1,
-    PowerCalSm_StateId_POWERCOMPLETE = 2,
-    PowerCalSm_StateId_POWERPOINT1 = 3,
-    PowerCalSm_StateId_POWERPOINT2 = 4,
-    PowerCalSm_StateId_POWERPOINT3 = 5,
-    PowerCalSm_StateId_SSBPOINT = 6
+    PowerCalSm_StateId_ACQUISITION = 1,
+    PowerCalSm_StateId_MEASUREMENTCOMPLETE = 2,
+    PowerCalSm_StateId_POWERCOMPLETE = 3,
+    PowerCalSm_StateId_POWERPOINT1 = 4,
+    PowerCalSm_StateId_POWERPOINT2 = 5,
+    PowerCalSm_StateId_POWERPOINT3 = 6,
+    PowerCalSm_StateId_READ_AND_ADJUST = 7,
+    PowerCalSm_StateId_SSBPOINT = 8
 } PowerCalSm_StateId;
 
 enum
 {
-    PowerCalSm_StateIdCount = 7
+    PowerCalSm_StateIdCount = 9
 };
 
 
@@ -45,7 +50,8 @@ typedef struct PowerCalSm PowerCalSm;
 // State machine variables. Can be used for inputs, outputs, user variables...
 typedef struct PowerCalSm_Vars
 {
-    uint16_t count; // this var can be referenced in diagram
+    uint32_t count_ms; // this var can be referenced in diagram
+    uint32_t acquisitionDuration_ms;
 } PowerCalSm_Vars;
 
 
