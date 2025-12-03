@@ -1321,10 +1321,10 @@ void ConsumeInterrupt(void){
         }
         case (iCALIBRATE_POWER):{
             SaveArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
+            UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_POWER);
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);   
             // Start the power cal state machine
             InitializePowerCalibration();
-            UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_POWER);
-            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);     
             break;
         }
         case (iCALIBRATE_EXIT):{

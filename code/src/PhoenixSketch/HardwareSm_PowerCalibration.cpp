@@ -188,11 +188,13 @@ void InitializePowerCalibration(void){
         ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
     }
     SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
+    UpdateRFHardwareState();
 }
 
 
 static float32_t forwardPowerAtt_dB[40];
 static float32_t forwardPower_W[40];
+static float32_t reflectedPower_W[40];
 static float32_t scaledForwardPower_mW[40];
 static uint32_t Nswrpoints = 0;
 
@@ -211,11 +213,29 @@ void StartPowerAutoCal(void){
     }
 }
 
+/**
+ * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement 
+ * to CALIBRATE_OFFSET measurement when curve fit is complete. If we are not in the
+ * POWERCOMPLETE state, ignore this button press.
+ */
+void ChangePowerCalibrationPhase(void){
+    Debug("Calling change power");
+    if ((powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE) || 
+        (powerSM.state_id == PowerCalSm_StateId_READ_AND_ADJUST)){
+        // Issue the event that causes state to change to SSBPOINT measurement
+        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_CURVE_COMPLETE);
+        // Change to offset measurement mode
+        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START);
+        UpdateRFHardwareState();
+    }
+}
+
 // Used by the auto cal
 void AdjustAttenuation(void){
     // Read the current forward power
     forwardPowerAtt_dB[Nswrpoints] = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
     forwardPower_W[Nswrpoints] = ReadForwardPower();
+    reflectedPower_W[Nswrpoints] = ReadReflectedPower();
     Nswrpoints++;
     // Change attenuation by 1 dB
     ED.XAttenCW[ED.currentBand[ED.activeVFO]] += 1.0;
@@ -241,12 +261,13 @@ void AdjustAttenuation(void){
         sprintf(buff,"Scale factor %5.4f",scale);
         Serial.println(buff);
 
-        Serial.println("| Att [dB] | Pswr [W] | Pscaled [W] |");
-        Serial.println("|----------|----------|-------------|");
+        Serial.println("| Att [dB] | Pfwd [W] | Pref [W] | Pscaled [W] |");
+        Serial.println("|----------|----------|----------|-------------|");
         for (size_t k=0; k<Nswrpoints; k++){
             scaledForwardPower_mW[k] = scale*forwardPower_W[k]*1000.0;
-            sprintf(buff,"| %3.2f | %5.4f | %5.4f |",
-                        forwardPowerAtt_dB[k],forwardPower_W[k],scaledForwardPower_mW[k]/1000.0);
+            sprintf(buff,"| %3.2f | %5.4f | %5.4f | %5.4f |",
+                        forwardPowerAtt_dB[k],forwardPower_W[k],
+                        reflectedPower_W[k], scaledForwardPower_mW[k]/1000.0);
             Serial.println(buff);
         }
 
@@ -261,8 +282,10 @@ void AdjustAttenuation(void){
             ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
             ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
         }
-
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_CURVE_COMPLETE);
+        // Enqueue a button press in order to call the ChangePowerCalibrationPhase
+        // function *after* the iPTT_RELEASED event has been handled
+        SetButton(12);
+        SetInterrupt(iBUTTON_PRESSED);
     }
 }
 
@@ -289,20 +312,6 @@ void ResetPowerCalibration(void){
     ResetPowerTarget(); 
 }
 
-/**
- * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement 
- * to CALIBRATE_OFFSET measurement when curve fit is complete. If we are not in the
- * POWERCOMPLETE state, ignore this button press.
- */
-void ChangePowerCalibrationPhase(void){
-    if (powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE){
-        // Issue the event that causes state to change to SSBPOINT measurement
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_CURVE_COMPLETE);
-        // Change to offset measurement mode
-        ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START);
-        UpdateRFHardwareState();
-    }
-}
 
 /**
  * Called upon entry to second and third power point measurements
