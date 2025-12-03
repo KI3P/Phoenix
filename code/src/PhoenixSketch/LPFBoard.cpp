@@ -575,6 +575,15 @@ void PerformSWRBridgeReading(void) {
     swr = (1.0 + A) / (1.0 - A);
 }
 
+float32_t ReadADCFwdRaw(void){
+    return adcF_sRaw;
+}
+
+float32_t ReadADCRefRaw(void){
+    return adcR_sRaw;
+}
+
+
 /**
  * Get the most recently calculated SWR value.
  *

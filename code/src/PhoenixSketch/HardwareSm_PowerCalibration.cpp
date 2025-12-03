@@ -177,7 +177,7 @@ void CalculatePowerCurveFit(void){
 
 void InitializePowerCalibration(void){
     PowerCalSm_start(&powerSM);
-    powerSM.vars.acquisitionDuration_ms = 100;
+    powerSM.vars.acquisitionDuration_ms = 150;
     // Make all the attenuations zero so we start off right
     // Make the SWR offset adjustments zero as well
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++){
@@ -195,6 +195,8 @@ void InitializePowerCalibration(void){
 static float32_t forwardPowerAtt_dB[40];
 static float32_t forwardPower_W[40];
 static float32_t reflectedPower_W[40];
+static float32_t forwardADC_mV[40];
+static float32_t reflectedADC_mV[40];
 static float32_t scaledForwardPower_mW[40];
 static uint32_t Nswrpoints = 0;
 
@@ -230,12 +232,17 @@ void ChangePowerCalibrationPhase(void){
     }
 }
 
+float32_t ReadADCFwdRaw(void);
+float32_t ReadADCRefRaw(void);
+
 // Used by the auto cal
 void AdjustAttenuation(void){
     // Read the current forward power
     forwardPowerAtt_dB[Nswrpoints] = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
     forwardPower_W[Nswrpoints] = ReadForwardPower();
     reflectedPower_W[Nswrpoints] = ReadReflectedPower();
+    forwardADC_mV[Nswrpoints] = ReadADCFwdRaw();
+    reflectedADC_mV[Nswrpoints] = ReadADCRefRaw();
     Nswrpoints++;
     // Change attenuation by 1 dB
     ED.XAttenCW[ED.currentBand[ED.activeVFO]] += 1.0;
@@ -261,13 +268,15 @@ void AdjustAttenuation(void){
         sprintf(buff,"Scale factor %5.4f",scale);
         Serial.println(buff);
 
-        Serial.println("| Att [dB] | Pfwd [W] | Pref [W] | Pscaled [W] |");
-        Serial.println("|----------|----------|----------|-------------|");
+        Serial.println("| Att [dB] | ADCf | ADCr | Pfwd [W] | Pref [W] | Pscaled [W] |");
+        Serial.println("|----------|------|------|----------|----------|-------------|");
         for (size_t k=0; k<Nswrpoints; k++){
             scaledForwardPower_mW[k] = scale*forwardPower_W[k]*1000.0;
-            sprintf(buff,"| %3.2f | %5.4f | %5.4f | %5.4f |",
-                        forwardPowerAtt_dB[k],forwardPower_W[k],
-                        reflectedPower_W[k], scaledForwardPower_mW[k]/1000.0);
+            sprintf(buff,"| %3.2f | %5.4f | %5.4f | %5.4f | %5.4f | %5.4f |",
+                        forwardPowerAtt_dB[k],
+                        forwardADC_mV[k],reflectedADC_mV[k],
+                        forwardPower_W[k],reflectedPower_W[k],
+                        scaledForwardPower_mW[k]/1000.0);
             Serial.println(buff);
         }
 
