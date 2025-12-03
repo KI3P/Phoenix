@@ -12,6 +12,7 @@ static int16_t *sp_R2;
 static uint32_t n_clear;
 static char *filename = nullptr;
 void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
+static uint32_t swrTimer_ms = 0;
 
 /**
  * Perform the appropriate IQ signal processing depending on the state we're in
@@ -46,7 +47,12 @@ void PerformSignalProcessing(void){
         case (ModeSm_StateId_CW_TRANSMIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):{
-            PerformSWRBridgeReading();
+            // Use a timer to keep us from performing I2C reads
+            // too often
+            if ((millis()-swrTimer_ms) > 10){
+                PerformSWRBridgeReading();
+                swrTimer_ms = millis();
+            }
             break;
         }
         default:{
