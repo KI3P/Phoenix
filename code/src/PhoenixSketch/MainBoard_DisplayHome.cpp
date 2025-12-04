@@ -1310,9 +1310,9 @@ void UpdateRFGainSetting(void){
         case ModeSm_StateId_CW_RECEIVE:
             comp = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
             break;
-        //case ModeSm_StateId_SSB_RECEIVE:
-        //    comp = ED.XAttenSSB[ED.currentBand[ED.activeVFO]];
-        //    break;
+        case ModeSm_StateId_SSB_RECEIVE:
+            comp = 0.0;
+            break;
         default:
             comp = oldTAtten;
             break;
@@ -1563,6 +1563,11 @@ void DrawHome(){
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
             WindowPanes[i]->stale = true;
         }
+        // For the purposes of displaying the correct values, set the TX CW 
+        // attenuation values to be based on the desired power
+        bool tmp;
+        for (size_t k = FIRST_BAND; k <= LAST_BAND; k++)
+            ED.XAttenCW[k] = CalculateCWAttenuation(ED.powerOutCW[k],&tmp);
     }
     if (millis()-timer_ms > 1000) {
         timer_ms = millis();
