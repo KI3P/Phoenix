@@ -34,13 +34,16 @@ static Pane* PowerWindowPanes[NUMBER_OF_POWER_PANES] = {&PanePowerAdjust,&PanePo
 static char buff[100];
 
 float32_t oldpowdatasum = 0.0;
+static PowerCalSm_StateId oldstate = PowerCalSm_StateId_ROOT;
 /**
  * Draw the data points accumulated so far for the power curve fit
  */
 static void DrawPowerDataPane(void){
-    if ((oldpowdatasum != GetPowDataSum()))
+    if ((oldpowdatasum != GetPowDataSum()) || 
+        (powerSM.state_id != oldstate))
         PanePowerData.stale = true;
     oldpowdatasum = GetPowDataSum();
+    oldstate = powerSM.state_id;
 
     if (!PanePowerData.stale) return;
     tft.fillRect(PanePowerData.x0, PanePowerData.y0, PanePowerData.width, PanePowerData.height, RA8875_BLACK);
