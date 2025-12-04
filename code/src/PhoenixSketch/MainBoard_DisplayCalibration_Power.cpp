@@ -181,6 +181,12 @@ void ChangePowerIncrement(void){
         incindexPower = 0;
 }
 
+/**
+ * @brief Increase measured power value during calibration
+ * @note Increments by current step size (powerincvals[incindexPower])
+ * @note Clamped to maximum 100.0
+ * @note Called when user rotates filter encoder clockwise
+ */
 void IncrementCalibrationPower(void){
     float32_t p = GetMeasuredPower();
     p += powerincvals[incindexPower];
@@ -189,6 +195,12 @@ void IncrementCalibrationPower(void){
     SetMeasuredPower(p);
 }
 
+/**
+ * @brief Decrease measured power value during calibration
+ * @note Decrements by current step size (powerincvals[incindexPower])
+ * @note Clamped to minimum 0.0
+ * @note Called when user rotates filter encoder counter-clockwise
+ */
 void DecrementCalibrationPower(void){
     float32_t p = GetMeasuredPower();
     p -= powerincvals[incindexPower];
@@ -377,6 +389,11 @@ float32_t GetKSum(void){
     return ksum;
 }
 
+/**
+ * @brief Calculate sum of DSP gain correction factors across all bands
+ * @return Sum of absolute DSP gain correction values in dB
+ * @note Used to detect changes requiring table pane redraw
+ */
 float32_t GetCorrSum(void){
     float32_t ksum = 0;
     for (size_t k=0; k<NUMBER_OF_BANDS; k++){

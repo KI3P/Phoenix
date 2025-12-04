@@ -784,10 +784,13 @@ void HandleButtonPress(int32_t button){
                     RecordPowerButtonPressed();
                     break;
                 }
-                case (1):{
-                    StartPowerAutoCal();
-                    break;
-                }
+                // Auto power cal is not ready for prime time
+                // The behavior of the SWR bridge needs to be
+                // better characterized.
+                //case (1):{
+                //    StartPowerAutoCal();
+                //    break;
+                //}
                 case (ZOOM):{
                     // Reset and begin again
                     ResetPowerCal();
