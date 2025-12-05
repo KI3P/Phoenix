@@ -901,7 +901,7 @@ TEST_F(DisplayTest, RFSetMenu_SSBPower_Configuration) {
     extern void UpdateSSBPower(void);
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[0].label, "TX SSB Power");
+    EXPECT_STREQ(RFSet[0].label, "SSB Power");
     EXPECT_EQ(RFSet[0].action, variableOption);
     EXPECT_EQ(RFSet[0].varPam, &ssbPower);
     EXPECT_EQ(RFSet[0].func, nullptr);
@@ -981,7 +981,7 @@ TEST_F(DisplayTest, RFSetMenu_CWPower_Configuration) {
     extern void UpdateCWPower(void);
 
     // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[1].label, "TX CW Power");
+    EXPECT_STREQ(RFSet[1].label, "CW Power");
     EXPECT_EQ(RFSet[1].action, variableOption);
     EXPECT_EQ(RFSet[1].varPam, &cwPower);
     EXPECT_EQ(RFSet[1].func, nullptr);
@@ -1016,30 +1016,6 @@ TEST_F(DisplayTest, RFSetMenu_CWPower_IncrementDecrement) {
     // Decrement power
     DecrementVariable(&cwPower);
     EXPECT_FLOAT_EQ(ED.powerOutCW[ED.currentBand[ED.activeVFO]], 10.0f);
-}
-
-/**
- * Test RFSet menu - Gain option
- * Verifies gain variable parameter is configured correctly
- */
-TEST_F(DisplayTest, RFSetMenu_Gain_Configuration) {
-
-
-    extern struct SecondaryMenuOption RFSet[6];
-    extern VariableParameter gain;
-
-    // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[4].label, "[__RX DSP Gain]");
-    EXPECT_EQ(RFSet[4].action, variableOption);
-    EXPECT_EQ(RFSet[4].varPam, &gain);
-    EXPECT_EQ(RFSet[4].func, nullptr);
-    EXPECT_EQ(RFSet[4].postUpdateFunc, nullptr);
-
-    // Verify variable parameter configuration
-    EXPECT_EQ(gain.type, TYPE_F32);
-    EXPECT_EQ(gain.limits.f32.min, -5);
-    EXPECT_EQ(gain.limits.f32.max, 20);
-    EXPECT_EQ(gain.limits.f32.step, 0.5);
 }
 
 /**
@@ -1118,29 +1094,6 @@ TEST_F(DisplayTest, RFSetMenu_RXAttenuation_IncrementDecrement) {
     // Decrement attenuation
     DecrementVariable(&rxAtten);
     EXPECT_EQ(ED.RAtten[ED.currentBand[ED.activeVFO]], 10);
-}
-
-/**
- * Test RFSet menu - TX Attenuation (CW) option
- * Verifies TX CW attenuation variable parameter is configured correctly
- */
-TEST_F(DisplayTest, RFSetMenu_TXAttenuationCW_Configuration) {
-
-
-    extern struct SecondaryMenuOption RFSet[6];
-    extern VariableParameter txAttenCW;
-
-    // Verify menu option is configured correctly
-    EXPECT_STREQ(RFSet[5].label, "[__TX Attenuation(CW)]");
-    EXPECT_EQ(RFSet[5].action, variableOption);
-    EXPECT_EQ(RFSet[5].varPam, &txAttenCW);
-    EXPECT_EQ(RFSet[5].func, nullptr);
-
-    // Verify variable parameter configuration
-    EXPECT_EQ(txAttenCW.type, TYPE_F32);
-    EXPECT_EQ(txAttenCW.limits.f32.min, 0);
-    EXPECT_EQ(txAttenCW.limits.f32.max, 31.5);
-    EXPECT_EQ(txAttenCW.limits.f32.step, 0.5);
 }
 
 /**

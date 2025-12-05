@@ -2,6 +2,8 @@
 
 This is a new software approach, called Phoenix, for the T41-EP radio running V12 hardware. It is a ground-up rewrite of the T41 software, which had been authored by dozens of people over the years. I have listed the known authors that left their call signs in the code in the file `code/Contributors.txt` -- please let me know if I've missed anyone!
 
+![](images/T41_radio.png)
+
 # T41-EP overview
 
 The T41-EP Software Defined Transceiver (SDT), originally designed by Al Peter-AC8GY and Jack Purdum-W8TEE, is a 20W, HF, 7 band, CW/SSB Software Defined Transceiver (SDT) with features like 192kHz spectrum display bandwidth, ALP CW decoder, Bode Plots. The T41-EP is a self-contain SDT that does not require an external PC, laptop, or tablet to use. Al and Jack wrote a book, available on [Amazon](https://www.amazon.com/Digital-Signal-Processing-Software-Defined/dp/B0F5BDQZW3), describing the theory and operation of the T41-EP. The [project's website](https://t41sdrtransceiver.wordpress.com/) gives an overview of the project and its history.
@@ -16,7 +18,7 @@ Some of the features of the T41 V12 hardware running the Phoenix firmware:
 * Automated receive IQ calibration routine.
 * CAT control.
 
-The T41-EP is a fully open-source radio. This repository hosts the transceiver software. The hardware designs are hosted on Bill-K9HZ's [GitHub repository](https://github.com/DRWJSCHMIDT/T41/tree/main/T41_V012_Files). The primary forum for discussions on the T41-EP radio is on [Groups.io](https://groups.io/g/SoftwareControlledHamRadio/topics).
+The T41-EP is a fully open-source radio. This repository hosts the transceiver software, licensed under GPLV3 (see LICENSE file). The hardware designs are hosted on Bill-K9HZ's [GitHub repository](https://github.com/DRWJSCHMIDT/T41/tree/main/T41_V012_Files). The primary forum for discussions on the T41-EP radio is on [Groups.io](https://groups.io/g/SoftwareControlledHamRadio/topics).
 
 The EP stands for Experimenter's Platform because the T41-EP is designed around 5 small printed circuit boards (100mm x 100mm) that can be easily swapped for boards of your own design. Because the T41-EP project is completely Open Source, you have complete access to the C/C++ source code that controls the T41-EP as well as the KiCad design files, schematics, and Gerber files. 
 
@@ -35,7 +37,7 @@ The latest version (V12.6) of the bare PCBs are available for less than $5 each 
 
 ## Screenshots
 
-The home screen should look familiar, with some change in the layout.
+The home screen should look familiar to users of previous versions of the code, with some change in the layout.
 
 ![](images/Home_window.png)
 
@@ -50,6 +52,10 @@ As have the calibration routines. The receive IQ calibration can now automatical
 A block diagram of the V12 radio hardware is shown below.
 
 ![](images/T41_V12_block_diagram.png)
+
+The mapping of the buttons to various functions is defined in `code/src/PhoenixSketch/Config.h`. The default mapping is:
+
+![](images/Home_screen_button_map.png)
 
 # File Organization
 
@@ -137,7 +143,7 @@ Install the following libraries via the Arduino Library Manager:
 
 * Adafruit MCP23017 Arduino Library, by Adafruit (v2.3.2) (note: install with dependencies)
 
-Several libraries need to be installed manually. The manual process is:
+Some libraries need to be installed manually. The manual process is:
 
 1. Go to the provided GitHub link for the library and download the library as a zip by clicking Code -> Download ZIP.
 2. Import it into the Arduino 2 IDE by clicking Sketch -> Include Library -> Add .ZIP library, and then selecting the file you just downloaded.
@@ -155,8 +161,8 @@ Configure the Arduino IDE to compile with the following settings:
 You should see the following memory usage when compilation is complete:
 ```
 Memory Usage on Teensy 4.1:
-  FLASH: code:268796, data:63384, headers:8808   free for files:7785476
-   RAM1: variables:121888, code:265608, padding:29304   free for local variables:107488
+  FLASH: code:287164, data:75372, headers:9172   free for files:7754756
+   RAM1: variables:127136, code:283976, padding:10936   free for local variables:102240
    RAM2: variables:300480  free for malloc/new:223808
 ```
 
@@ -188,26 +194,20 @@ cmake ../ && make
 ctest --output-on-failure
 ```
 
-This will compile and run the unit test programs. You should see an output that looks something like this (but with all tests passed!):
+This will compile and run the unit test programs. You should see an output that looks something like this:
 
 ```bash
 ...
-127/131 Test #127: FrontPanel.CenterTuneIncrease ...................................   Passed    0.02 sec
-        Start 128: FrontPanel.CenterTuneDecrease
-128/131 Test #128: FrontPanel.CenterTuneDecrease ...................................   Passed    0.01 sec
-        Start 129: FrontPanel.FineTuneIncrease
-129/131 Test #129: FrontPanel.FineTuneIncrease .....................................   Passed    0.02 sec
-        Start 130: FrontPanel.FineTuneDecrease
-130/131 Test #130: FrontPanel.FineTuneDecrease .....................................   Passed    0.01 sec
-        Start 131: FrontPanel.FineTuneLimits
-131/131 Test #131: FrontPanel.FineTuneLimits .......................................   Passed    0.01 sec
+654/657 Test #654: PowerCalibrationTest.FitPowerCurve_RealWorldData ..............................   Passed    0.00 sec
+        Start 655: PowerCalibrationWalkthroughTest.CompleteCalibrationAllBands
+655/657 Test #655: PowerCalibrationWalkthroughTest.CompleteCalibrationAllBands ...................   Passed    1.64 sec
+        Start 656: PowerCalibrationWalkthroughTest.RemeasuringDataPoints_StateRemainsCorrect
+656/657 Test #656: PowerCalibrationWalkthroughTest.RemeasuringDataPoints_StateRemainsCorrect .....   Passed    0.44 sec
+        Start 657: PowerCalibrationWalkthroughTest.StateTransitions_ResetBehavior
+657/657 Test #657: PowerCalibrationWalkthroughTest.StateTransitions_ResetBehavior ................   Passed    0.49 sec
 
-98% tests passed, 2 tests failed out of 131
+100% tests passed, 0 tests failed out of 657
 
-Total Test time (real) =   5.91 sec
-
-The following tests FAILED:
-         96 - SignalProcessing.DemodulateAM (Failed)
-         97 - SignalProcessing.DemodulateSAM (Failed)
+Total Test time (real) =  50.16 sec
 ```
 

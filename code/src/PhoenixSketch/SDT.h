@@ -2,15 +2,15 @@
 #define SDT_H
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1RC2"
+#define VERSION "Phx V1.0"
 
 #include "BuildInfo.h"
 
 #define Debug(x) Serial.println(x)
 
 #include <Arduino.h>
-#include <Adafruit_MCP23X17.h>
-#include <OpenAudio_ArduinoLibrary.h>  //https://github.com/chipaudette/OpenAudio_ArduinoLibrary
+#include <Adafruit_MCP23X17.h>         // Installed via Arduino library manager
+#include <OpenAudio_ArduinoLibrary.h>  // https://github.com/chipaudette/OpenAudio_ArduinoLibrary
 #include <utility/imxrt_hw.h>
 #include <arm_math.h>
 #include <arm_const_structs.h>

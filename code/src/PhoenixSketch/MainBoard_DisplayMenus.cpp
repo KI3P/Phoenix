@@ -296,12 +296,12 @@ void UpdateCWPower(void){
 }
 
 struct SecondaryMenuOption RFSet[6] = {
-    "TX SSB Power", variableOption, &ssbPower, NULL, (void *)UpdateSSBPower,
-    "TX CW Power", variableOption, &cwPower, NULL, (void *)UpdateCWPower,
+    "SSB Power", variableOption, &ssbPower, NULL, (void *)UpdateSSBPower,
+    "CW Power", variableOption, &cwPower, NULL, (void *)UpdateCWPower,
     "RX Attenuation",variableOption, &rxAtten, NULL, (void *)UpdateRatten,
     "Antenna",variableOption, &antenna, NULL, (void *)UpdateTuneState,
-    "[__RX DSP Gain]",variableOption, &gain, NULL, NULL,
-    "[__TX Attenuation(CW)]",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
+    //"[__RX DSP Gain]",variableOption, &gain, NULL, NULL,
+    //"[__TX Attenuation(CW)]",variableOption, &txAttenCW, NULL, (void *)UpdateTXAttenCW,
 };
 
 // CW Options menu
