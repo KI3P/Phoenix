@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <TimeLib.h>
 #include "Config.h"
 
 #ifndef __STDC_LIB_EXT1__

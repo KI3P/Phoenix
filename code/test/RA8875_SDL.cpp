@@ -80,14 +80,7 @@ static void update_display() {
     SDL_RenderClear(g_renderer);
     SDL_RenderCopy(g_renderer, g_texture, nullptr, nullptr);
     SDL_RenderPresent(g_renderer);
-
-    // Process SDL events to keep window responsive
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
-            // Could set a flag here for graceful shutdown
-        }
-    }
+    // Note: Don't poll events here - let the main loop's processEvents() handle them
 }
 
 // Set a pixel in the current buffer
@@ -388,7 +381,7 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
     }
 
     g_window = SDL_CreateWindow(
-        "Phoenix SDR Display Simulator",
+        "Phoenix SDR Radio Simulator",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         DISPLAY_WIDTH,
@@ -459,8 +452,7 @@ void RA8875::clearScreen(uint16_t color) {
     for (int i = 0; i < DISPLAY_WIDTH * DISPLAY_HEIGHT; i++) {
         buffer[i] = argb;
     }
-
-    update_display();
+    // Don't update_display() here - let the main loop do it once per frame
 }
 
 void RA8875::fillWindow(uint16_t color) {
@@ -500,8 +492,6 @@ void RA8875::fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c
             set_pixel(px, py, argb);
         }
     }
-
-    update_display();
 }
 
 void RA8875::drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
@@ -520,8 +510,6 @@ void RA8875::drawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c
         set_pixel(x, py, argb);
         set_pixel(x + w - 1, py, argb);
     }
-
-    update_display();
 }
 
 void RA8875::drawCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
@@ -552,8 +540,6 @@ void RA8875::drawCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
         }
         cx++;
     }
-
-    update_display();
 }
 
 void RA8875::fillCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
@@ -567,8 +553,6 @@ void RA8875::fillCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
             set_pixel(x + px, y + py, argb);
         }
     }
-
-    update_display();
 }
 
 void RA8875::setFont(const void* font) {
@@ -602,8 +586,6 @@ void RA8875::print(const char* text) {
         }
         text++;
     }
-
-    update_display();
 }
 
 void RA8875::print(const String& str) {
@@ -679,8 +661,6 @@ void RA8875::drawPixels(uint16_t* pixels, uint16_t count, uint16_t x, uint16_t y
     for (uint16_t i = 0; i < count && (x + i) < DISPLAY_WIDTH; i++) {
         set_pixel(x + i, y, rgb565_to_argb8888(pixels[i]));
     }
-
-    update_display();
 }
 
 void RA8875::drawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color) {
@@ -712,8 +692,6 @@ void RA8875::drawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16
             y += sy;
         }
     }
-
-    update_display();
 }
 
 void RA8875::drawFastVLine(uint16_t x, uint16_t y, uint16_t h, uint16_t color) {
@@ -724,8 +702,6 @@ void RA8875::drawFastVLine(uint16_t x, uint16_t y, uint16_t h, uint16_t color) {
     for (int py = y; py < y + h && py < DISPLAY_HEIGHT; py++) {
         set_pixel(x, py, argb);
     }
-
-    update_display();
 }
 
 void RA8875::drawFastHLine(uint16_t x, uint16_t y, uint16_t w, uint16_t color) {
@@ -736,8 +712,6 @@ void RA8875::drawFastHLine(uint16_t x, uint16_t y, uint16_t w, uint16_t color) {
     for (int px = x; px < x + w && px < DISPLAY_WIDTH; px++) {
         set_pixel(px, y, argb);
     }
-
-    update_display();
 }
 
 void RA8875::useLayers(bool enable) {
@@ -768,8 +742,6 @@ void RA8875::clearMemory() {
             g_layer2[i] = black;
         }
     }
-
-    update_display();
 }
 
 void RA8875::BTE_move(uint16_t src_x, uint16_t src_y, uint16_t width, uint16_t height,
@@ -803,7 +775,6 @@ void RA8875::BTE_move(uint16_t src_x, uint16_t src_y, uint16_t width, uint16_t h
     }
 
     delete[] temp;
-    update_display();
 }
 
 bool RA8875::readStatus() {
@@ -823,7 +794,10 @@ void RA8875::writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uin
             }
         }
     }
+}
 
+// Public function to update the SDL display - call once per frame
+void RA8875::updateScreen() {
     update_display();
 }
 

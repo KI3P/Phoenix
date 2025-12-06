@@ -156,8 +156,8 @@ gtest_discover_tests(all_PowerCalibration_tests)
 # SDL2 Display Simulator executable (optional)
 # Build with: cmake -DUSE_SDL_DISPLAY=ON ..
 if(USE_SDL_DISPLAY)
-    add_executable(display_simulator
-        DisplaySimulator_main.cpp
+    add_executable(radio_simulator
+        RadioSimulator_main.cpp
         ../src/PhoenixSketch/MainBoard_Display.cpp
         ../src/PhoenixSketch/MainBoard_DisplayHome.cpp
         ../src/PhoenixSketch/MainBoard_DisplayMenus.cpp
@@ -202,9 +202,9 @@ if(USE_SDL_DISPLAY)
         RA8875_SDL.cpp
     )
 
-    target_compile_definitions(display_simulator PRIVATE USE_SDL_DISPLAY)
-    target_include_directories(display_simulator PRIVATE ${SDL2_INCLUDE_DIRS})
-    target_link_libraries(display_simulator ${SDL2_LIBRARIES})
+    target_compile_definitions(radio_simulator PRIVATE USE_SDL_DISPLAY)
+    target_include_directories(radio_simulator PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(radio_simulator ${SDL2_LIBRARIES})
 
-    message(STATUS "Display simulator enabled - build with 'make display_simulator'")
+    message(STATUS "Radio simulator enabled - build with 'make radio_simulator'")
 endif()

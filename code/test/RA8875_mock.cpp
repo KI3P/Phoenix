@@ -169,3 +169,7 @@ bool RA8875::readStatus() {
 void RA8875::writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data) {
     // Mock implementation - write a rectangular array of pixels
 }
+
+void RA8875::updateScreen() {
+    // Mock implementation - no-op for non-SDL builds
+}
