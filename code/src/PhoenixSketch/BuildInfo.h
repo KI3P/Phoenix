@@ -9,7 +9,7 @@
 #ifndef BUILDINFO_H
 #define BUILDINFO_H
 
-#define GIT_COMMIT_HASH "405dc30"
-#define BUILD_TIMESTAMP "2025-12-06 10:07:30"
+#define GIT_COMMIT_HASH "55cfdff"
+#define BUILD_TIMESTAMP "2025-12-06 17:45:31"
 
 #endif // BUILDINFO_H
