@@ -98,6 +98,12 @@ private:
     uint16_t _cursor_x;
     uint16_t _cursor_y;
     uint16_t _text_color;
+    const void* _custom_font;
 };
+
+#ifdef USE_SDL_DISPLAY
+// Cleanup function for SDL resources - call at program exit
+void RA8875_SDL_Cleanup();
+#endif
 
 #endif
