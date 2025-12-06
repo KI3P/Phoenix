@@ -9,7 +9,6 @@
 #include "SDT.h"
 
 struct config_t ED;
-bool displayFFTUpdated;
 bool psdupdated = false;
 float32_t psdnew[SPECTRUM_RES];
 float32_t audioYPixel[SPECTRUM_RES/4];
@@ -85,6 +84,7 @@ const struct SR_Descriptor SR[18] = {
 };
 
 ReceiveFilterConfig RXfilters;
+ReceiveFilterConfig RXTXfilters;
 TransmitFilterConfig TXfilters;
 AGCConfig agc;
 uint8_t SampleRate = SAMPLE_RATE_192K;

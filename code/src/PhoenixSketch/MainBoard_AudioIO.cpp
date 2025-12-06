@@ -293,9 +293,9 @@ void UpdateAudioIOState(void){
             break;
         }
         case (ModeSm_StateId_SSB_TRANSMIT):{
-            // IQ from receive stops
-            Q_in_L.end(); 
-            Q_in_R.end();
+            // IQ from receive continues
+            Q_in_L.begin(); 
+            Q_in_R.begin();
             // Microphone input starts
             Q_in_L_Ex.begin(); 
             Q_in_R_Ex.begin();
@@ -307,9 +307,9 @@ void UpdateAudioIOState(void){
             // Output is samples to RF transmit
             SelectMixerChannel(&modeSelectOutExL,0);
             SelectMixerChannel(&modeSelectOutExR,0);
-            // Mute IQ samples from the receive board
-            MuteMixerChannels(&modeSelectInL);
-            MuteMixerChannels(&modeSelectInR);
+            // Input is IQ samples from the receive board
+            SelectMixerChannel(&modeSelectInL, 0);
+            SelectMixerChannel(&modeSelectInR, 0);
             // Mute speaker audio
             MuteMixerChannels(&modeSelectOutL);
             MuteMixerChannels(&modeSelectOutR);

@@ -31,6 +31,7 @@ void PerformSignalProcessing(void){
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
+            TransmitReceiveProcessing();
             break;
         }
         default:{
@@ -716,6 +717,7 @@ void PlayBuffer(DataBlock *data){
  */
 void InitializeSignalProcessing(void){
     InitializeFilters(ED.spectrum_zoom,&RXfilters);
+    InitializeFilters(0,&RXTXfilters);
     InitializeTransmitFilters(&TXfilters);
     InitializeAGC(&agc, SR[SampleRate].rate/RXfilters.DF);
     InitializeKim1NoiseReduction();
@@ -729,6 +731,39 @@ void InitializeSignalProcessing(void){
  */
 void setfilename(char *fnm){
     filename = fnm;
+}
+
+/**
+ * Truncated version of the receive processing that runs during transmit
+ */
+void TransmitReceiveProcessing(void){
+    data.I = float_buffer_L;
+    data.Q = float_buffer_R;
+
+    // Read data from buffer
+    if (ReadIQInputBuffer(&data)){
+        // There is no data available, skip the rest
+        return;
+    }
+    Flag(4);
+    
+    // Scale data channels by the overall system RF gain and the band-specified gain adjustment
+    ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
+
+    // Perform IQ correction
+    ApplyIQCorrection(&data,
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+
+    // Perform FFT of full spectrum for spectral display at this point
+    ZoomFFTExe(&data, 0, &RXTXfilters);
+
+    //FreqShiftFs4(&data);
+    //// Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
+    //if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) 
+    //    ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
+
+    Flag(0);
 }
 
 /**
@@ -754,7 +789,7 @@ DataBlock * ReceiveProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    //Flag(1);
+    Flag(1);
     // Clear overfull buffers is not needed
     //ClearAudioBuffers();
 
@@ -779,7 +814,6 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Perform FFT of full spectrum for spectral display at this point if no zoom
     if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
         ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
-        displayFFTUpdated = true;
     }
 
     // First, frequency translation by +Fs/4 without multiplication from Lyons 
@@ -792,12 +826,10 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) {
-        if(ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters)) {
-            // at high zoom levels, multiple calls to ZoomFFTExe might be needed to fill
-            // the buffers before the FFT is actually calculated. ZoomFFTExe returns true
-            // if it actually performed the FFT during this call.
-            displayFFTUpdated = true;
-        }
+        // at high zoom levels, multiple calls to ZoomFFTExe might be needed to fill
+        // the buffers before the FFT is actually calculated. ZoomFFTExe returns true
+        // if it actually performed the FFT during this call.
+        ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
     }
 
     // Now, translate by the fine tune frequency. A signal at x Hz will be at 
@@ -870,7 +902,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
-    //Flag(0);
+    Flag(0);
 
     return &data;
 }
@@ -1031,7 +1063,7 @@ DataBlock * TransmitProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-
+    Flag(2);
     TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
@@ -1050,5 +1082,6 @@ DataBlock * TransmitProcessing(const char *fname){
 
     // Play the data on the output buffer
     PlayIQData(&data);
+    Flag(0);
     return &data;
 }

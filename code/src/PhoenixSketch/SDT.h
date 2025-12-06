@@ -651,12 +651,12 @@ extern struct BIT bit_results;
 extern struct band bands[];
 extern const struct SR_Descriptor SR[];
 extern ReceiveFilterConfig RXfilters;
+extern ReceiveFilterConfig RXTXfilters;
 extern TransmitFilterConfig TXfilters;
 extern AGCConfig agc;
 extern UISm uiSM;
 extern ModeSm modeSM;
 extern PowerCalSm powerSM;
-extern bool displayFFTUpdated; /** Set true when psdnew is updated */
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t audioYPixel[];
