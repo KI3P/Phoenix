@@ -65,6 +65,7 @@ static std::thread timer_thread;
 #include "PowerCalSm.h"
 #include "FrontPanel.h"
 #include "Config.h"
+#include "OpenAudio_ArduinoLibrary.h"
 
 // External declarations
 extern RA8875 tft;
@@ -306,15 +307,31 @@ int main(int argc, char* argv[]) {
     Q_in_R_Ex.setChannel(1);
     Q_in_L_Ex.clear();
     Q_in_R_Ex.clear();
+
+    // Set up audio output queues with left/right channel assignment
+    Q_out_L.setAudioChannel(0);  // Left channel
+    Q_out_R.setAudioChannel(1);  // Right channel
+    Q_out_L_Ex.setAudioChannel(0);
+    Q_out_R_Ex.setAudioChannel(1);
+
+    // Initialize SDL audio for demodulated audio playback
+    // Using 192kHz to match the DSP output sample rate (SR[SampleRate].rate)
+    // Most modern audio systems can handle this via software resampling
+    if (!SDL_Audio_Init(192000)) {
+        std::cerr << "Warning: SDL Audio initialization failed. Audio playback disabled." << std::endl;
+    } else {
+        std::cout << "SDL Audio initialized for demodulated audio playback" << std::endl;
+    }
+
     // Initialize the millis() timer for timing functions
     StartMillis();
 
     std::cout << "Initializing display..." << std::endl;
 
 
-    //setup();
+    setup();
 
-    InitializeFrontPanel();
+    /*InitializeFrontPanel();
     InitializeSignalProcessing();
     InitializeAudio();
     InitializeDisplay();
@@ -332,6 +349,7 @@ int main(int argc, char* argv[]) {
 
     PowerCalSm_ctor(&powerSM);
     PowerCalSm_start(&powerSM);
+    */
 
     // Initialize key pins to released state (active low)
     digitalWrite(KEY1, 1); // KEY1 released
@@ -367,7 +385,7 @@ int main(int argc, char* argv[]) {
         tft.updateScreen();
 
         // FPS counter
-        frameCount++;
+        /*frameCount++;
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastFPSTime).count();
         if (elapsed >= 5) {
@@ -378,13 +396,15 @@ int main(int argc, char* argv[]) {
                       << std::endl;
             frameCount = 0;
             lastFPSTime = now;
-        }
+        }*/
 
         // Small delay to prevent CPU spinning (target ~60 FPS)
         //std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
     std::cout << "Cleaning up..." << std::endl;
+    stop_timer1ms();  // Stop the timer thread before cleanup
+    SDL_Audio_Cleanup();  // Clean up audio before display
     RA8875_SDL_Cleanup();
 
     std::cout << "Simulator exited cleanly." << std::endl;

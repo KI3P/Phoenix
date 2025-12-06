@@ -9,6 +9,7 @@ SerialClass SerialUSB1;
 TwoWire Wire;
 TwoWire Wire1;
 TwoWire Wire2;
+Teensy3ClockClass Teensy3Clock;
 
 // Mock Teensy temperature monitor registers
 // Set bit 2 (0x4) to indicate temperature sensor is ready
@@ -19,6 +20,11 @@ uint32_t mock_HW_OCOTP_ANA1 = 0x19C01900;  // Dummy calibration data
 #define NUMPINS 41
 static bool pin_mode[NUMPINS];
 static bool pin_value[NUMPINS];
+
+void SerialClass::begin(uint32_t baud) {
+    // Mock - just ignore the baud rate
+    (void)baud;
+}
 
 void SerialClass::createFile(const char* filename) {
     if (filename != nullptr) {
@@ -189,6 +195,14 @@ void SerialClass::println() {
         std::cout << std::endl;
     }
 }
+
+// Time synchronization mock
+void setSyncProvider(getExternalTime getTimeFunction) {
+    // Mock - just ignore the time provider
+    (void)getTimeFunction;
+}
+
+// Note: initTempMon is defined in Globals.cpp, no mock needed
 
 int64_t tstart;
 int64_t tstartMicros;

@@ -4,6 +4,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef USE_SDL_DISPLAY
+// SDL2 Audio support - cross-platform (Linux, Windows, macOS)
+bool SDL_Audio_Init(int sampleRate);
+void SDL_Audio_Cleanup(void);
+void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t channel);
+int SDL_Audio_ReadSamples(int16_t* samplesL, int16_t* samplesR, int numSamples);
+bool SDL_Audio_InputAvailable(void);
+#endif
+
 #define LOW 0
 #define HIGH 1
 #define AUDIO_INPUT_MIC 1
@@ -55,15 +64,18 @@ class AudioPlayQueue
             fopened = false;
         }
         void end(void){
-            fclose(fle);
+            if (fopened) fclose(fle);
         }
         int16_t *getBuffer(void);
         void playBuffer(void);
         void setName(char *fn);
+        void setAudioChannel(uint8_t ch) { audioChannel = ch; }
+        uint8_t getAudioChannel(void) { return audioChannel; }
     private:
         int16_t buf[128];
         FILE *fle;
         bool fopened;
+        uint8_t audioChannel = 0; // 0=left, 1=right
 };
 
 

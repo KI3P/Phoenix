@@ -31,6 +31,10 @@ void StartMillis(void);
 void AddMillisTime(uint64_t delta_ms);
 void SetMillisTime(uint64_t time_ms);
 
+// Time synchronization functions
+typedef time_t (*getExternalTime)();
+void setSyncProvider(getExternalTime getTimeFunction);
+
 void cli(void);
 void __disable_irq(void);
 void __enable_irq(void);
@@ -72,6 +76,27 @@ private:
     uint32_t _start;
 };
 
+// Mock IntervalTimer class (Teensy-specific)
+class IntervalTimer {
+public:
+    IntervalTimer() : _callback(nullptr), _interval_us(0) {}
+
+    bool begin(void (*callback)(void), uint32_t interval_us) {
+        _callback = callback;
+        _interval_us = interval_us;
+        return true;
+    }
+
+    void end() {
+        _callback = nullptr;
+        _interval_us = 0;
+    }
+
+private:
+    voidFuncPtr _callback;
+    uint32_t _interval_us;
+};
+
 #define OUTPUT 1
 #define INPUT 0
 #define INPUT_PULLUP 2
@@ -94,9 +119,8 @@ extern uint32_t mock_HW_OCOTP_ANA1;
 #define TEMPMON_TEMPSENSE0 mock_TEMPMON_TEMPSENSE0
 #define TEMPMON_TEMPSENSE1 mock_TEMPMON_TEMPSENSE1
 #define HW_OCOTP_ANA1 mock_HW_OCOTP_ANA1
-//#define TMS0_POWER_DOWN_MASK 0x1
-//#define TMS1_MEASURE_FREQ(x) (x)
-//#define TEMPMON_ROOMTEMP 25
+
+// Note: initTempMon is declared in SDT.h and defined in Globals.cpp
 
 #include <cstdio>
 #include <cstdlib>
@@ -183,6 +207,7 @@ class String;
 class SerialClass {
 public:
     std::vector<std::string> lines;
+    void begin(uint32_t baud);
     void createFile(const char* filename);
     void closeFile();
     void print(const char*);
@@ -214,6 +239,15 @@ private:
 
 extern SerialClass Serial;
 extern SerialClass SerialUSB1;
+
+// Mock Teensy3Clock (Real-time clock)
+class Teensy3ClockClass {
+public:
+    time_t get() { return 1234567890; } // Return a fixed timestamp for testing
+    void set(time_t t) { (void)t; }
+};
+
+extern Teensy3ClockClass Teensy3Clock;
 
 class String {
 public:
