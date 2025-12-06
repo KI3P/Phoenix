@@ -709,6 +709,8 @@ void PlayBuffer(DataBlock *data){
     }
 }
 
+#define RXTXZoom 3
+
 /**
  * Initialize the global variables to their default startup values
  * 1) Configure the RXfilters
@@ -717,7 +719,7 @@ void PlayBuffer(DataBlock *data){
  */
 void InitializeSignalProcessing(void){
     InitializeFilters(ED.spectrum_zoom,&RXfilters);
-    InitializeFilters(0,&RXTXfilters);
+    InitializeFilters(RXTXZoom,&RXTXfilters);
     InitializeTransmitFilters(&TXfilters);
     InitializeAGC(&agc, SR[SampleRate].rate/RXfilters.DF);
     InitializeKim1NoiseReduction();
@@ -744,9 +746,7 @@ void TransmitReceiveProcessing(void){
     if (ReadIQInputBuffer(&data)){
         // There is no data available, skip the rest
         return;
-    }
-    Flag(4);
-    
+    }    
     // Scale data channels by the overall system RF gain and the band-specified gain adjustment
     ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
 
@@ -755,15 +755,8 @@ void TransmitReceiveProcessing(void){
         ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
         ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
 
-    // Perform FFT of full spectrum for spectral display at this point
-    ZoomFFTExe(&data, 0, &RXTXfilters);
-
-    //FreqShiftFs4(&data);
-    //// Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
-    //if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) 
-    //    ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
-
-    Flag(0);
+    // Perform FFT for spectral display
+    ZoomFFTExe(&data, RXTXZoom, &RXTXfilters);
 }
 
 /**

@@ -227,6 +227,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             }
             // In calibration modes, ED.PA100Wactive is already set correctly
             // and we don't need to calculate gain
+            SetRXAttenuation( 31.5 );
 
             // Get all the receive hardware out of the path
             RXBypassBPF(); // BPF out of RX path
