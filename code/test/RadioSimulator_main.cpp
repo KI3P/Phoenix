@@ -69,12 +69,14 @@ static std::thread timer_thread;
 #include "FrontPanel.h"
 #include "Config.h"
 #include "OpenAudio_ArduinoLibrary.h"
+#include "LittleFS_mock.h"
 
 // External declarations
 extern RA8875 tft;
 extern UISm uiSM;
 extern ModeSm modeSM;
 extern PowerCalSm powerSM;
+extern LittleFS_Program myfs;  // From Storage.cpp
 void setup(void); // forward declaration of setup function
 
 // External function from Arduino_mock.cpp to start the millis() timer
@@ -84,6 +86,9 @@ extern void StartMillis(void);
 #ifdef USE_SDL_DISPLAY
 extern void RA8875_SDL_Cleanup();
 #endif
+
+// Flag to signal shutdown was requested
+static bool shutdownRequested = false;
 
 // Simulated time is handled by Arduino_mock.cpp
 
@@ -117,6 +122,9 @@ SimulatorAction processEvents() {
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
+                // Window closed - do proper shutdown
+                ShutdownTeensy();
+                shutdownRequested = true;
                 return ACTION_QUIT;
 
             case SDL_KEYDOWN:
@@ -125,6 +133,9 @@ SimulatorAction processEvents() {
 
                 switch (event.key.keysym.sym) {
                     case SDLK_ESCAPE:
+                        // Request shutdown via the normal shutdown routine
+                        ShutdownTeensy();
+                        shutdownRequested = true;
                         return ACTION_QUIT;
 
                     // ---- Front Panel Buttons (top row: 1-9) ----
@@ -354,6 +365,10 @@ int main(int argc, char* argv[]) {
     // Initialize the millis() timer for timing functions
     StartMillis();
 
+    // Set up disk backing for LittleFS so config persists between sessions
+    // The config file will be saved in the current working directory
+    myfs.setDiskBackingPath(".");
+
     std::cout << "Initializing display..." << std::endl;
 
 
@@ -432,6 +447,10 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Cleaning up..." << std::endl;
     stop_timer1ms();  // Stop the timer thread before cleanup
+
+    // Sync LittleFS storage to disk (config was saved by ShutdownTeensy)
+    myfs.syncToDisk();
+
     SDL_Audio_Cleanup();  // Clean up audio before display
     RA8875_SDL_Cleanup();
 

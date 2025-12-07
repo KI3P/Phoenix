@@ -1,5 +1,6 @@
 #include "LittleFS_mock.h"
 #include <iostream>
+#include <fstream>
 #include <cstring>
 
 // Global instances
@@ -286,6 +287,59 @@ std::string LittleFS_Program::getFileContent(const std::string& path) {
         return (*_storage)[path];
     }
     return "";
+}
+
+void LittleFS_Program::setDiskBackingPath(const std::string& basePath) {
+    _diskBasePath = basePath;
+    // Load any existing files from disk
+    loadFromDisk();
+}
+
+void LittleFS_Program::syncToDisk() {
+    if (_diskBasePath.empty() || !_storage) return;
+
+    for (const auto& entry : *_storage) {
+        // Convert LittleFS path to disk path
+        // Remove leading slash if present
+        std::string relativePath = entry.first;
+        if (!relativePath.empty() && relativePath[0] == '/') {
+            relativePath = relativePath.substr(1);
+        }
+
+        std::string diskPath = _diskBasePath + "/" + relativePath;
+
+        std::ofstream outFile(diskPath, std::ios::binary);
+        if (outFile.is_open()) {
+            outFile.write(entry.second.c_str(), entry.second.size());
+            outFile.close();
+            std::cout << "Saved to disk: " << diskPath << std::endl;
+        } else {
+            std::cerr << "Failed to save to disk: " << diskPath << std::endl;
+        }
+    }
+}
+
+void LittleFS_Program::loadFromDisk() {
+    if (_diskBasePath.empty() || !_storage) return;
+
+    // Try to load T41_configuration.txt from disk
+    std::string configPath = _diskBasePath + "/T41_configuration.txt";
+    std::ifstream inFile(configPath, std::ios::binary | std::ios::ate);
+
+    if (inFile.is_open()) {
+        std::streamsize size = inFile.tellg();
+        inFile.seekg(0, std::ios::beg);
+
+        std::string content;
+        content.resize(size);
+        if (inFile.read(&content[0], size)) {
+            (*_storage)["T41_configuration.txt"] = content;
+            std::cout << "Loaded from disk: " << configPath << " (" << size << " bytes)" << std::endl;
+        }
+        inFile.close();
+    } else {
+        std::cout << "No existing config file found at: " << configPath << std::endl;
+    }
 }
 
 // SDClass implementation

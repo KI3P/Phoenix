@@ -17,7 +17,7 @@ class JsonArray;
 // Mock JsonVariant class
 class JsonVariant {
 public:
-    enum Type { TYPE_NULL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING };
+    enum Type { TYPE_NULL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_ARRAY };
 
     JsonVariant() : _type(TYPE_NULL), _int_value(0), _float_value(0.0), _bool_value(false) {}
     JsonVariant(int value) : _type(TYPE_INT), _int_value(value), _float_value(value), _bool_value(value != 0) {}
@@ -39,6 +39,14 @@ public:
         _type = TYPE_FLOAT;
         _int_value = (int)value;
         _float_value = value;
+        _bool_value = value != 0.0;
+        return *this;
+    }
+
+    JsonVariant& operator=(double value) {
+        _type = TYPE_FLOAT;
+        _int_value = (int)value;
+        _float_value = (float)value;
         _bool_value = value != 0.0;
         return *this;
     }
@@ -112,16 +120,18 @@ public:
     operator bool() const { return _bool_value; }
     operator std::string() const { return _string_value; }
 
-    // Array access
-    JsonVariant operator[](int index);
-    JsonVariant operator[](const char* key);
+    // Array access - returns reference for assignment, auto-grows array
+    JsonVariant& operator[](int index);
+    JsonVariant& operator[](size_t index);
+    JsonVariant operator[](const char* key) const;
+    JsonVariant& operator[](const char* key);
 
     // Type checking
     template<typename T>
     bool is() const { return false; }
 
-    bool isArray() const { return !_array_value.empty(); }
-    bool isNull() const { return _type == TYPE_NULL; }
+    bool isArray() const { return _type == TYPE_ARRAY; }
+    bool isNull() const { return _type == TYPE_NULL && !isArray(); }
 
 private:
     Type _type;
@@ -135,8 +145,11 @@ private:
     friend class JsonDocument;
     friend class JsonObject;
     friend class JsonArray;
+    friend class JsonParser;
     friend size_t serializeJson(const JsonDocument& doc, std::ostream& output);
     friend size_t serializeJsonPretty(const JsonDocument& doc, std::ostream& output);
+    friend void serializeVariant(const JsonVariant& variant, std::ostream& output);
+    friend void serializeVariantPretty(const JsonVariant& variant, std::ostream& output, int indent);
 };
 
 // Mock JsonArray class
@@ -186,7 +199,8 @@ class JsonDocument {
 public:
     JsonDocument() {}
 
-    JsonVariant operator[](const char* key) {
+    // For reading - returns value (const version)
+    JsonVariant operator[](const char* key) const {
         if (key) {
             auto it = _root.find(std::string(key));
             if (it != _root.end()) {
@@ -194,6 +208,11 @@ public:
             }
         }
         return JsonVariant();
+    }
+
+    // For writing - returns reference (non-const version)
+    JsonVariant& operator[](const char* key) {
+        return _root[std::string(key)];
     }
 
     JsonVariant& operator[](const std::string& key) {
@@ -240,14 +259,24 @@ private:
 };
 
 // Inline implementations for JsonVariant methods that need JsonArray
-inline JsonVariant JsonVariant::operator[](int index) {
-    if (_array_value.size() > (size_t)index && index >= 0) {
-        return _array_value[index];
-    }
-    return JsonVariant();
+inline JsonVariant& JsonVariant::operator[](int index) {
+    return operator[]((size_t)index);
 }
 
-inline JsonVariant JsonVariant::operator[](const char* key) {
+inline JsonVariant& JsonVariant::operator[](size_t index) {
+    // Convert to array type if not already
+    if (_type != TYPE_ARRAY) {
+        _type = TYPE_ARRAY;
+        _array_value.clear();
+    }
+    // Auto-grow the array if needed
+    if (_array_value.size() <= index) {
+        _array_value.resize(index + 1);
+    }
+    return _array_value[index];
+}
+
+inline JsonVariant JsonVariant::operator[](const char* key) const {
     if (key) {
         auto it = _object_value.find(std::string(key));
         if (it != _object_value.end()) {
@@ -257,16 +286,21 @@ inline JsonVariant JsonVariant::operator[](const char* key) {
     return JsonVariant();
 }
 
+inline JsonVariant& JsonVariant::operator[](const char* key) {
+    return _object_value[std::string(key)];
+}
+
 // Template specialization for JsonArray
 template<>
 inline bool JsonVariant::is<JsonArray>() const {
-    return !_array_value.empty();
+    return _type == TYPE_ARRAY;
 }
 
 // Function declarations (implemented in ArduinoJson.cpp)
 
 size_t serializeJson(const JsonDocument& doc, std::ostream& output);
 size_t serializeJsonPretty(const JsonDocument& doc, std::ostream& output);
+DeserializationError<> deserializeJsonFromString(JsonDocument& doc, const std::string& json);
 
 // File interface compatibility
 // This template is for File-like objects (not std::ostream derivatives)
@@ -294,8 +328,17 @@ serializeJsonPretty(const JsonDocument& doc, FileType& file) {
 
 template<typename FileType>
 DeserializationError<> deserializeJson(JsonDocument& doc, FileType& file) {
-    // Mock implementation - just return Ok for now
-    return DeserializationError<>(DeserializationError<>::Ok);
+    // Read entire file content
+    std::string content;
+    size_t fileSize = file.size();
+    if (fileSize == 0) {
+        return DeserializationError<>(DeserializationError<>::EmptyInput);
+    }
+    content.resize(fileSize);
+    file.read(&content[0], fileSize);
+
+    // Parse the JSON string
+    return deserializeJsonFromString(doc, content);
 }
 
 #endif // ARDUINOJSON_H
