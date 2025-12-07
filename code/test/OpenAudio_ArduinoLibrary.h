@@ -4,6 +4,17 @@
 #include <stdint.h>
 #include <stdio.h>
 
+// Audio source selection for simulator
+enum AudioInputSource {
+    AUDIO_SOURCE_COMPUTER,   // Live audio from computer's audio input
+    AUDIO_SOURCE_TWO_TONE,   // Two-tone test signal (700Hz and 1900Hz at -48kHz)
+    AUDIO_SOURCE_SINGLE_TONE // Single-tone test signal (1000Hz at -49kHz)
+};
+
+void setAudioInputSource(AudioInputSource source);
+AudioInputSource getAudioInputSource(void);
+const char* getAudioInputSourceName(void);
+
 #ifdef USE_SDL_DISPLAY
 // SDL2 Audio support - cross-platform (Linux, Windows, macOS)
 bool SDL_Audio_Init(int sampleRate);

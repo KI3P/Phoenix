@@ -1,5 +1,147 @@
 #include "../src/PhoenixSketch/SDT.h"
 #include "OpenAudio_ArduinoLibrary.h"
+#include <cmath>
+#include <cstdlib>
+#include <chrono>
+
+// ============== Audio Source Selection ==============
+static AudioInputSource currentAudioSource = AUDIO_SOURCE_TWO_TONE;
+
+// Forward declaration for tone timing reset
+static bool toneTimerInitialized = false;
+
+void setAudioInputSource(AudioInputSource source) {
+    currentAudioSource = source;
+    // Reset tone timing when switching to a tone source
+    if (source == AUDIO_SOURCE_TWO_TONE || source == AUDIO_SOURCE_SINGLE_TONE) {
+        toneTimerInitialized = false;  // Will reinitialize on next use
+    }
+}
+
+AudioInputSource getAudioInputSource(void) {
+    return currentAudioSource;
+}
+
+const char* getAudioInputSourceName(void) {
+    switch (currentAudioSource) {
+        case AUDIO_SOURCE_COMPUTER:   return "Computer Audio";
+        case AUDIO_SOURCE_TWO_TONE:   return "Two-Tone (700/1900Hz @ 48kHz)";
+        case AUDIO_SOURCE_SINGLE_TONE: return "Single-Tone (1kHz @ 49kHz)";
+        default:                       return "Unknown";
+    }
+}
+
+// ============== Tone Generator ==============
+// Sample rate is 192kHz
+// For I/Q signal at frequency f: I = cos(2*pi*f*t), Q = -sin(2*pi*f*t)
+// (negative sin for USB representation where positive frequency = lower sideband)
+static const double TONE_SAMPLE_RATE = 192000.0;
+static const double TONE_TWO_PI = 2.0 * M_PI;
+
+// Phase accumulators for continuous tone generation
+static double tonePhase1 = 0.0;  // For first tone (or single tone)
+static double tonePhase2 = 0.0;  // For second tone (two-tone only)
+
+// Generate random noise in range [-1.0, 1.0]
+static inline double randomNoise() {
+    return (2.0 * rand() / RAND_MAX) - 1.0;
+}
+
+// ============== Tone Generator Timing Control ==============
+// Track samples available based on elapsed time at 192kHz
+static std::chrono::steady_clock::time_point toneStartTime;
+static uint64_t toneSamplesConsumed = 0;
+
+// Initialize or reset the tone timing
+static void initToneTiming() {
+    toneStartTime = std::chrono::steady_clock::now();
+    toneSamplesConsumed = 0;
+    toneTimerInitialized = true;
+}
+
+// Get number of samples that should be available based on elapsed time
+static size_t getToneSamplesAvailable() {
+    if (!toneTimerInitialized) {
+        initToneTiming();
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - toneStartTime);
+
+    // Calculate total samples that should have been generated at 192kHz
+    // samples = time_in_seconds * 192000
+    uint64_t totalSamplesExpected = (elapsed.count() * 192000) / 1000000;
+
+    // Available = expected - consumed
+    if (totalSamplesExpected > toneSamplesConsumed) {
+        return totalSamplesExpected - toneSamplesConsumed;
+    }
+    return 0;
+}
+
+// Generate I/Q samples for two-tone test signal
+// Tones at 700Hz and 1900Hz offset from 48kHz carrier
+static void generateTwoToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    // Audio offsets from 48kHz
+    const double audioFreq1 = 700.0;   // Hz
+    const double audioFreq2 = 1900.0;  // Hz
+    // RF carrier offset
+    const double carrierFreq = 48000.0;  // Hz
+
+    // Combined frequencies
+    const double freq1 = carrierFreq + audioFreq1;  // 48700 Hz
+    const double freq2 = carrierFreq + audioFreq2;  // 49900 Hz
+
+    const double phaseInc1 = TONE_TWO_PI * freq1 / TONE_SAMPLE_RATE;
+    const double phaseInc2 = TONE_TWO_PI * freq2 / TONE_SAMPLE_RATE;
+
+    // Amplitude for each tone (half amplitude so sum doesn't clip)
+    const double amplitude = 1380.0;
+    // Noise amplitude is 1/20th of signal amplitude
+    const double noiseAmp = amplitude / 20.0;
+
+    for (int i = 0; i < numSamples; i++) {
+        // Sum of two tones plus noise
+        double I = amplitude * (cos(tonePhase1) + cos(tonePhase2)) + noiseAmp * randomNoise();
+        double Q = amplitude * (-sin(tonePhase1) + -sin(tonePhase2)) + noiseAmp * randomNoise();
+
+        samplesI[i] = (int16_t)I;
+        samplesQ[i] = (int16_t)Q;
+
+        tonePhase1 += phaseInc1;
+        tonePhase2 += phaseInc2;
+
+        // Keep phases in reasonable range
+        if (tonePhase1 > TONE_TWO_PI) tonePhase1 -= TONE_TWO_PI;
+        if (tonePhase1 < -TONE_TWO_PI) tonePhase1 += TONE_TWO_PI;
+        if (tonePhase2 > TONE_TWO_PI) tonePhase2 -= TONE_TWO_PI;
+        if (tonePhase2 < -TONE_TWO_PI) tonePhase2 += TONE_TWO_PI;
+    }
+}
+
+// Generate I/Q samples for single-tone test signal
+// Tone at -49kHz (1kHz below -48kHz, will appear at 1kHz audio)
+static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    const double freq = 49000.0;  // Hz (48kHz + 1kHz = 49kHz)
+    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
+    // Noise amplitude is 1/20th of signal amplitude
+    const double noiseAmp = amplitude / 20.0;
+
+    for (int i = 0; i < numSamples; i++) {
+        double I = amplitude * cos(tonePhase1) + noiseAmp * randomNoise();
+        double Q = amplitude * -sin(tonePhase1) + noiseAmp * randomNoise();
+
+        samplesI[i] = (int16_t)I;
+        samplesQ[i] = (int16_t)Q;
+
+        tonePhase1 += phaseInc;
+
+        // Keep phase in reasonable range
+        if (tonePhase1 > TONE_TWO_PI) tonePhase1 -= TONE_TWO_PI;
+        if (tonePhase1 < -TONE_TWO_PI) tonePhase1 += TONE_TWO_PI;
+    }
+}
 
 #ifdef USE_SDL_DISPLAY
 #include <SDL2/SDL.h>
@@ -294,6 +436,13 @@ static size_t SDL_Audio_SamplesAvailable(void) {
 #endif
 
 int AudioRecordQueue::available(void) {
+    // For tone generators, use timing-based sample availability
+    if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
+        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        size_t samplesAvailable = getToneSamplesAvailable();
+        return samplesAvailable / BUFFER_SIZE;
+    }
+
 #ifdef USE_SDL_DISPLAY
     if (SDL_Audio_InputAvailable()) {
         // Return actual number of BLOCKS available (samples / BUFFER_SIZE)
@@ -339,6 +488,54 @@ uint8_t AudioRecordQueue::getChannel(void) {
 }
 
 int16_t* AudioRecordQueue::readBuffer(void) {
+    // Static buffers for generated I/Q samples
+    static int16_t toneBuf_I[BUFFER_SIZE];
+    static int16_t toneBuf_Q[BUFFER_SIZE];
+    static bool qDataReady = false;
+
+    // Handle tone generator sources
+    if (currentAudioSource == AUDIO_SOURCE_TWO_TONE) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            // Track samples consumed when Q is read (I+Q pair complete)
+            toneSamplesConsumed += BUFFER_SIZE;
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
+    if (currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateSingleToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            // Track samples consumed when Q is read (I+Q pair complete)
+            toneSamplesConsumed += BUFFER_SIZE;
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateSingleToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
 #ifdef USE_SDL_DISPLAY
     if (SDL_Audio_InputAvailable()) {
         // Static buffers for L and R channels

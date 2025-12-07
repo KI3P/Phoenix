@@ -40,6 +40,9 @@
  *   p - PTT (hold to transmit SSB)
  *   . - CW Key 1 (straight key / dit)
  *   / - CW Key 2 (dah for iambic keyer)
+ *
+ *   ---- Audio Source ----
+ *   a - Cycle audio input source (Computer/Two-Tone/Single-Tone)
  */
 
 
@@ -198,6 +201,28 @@ SimulatorAction processEvents() {
                         SetInterrupt(iKEY2_PRESSED);
                         std::cout << "KEY2 PRESSED" << std::endl;
                         break;
+
+                    // ---- Audio Source Selection ----
+                    case SDLK_a: {
+                        // Cycle through audio sources
+                        AudioInputSource current = getAudioInputSource();
+                        AudioInputSource next;
+                        switch (current) {
+                            case AUDIO_SOURCE_COMPUTER:
+                                next = AUDIO_SOURCE_TWO_TONE;
+                                break;
+                            case AUDIO_SOURCE_TWO_TONE:
+                                next = AUDIO_SOURCE_SINGLE_TONE;
+                                break;
+                            case AUDIO_SOURCE_SINGLE_TONE:
+                            default:
+                                next = AUDIO_SOURCE_COMPUTER;
+                                break;
+                        }
+                        setAudioInputSource(next);
+                        std::cout << "Audio Source: " << getAudioInputSourceName() << std::endl;
+                        break;
+                    }
                 }
                 break;
 
@@ -249,6 +274,8 @@ void printUsage() {
     std::cout << "  p (hold)      - PTT (transmit SSB)" << std::endl;
     std::cout << "  . (hold)      - CW Key 1 (straight key / dit)" << std::endl;
     std::cout << "  /             - CW Key 2 (dah)" << std::endl;
+    std::cout << "\n  --- Audio Source ---" << std::endl;
+    std::cout << "  a             - Cycle audio source (Computer/Two-Tone/Single-Tone)" << std::endl;
     std::cout << "============================================\n" << std::endl;
 }
 
