@@ -12,7 +12,7 @@
  * Controls:
  *   ESC or close window - Exit
  *
- *   ---- Front Panel Buttons (top row: 1-8, bottom row: q-i) ----
+ *   ---- Front Panel Buttons (top row: 1-9, bottom row: q-h) ----
  *   1 - Menu Select (button 0)    q - Noise Reduction (button 9)
  *   2 - Main Menu (button 1)      w - Notch Filter (button 10)
  *   3 - Band Up (button 2)        e - Fine Tune Inc (button 11)
@@ -20,10 +20,10 @@
  *   5 - Reset Tuning (button 4)   t - Decoder Toggle (button 13)
  *   6 - Band Down (button 5)      y - DFE (button 14)
  *   7 - Toggle Mode (button 6)    u - Bearing (button 15)
- *   8 - Demodulation (button 7)   i - Main Tune Inc (button 8)
+ *   8 - Demodulation (button 7)   o - Spare (button 16)
+ *   9 - Main Tune Inc (button 8)  h - Home Screen (button 17)
  *
  *   ---- Additional Buttons ----
- *   h - Home Screen (button 17)
  *   v - Volume Button (button 18)
  *   f - Filter Button (button 19)
  *   n - Fine Tune Button (button 20)
@@ -127,7 +127,7 @@ SimulatorAction processEvents() {
                     case SDLK_ESCAPE:
                         return ACTION_QUIT;
 
-                    // ---- Front Panel Buttons (top row: 1-8) ----
+                    // ---- Front Panel Buttons (top row: 1-9) ----
                     case SDLK_1: simulateButtonPress(MENU_OPTION_SELECT); break;
                     case SDLK_2: simulateButtonPress(MAIN_MENU_UP); break;
                     case SDLK_3: simulateButtonPress(BAND_UP); break;
@@ -136,8 +136,9 @@ SimulatorAction processEvents() {
                     case SDLK_6: simulateButtonPress(BAND_DN); break;
                     case SDLK_7: simulateButtonPress(TOGGLE_MODE); break;
                     case SDLK_8: simulateButtonPress(DEMODULATION); break;
+                    case SDLK_9: simulateButtonPress(MAIN_TUNE_INCREMENT); break;
 
-                    // ---- Front Panel Buttons (bottom row: q-i) ----
+                    // ---- Front Panel Buttons (bottom row: q-o) ----
                     case SDLK_q: simulateButtonPress(NOISE_REDUCTION); break;
                     case SDLK_w: simulateButtonPress(NOTCH_FILTER); break;
                     case SDLK_e: simulateButtonPress(FINE_TUNE_INCREMENT); break;
@@ -145,10 +146,10 @@ SimulatorAction processEvents() {
                     case SDLK_t: simulateButtonPress(DECODER_TOGGLE); break;
                     case SDLK_y: simulateButtonPress(DFE); break;
                     case SDLK_u: simulateButtonPress(BEARING); break;
-                    case SDLK_i: simulateButtonPress(MAIN_TUNE_INCREMENT); break;
+                    case SDLK_o: simulateButtonPress(SPARE); break;
+                    case SDLK_h: simulateButtonPress(HOME_SCREEN); break;
 
                     // ---- Additional Buttons ----
-                    case SDLK_h: simulateButtonPress(HOME_SCREEN); break;
                     case SDLK_v: simulateButtonPress(VOLUME_BUTTON); break;
                     case SDLK_f: simulateButtonPress(FILTER_BUTTON); break;
                     case SDLK_n: simulateButtonPress(FINETUNE_BUTTON); break;

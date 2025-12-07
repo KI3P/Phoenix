@@ -14,12 +14,16 @@
 // Display dimensions
 static const int DISPLAY_WIDTH = 800;
 static const int DISPLAY_HEIGHT = 480;
+static const int HELP_PANEL_HEIGHT = 200;
+static const int WINDOW_HEIGHT = DISPLAY_HEIGHT + HELP_PANEL_HEIGHT;
 
 // SDL globals
 static SDL_Window* g_window = nullptr;
 static SDL_Renderer* g_renderer = nullptr;
 static SDL_Texture* g_texture = nullptr;
+static SDL_Texture* g_help_texture = nullptr;
 static uint32_t* g_framebuffer = nullptr;  // ARGB8888 format
+static uint32_t* g_help_buffer = nullptr;  // Help panel buffer
 static bool g_initialized = false;
 static bool g_layers_enabled = false;
 static uint8_t g_current_layer = 0;
@@ -77,8 +81,17 @@ static void update_display() {
     }
 
     SDL_UpdateTexture(g_texture, nullptr, g_framebuffer, DISPLAY_WIDTH * sizeof(uint32_t));
+    SDL_UpdateTexture(g_help_texture, nullptr, g_help_buffer, DISPLAY_WIDTH * sizeof(uint32_t));
     SDL_RenderClear(g_renderer);
-    SDL_RenderCopy(g_renderer, g_texture, nullptr, nullptr);
+
+    // Render main display at top
+    SDL_Rect display_rect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
+    SDL_RenderCopy(g_renderer, g_texture, nullptr, &display_rect);
+
+    // Render help panel below
+    SDL_Rect help_rect = {0, DISPLAY_HEIGHT, DISPLAY_WIDTH, HELP_PANEL_HEIGHT};
+    SDL_RenderCopy(g_renderer, g_help_texture, nullptr, &help_rect);
+
     SDL_RenderPresent(g_renderer);
     // Note: Don't poll events here - let the main loop's processEvents() handle them
 }
@@ -287,6 +300,142 @@ static const uint8_t font_8x16[][16] = {
     {0x00,0x00,0x76,0xDC,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
 };
 
+// Set a pixel in the help buffer
+static void set_help_pixel(int x, int y, uint32_t color) {
+    if (x < 0 || x >= DISPLAY_WIDTH || y < 0 || y >= HELP_PANEL_HEIGHT) return;
+    if (g_help_buffer) {
+        g_help_buffer[y * DISPLAY_WIDTH + x] = color;
+    }
+}
+
+// Draw a single character to the help buffer using built-in font
+static int draw_help_char(int x, int y, char c, uint32_t color, int scale = 1) {
+    if (c < 32 || c > 126) c = '?';
+    int idx = c - 32;
+
+    int char_width = 8 * scale;
+
+    for (int row = 0; row < 16; row++) {
+        uint8_t line = font_8x16[idx][row];
+        for (int col = 0; col < 8; col++) {
+            if (line & (0x80 >> col)) {
+                for (int sy = 0; sy < scale; sy++) {
+                    for (int sx = 0; sx < scale; sx++) {
+                        set_help_pixel(x + col * scale + sx, y + row * scale + sy, color);
+                    }
+                }
+            }
+        }
+    }
+
+    return char_width;
+}
+
+// Draw a string to the help buffer
+static void draw_help_string(int x, int y, const char* text, uint32_t color, int scale = 1) {
+    while (*text) {
+        x += draw_help_char(x, y, *text, color, scale);
+        text++;
+    }
+}
+
+// Initialize the help panel with keyboard map
+static void init_help_panel() {
+    if (!g_help_buffer) return;
+
+    // Fill with dark gray background
+    uint32_t bg_color = 0xFF202020;
+    uint32_t title_color = 0xFFFFFF00;  // Yellow
+    uint32_t key_color = 0xFF00FF00;    // Green
+    uint32_t desc_color = 0xFFCCCCCC;   // Light gray
+    uint32_t separator_color = 0xFF404040;
+
+    for (int i = 0; i < DISPLAY_WIDTH * HELP_PANEL_HEIGHT; i++) {
+        g_help_buffer[i] = bg_color;
+    }
+
+    // Draw separator line at top
+    for (int x = 0; x < DISPLAY_WIDTH; x++) {
+        g_help_buffer[x] = separator_color;
+    }
+
+    int y = 8;
+    int col1 = 10;
+    int col2 = 210;
+    int col3 = 410;
+    int col4 = 610;
+    int line_height = 16;
+
+    // Title
+    draw_help_string(col1, y, "KEYBOARD CONTROLS", title_color);
+    y += line_height + 4;
+
+    // Column headers
+    draw_help_string(col1, y, "Front Panel (Top)", title_color);
+    draw_help_string(col2, y, "Front Panel (Bot)", title_color);
+    draw_help_string(col3, y, "Encoders", title_color);
+    draw_help_string(col4, y, "PTT/CW/Audio", title_color);
+    y += line_height + 2;
+
+    // Row 1
+    draw_help_string(col1, y, "1", key_color); draw_help_string(col1 + 16, y, "Menu Select (0)", desc_color);
+    draw_help_string(col2, y, "Q", key_color); draw_help_string(col2 + 16, y, "Noise Reduc (9)", desc_color);
+    draw_help_string(col3, y, "Up/Dn", key_color); draw_help_string(col3 + 48, y, "Filter Enc", desc_color);
+    draw_help_string(col4, y, "P", key_color); draw_help_string(col4 + 16, y, "PTT (hold)", desc_color);
+    y += line_height;
+
+    // Row 2
+    draw_help_string(col1, y, "2", key_color); draw_help_string(col1 + 16, y, "Main Menu (1)", desc_color);
+    draw_help_string(col2, y, "W", key_color); draw_help_string(col2 + 16, y, "Notch (10)", desc_color);
+    draw_help_string(col3, y, "+/-", key_color); draw_help_string(col3 + 32, y, "Volume Enc", desc_color);
+    draw_help_string(col4, y, ".", key_color); draw_help_string(col4 + 16, y, "CW Key 1", desc_color);
+    y += line_height;
+
+    // Row 3
+    draw_help_string(col1, y, "3", key_color); draw_help_string(col1 + 16, y, "Band Up (2)", desc_color);
+    draw_help_string(col2, y, "E", key_color); draw_help_string(col2 + 16, y, "Fine Tune+ (11)", desc_color);
+    draw_help_string(col3, y, "[ / ]", key_color); draw_help_string(col3 + 48, y, "Main Tune", desc_color);
+    draw_help_string(col4, y, "/", key_color); draw_help_string(col4 + 16, y, "CW Key 2", desc_color);
+    y += line_height;
+
+    // Row 4
+    draw_help_string(col1, y, "4", key_color); draw_help_string(col1 + 16, y, "Zoom (3)", desc_color);
+    draw_help_string(col2, y, "R", key_color); draw_help_string(col2 + 16, y, "Filter (12)", desc_color);
+    draw_help_string(col3, y, "; / '", key_color); draw_help_string(col3 + 48, y, "Fine Tune", desc_color);
+    draw_help_string(col4, y, "A", key_color); draw_help_string(col4 + 16, y, "Audio Source", desc_color);
+    y += line_height;
+
+    // Row 5
+    draw_help_string(col1, y, "5", key_color); draw_help_string(col1 + 16, y, "Reset Tune (4)", desc_color);
+    draw_help_string(col2, y, "T", key_color); draw_help_string(col2 + 16, y, "Decoder (13)", desc_color);
+    y += line_height;
+
+    // Row 6
+    draw_help_string(col1, y, "6", key_color); draw_help_string(col1 + 16, y, "Band Down (5)", desc_color);
+    draw_help_string(col2, y, "Y", key_color); draw_help_string(col2 + 16, y, "DFE (14)", desc_color);
+    draw_help_string(col3, y, "Additional Buttons:", title_color);
+    y += line_height;
+
+    // Row 7
+    draw_help_string(col1, y, "7", key_color); draw_help_string(col1 + 16, y, "Toggle Mode (6)", desc_color);
+    draw_help_string(col2, y, "U", key_color); draw_help_string(col2 + 16, y, "Bearing (15)", desc_color);
+    draw_help_string(col3, y, "V", key_color); draw_help_string(col3 + 16, y, "Vol (18)", desc_color);
+    draw_help_string(col3 + 100, y, "F", key_color); draw_help_string(col3 + 116, y, "Filter (19)", desc_color);
+    y += line_height;
+
+    // Row 8
+    draw_help_string(col1, y, "8", key_color); draw_help_string(col1 + 16, y, "Demod (7)", desc_color);
+    draw_help_string(col2, y, "O", key_color); draw_help_string(col2 + 16, y, "Spare (16)", desc_color);
+    draw_help_string(col3, y, "N", key_color); draw_help_string(col3 + 16, y, "FT (20)", desc_color);
+    draw_help_string(col3 + 100, y, "B", key_color); draw_help_string(col3 + 116, y, "VFO (21)", desc_color);
+    y += line_height;
+
+    // Row 9
+    draw_help_string(col1, y, "9", key_color); draw_help_string(col1 + 16, y, "Main Tune+ (8)", desc_color);
+    draw_help_string(col2, y, "H", key_color); draw_help_string(col2 + 16, y, "Home (17)", desc_color);
+    draw_help_string(col4, y, "ESC", key_color); draw_help_string(col4 + 32, y, "Exit", desc_color);
+}
+
 // Draw a single character using built-in font and return its width
 static int draw_char_builtin(int x, int y, char c, uint32_t color, int scale) {
     if (c < 32 || c > 126) c = '?';
@@ -385,7 +534,7 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         DISPLAY_WIDTH,
-        DISPLAY_HEIGHT,
+        WINDOW_HEIGHT,
         SDL_WINDOW_SHOWN
     );
 
@@ -419,10 +568,29 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         return false;
     }
 
+    // Create help panel texture
+    g_help_texture = SDL_CreateTexture(
+        g_renderer,
+        SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING,
+        DISPLAY_WIDTH,
+        HELP_PANEL_HEIGHT
+    );
+
+    if (!g_help_texture) {
+        std::cerr << "Help texture creation failed: " << SDL_GetError() << std::endl;
+        SDL_DestroyTexture(g_texture);
+        SDL_DestroyRenderer(g_renderer);
+        SDL_DestroyWindow(g_window);
+        SDL_Quit();
+        return false;
+    }
+
     // Allocate framebuffer and layer buffers
     g_framebuffer = new uint32_t[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     g_layer1 = new uint32_t[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     g_layer2 = new uint32_t[DISPLAY_WIDTH * DISPLAY_HEIGHT];
+    g_help_buffer = new uint32_t[DISPLAY_WIDTH * HELP_PANEL_HEIGHT];
 
     // Clear to black
     uint32_t black = 0xFF000000;
@@ -431,6 +599,9 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         g_layer1[i] = black;
         g_layer2[i] = black;
     }
+
+    // Initialize help panel with keyboard map
+    init_help_panel();
 
     g_initialized = true;
     update_display();
@@ -807,6 +978,10 @@ void RA8875_SDL_Cleanup() {
         SDL_DestroyTexture(g_texture);
         g_texture = nullptr;
     }
+    if (g_help_texture) {
+        SDL_DestroyTexture(g_help_texture);
+        g_help_texture = nullptr;
+    }
     if (g_renderer) {
         SDL_DestroyRenderer(g_renderer);
         g_renderer = nullptr;
@@ -818,6 +993,10 @@ void RA8875_SDL_Cleanup() {
     if (g_framebuffer) {
         delete[] g_framebuffer;
         g_framebuffer = nullptr;
+    }
+    if (g_help_buffer) {
+        delete[] g_help_buffer;
+        g_help_buffer = nullptr;
     }
     if (g_layer1) {
         delete[] g_layer1;

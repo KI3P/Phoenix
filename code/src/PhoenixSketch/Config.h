@@ -61,6 +61,7 @@
 #define DECODER_TOGGLE      13
 #define DFE                 14
 #define BEARING             15
+#define SPARE               16
 #define HOME_SCREEN         17
 #define VOLUME_BUTTON       18
 #define FILTER_BUTTON       19
