@@ -6,7 +6,12 @@
 #include <thread>
 
 // ============== Audio Source Selection ==============
+// Default: MOCK_DATA for unit tests, TWO_TONE for simulator with SDL
+#ifdef USE_SDL_DISPLAY
 static AudioInputSource currentAudioSource = AUDIO_SOURCE_TWO_TONE;
+#else
+static AudioInputSource currentAudioSource = AUDIO_SOURCE_MOCK_DATA;
+#endif
 
 // Forward declaration for tone timing reset
 static bool toneTimerInitialized = false;
@@ -25,9 +30,10 @@ AudioInputSource getAudioInputSource(void) {
 
 const char* getAudioInputSourceName(void) {
     switch (currentAudioSource) {
-        case AUDIO_SOURCE_COMPUTER:   return "Computer Audio";
-        case AUDIO_SOURCE_TWO_TONE:   return "Two-Tone (700/1900Hz @ 48kHz)";
+        case AUDIO_SOURCE_COMPUTER:    return "Computer Audio";
+        case AUDIO_SOURCE_TWO_TONE:    return "Two-Tone (700/1900Hz @ 48kHz)";
         case AUDIO_SOURCE_SINGLE_TONE: return "Single-Tone (1kHz @ 49kHz)";
+        case AUDIO_SOURCE_MOCK_DATA:   return "Mock Data (unit tests)";
         default:                       return "Unknown";
     }
 }
@@ -516,6 +522,7 @@ int AudioRecordQueue::available(void) {
         return samplesAvailable / BUFFER_SIZE;
     }
 
+    // AUDIO_SOURCE_MOCK_DATA or fallback: use file-based mock data
     int blocks_available = 4*2048/BUFFER_SIZE;
     int answer = (blocks_available-head+1)*BUFFER_SIZE;
     if (answer >= 100) answer = 99;
@@ -601,7 +608,7 @@ int16_t* AudioRecordQueue::readBuffer(void) {
     }
 
 #ifdef USE_SDL_DISPLAY
-    if (SDL_Audio_InputAvailable()) {
+    if (currentAudioSource == AUDIO_SOURCE_COMPUTER && SDL_Audio_InputAvailable()) {
         // Static buffers for L and R channels
         // We read both channels together when L is requested,
         // then return cached R data when R is requested
@@ -627,7 +634,7 @@ int16_t* AudioRecordQueue::readBuffer(void) {
         }
     }
 #endif
-    // Fallback to mock data
+    // Fallback to mock data (AUDIO_SOURCE_MOCK_DATA or fallback)
     int16_t * ptr = &data[head*BUFFER_SIZE];
     head += 1;
     int blocks_available = 4*2048/BUFFER_SIZE;

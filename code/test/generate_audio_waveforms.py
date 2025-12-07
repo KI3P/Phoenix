@@ -28,6 +28,7 @@ import sip
 from gnuradio import analog
 from gnuradio import audio
 from gnuradio import blocks
+from gnuradio import filter
 from gnuradio import gr
 from gnuradio.fft import window
 import sys
@@ -116,6 +117,7 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
         self.qtgui_sink_x_0.enable_rf_freq(False)
 
         self.top_layout.addWidget(self._qtgui_sink_x_0_win)
+        self.hilbert_fc_0 = filter.hilbert_fc(65, window.WIN_HAMMING, 6.76)
         self.blocks_selector_0_0 = blocks.selector(gr.sizeof_float*1,0 if phase < 0 else 1,0)
         self.blocks_selector_0_0.set_enabled(True)
         self.blocks_selector_0 = blocks.selector(gr.sizeof_float*1,0 if phase < 0 else 1,0)
@@ -124,12 +126,13 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
         self.blocks_multiply_const_vxx_0_0 = blocks.multiply_const_ff(phase)
         self.blocks_multiply_const_vxx_0 = blocks.multiply_const_ff(-gain)
         self.blocks_float_to_complex_0 = blocks.float_to_complex(1)
+        self.blocks_complex_to_real_0 = blocks.complex_to_real(1)
+        self.blocks_complex_to_imag_0 = blocks.complex_to_imag(1)
         self.blocks_add_xx_1_0 = blocks.add_vff(1)
         self.blocks_add_xx_1 = blocks.add_vff(1)
         self.blocks_add_xx_0_0 = blocks.add_vff(1)
         self.blocks_add_xx_0 = blocks.add_vff(1)
         self.audio_sink_1 = audio.sink(samp_rate, '', True)
-        self.analog_sig_source_x_0_0 = analog.sig_source_f(samp_rate, analog.GR_COS_WAVE, freq, amp, 0, np.pi/2)
         self.analog_sig_source_x_0 = analog.sig_source_f(samp_rate, analog.GR_COS_WAVE, freq, amp, 0, 0)
         self.analog_noise_source_x_0_0 = analog.noise_source_f(analog.GR_GAUSSIAN, noise_amp, 2326563)
         self.analog_noise_source_x_0 = analog.noise_source_f(analog.GR_GAUSSIAN, noise_amp, 14684613)
@@ -140,14 +143,15 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
         ##################################################
         self.connect((self.analog_noise_source_x_0, 0), (self.blocks_add_xx_1, 1))
         self.connect((self.analog_noise_source_x_0_0, 0), (self.blocks_add_xx_1_0, 0))
-        self.connect((self.analog_sig_source_x_0, 0), (self.blocks_add_xx_1_0, 1))
-        self.connect((self.analog_sig_source_x_0_0, 0), (self.blocks_add_xx_1, 0))
+        self.connect((self.analog_sig_source_x_0, 0), (self.hilbert_fc_0, 0))
         self.connect((self.blocks_add_xx_0, 0), (self.blocks_selector_0, 1))
         self.connect((self.blocks_add_xx_0_0, 0), (self.blocks_selector_0_0, 0))
         self.connect((self.blocks_add_xx_1, 0), (self.blocks_add_xx_0_0, 1))
         self.connect((self.blocks_add_xx_1, 0), (self.blocks_multiply_const_vxx_0_0, 0))
         self.connect((self.blocks_add_xx_1, 0), (self.blocks_selector_0_0, 1))
         self.connect((self.blocks_add_xx_1_0, 0), (self.blocks_multiply_const_vxx_0, 0))
+        self.connect((self.blocks_complex_to_imag_0, 0), (self.blocks_add_xx_1, 0))
+        self.connect((self.blocks_complex_to_real_0, 0), (self.blocks_add_xx_1_0, 1))
         self.connect((self.blocks_float_to_complex_0, 0), (self.qtgui_sink_x_0, 0))
         self.connect((self.blocks_multiply_const_vxx_0, 0), (self.blocks_add_xx_0, 1))
         self.connect((self.blocks_multiply_const_vxx_0, 0), (self.blocks_multiply_const_vxx_0_0_0, 0))
@@ -158,6 +162,8 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_selector_0, 0), (self.blocks_float_to_complex_0, 0))
         self.connect((self.blocks_selector_0_0, 0), (self.audio_sink_1, 1))
         self.connect((self.blocks_selector_0_0, 0), (self.blocks_float_to_complex_0, 1))
+        self.connect((self.hilbert_fc_0, 0), (self.blocks_complex_to_imag_0, 0))
+        self.connect((self.hilbert_fc_0, 0), (self.blocks_complex_to_real_0, 0))
 
 
     def closeEvent(self, event):
@@ -174,7 +180,6 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self.analog_sig_source_x_0.set_sampling_freq(self.samp_rate)
-        self.analog_sig_source_x_0_0.set_sampling_freq(self.samp_rate)
         self.qtgui_sink_x_0.set_frequency_range(0, self.samp_rate)
 
     def get_phase(self):
@@ -208,7 +213,6 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
     def set_freq(self, freq):
         self.freq = freq
         self.analog_sig_source_x_0.set_frequency(self.freq)
-        self.analog_sig_source_x_0_0.set_frequency(self.freq)
 
     def get_amp(self):
         return self.amp
@@ -216,7 +220,6 @@ class generate_audio_waveforms(gr.top_block, Qt.QWidget):
     def set_amp(self, amp):
         self.amp = amp
         self.analog_sig_source_x_0.set_amplitude(self.amp)
-        self.analog_sig_source_x_0_0.set_amplitude(self.amp)
 
 
 
