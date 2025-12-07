@@ -544,7 +544,9 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         return false;
     }
 
-    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    // Note: Don't use SDL_RENDERER_PRESENTVSYNC - it limits framerate to display refresh rate
+    // which is too slow for audio processing (need ~94 Hz for 48kHz audio at 512 samples/frame)
+    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
     if (!g_renderer) {
         std::cerr << "Renderer creation failed: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(g_window);

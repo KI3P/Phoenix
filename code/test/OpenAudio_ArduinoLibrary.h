@@ -22,6 +22,8 @@ void SDL_Audio_Cleanup(void);
 void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t channel);
 int SDL_Audio_ReadSamples(int16_t* samplesL, int16_t* samplesR, int numSamples);
 bool SDL_Audio_InputAvailable(void);
+size_t SDL_Audio_OutputBufferLevel(void);  // Returns samples buffered for output
+bool SDL_Audio_OutputNeedsData(void);      // True if output buffer is below target level
 #endif
 
 #define LOW 0

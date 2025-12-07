@@ -202,7 +202,7 @@ if(USE_SDL_DISPLAY)
         RA8875_SDL.cpp
     )
 
-    target_compile_definitions(radio_simulator PRIVATE USE_SDL_DISPLAY)
+    target_compile_definitions(radio_simulator PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS)
     target_include_directories(radio_simulator PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(radio_simulator ${SDL2_LIBRARIES})
 

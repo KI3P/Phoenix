@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <chrono>
+#include <thread>
 
 // ============== Audio Source Selection ==============
 static AudioInputSource currentAudioSource = AUDIO_SOURCE_TWO_TONE;
@@ -151,9 +152,10 @@ static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int 
 #include <cstring>
 
 // ============== Audio Output (Playback) ==============
-// Ring buffer for stereo audio output - 1 second at ~115kHz (DSP throughput rate)
+// Ring buffer for stereo audio output - 1 second at 48kHz (downsampled from 192kHz)
 // Store interleaved stereo: L0, R0, L1, R1, ...
-static const size_t AUDIO_OUT_BUFFER_SIZE = 120000 * 2;  // stereo samples
+static const size_t AUDIO_OUT_BUFFER_SIZE = 48000 * 2;  // stereo samples
+static const int DOWNSAMPLE_FACTOR = 4;  // 192kHz -> 48kHz
 static int16_t audioOutBuffer[AUDIO_OUT_BUFFER_SIZE];
 static std::atomic<size_t> outWritePos{0};
 static std::atomic<size_t> outReadPos{0};
@@ -184,6 +186,7 @@ static std::atomic<uint32_t> underrunCount{0};
 static std::atomic<uint32_t> callbackCount{0};
 static std::atomic<uint32_t> samplesQueued{0};
 static std::atomic<uint32_t> samplesConsumed{0};  // samples actually read by DSP
+static std::atomic<bool> audioPlaybackStarted{false};  // Track if we've started playback
 
 // Audio output callback - SDL calls this to get samples for playback
 static void Phoenix_OutputCallback(void* userdata, Uint8* stream, int len) {
@@ -248,9 +251,8 @@ bool SDL_Audio_Init(int sampleRate) {
     currentSampleRate = sampleRate;
 
     // ---- Initialize Audio Output (Playback) ----
-    // DSP runs at ~60% of real-time (192kHz), so effective rate is ~115kHz
-    // Output at this rate to match DSP throughput (no decimation)
-    int outputRate = 115200;
+    // DSP output is at 192kHz, downsample to 48kHz for playback
+    int outputRate = 48000;
 
     SDL_AudioSpec outDesired, outObtained;
     SDL_zero(outDesired);
@@ -301,11 +303,8 @@ bool SDL_Audio_Init(int sampleRate) {
     memset(audioInBuffer_L, 0, sizeof(audioInBuffer_L));
     memset(audioInBuffer_R, 0, sizeof(audioInBuffer_R));
 
-    // Pre-fill output buffer with ~500ms of silence to absorb timing jitter
-    // This prevents underruns during initial startup and DSP processing gaps
-    int actualOutputRate = 115200;
-    size_t prefillSamples = actualOutputRate / 2 * 2;  // 500ms stereo samples
-    outWritePos.store(prefillSamples);
+    // No prefill - we'll start playback once DSP has produced enough data
+    outWritePos.store(0);
     outReadPos.store(0);
     pendingLCount = 0;
     inWritePos.store(0);
@@ -316,12 +315,14 @@ bool SDL_Audio_Init(int sampleRate) {
     samplesConsumed.store(0);
     underrunCount.store(0);
     callbackCount.store(0);
+    audioPlaybackStarted.store(false);
 
-    // Start audio devices
-    SDL_PauseAudioDevice(audioOutDevice, 0);
+    // Start audio input immediately (we need to receive samples)
     if (audioInDevice != 0) {
         SDL_PauseAudioDevice(audioInDevice, 0);
     }
+    // Keep audio output paused - will start once buffer has enough data
+    SDL_PauseAudioDevice(audioOutDevice, 1);  // 1 = paused
 
     sdlAudioEnabled = true;
     return true;
@@ -362,8 +363,10 @@ void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t chan
 
         size_t pos = outWritePos.load();
 
-        // Write all samples (no decimation - SDL will resample as needed)
-        for (int i = 0; i < numSamples; i++) {
+        // Downsample from 192kHz to 48kHz (factor of 4)
+        // Simple decimation - take every 4th sample
+        // For better quality, could add a low-pass filter before decimation
+        for (int i = 0; i < numSamples; i += DOWNSAMPLE_FACTOR) {
             audioOutBuffer[pos] = pendingL[i];  // L
             pos = (pos + 1) % AUDIO_OUT_BUFFER_SIZE;
             audioOutBuffer[pos] = samples[i];   // R
@@ -372,7 +375,23 @@ void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t chan
 
         outWritePos.store(pos);
         pendingLCount = 0;
-        samplesQueued.fetch_add(numSamples);
+        samplesQueued.fetch_add(numSamples / DOWNSAMPLE_FACTOR);
+
+        // Start playback once we've buffered ~300ms of audio at 48kHz
+        // This gives us headroom to absorb timing variations
+        if (!audioPlaybackStarted.load()) {
+            size_t writePos = outWritePos.load();
+            size_t readPos = outReadPos.load();
+            size_t buffered = (writePos >= readPos) ? (writePos - readPos)
+                                                    : (AUDIO_OUT_BUFFER_SIZE - readPos + writePos);
+            // 300ms at 48kHz stereo = 14400 stereo samples = 28800 buffer entries
+            if (buffered >= 28800) {
+                SDL_PauseAudioDevice(audioOutDevice, 0);  // 0 = unpaused
+                audioPlaybackStarted.store(true);
+                printf("SDL Audio: Started playback after buffering %zu samples (%.0fms)\n",
+                       buffered/2, (buffered/2) * 1000.0 / 48000);
+            }
+        }
     }
 }
 
@@ -412,6 +431,32 @@ bool SDL_Audio_InputAvailable(void) {
     return audioInDevice != 0 && sdlAudioEnabled;
 }
 
+// Returns the number of samples currently buffered for output (mono sample count)
+size_t SDL_Audio_OutputBufferLevel(void) {
+    size_t writePos = outWritePos.load();
+    size_t readPos = outReadPos.load();
+    if (writePos >= readPos) {
+        return (writePos - readPos) / 2;  // Divide by 2 for mono count (buffer is stereo interleaved)
+    } else {
+        return (AUDIO_OUT_BUFFER_SIZE - readPos + writePos) / 2;
+    }
+}
+
+// Target buffer level in samples (at 48kHz output rate)
+// We want ~250ms of audio buffered to smooth out timing variations
+// Each DSP cycle produces 512 samples (10.67ms at 48kHz)
+static const size_t TARGET_BUFFER_LEVEL = 48000 / 4;  // 250ms at 48kHz = 12000 samples
+
+// Returns true if output buffer needs more data (below target level)
+bool SDL_Audio_OutputNeedsData(void) {
+    if (!audioPlaybackStarted.load()) {
+        // Before playback starts, always accept data to fill initial buffer
+        return true;
+    }
+    // Always return true - let DSP run as fast as it can, buffer will regulate itself
+    return true;
+}
+
 #endif // USE_SDL_DISPLAY
 
 #include "mock_R_data_int.c"
@@ -436,22 +481,41 @@ static size_t SDL_Audio_SamplesAvailable(void) {
 #endif
 
 int AudioRecordQueue::available(void) {
-    // For tone generators, use timing-based sample availability
+#ifdef USE_SDL_DISPLAY
+    // For tone generators in simulator: pace based on output buffer level
+    // Run DSP when output buffer needs data, sleep when buffer is full
+    if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
+        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        size_t bufLevel = SDL_Audio_OutputBufferLevel();
+        if (bufLevel > TARGET_BUFFER_LEVEL * 2) {
+            // Buffer is well above target - sleep to let it drain
+            // Sleep ~5ms (about 240 samples at 48kHz consumed)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            return 0;
+        }
+        // Buffer needs data or is at reasonable level - run DSP
+        return 17;
+    }
+
+    // For computer audio input: use actual sample availability
+    if (SDL_Audio_InputAvailable()) {
+        // Still pace based on output buffer to prevent overrun
+        if (!SDL_Audio_OutputNeedsData()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            return 0;
+        }
+        size_t samplesAvailable = SDL_Audio_SamplesAvailable();
+        return samplesAvailable / BUFFER_SIZE;
+    }
+#endif
+
+    // Fallback to mock behavior (for unit tests without SDL)
     if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
         currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
         size_t samplesAvailable = getToneSamplesAvailable();
         return samplesAvailable / BUFFER_SIZE;
     }
 
-#ifdef USE_SDL_DISPLAY
-    if (SDL_Audio_InputAvailable()) {
-        // Return actual number of BLOCKS available (samples / BUFFER_SIZE)
-        // DSP checks if available() > N_BLOCKS before reading
-        size_t samplesAvailable = SDL_Audio_SamplesAvailable();
-        return samplesAvailable / BUFFER_SIZE;
-    }
-#endif
-    // Fallback to mock behavior
     int blocks_available = 4*2048/BUFFER_SIZE;
     int answer = (blocks_available-head+1)*BUFFER_SIZE;
     if (answer >= 100) answer = 99;
