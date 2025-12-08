@@ -657,7 +657,6 @@ extern AGCConfig agc;
 extern UISm uiSM;
 extern ModeSm modeSM;
 extern PowerCalSm powerSM;
-extern bool displayFFTUpdated; /** Set true when psdnew is updated */
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t audioYPixel[];

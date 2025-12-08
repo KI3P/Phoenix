@@ -9,7 +9,6 @@
 #include "SDT.h"
 
 struct config_t ED;
-bool displayFFTUpdated;
 bool psdupdated = false;
 float32_t psdnew[SPECTRUM_RES];
 float32_t audioYPixel[SPECTRUM_RES/4];

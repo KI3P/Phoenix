@@ -779,7 +779,6 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Perform FFT of full spectrum for spectral display at this point if no zoom
     if (ED.spectrum_zoom == SPECTRUM_ZOOM_1) {
         ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
-        displayFFTUpdated = true;
     }
 
     // First, frequency translation by +Fs/4 without multiplication from Lyons 
@@ -792,12 +791,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) {
-        if(ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters)) {
-            // at high zoom levels, multiple calls to ZoomFFTExe might be needed to fill
-            // the buffers before the FFT is actually calculated. ZoomFFTExe returns true
-            // if it actually performed the FFT during this call.
-            displayFFTUpdated = true;
-        }
+        ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
     }
 
     // Now, translate by the fine tune frequency. A signal at x Hz will be at 
