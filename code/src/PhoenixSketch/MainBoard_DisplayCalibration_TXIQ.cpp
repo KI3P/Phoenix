@@ -166,6 +166,7 @@ void IncrementTransmitAtt(void){
     if (attLevel > 31.5)
         attLevel = 31.5;
     SetTXAttenuation(attLevel);
+    ForceUpdateRFHardwareState();
 }
 
 /**
@@ -178,6 +179,7 @@ void DecrementTransmitAtt(void){
     if (attLevel < 0.0)
         attLevel = 0.0;
     SetTXAttenuation(attLevel);
+    ForceUpdateRFHardwareState();
 }
 
 /**
@@ -427,6 +429,11 @@ void DrawCalibrateTXIQ(void){
         ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
         ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
         ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+
+        // Set the initial attenuation to 0
+        attLevel = 0.0;
+        SetTXAttenuation(attLevel);
+        ForceUpdateRFHardwareState();
 
         // Mark all the panes stale to force a screen refresh
         for (size_t i = 0; i < NUMBER_OF_TXIQ_PANES; i++){
