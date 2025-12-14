@@ -210,7 +210,7 @@ void SetSSBRXVFOFrequency(int64_t frequency_dHz){
 }
 
 /**
- * Set the CLK6 and CLK7 outputs as quadrature outputs at the specified frequency.
+ * Set the CLK4 and CLK5 outputs as quadrature outputs at the specified frequency.
  *
  * @param frequency_dHz The desired clock frequency in (Hz * 100)
  */
@@ -218,9 +218,9 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == SSBTXVFOFreq_dHz) return;
     SSBTXVFOFreq_dHz = frequency_dHz;
-    int64_t Clk7SetFreq = frequency_dHz;
-    txmultiple = EvenDivisor(Clk7SetFreq / SI5351_FREQ_MULT);
-    uint64_t pll_freq = Clk7SetFreq * txmultiple;
+    int64_t Clk5SetFreq = frequency_dHz;
+    txmultiple = EvenDivisor(Clk5SetFreq / SI5351_FREQ_MULT);
+    uint64_t pll_freq = Clk5SetFreq * txmultiple;
     uint64_t freq = pll_freq / txmultiple;
 
     if ( txmultiple == oldtxMultiple) {               // Still within the same multiple range
@@ -229,32 +229,32 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
                                                   // multiple range
     } else {
         if ( txmultiple <= 126) {                                 // this the library setting of phase for freqs
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK6);  // greater than 3.2MHz where multiple is <= 126
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK7);   // set both clocks to new frequency
-            si5351.set_phase(SI5351_CLK6, 0);                      // CLK6 phase = 0
-            si5351.set_phase(SI5351_CLK7, txmultiple);               // Clk7 phase = multiple for 90 degrees(digital delay)
+            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK4);  // greater than 3.2MHz where multiple is <= 126
+            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK5);   // set both clocks to new frequency
+            si5351.set_phase(SI5351_CLK4, 0);                      // CLK4 phase = 0
+            si5351.set_phase(SI5351_CLK5, txmultiple);               // Clk5 phase = multiple for 90 degrees(digital delay)
             si5351.pll_reset(SI5351_PLLB);                         // reset PLLB to align outputs
-            si5351.output_enable(SI5351_CLK6, 1);                  // set outputs on or off
-            si5351.output_enable(SI5351_CLK7, 1);
+            si5351.output_enable(SI5351_CLK4, 1);                  // set outputs on or off
+            si5351.output_enable(SI5351_CLK5, 1);
             SET_BIT(hardwareRegister,SSBVFOBIT);
         }
         else {        // this is the timed delay technique for frequencies below 3.2MHz as detailed in
                     // https://tj-lab.org/2020/08/27/si5351単体で3mhz以下の直交信号を出力する/
             cli();                //__disable_irq(); or __enable_irq();     // or cli()/sei() pair; needed to get accurate timing??
-            //si5351.output_enable(SI5351_CLK6, 0);  // optional switch off clocks if audio effects are generated
-            //si5351.output_enable(SI5351_CLK7, 0);  //  with the change of multiple below 3.2MHz
-            si5351.set_freq_manual((freq - 400ULL), pll_freq, SI5351_CLK6);  // set up frequencies of CLK 6/7 4 Hz low
-            si5351.set_freq_manual((freq - 400ULL), pll_freq, SI5351_CLK7);  // as per TJ-Labs article
-            si5351.set_phase(SI5351_CLK6, 0);                          // set phase registers to 0 just to be sure
-            si5351.set_phase(SI5351_CLK7, 0);
-            si5351.pll_reset(SI5351_PLLB);                             // align both clockss in phase
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK6);       // set clock 0  to required freq
+            //si5351.output_enable(SI5351_CLK4, 0);  // optional switch off clocks if audio effects are generated
+            //si5351.output_enable(SI5351_CLK5, 0);  //  with the change of multiple below 3.2MHz
+            si5351.set_freq_manual((freq - 400ULL), pll_freq, SI5351_CLK4);  // set up frequencies of CLK 4/5 4 Hz low
+            si5351.set_freq_manual((freq - 400ULL), pll_freq, SI5351_CLK5);  // as per TJ-Labs article
+            si5351.set_phase(SI5351_CLK4, 0);                          // set phase registers to 0 just to be sure
+            si5351.set_phase(SI5351_CLK5, 0);
+            si5351.pll_reset(SI5351_PLLB);                             // align both clocks in phase
+            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK4);       // set clock 4 to required freq
             //delayNanoseconds(625000000);       // 62.5 * 1000000      //configured for a 62.5 mSec delay at 4 Hz difference
             delayMicroseconds(58500);                       //nominally 62500 this figure can be adjusted for a more exact delay which is phase
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK7);       // set CLK 7 to the required freq after delay
+            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK5);       // set CLK 5 to the required freq after delay
             sei();
-            si5351.output_enable(SI5351_CLK6, 1);                      // switch them on to be sure
-            si5351.output_enable(SI5351_CLK7, 1);                      //    ""        ""
+            si5351.output_enable(SI5351_CLK4, 1);                      // switch them on to be sure
+            si5351.output_enable(SI5351_CLK5, 1);                      //    ""        ""
             SET_BIT(hardwareRegister,SSBVFOBIT);
         }
     }
@@ -266,7 +266,7 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
 /**
  * Set the CW VFO frequency for Morse code transmission.
  *
- * Configures the Si5351 CLK2 output frequency used for CW (Morse code) operation.
+ * Configures the Si5351 CLK6 output frequency used for CW (Morse code) operation.
  * The frequency is stored and set in deci-Hertz units (Hz × 10) for high precision.
  *
  * Optimization: Skips the Si5351 write if the requested frequency matches the
@@ -279,14 +279,14 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
  * @param frequency_dHz Desired CW VFO frequency in deci-Hertz (Hz × 10)
  *
  * @see GetCWVFOFrequency() to read current frequency
- * @see EnableCWVFOOutput() to enable CLK2 output
+ * @see EnableCWVFOOutput() to enable CLK6 output
  * @see Tune.cpp for CW frequency offset handling
  */
 void SetCWTXVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == CWTXVFOFreq_dHz) return;
     CWTXVFOFreq_dHz = frequency_dHz;
-    si5351.set_freq(CWTXVFOFreq_dHz, SI5351_CLK5);
+    si5351.set_freq(CWTXVFOFreq_dHz, SI5351_CLK6);
 }
 
 /**
@@ -318,8 +318,8 @@ errno_t InitVFOs(void){
 
     si5351.set_ms_source(SI5351_CLK0, SI5351_PLLA);
     si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
+    si5351.set_ms_source(SI5351_CLK2, SI5351_PLLA);
     si5351.set_ms_source(SI5351_CLK3, SI5351_PLLA);
-    si5351.set_ms_source(SI5351_CLK4, SI5351_PLLA);
     si5351.set_ms_source(SI5351_CLK4, SI5351_PLLB);
     si5351.set_ms_source(SI5351_CLK5, SI5351_PLLB);
     si5351.set_ms_source(SI5351_CLK6, SI5351_PLLB);
@@ -329,10 +329,10 @@ errno_t InitVFOs(void){
     si5351.output_enable(SI5351_CLK1, 1);
     si5351.output_enable(SI5351_CLK2, 0);
     si5351.output_enable(SI5351_CLK3, 0);
-    si5351.output_enable(SI5351_CLK4, 0);
+    si5351.output_enable(SI5351_CLK4, 1);
     si5351.output_enable(SI5351_CLK5, 1);
     si5351.output_enable(SI5351_CLK6, 1);
-    si5351.output_enable(SI5351_CLK7, 1);
+    si5351.output_enable(SI5351_CLK7, 0);
 
     SetSSBRXVFOFrequency(10000000L*100);
     SetSSBTXVFOFrequency( 5000000L*100);
@@ -359,14 +359,16 @@ void loop() {
   // print the state and selection menu
   Serial.println("------------------------------");
   Serial.println("Select option and hit enter:");
-  Serial.println("TX - SSB TX Frequency (CLK 6/7)");
+  Serial.println("TX - SSB TX Frequency (CLK 4/5)");
   Serial.println("RX - SSB RX Frequency (CLK 0/1)");
-  Serial.println("CW - CW TX Frequency  (CLK 5)");
+  Serial.println("CW - CW TX Frequency  (CLK 6)");
   Serial.println("------------------------------");
 
+  Serial.setTimeout(10000);  // 10 second timeout for slower typing
   while (Serial.available() == 0) {}     //wait for data available
   String selection = Serial.readString();  //read until timeout
   selection.trim(); // remove any \r \n whitespace at the end of the String
+  selection.toUpperCase(); // accept lowercase input
   if (selection == "TX"){
       Serial.println("Enter the TX frequency in kHz");
       while (Serial.available() == 0) {}     //wait for data available
@@ -393,6 +395,10 @@ void loop() {
       // Convert to int
       long f_kHz = fsel.toInt();
       SetCWTXVFOFrequency((f_kHz*1000L)*100L);
+  } else if (selection != "TX" && selection != "RX") {
+      Serial.print("Invalid selection: '");
+      Serial.print(selection);
+      Serial.println("'. Please enter TX, RX, or CW.");
   }
   Serial.println("------------------------------");
 
