@@ -20,6 +20,15 @@ FetchContent_MakeAvailable(googletest)
 
 set(CMAKE_BUILD_TYPE Debug)
 
+# Option to enable SDL display simulator
+option(USE_SDL_DISPLAY "Enable SDL2-based graphical display simulator" OFF)
+
+# Find SDL2 if display simulator is enabled
+if(USE_SDL_DISPLAY)
+    find_package(SDL2 REQUIRED)
+    message(STATUS "SDL2 found: ${SDL2_INCLUDE_DIRS}")
+endif()
+
 enable_testing()
 
 # Try to get rid of this if you can
@@ -143,3 +152,59 @@ gtest_discover_tests(all_Radio_tests)
 gtest_discover_tests(all_Display_tests)
 gtest_discover_tests(all_Calibration_tests)
 gtest_discover_tests(all_PowerCalibration_tests)
+
+# SDL2 Display Simulator executable (optional)
+# Build with: cmake -DUSE_SDL_DISPLAY=ON ..
+if(USE_SDL_DISPLAY)
+    add_executable(radio_simulator
+        RadioSimulator_main.cpp
+        ../src/PhoenixSketch/MainBoard_Display.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayHome.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayMenus.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayDFE.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayEqualizer.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayCalibration_Frequency.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayCalibration_RXIQ.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayCalibration_Power.cpp
+        ../src/PhoenixSketch/MainBoard_DisplayCalibration_TXIQ.cpp
+        ../src/PhoenixSketch/PowerCalSm.cpp
+        ../src/PhoenixSketch/Loop.cpp
+        ../src/PhoenixSketch/Tune.cpp
+        ../src/PhoenixSketch/Mode.cpp
+        ../src/PhoenixSketch/ModeSm.cpp
+        ../src/PhoenixSketch/UISm.cpp
+        ../src/PhoenixSketch/HardwareSm.cpp
+        ../src/PhoenixSketch/HardwareSm_PowerCalibration.cpp
+        ../src/PhoenixSketch/RFBoard.cpp
+        ../src/PhoenixSketch/DSP.cpp
+        ../src/PhoenixSketch/DSP_FFT.cpp
+        ../src/PhoenixSketch/DSP_FIR.cpp
+        ../src/PhoenixSketch/DSP_Noise.cpp
+        ../src/PhoenixSketch/DSP_CWProcessing.cpp
+        ../src/PhoenixSketch/CAT.cpp
+        ../src/PhoenixSketch/BPFBoard.cpp
+        ../src/PhoenixSketch/LPFBoard.cpp
+        ../src/PhoenixSketch/LPFBoard_AD7991.cpp
+        ../src/PhoenixSketch/Storage.cpp
+        ../src/PhoenixSketch/Globals.cpp
+        ../src/PhoenixSketch/MainBoard_AudioIO.cpp
+        ../src/PhoenixSketch/FrontPanel.cpp
+        ../src/PhoenixSketch/FrontPanel_Rotary.cpp
+        ../src/PhoenixSketch/ParamSave.cpp
+        DSP_FFT_stub_test.cpp
+        arm_functions.c
+        si5351_mock.cpp
+        Arduino_mock.cpp
+        Adafruit_I2CDevice_mock.cpp
+        OpenAudio_ArduinoLibrary_mock.cpp
+        LittleFS_mock.cpp
+        ArduinoJson.cpp
+        RA8875_SDL.cpp
+    )
+
+    target_compile_definitions(radio_simulator PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS)
+    target_include_directories(radio_simulator PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(radio_simulator ${SDL2_LIBRARIES})
+
+    message(STATUS "Radio simulator enabled - build with 'make radio_simulator'")
+endif()

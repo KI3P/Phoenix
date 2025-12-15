@@ -1,20 +1,536 @@
 #include "../src/PhoenixSketch/SDT.h"
 #include "OpenAudio_ArduinoLibrary.h"
+#include <cmath>
+#include <cstdlib>
+#include <chrono>
+#include <thread>
+
+// ============== Audio Source Selection ==============
+// Default: MOCK_DATA for unit tests, TWO_TONE for simulator with SDL
+#ifdef USE_SDL_DISPLAY
+static AudioInputSource currentAudioSource = AUDIO_SOURCE_TWO_TONE;
+#else
+static AudioInputSource currentAudioSource = AUDIO_SOURCE_MOCK_DATA;
+#endif
+
+// Forward declaration for tone timing reset
+static bool toneTimerInitialized = false;
+
+void setAudioInputSource(AudioInputSource source) {
+    currentAudioSource = source;
+    // Reset tone timing when switching to a tone source
+    if (source == AUDIO_SOURCE_TWO_TONE || source == AUDIO_SOURCE_SINGLE_TONE) {
+        toneTimerInitialized = false;  // Will reinitialize on next use
+    }
+}
+
+AudioInputSource getAudioInputSource(void) {
+    return currentAudioSource;
+}
+
+const char* getAudioInputSourceName(void) {
+    switch (currentAudioSource) {
+        case AUDIO_SOURCE_COMPUTER:    return "Computer Audio";
+        case AUDIO_SOURCE_TWO_TONE:    return "Two-Tone (700/1900Hz @ 48kHz)";
+        case AUDIO_SOURCE_SINGLE_TONE: return "Single-Tone (1kHz @ 49kHz)";
+        case AUDIO_SOURCE_MOCK_DATA:   return "Mock Data (unit tests)";
+        default:                       return "Unknown";
+    }
+}
+
+// ============== Tone Generator ==============
+// Sample rate is 192kHz
+// For I/Q signal at frequency f: I = cos(2*pi*f*t), Q = -sin(2*pi*f*t)
+// (negative sin for USB representation where positive frequency = lower sideband)
+static const double TONE_SAMPLE_RATE = 192000.0;
+static const double TONE_TWO_PI = 2.0 * M_PI;
+
+// Phase accumulators for continuous tone generation
+static double tonePhase1 = 0.0;  // For first tone (or single tone)
+static double tonePhase2 = 0.0;  // For second tone (two-tone only)
+
+// Generate random noise in range [-1.0, 1.0]
+static inline double randomNoise() {
+    return (2.0 * rand() / RAND_MAX) - 1.0;
+}
+
+// ============== Tone Generator Timing Control ==============
+// Track samples available based on elapsed time at 192kHz
+static std::chrono::steady_clock::time_point toneStartTime;
+static uint64_t toneSamplesConsumed = 0;
+
+// Initialize or reset the tone timing
+static void initToneTiming() {
+    toneStartTime = std::chrono::steady_clock::now();
+    toneSamplesConsumed = 0;
+    toneTimerInitialized = true;
+}
+
+// Get number of samples that should be available based on elapsed time
+static size_t getToneSamplesAvailable() {
+    if (!toneTimerInitialized) {
+        initToneTiming();
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - toneStartTime);
+
+    // Calculate total samples that should have been generated at 192kHz
+    // samples = time_in_seconds * 192000
+    uint64_t totalSamplesExpected = (elapsed.count() * 192000) / 1000000;
+
+    // Available = expected - consumed
+    if (totalSamplesExpected > toneSamplesConsumed) {
+        return totalSamplesExpected - toneSamplesConsumed;
+    }
+    return 0;
+}
+
+// Generate I/Q samples for two-tone test signal
+// Tones at 700Hz and 1900Hz offset from 48kHz carrier
+static void generateTwoToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    // Audio offsets from 48kHz
+    const double audioFreq1 = 700.0;   // Hz
+    const double audioFreq2 = 1900.0;  // Hz
+    // RF carrier offset
+    const double carrierFreq = 48000.0;  // Hz
+
+    // Combined frequencies
+    const double freq1 = carrierFreq + audioFreq1;  // 48700 Hz
+    const double freq2 = carrierFreq + audioFreq2;  // 49900 Hz
+
+    const double phaseInc1 = TONE_TWO_PI * freq1 / TONE_SAMPLE_RATE;
+    const double phaseInc2 = TONE_TWO_PI * freq2 / TONE_SAMPLE_RATE;
+
+    // Amplitude for each tone (half amplitude so sum doesn't clip)
+    const double amplitude = 1380.0;
+    // Noise amplitude is 1/20th of signal amplitude
+    const double noiseAmp = amplitude / 20.0;
+
+    for (int i = 0; i < numSamples; i++) {
+        // Sum of two tones plus noise
+        double I = amplitude * (cos(tonePhase1) + cos(tonePhase2)) + noiseAmp * randomNoise();
+        double Q = amplitude * (-sin(tonePhase1) + -sin(tonePhase2)) + noiseAmp * randomNoise();
+
+        samplesI[i] = (int16_t)I;
+        samplesQ[i] = (int16_t)Q;
+
+        tonePhase1 += phaseInc1;
+        tonePhase2 += phaseInc2;
+
+        // Keep phases in reasonable range
+        if (tonePhase1 > TONE_TWO_PI) tonePhase1 -= TONE_TWO_PI;
+        if (tonePhase1 < -TONE_TWO_PI) tonePhase1 += TONE_TWO_PI;
+        if (tonePhase2 > TONE_TWO_PI) tonePhase2 -= TONE_TWO_PI;
+        if (tonePhase2 < -TONE_TWO_PI) tonePhase2 += TONE_TWO_PI;
+    }
+}
+
+// Generate I/Q samples for single-tone test signal
+// Tone at -49kHz (1kHz below -48kHz, will appear at 1kHz audio)
+static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    const double freq = 49000.0;  // Hz (48kHz + 1kHz = 49kHz)
+    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
+    // Noise amplitude is 1/20th of signal amplitude
+    const double noiseAmp = amplitude / 20.0;
+
+    for (int i = 0; i < numSamples; i++) {
+        double I = amplitude * cos(tonePhase1) + noiseAmp * randomNoise();
+        double Q = amplitude * -sin(tonePhase1) + noiseAmp * randomNoise();
+
+        samplesI[i] = (int16_t)I;
+        samplesQ[i] = (int16_t)Q;
+
+        tonePhase1 += phaseInc;
+
+        // Keep phase in reasonable range
+        if (tonePhase1 > TONE_TWO_PI) tonePhase1 -= TONE_TWO_PI;
+        if (tonePhase1 < -TONE_TWO_PI) tonePhase1 += TONE_TWO_PI;
+    }
+}
+
+#ifdef USE_SDL_DISPLAY
+#include <SDL2/SDL.h>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <cstring>
+
+// ============== Audio Output (Playback) ==============
+// Ring buffer for stereo audio output - 1 second at 48kHz (downsampled from 192kHz)
+// Store interleaved stereo: L0, R0, L1, R1, ...
+static const size_t AUDIO_OUT_BUFFER_SIZE = 48000 * 2;  // stereo samples
+static const int DOWNSAMPLE_FACTOR = 4;  // 192kHz -> 48kHz
+static int16_t audioOutBuffer[AUDIO_OUT_BUFFER_SIZE];
+static std::atomic<size_t> outWritePos{0};
+static std::atomic<size_t> outReadPos{0};
+static SDL_AudioDeviceID audioOutDevice = 0;
+
+// Temporary buffer to accumulate L samples until R arrives
+static int16_t pendingL[128];
+static int pendingLCount = 0;
+
+// ============== Audio Input (Capture) ==============
+// Ring buffer for stereo audio input - 1 second at 192kHz
+static const size_t AUDIO_IN_BUFFER_SIZE = 192000;
+static int16_t audioInBuffer_L[AUDIO_IN_BUFFER_SIZE];
+static int16_t audioInBuffer_R[AUDIO_IN_BUFFER_SIZE];
+static std::atomic<size_t> inWritePos{0};
+static std::atomic<size_t> inReadPos{0};
+static std::mutex inMutex;
+static std::condition_variable inDataAvailable;
+static SDL_AudioDeviceID audioInDevice = 0;
+
+static int currentSampleRate = 192000;
+static std::atomic<uint32_t> samplesPlayed{0};
+static std::atomic<uint32_t> samplesCaptured{0};
+static bool sdlAudioEnabled = false;
+
+// Debug: track underruns
+static std::atomic<uint32_t> underrunCount{0};
+static std::atomic<uint32_t> callbackCount{0};
+static std::atomic<uint32_t> samplesQueued{0};
+static std::atomic<uint32_t> samplesConsumed{0};  // samples actually read by DSP
+static std::atomic<bool> audioPlaybackStarted{false};  // Track if we've started playback
+
+// Audio output callback - SDL calls this to get samples for playback
+static void Phoenix_OutputCallback(void* userdata, Uint8* stream, int len) {
+    int16_t* outStream = reinterpret_cast<int16_t*>(stream);
+    int numSamples = len / sizeof(int16_t);  // Total samples (L+R interleaved)
+
+    size_t readPos = outReadPos.load();
+    size_t writePos = outWritePos.load();
+
+    int samplesOutput = 0;
+    int silenceOutput = 0;
+
+    for (int i = 0; i < numSamples; i++) {
+        if (readPos != writePos) {
+            outStream[i] = audioOutBuffer[readPos];
+            readPos = (readPos + 1) % AUDIO_OUT_BUFFER_SIZE;
+            samplesOutput++;
+        } else {
+            // Buffer underrun - output silence
+            outStream[i] = 0;
+            silenceOutput++;
+        }
+    }
+    outReadPos.store(readPos);
+    samplesPlayed.fetch_add(samplesOutput / 2);
+
+    if (silenceOutput > 0) {
+        underrunCount.fetch_add(1);
+    }
+    callbackCount.fetch_add(1);
+}
+
+// Audio input callback - SDL calls this when captured samples are available
+static void Phoenix_InputCallback(void* userdata, Uint8* stream, int len) {
+    int16_t* inStream = reinterpret_cast<int16_t*>(stream);
+    int numStereoSamples = len / (2 * sizeof(int16_t));
+
+    size_t writePos = inWritePos.load();
+
+    for (int i = 0; i < numStereoSamples; i++) {
+        // Deinterleave stereo input: L, R, L, R, ... -> separate L and R buffers
+        audioInBuffer_L[writePos] = inStream[i * 2];
+        audioInBuffer_R[writePos] = inStream[i * 2 + 1];
+        writePos = (writePos + 1) % AUDIO_IN_BUFFER_SIZE;
+    }
+
+    inWritePos.store(writePos);
+    samplesCaptured.fetch_add(numStereoSamples);
+
+    // Signal that new data is available
+    inDataAvailable.notify_all();
+}
+
+bool SDL_Audio_Init(int sampleRate) {
+    if (SDL_WasInit(SDL_INIT_AUDIO) == 0) {
+        if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
+            fprintf(stderr, "SDL Audio init failed: %s\n", SDL_GetError());
+            return false;
+        }
+    }
+
+    currentSampleRate = sampleRate;
+
+    // ---- Initialize Audio Output (Playback) ----
+    // DSP output is at 192kHz, downsample to 48kHz for playback
+    int outputRate = 48000;
+
+    SDL_AudioSpec outDesired, outObtained;
+    SDL_zero(outDesired);
+    outDesired.freq = outputRate;
+    outDesired.format = AUDIO_S16SYS;
+    outDesired.channels = 2;
+    outDesired.samples = 1024;
+    outDesired.callback = Phoenix_OutputCallback;
+    outDesired.userdata = nullptr;
+
+    // Allow sample rate flexibility for output
+    audioOutDevice = SDL_OpenAudioDevice(nullptr, 0, &outDesired, &outObtained,
+                                          SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+    if (audioOutDevice == 0) {
+        fprintf(stderr, "Failed to open audio output: %s\n", SDL_GetError());
+        return false;
+    }
+    printf("SDL Audio Output: %d Hz, %d ch, %d samples buffer\n",
+           outObtained.freq, outObtained.channels, outObtained.samples);
+
+    // ---- Initialize Audio Input (Capture) ----
+    // Must use full sample rate (192kHz) to match DSP expectations
+    int captureRate = sampleRate;
+
+    SDL_AudioSpec inDesired, inObtained;
+    SDL_zero(inDesired);
+    inDesired.freq = captureRate;
+    inDesired.format = AUDIO_S16SYS;
+    inDesired.channels = 2;
+    inDesired.samples = 1024;
+    inDesired.callback = Phoenix_InputCallback;
+    inDesired.userdata = nullptr;
+
+    // Allow sample rate flexibility for input
+    audioInDevice = SDL_OpenAudioDevice(nullptr, 1, &inDesired, &inObtained,
+                                         SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+    if (audioInDevice == 0) {
+        fprintf(stderr, "Failed to open audio input: %s\n", SDL_GetError());
+        // Continue without input - just use mock data
+        printf("Audio capture not available - using mock input data\n");
+    } else {
+        printf("SDL Audio Input: %d Hz, %d ch, %d samples buffer\n",
+               inObtained.freq, inObtained.channels, inObtained.samples);
+    }
+
+    // Clear buffers
+    memset(audioOutBuffer, 0, sizeof(audioOutBuffer));
+    memset(audioInBuffer_L, 0, sizeof(audioInBuffer_L));
+    memset(audioInBuffer_R, 0, sizeof(audioInBuffer_R));
+
+    // No prefill - we'll start playback once DSP has produced enough data
+    outWritePos.store(0);
+    outReadPos.store(0);
+    pendingLCount = 0;
+    inWritePos.store(0);
+    inReadPos.store(0);
+    samplesPlayed.store(0);
+    samplesCaptured.store(0);
+    samplesQueued.store(0);
+    samplesConsumed.store(0);
+    underrunCount.store(0);
+    callbackCount.store(0);
+    audioPlaybackStarted.store(false);
+
+    // Start audio input immediately (we need to receive samples)
+    if (audioInDevice != 0) {
+        SDL_PauseAudioDevice(audioInDevice, 0);
+    }
+    // Keep audio output paused - will start once buffer has enough data
+    SDL_PauseAudioDevice(audioOutDevice, 1);  // 1 = paused
+
+    sdlAudioEnabled = true;
+    return true;
+}
+
+void SDL_Audio_Cleanup(void) {
+    sdlAudioEnabled = false;
+
+    if (audioOutDevice != 0) {
+        printf("SDL Audio: captured=%u consumed=%u queued=%u played=%u\n",
+               samplesCaptured.load(), samplesConsumed.load(), samplesQueued.load(), samplesPlayed.load());
+        printf("SDL Audio: %u callbacks, %u underruns (%.1f%%)\n",
+               callbackCount.load(), underrunCount.load(),
+               callbackCount.load() > 0 ? 100.0 * underrunCount.load() / callbackCount.load() : 0.0);
+        SDL_CloseAudioDevice(audioOutDevice);
+        audioOutDevice = 0;
+    }
+    if (audioInDevice != 0) {
+        SDL_CloseAudioDevice(audioInDevice);
+        audioInDevice = 0;
+    }
+}
+
+void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t channel) {
+    if (audioOutDevice == 0) return;
+
+    if (channel == 0) {
+        // Left channel - save samples for later interleaving
+        memcpy(pendingL, samples, numSamples * sizeof(int16_t));
+        pendingLCount = numSamples;
+    } else {
+        // Right channel - interleave with pending L and write to buffer
+        if (pendingLCount != numSamples) {
+            // Mismatch - shouldn't happen, but handle gracefully
+            pendingLCount = 0;
+            return;
+        }
+
+        size_t pos = outWritePos.load();
+
+        // Downsample from 192kHz to 48kHz (factor of 4)
+        // Simple decimation - take every 4th sample
+        // For better quality, could add a low-pass filter before decimation
+        for (int i = 0; i < numSamples; i += DOWNSAMPLE_FACTOR) {
+            audioOutBuffer[pos] = pendingL[i];  // L
+            pos = (pos + 1) % AUDIO_OUT_BUFFER_SIZE;
+            audioOutBuffer[pos] = samples[i];   // R
+            pos = (pos + 1) % AUDIO_OUT_BUFFER_SIZE;
+        }
+
+        outWritePos.store(pos);
+        pendingLCount = 0;
+        samplesQueued.fetch_add(numSamples / DOWNSAMPLE_FACTOR);
+
+        // Start playback once we've buffered ~300ms of audio at 48kHz
+        // This gives us headroom to absorb timing variations
+        if (!audioPlaybackStarted.load()) {
+            size_t writePos = outWritePos.load();
+            size_t readPos = outReadPos.load();
+            size_t buffered = (writePos >= readPos) ? (writePos - readPos)
+                                                    : (AUDIO_OUT_BUFFER_SIZE - readPos + writePos);
+            // 300ms at 48kHz stereo = 14400 stereo samples = 28800 buffer entries
+            if (buffered >= 28800) {
+                SDL_PauseAudioDevice(audioOutDevice, 0);  // 0 = unpaused
+                audioPlaybackStarted.store(true);
+                printf("SDL Audio: Started playback after buffering %zu samples (%.0fms)\n",
+                       buffered/2, (buffered/2) * 1000.0 / 48000);
+            }
+        }
+    }
+}
+
+// Read captured audio samples - non-blocking (caller checks available() first)
+// Returns number of samples actually read per channel
+int SDL_Audio_ReadSamples(int16_t* samplesL, int16_t* samplesR, int numSamples) {
+    if (audioInDevice == 0 || !sdlAudioEnabled) return 0;
+
+    size_t readPos = inReadPos.load();
+    size_t writePos = inWritePos.load();
+
+    // Calculate available samples
+    size_t available;
+    if (writePos >= readPos) {
+        available = writePos - readPos;
+    } else {
+        available = AUDIO_IN_BUFFER_SIZE - readPos + writePos;
+    }
+
+    // Don't read more than available
+    int toRead = (available < (size_t)numSamples) ? available : numSamples;
+    if (toRead == 0) return 0;
+
+    // Copy samples
+    for (int i = 0; i < toRead; i++) {
+        samplesL[i] = audioInBuffer_L[readPos];
+        samplesR[i] = audioInBuffer_R[readPos];
+        readPos = (readPos + 1) % AUDIO_IN_BUFFER_SIZE;
+    }
+
+    inReadPos.store(readPos);
+    samplesConsumed.fetch_add(toRead);
+    return toRead;
+}
+
+bool SDL_Audio_InputAvailable(void) {
+    return audioInDevice != 0 && sdlAudioEnabled;
+}
+
+// Returns the number of samples currently buffered for output (mono sample count)
+size_t SDL_Audio_OutputBufferLevel(void) {
+    size_t writePos = outWritePos.load();
+    size_t readPos = outReadPos.load();
+    if (writePos >= readPos) {
+        return (writePos - readPos) / 2;  // Divide by 2 for mono count (buffer is stereo interleaved)
+    } else {
+        return (AUDIO_OUT_BUFFER_SIZE - readPos + writePos) / 2;
+    }
+}
+
+// Target buffer level in samples (at 48kHz output rate)
+// We want ~250ms of audio buffered to smooth out timing variations
+// Each DSP cycle produces 512 samples (10.67ms at 48kHz)
+static const size_t TARGET_BUFFER_LEVEL = 48000 / 4;  // 250ms at 48kHz = 12000 samples
+
+// Returns true if output buffer needs more data (below target level)
+bool SDL_Audio_OutputNeedsData(void) {
+    if (!audioPlaybackStarted.load()) {
+        // Before playback starts, always accept data to fill initial buffer
+        return true;
+    }
+    // Always return true - let DSP run as fast as it can, buffer will regulate itself
+    return true;
+}
+
+#endif // USE_SDL_DISPLAY
 
 #include "mock_R_data_int.c"
 #include "mock_L_data_int.c"
 #include "mock_L_data_int_1khz.c"
 #include "mock_R_data_int_1khz.c"
 
+// Helper to get number of samples available in SDL input buffer
+#ifdef USE_SDL_DISPLAY
+static size_t SDL_Audio_SamplesAvailable(void) {
+    if (audioInDevice == 0 || !sdlAudioEnabled) return 0;
+
+    size_t readPos = inReadPos.load();
+    size_t writePos = inWritePos.load();
+
+    if (writePos >= readPos) {
+        return writePos - readPos;
+    } else {
+        return AUDIO_IN_BUFFER_SIZE - readPos + writePos;
+    }
+}
+#endif
+
 int AudioRecordQueue::available(void) {
+#ifdef USE_SDL_DISPLAY
+    // For tone generators in simulator: pace based on output buffer level
+    // Run DSP when output buffer needs data, sleep when buffer is full
+    if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
+        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        size_t bufLevel = SDL_Audio_OutputBufferLevel();
+        if (bufLevel > TARGET_BUFFER_LEVEL * 2) {
+            // Buffer is well above target - sleep to let it drain
+            // Sleep ~5ms (about 240 samples at 48kHz consumed)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            return 0;
+        }
+        // Buffer needs data or is at reasonable level - run DSP
+        return 17;
+    }
+
+    // For computer audio input: use actual sample availability
+    if (SDL_Audio_InputAvailable()) {
+        // Still pace based on output buffer to prevent overrun
+        if (!SDL_Audio_OutputNeedsData()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            return 0;
+        }
+        size_t samplesAvailable = SDL_Audio_SamplesAvailable();
+        return samplesAvailable / BUFFER_SIZE;
+    }
+#endif
+
+    // Fallback to mock behavior (for unit tests without SDL)
+    if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
+        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        size_t samplesAvailable = getToneSamplesAvailable();
+        return samplesAvailable / BUFFER_SIZE;
+    }
+
+    // AUDIO_SOURCE_MOCK_DATA or fallback: use file-based mock data
     int blocks_available = 4*2048/BUFFER_SIZE;
     int answer = (blocks_available-head+1)*BUFFER_SIZE;
-    if (answer >= 100) answer = 99; // avoid the buffer overflow messages in testing
+    if (answer >= 100) answer = 99;
     return answer;
 }
 
 void AudioRecordQueue::clear(void) {
-    //head = 0;
+    head = 0;
 }
 
 void AudioRecordQueue::setChannel(uint8_t chan) {
@@ -25,17 +541,16 @@ void AudioRecordQueue::setChannel(uint8_t chan) {
     if (chan == 0) {
         data = L_mock;
     }
-
     if (chan == 3) {
         data = R_mock_1khz;
     }
     if (chan == 2) {
         data = L_mock_1khz;
     }
-
 }
 
 void AudioRecordQueue::setChannel(uint8_t chan, int16_t *dataChan) {
+    channel = chan;
     data = dataChan;
 }
 
@@ -44,6 +559,82 @@ uint8_t AudioRecordQueue::getChannel(void) {
 }
 
 int16_t* AudioRecordQueue::readBuffer(void) {
+    // Static buffers for generated I/Q samples
+    static int16_t toneBuf_I[BUFFER_SIZE];
+    static int16_t toneBuf_Q[BUFFER_SIZE];
+    static bool qDataReady = false;
+
+    // Handle tone generator sources
+    if (currentAudioSource == AUDIO_SOURCE_TWO_TONE) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            // Track samples consumed when Q is read (I+Q pair complete)
+            toneSamplesConsumed += BUFFER_SIZE;
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
+    if (currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateSingleToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            // Track samples consumed when Q is read (I+Q pair complete)
+            toneSamplesConsumed += BUFFER_SIZE;
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateSingleToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
+#ifdef USE_SDL_DISPLAY
+    if (currentAudioSource == AUDIO_SOURCE_COMPUTER && SDL_Audio_InputAvailable()) {
+        // Static buffers for L and R channels
+        // We read both channels together when L is requested,
+        // then return cached R data when R is requested
+        static int16_t sdlReadBuf_L[BUFFER_SIZE];
+        static int16_t sdlReadBuf_R[BUFFER_SIZE];
+        static bool rDataReady = false;
+
+        if (channel == 0 || channel == 2) {
+            // Left channel request - read fresh data for both L and R
+            SDL_Audio_ReadSamples(sdlReadBuf_L, sdlReadBuf_R, BUFFER_SIZE);
+            rDataReady = true;
+            return sdlReadBuf_L;
+        } else {
+            // Right channel request - return cached R data
+            if (rDataReady) {
+                rDataReady = false;
+                return sdlReadBuf_R;
+            } else {
+                // R requested before L - read fresh data
+                SDL_Audio_ReadSamples(sdlReadBuf_L, sdlReadBuf_R, BUFFER_SIZE);
+                return sdlReadBuf_R;
+            }
+        }
+    }
+#endif
+    // Fallback to mock data (AUDIO_SOURCE_MOCK_DATA or fallback)
     int16_t * ptr = &data[head*BUFFER_SIZE];
     head += 1;
     int blocks_available = 4*2048/BUFFER_SIZE;
@@ -70,6 +661,11 @@ void AudioPlayQueue::setName(char *fn){
 }
 
 void AudioPlayQueue::playBuffer(void){
+#ifdef USE_SDL_DISPLAY
+    // Send audio to SDL for playback
+    SDL_Audio_QueueSamples(buf, 128, audioChannel);
+#endif
+    // Also write to file if enabled (for debugging/analysis)
     if (fopened){
         for (size_t k=0; k<128; k++){
             fprintf(fle,"%d\n",buf[k]);

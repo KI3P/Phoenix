@@ -4,6 +4,29 @@
 #include <stdint.h>
 #include <stdio.h>
 
+// Audio source selection for simulator
+enum AudioInputSource {
+    AUDIO_SOURCE_COMPUTER,    // Live audio from computer's audio input
+    AUDIO_SOURCE_TWO_TONE,    // Two-tone test signal (700Hz and 1900Hz at -48kHz)
+    AUDIO_SOURCE_SINGLE_TONE, // Single-tone test signal (1000Hz at -49kHz)
+    AUDIO_SOURCE_MOCK_DATA    // Mock data from files (for unit tests)
+};
+
+void setAudioInputSource(AudioInputSource source);
+AudioInputSource getAudioInputSource(void);
+const char* getAudioInputSourceName(void);
+
+#ifdef USE_SDL_DISPLAY
+// SDL2 Audio support - cross-platform (Linux, Windows, macOS)
+bool SDL_Audio_Init(int sampleRate);
+void SDL_Audio_Cleanup(void);
+void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t channel);
+int SDL_Audio_ReadSamples(int16_t* samplesL, int16_t* samplesR, int numSamples);
+bool SDL_Audio_InputAvailable(void);
+size_t SDL_Audio_OutputBufferLevel(void);  // Returns samples buffered for output
+bool SDL_Audio_OutputNeedsData(void);      // True if output buffer is below target level
+#endif
+
 #define LOW 0
 #define HIGH 1
 #define AUDIO_INPUT_MIC 1
@@ -55,15 +78,18 @@ class AudioPlayQueue
             fopened = false;
         }
         void end(void){
-            fclose(fle);
+            if (fopened) fclose(fle);
         }
         int16_t *getBuffer(void);
         void playBuffer(void);
         void setName(char *fn);
+        void setAudioChannel(uint8_t ch) { audioChannel = ch; }
+        uint8_t getAudioChannel(void) { return audioChannel; }
     private:
         int16_t buf[128];
         FILE *fle;
         bool fopened;
+        uint8_t audioChannel = 0; // 0=left, 1=right
 };
 
 

@@ -91,6 +91,9 @@ public:
     bool readStatus();
     void writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data);
 
+    // SDL display update - call once per frame to present framebuffer
+    void updateScreen();
+
 private:
     uint8_t _cs;
     uint8_t _rst;
@@ -98,6 +101,12 @@ private:
     uint16_t _cursor_x;
     uint16_t _cursor_y;
     uint16_t _text_color;
+    const void* _custom_font;
 };
+
+#ifdef USE_SDL_DISPLAY
+// Cleanup function for SDL resources - call at program exit
+void RA8875_SDL_Cleanup();
+#endif
 
 #endif

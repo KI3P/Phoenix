@@ -237,7 +237,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
 
             // Start configuring the transmit chain
             // Set GPB state to appropriate value
-            SetTXAttenuation( 0 ); // Always 0 in SSB mode. Gain is set in DSP chain.
+            if (modeSM.state_id != ModeSm_StateId_CALIBRATE_TX_IQ_MARK)
+                SetTXAttenuation( 0 ); // Always 0 in SSB mode. Gain is set in DSP chain.
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
             // Set cwState to LO

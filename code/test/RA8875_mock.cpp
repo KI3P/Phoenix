@@ -3,7 +3,7 @@
 #include <iostream>
 #include <iomanip>
 
-RA8875::RA8875(uint8_t cs, uint8_t rst) : _cs(cs), _rst(rst), _font_scale(1), _cursor_x(0), _cursor_y(0), _text_color(RA8875_WHITE) {
+RA8875::RA8875(uint8_t cs, uint8_t rst) : _cs(cs), _rst(rst), _font_scale(1), _cursor_x(0), _cursor_y(0), _text_color(RA8875_WHITE), _custom_font(nullptr) {
 }
 
 bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, uint32_t spi_clock_read) {
@@ -61,7 +61,7 @@ void RA8875::fillCircle(uint16_t x, uint16_t y, uint16_t r, uint16_t color) {
 }
 
 void RA8875::setFont(const void* font) {
-    // Mock implementation - store font pointer if needed
+    _custom_font = font;
 }
 
 void RA8875::print(const char* text) {
@@ -87,6 +87,7 @@ void RA8875::print(float value) {
 void RA8875::setFontDefault() {
     // Mock implementation - reset to default font
     _font_scale = 1;
+    _custom_font = nullptr;
 }
 
 uint8_t RA8875::getFontWidth() {
@@ -167,4 +168,8 @@ bool RA8875::readStatus() {
 
 void RA8875::writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t* data) {
     // Mock implementation - write a rectangular array of pixels
+}
+
+void RA8875::updateScreen() {
+    // Mock implementation - no-op for non-SDL builds
 }

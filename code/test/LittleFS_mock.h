@@ -69,9 +69,15 @@ public:
     void setFileContent(const std::string& path, const std::string& content);
     std::string getFileContent(const std::string& path);
 
+    // Disk persistence methods for simulator
+    void setDiskBackingPath(const std::string& basePath);
+    void syncToDisk();
+    void loadFromDisk();
+
 private:
     std::shared_ptr<std::map<std::string, std::string>> _storage;
     bool _initialized;
+    std::string _diskBasePath;  // If set, files are persisted to disk
 };
 
 // Mock SD class

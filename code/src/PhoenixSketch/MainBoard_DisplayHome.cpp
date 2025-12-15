@@ -648,7 +648,7 @@ FASTRUN void ShowSpectrum(void){
         if (modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT){
             if (x1 < 128) {
                 tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
-                if (audioYPixel[x1] != 0) {
+                if (audioYPixel[x1] > 2) {
                     if (audioYPixel[x1] > CLIP_AUDIO_PEAK)
                         audioYPixel[x1] = CLIP_AUDIO_PEAK;
                     if (x1 == middleSlice) {

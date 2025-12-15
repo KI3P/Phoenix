@@ -819,9 +819,6 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Perform FFT of zoomed-in spectrum for spectral display at this point if zoom != 1
     if (ED.spectrum_zoom != SPECTRUM_ZOOM_1) {
-        // at high zoom levels, multiple calls to ZoomFFTExe might be needed to fill
-        // the buffers before the FFT is actually calculated. ZoomFFTExe returns true
-        // if it actually performed the FFT during this call.
         ZoomFFTExe(&data, ED.spectrum_zoom, &RXfilters);
     }
 
