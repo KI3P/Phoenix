@@ -299,6 +299,7 @@ errno_t InitVFOs(void){
     if (!si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
         bit_results.RF_Si5351_present = false;
         Debug("Initialize si5351 failed!");
+        scanner(&Wire);
         return EFAIL;
     } else {
         bit_results.RF_Si5351_present = true;
@@ -352,8 +353,6 @@ void setup() {
   Serial.println("Dual VFO test sketch");
   Wire.begin();
   
-  //scanner(&Wire);
-
   /* Initialise the LO */
   Serial.println("Initialize VFOs...");
   InitVFOs();

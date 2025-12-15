@@ -186,6 +186,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             CWoff();                                            // <<1ms  | < 1ms
             // Set clockEnableCW to LO
             DisableCWVFOOutput();                               // ~ 1ms  | < 2ms
+            DisableTXVFOOutput();
             SetTXAttenuation(31.5);                             // ~ 1ms  | < 3ms
             TXBypassBPF(); // BPF out of TX path                // ~ 1ms  | < 4ms
             SelectXVTR();  // Shunt the TX path to nothing      // ~ 1ms  | < 5ms
@@ -203,7 +204,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
-            EnableSSBVFOOutput();
+            EnableRXVFOOutput();
             SelectTXSSBModulation();
             // Make sure calFeedbackState is LO
             DisableCalFeedback();
@@ -244,12 +245,14 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set cwState to LO
             CWoff();
             // Set frequencySSB_Hz to the TXRX frequency
-            //SetSSBVFOFrequency( GetTXRXFreq_dHz() );
+            SetRXVFOFrequency( GetTXRXFreq_dHz() );
+            SetTXVFOFrequency( GetTXRXFreq_dHz() );
             UpdateTuneState();
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI
-            EnableSSBVFOOutput();
+            EnableRXVFOOutput();
+            EnableTXVFOOutput();
             // Set modulationState to HI (SSB)
             SelectTXSSBModulation();
             
@@ -288,7 +291,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 else
                     SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
                 // Set clockEnableSSB to LO
-                DisableSSBVFOOutput();
+                DisableRXVFOOutput();
+                DisableTXVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
                 //SetCWVFOFrequency( GetCWTXFreq_dHz() );
                 UpdateTuneState();
@@ -337,7 +341,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 else
                     SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
                 // Set clockEnableSSB to LO
-                DisableSSBVFOOutput();
+                DisableRXVFOOutput();
+                DisableTXVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
                 //SetCWVFOFrequency( GetCWTXFreq_dHz() );
                 UpdateTuneState();
@@ -368,6 +373,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             CWoff();
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
+            DisableTXVFOOutput();
             SetTXAttenuation(31.5);
             TXBypassBPF(); // BPF out of TX path
             SelectXVTR();  // Shunt the TX path to nothing
@@ -383,7 +389,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
-            EnableSSBVFOOutput();
+            EnableRXVFOOutput();
             SelectTXCWModulation();
             // Make sure calFeedbackState is HI
             EnableCalFeedback();
@@ -509,7 +515,7 @@ void TuneForReceiveIQCalibration(void){
     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
     int64_t band_center = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz + 
                             bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2;
-    SetSSBVFOFrequency( band_center*100 );
+    SetRXVFOFrequency( band_center*100 );
     // Set the CW signal to be on the opposite side of the LO from the
     // nominal tune frequency and minimize the leakage of that signal
     // into the nominal tune frequency bins
@@ -558,13 +564,13 @@ void HandleTuneState(TuneState tuneState){
         case TuneReceive:{
             // CW/SSB Receive:  RXfreq = centerFreq_Hz - fineTuneFreq_Hz - SampleRate/4
             int64_t newFreq = ED.centerFreq_Hz[ED.activeVFO]*100;
-            SetSSBVFOFrequency( newFreq );
+            SetRXVFOFrequency( newFreq );
             break;
         }
         case TuneSSBTX:{
             // SSB Transmit:    TXfreq = centerFreq_Hz
             int64_t newFreq = GetTXRXFreq_dHz();
-            SetSSBVFOFrequency( newFreq );
+            SetTXVFOFrequency( newFreq );
             break;
         }
         case TuneCWTX:{

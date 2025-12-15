@@ -14,18 +14,32 @@ static errno_t error_state;
 
 // VFO related
 Si5351 si5351;
-#define SI5351_DRIVE_CURRENT SI5351_DRIVE_2MA
 #define SI5351_LOAD_CAPACITANCE SI5351_CRYSTAL_LOAD_8PF
 #define Si_5351_crystal 25000000L
-static int32_t multiple, oldMultiple;
+
+// There are three VFOs: RX, TX, and CW. They are controlled separately.
+#define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_2MA
+static int32_t rxmultiple, oldrxMultiple;
+static int64_t RXVFOFreq_dHz;
+#define CLK0RX   SI5351_CLK0 
+#define CLK90RX  SI5351_CLK1
+
+#define SI5351_DRIVE_CURRENT_TX SI5351_DRIVE_2MA
+static int32_t txmultiple, oldtxMultiple;
+static int64_t TXVFOFreq_dHz;
+#define CLK0TX   SI5351_CLK4 
+#define CLK90TX  SI5351_CLK5
+
+#define SI5351_DRIVE_CURRENT_CW SI5351_DRIVE_2MA
+static int64_t CWVFOFreq_dHz;
+#define CLKCW  SI5351_CLK6
+
 #define XMIT_SSB 1
 #define XMIT_CW  0
 #define CAL_OFF 0
 #define CAL_ON  1
 #define RX  0
 #define TX  1
-static int64_t SSBVFOFreq_dHz;
-static int64_t CWVFOFreq_dHz;
 
 static uint8_t mcpA_old = 0x00;
 static uint8_t mcpB_old = 0x00;
@@ -191,21 +205,17 @@ errno_t TXAttenuatorCreate(float32_t txAttenuation_dB){
 ///////////////////////////////////////////////////////////////////////////////
 
 void SetFrequencyCorrectionFactor(int32_t corr){
-    int64_t freq = GetSSBVFOFrequency();
-    SSBVFOFreq_dHz = 0;
+    int64_t freq = GetRXVFOFrequency();
+    RXVFOFreq_dHz = 0;
 
     si5351.reset();
-    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);  // KI3P July 27 2024, updated to mirror Setup()                                                                                               // MyDelay(100L);                                                                           // KI3P July 27 2024, updated to mirror Setup()
-    si5351.drive_strength(SI5351_CLK0, SI5351_DRIVE_CURRENT);                                // KI3P July 27 2024, updated to mirror Setup()
-    si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_CURRENT);                                // KI3P July 27 2024, updated to mirror Setup()
-    si5351.drive_strength(SI5351_CLK2, SI5351_DRIVE_CURRENT);                                // KF5N July 10 2023
-    si5351.set_ms_source(SI5351_CLK0, SI5351_PLLA);                                          // KI3P July 27 2024, updated to mirror Setup()
-    si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
-    si5351.output_enable(SI5351_CLK2, 0);  // KI3P July 27 2024, updated to mirror Setup()
-    SetSSBVFOFrequency(freq*100);
-    SetSSBVFOFrequency((freq+5000000)*100);
-    SetSSBVFOFrequency(freq*100);
-    
+    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);
+    InitRXVFO();
+    InitTXVFO();
+    InitCWVFO();
+    SetRXVFOFrequency(freq*100);
+    SetRXVFOFrequency((freq+5000000)*100);
+    SetRXVFOFrequency(freq*100);
 }
 
 /**
@@ -287,61 +297,86 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
     }
 }
 
-///**
-// * Set the frequency of the Si5351
-// * 
-// * @param centerFreq_Hz The desired frequency in Hz
-// */
-//void SetFreq(int64_t centerFreq_Hz){
-//    if (centerFreq_Hz != SSBcenterFreq_Hz){
-//        SSBcenterFreq_Hz = centerFreq_Hz;
-//        SetSSBVFOFrequency(centerFreq_Hz*SI5351_FREQ_MULT);
-//    }
-//}
+// RX & TX VFO Control Functions
 
 /**
- * Get the current SSB VFO frequency setting.
+ * Get the current RX VFO frequency setting.
  *
- * Returns the frequency of the SSB VFO (CLK0 & CLK1 quadrature outputs)
- * used for SSB reception and transmission. The internal frequency is stored
- * in deci-Hertz (Hz × 10) but this function returns the value in Hertz.
+ * Returns the frequency of the RX VFO (CLK0RX & CLK90RX quadrature outputs)
+ * used for reception. The internal frequency is stored in deci-Hertz (Hz × 10) 
+ * but this function returns the value in Hertz.
  *
- * @return Current SSB VFO frequency in Hz
+ * @return Current RX VFO frequency in Hz
  *
- * @see SetSSBVFOFrequency() to change the frequency
- * @see SSBVFOFreq_dHz internal storage variable
+ * @see SetRXVFOFrequency() to change the frequency
+ * @see RXVFOFreq_dHz internal storage variable
  */
-int64_t GetSSBVFOFrequency(void){
-    return SSBVFOFreq_dHz/100;
+int64_t GetRXVFOFrequency(void){
+    return RXVFOFreq_dHz/100;
 }
 
-// SSB VFO Control Functions
+/**
+ * Get the current TX VFO frequency setting.
+ *
+ * Returns the frequency of the TX VFO (CLK0TX & CLK90TX quadrature outputs)
+ * used for SSB transmission. The internal frequency is stored in deci-Hertz 
+ * (Hz × 10) but this function returns the value in Hertz.
+ *
+ * @return Current TX VFO frequency in Hz
+ *
+ * @see SetTXVFOFrequency() to change the frequency
+ * @see TXVFOFreq_dHz internal storage variable
+ */
+int64_t GetTXVFOFrequency(void){
+    return TXVFOFreq_dHz/100;
+}
 
 /**
- * Set the power of the VFO used to drive the SSB portion of the radio.
+ * Set the power of the VFO used to drive the RX portion of the radio.
  * 
  * @param power Expect one of the SI5351_DRIVE_?MA parameters
  */
-void SetSSBVFOPower(int32_t power){
-    si5351.drive_strength(SI5351_CLK0, (si5351_drive)power);
-    si5351.drive_strength(SI5351_CLK1, (si5351_drive)power);
+void SetRXVFOPower(int32_t power){
+    si5351.drive_strength(CLK0RX, (si5351_drive)power);
+    si5351.drive_strength(CLK90RX, (si5351_drive)power);
 }
 
 /**
- * Initialize the SSB VFO. This is done once at startup and is invoked by InitVFOs().
+ * Set the power of the VFO used to drive the TX portion of the radio.
+ * 
+ * @param power Expect one of the SI5351_DRIVE_?MA parameters
+ */
+void SetTXVFOPower(int32_t power){
+    si5351.drive_strength(CLK0TX, (si5351_drive)power);
+    si5351.drive_strength(CLK90TX, (si5351_drive)power);
+}
+
+/**
+ * Initialize the RX VFO. This is done once at startup and is invoked by InitVFOs().
  * Set the power and configure the PLL source, does not set the frequency.
  */
-errno_t InitSSBVFO(void){
+errno_t InitRXVFO(void){
     // Set driveCurrentSSB_mA to appropriate value
-    SetSSBVFOPower( SI5351_DRIVE_CURRENT );
-    si5351.set_ms_source(SI5351_CLK0, SI5351_PLLA);
-    si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
+    SetRXVFOPower( SI5351_DRIVE_CURRENT_RX );
+    si5351.set_ms_source(CLK0RX, SI5351_PLLA);
+    si5351.set_ms_source(CLK90RX, SI5351_PLLA);
     return ESUCCESS;
 }
 
 /**
- * Calculate the even divisor used in the configuration of the PLL for the SSB
- * VFO frequency.
+ * Initialize the TX VFO. This is done once at startup and is invoked by InitVFOs().
+ * Set the power and configure the PLL source, does not set the frequency.
+ */
+errno_t InitTXVFO(void){
+    // Set driveCurrentSSB_mA to appropriate value
+    SetTXVFOPower( SI5351_DRIVE_CURRENT_TX );
+    si5351.set_ms_source(CLK0TX, SI5351_PLLB);
+    si5351.set_ms_source(CLK90TX, SI5351_PLLB);
+    return ESUCCESS;
+}
+
+/**
+ * Calculate the even divisor used in the configuration of the PLL for the VFO.
  * 
  * @param freq2_Hz The desired VFO frequency in units of Hz.
  */
@@ -412,75 +447,140 @@ int32_t EvenDivisor(int64_t freq2_Hz) {
 }
 
 /**
- * Set the CLK0 and CLK1 outputs as quadrature outputs at the specified frequency.
- * 
+ * Set the CLK0RX and CLK90RX outputs as quadrature outputs at the specified frequency.
+ *
  * @param frequency_dHz The desired clock frequency in (Hz * 100)
  */
-void SetSSBVFOFrequency(int64_t frequency_dHz){
+void SetRXVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
-    if (frequency_dHz == SSBVFOFreq_dHz) return;
-    SSBVFOFreq_dHz = frequency_dHz;
-    int64_t Clk1SetFreq = frequency_dHz;
-    multiple = EvenDivisor(Clk1SetFreq / SI5351_FREQ_MULT);
-    uint64_t pll_freq = Clk1SetFreq * multiple;
-    uint64_t freq = pll_freq / multiple;
-    
-    if ( multiple == oldMultiple) {               // Still within the same multiple range 
+    if (frequency_dHz == RXVFOFreq_dHz) return;
+    RXVFOFreq_dHz = frequency_dHz;
+    int64_t ClkSetFreq = frequency_dHz;
+    rxmultiple = EvenDivisor(ClkSetFreq / SI5351_FREQ_MULT);
+    uint64_t pll_freq = ClkSetFreq * rxmultiple;
+    uint64_t freq = pll_freq / rxmultiple;
+
+    if ( rxmultiple == oldrxMultiple) {               // Still within the same multiple range
         si5351.set_pll(pll_freq, SI5351_PLLA);    // just change PLLA on each frequency change of encoder
-                                                  // this minimizes I2C data for each frequency change within a 
+                                                  // this minimizes I2C data for each frequency change within a
                                                   // multiple range
-    } else { 
-        if ( multiple <= 126) {                                 // this the library setting of phase for freqs
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK0);  // greater than 3.2MHz where multiple is <= 126
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK1);   // set both clocks to new frequency
-            si5351.set_phase(SI5351_CLK0, 0);                      // CLK0 phase = 0 
-            si5351.set_phase(SI5351_CLK1, multiple);               // Clk1 phase = multiple for 90 degrees(digital delay)
-            si5351.pll_reset(SI5351_PLLA);                         // reset PLLA to align outputs 
-            si5351.output_enable(SI5351_CLK0, 1);                  // set outputs on or off
-            si5351.output_enable(SI5351_CLK1, 1);
+    } else {
+        if ( rxmultiple <= 126) {                            // this the library setting of phase for freqs
+            si5351.set_freq_manual(freq, pll_freq, CLK0RX);  // greater than 3.2MHz where multiple is <= 126
+            si5351.set_freq_manual(freq, pll_freq, CLK90RX); // set both clocks to new frequency
+            si5351.set_phase(CLK0RX, 0);                     // CLK0 phase = 0
+            si5351.set_phase(CLK90RX, rxmultiple);           // Clk90 phase = multiple for 90 degrees(digital delay)
+            si5351.pll_reset(SI5351_PLLA);                   // reset PLLA to align outputs
+            si5351.output_enable(CLK0RX, 1);                 // set outputs on or off
+            si5351.output_enable(CLK90RX, 1);
             SET_BIT(hardwareRegister,SSBVFOBIT);
-            //si5351.output_enable(SI5351_CLK2, 0);
-        }
-        else {        // this is the timed delay technique for frequencies below 3.2MHz as detailed in 
+        } else {    // this is the timed delay technique for frequencies below 3.2MHz as detailed in
                     // https://tj-lab.org/2020/08/27/si5351単体で3mhz以下の直交信号を出力する/
             cli();                //__disable_irq(); or __enable_irq();     // or cli()/sei() pair; needed to get accurate timing??
-            //si5351.output_enable(SI5351_CLK0, 0);  // optional switch off clocks if audio effects are generated
-            //si5351.output_enable(SI5351_CLK1, 0);  //  with the change of multiple below 3.2MHz
-            si5351.set_freq_manual((freq - 400ULL), pll_freq, SI5351_CLK0);  // set up frequencies of CLK 0/1 4 Hz low
-            si5351.set_freq_manual((freq - 400ULL), pll_freq, SI5351_CLK1);  // as per TJ-Labs article 
-            si5351.set_phase(SI5351_CLK0, 0);                          // set phase registers to 0 just to be sure
-            si5351.set_phase(SI5351_CLK1, 0);                          
-            si5351.pll_reset(SI5351_PLLA);                             // align both clockss in phase
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK0);       // set clock 0  to required freq
-            //delayNanoseconds(625000000);       // 62.5 * 1000000      //configured for a 62.5 mSec delay at 4 Hz difference 
-            delayMicroseconds(58500);                       //nominally 62500 this figure can be adjusted for a more exact delay which is phase
-            si5351.set_freq_manual(freq, pll_freq, SI5351_CLK1);       // set CLK 1 to the required freq after delay
+            //si5351.output_enable(CLK0RX, 0);   // optional switch off clocks if audio effects are generated
+            //si5351.output_enable(CLK90RX, 0);  //  with the change of multiple below 3.2MHz
+            si5351.set_freq_manual((freq - 400ULL), pll_freq, CLK0RX);  // set up frequencies of CLK 0/90 4 Hz low
+            si5351.set_freq_manual((freq - 400ULL), pll_freq, CLK90RX); // as per TJ-Labs article
+            si5351.set_phase(CLK0RX, 0);                                // set phase registers to 0 just to be sure
+            si5351.set_phase(CLK90RX, 0);
+            si5351.pll_reset(SI5351_PLLA);                              // align both clockss in phase
+            si5351.set_freq_manual(freq, pll_freq, CLK0RX);             // set clock 0  to required freq
+            //delayNanoseconds(625000000);       // 62.5 * 1000000      // configured for a 62.5 mSec delay at 4 Hz difference
+            delayMicroseconds(58500);                                   // nominally 62500 this figure can be adjusted for a more exact delay which is phase
+            si5351.set_freq_manual(freq, pll_freq, CLK90RX);            // set CLK90 to the required freq after delay
             sei();
-            si5351.output_enable(SI5351_CLK0, 1);                      // switch them on to be sure
-            si5351.output_enable(SI5351_CLK1, 1);                      //    ""        ""
+            si5351.output_enable(CLK0RX, 1);                            // switch them on to be sure
+            si5351.output_enable(CLK90RX, 1);                           //    ""        ""
             SET_BIT(hardwareRegister,SSBVFOBIT);
-            //si5351.output_enable(SI5351_CLK2, 0);
-            
         }
     }
-    oldMultiple = multiple; 
+    oldrxMultiple = rxmultiple;
 }
 
 /**
- * Enable the SSB VFO I & Q outputs (CLK0 & CLK1)
+ * Set the CLK0TX and CLK90TX outputs as quadrature outputs at the specified frequency.
+ *
+ * @param frequency_dHz The desired clock frequency in (Hz * 100)
  */
-void EnableSSBVFOOutput(void){
-    si5351.output_enable(SI5351_CLK0, 1);
-    si5351.output_enable(SI5351_CLK1, 1);
+void SetTXVFOFrequency(int64_t frequency_dHz){
+    // No need to change if it's already at this setting
+    if (frequency_dHz == TXVFOFreq_dHz) return;
+    TXVFOFreq_dHz = frequency_dHz;
+    int64_t ClkSetFreq = frequency_dHz;
+    txmultiple = EvenDivisor(ClkSetFreq / SI5351_FREQ_MULT);
+    uint64_t pll_freq = ClkSetFreq * txmultiple;
+    uint64_t freq = pll_freq / txmultiple;
+
+    if ( txmultiple == oldtxMultiple) {           // Still within the same multiple range
+        si5351.set_pll(pll_freq, SI5351_PLLB);    // just change PLLB on each frequency change of encoder
+                                                  // this minimizes I2C data for each frequency change within a
+                                                  // multiple range
+    } else {
+        if ( txmultiple <= 126) {                            // this the library setting of phase for freqs
+            si5351.set_freq_manual(freq, pll_freq, CLK0TX);  // greater than 3.2MHz where multiple is <= 126
+            si5351.set_freq_manual(freq, pll_freq, CLK90TX); // set both clocks to new frequency
+            si5351.set_phase(CLK0TX, 0);                     // CLK0 phase = 0
+            si5351.set_phase(CLK90TX, txmultiple);           // CLK90 phase = multiple for 90 degrees(digital delay)
+            si5351.pll_reset(SI5351_PLLB);                   // reset PLLB to align outputs
+            si5351.output_enable(CLK0TX, 1);                 // set outputs on or off
+            si5351.output_enable(CLK90TX, 1);
+            SET_BIT(hardwareRegister,SSBVFOBIT);
+        } else {    // this is the timed delay technique for frequencies below 3.2MHz as detailed in
+                    // https://tj-lab.org/2020/08/27/si5351単体で3mhz以下の直交信号を出力する/
+            cli();                              // or cli()/sei() pair; needed to get accurate timing??
+            //si5351.output_enable(CLK0TX, 0);  // optional switch off clocks if audio effects are generated
+            //si5351.output_enable(CLK90TX, 0); //  with the change of multiple below 3.2MHz
+            si5351.set_freq_manual((freq - 400ULL), pll_freq, CLK0TX);  // set up frequencies of CLK 0/90 4 Hz low
+            si5351.set_freq_manual((freq - 400ULL), pll_freq, CLK90TX); // as per TJ-Labs article
+            si5351.set_phase(CLK0TX, 0);                                // set phase registers to 0 just to be sure
+            si5351.set_phase(CLK90TX, 0);
+            si5351.pll_reset(SI5351_PLLB);                              // align both clocks in phase
+            si5351.set_freq_manual(freq, pll_freq, CLK0TX);             // set clock 4 to required freq
+            //delayNanoseconds(625000000);                              // 62.5 * 1000000      //configured for a 62.5 mSec delay at 4 Hz difference
+            delayMicroseconds(58500);                                   //nominally 62500 this figure can be adjusted for a more exact delay which is phase
+            si5351.set_freq_manual(freq, pll_freq, CLK90TX);            // set CLK90 to the required freq after delay
+            sei();
+            si5351.output_enable(CLK0TX, 1);                            // switch them on to be sure
+            si5351.output_enable(CLK90TX, 1);                           //    ""        ""
+            SET_BIT(hardwareRegister,SSBVFOBIT);
+        }
+    }
+    oldtxMultiple = txmultiple;
+}
+
+/**
+ * Enable the RX VFO I & Q outputs
+ */
+void EnableRXVFOOutput(void){
+    si5351.output_enable(CLK0RX, 1);
+    si5351.output_enable(CLK90RX, 1);
     SET_BIT(hardwareRegister,SSBVFOBIT);
 }
 
 /**
- * Disable the SSB VFO I & Q outputs (CLK0 & CLK1)
+ * Enable the TX VFO I & Q outputs
  */
-void DisableSSBVFOOutput(void){
-    si5351.output_enable(SI5351_CLK0, 0);
-    si5351.output_enable(SI5351_CLK1, 0);
+void EnableTXVFOOutput(void){
+    si5351.output_enable(CLK0TX, 1);
+    si5351.output_enable(CLK90TX, 1);
+    SET_BIT(hardwareRegister,SSBVFOBIT);
+}
+
+/**
+ * Disable the RX VFO I & Q outputs
+ */
+void DisableRXVFOOutput(void){
+    si5351.output_enable(CLK0RX, 0);
+    si5351.output_enable(CLK90RX, 0);
+    CLEAR_BIT(hardwareRegister,SSBVFOBIT);
+}
+
+/**
+ * Disable the TX VFO I & Q outputs
+ */
+void DisableTXVFOOutput(void){
+    si5351.output_enable(CLK0TX, 0);
+    si5351.output_enable(CLK90TX, 0);
     CLEAR_BIT(hardwareRegister,SSBVFOBIT);
 }
 
@@ -489,7 +589,7 @@ void DisableSSBVFOOutput(void){
 /**
  * Set the CW VFO frequency for Morse code transmission.
  *
- * Configures the Si5351 CLK2 output frequency used for CW (Morse code) operation.
+ * Configures the Si5351 CLKCW output frequency used for CW (Morse code) operation.
  * The frequency is stored and set in deci-Hertz units (Hz × 10) for high precision.
  *
  * Optimization: Skips the Si5351 write if the requested frequency matches the
@@ -509,7 +609,7 @@ void SetCWVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == CWVFOFreq_dHz) return;
     CWVFOFreq_dHz = frequency_dHz;
-    si5351.set_freq(CWVFOFreq_dHz, SI5351_CLK2);
+    si5351.set_freq(CWVFOFreq_dHz, CLKCW);
 }
 
 /**
@@ -532,7 +632,7 @@ int64_t GetCWVFOFrequency(void){
  * Enable the CW VFO output (CLK2)
  */
 void EnableCWVFOOutput(void){
-    si5351.output_enable(SI5351_CLK2, 1);
+    si5351.output_enable(CLKCW, 1);
     SET_BIT(hardwareRegister,CWVFOBIT);
 }
 
@@ -540,7 +640,7 @@ void EnableCWVFOOutput(void){
  * Disable the CW VFO output (CLK2)
  */
 void DisableCWVFOOutput(void){
-    si5351.output_enable(SI5351_CLK2, 0);
+    si5351.output_enable(CLKCW, 0);
     CLEAR_BIT(hardwareRegister,CWVFOBIT);
 }
 
@@ -550,8 +650,8 @@ void DisableCWVFOOutput(void){
  * @param power Expect one of the SI5351_DRIVE_?MA parameters
  */
 void SetCWVFOPower(int32_t power){
-    si5351.drive_strength(SI5351_CLK2, (si5351_drive)power);
-    si5351.set_ms_source(SI5351_CLK2, SI5351_PLLA);
+    si5351.drive_strength(CLKCW, (si5351_drive)power);
+    si5351.set_ms_source(CLKCW, SI5351_PLLB);
 }
 
 /**
@@ -560,8 +660,8 @@ void SetCWVFOPower(int32_t power){
  * output is off after initialization.
  */
 errno_t InitCWVFO(void){
-    SetCWVFOPower( SI5351_DRIVE_CURRENT );
-    si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
+    SetCWVFOPower( SI5351_DRIVE_CURRENT_CW );
+    si5351.set_ms_source(CLKCW, SI5351_PLLB);
     pinMode(CW_ON_OFF, OUTPUT);
     CLEAR_BIT(hardwareRegister,CWBIT);
     digitalWrite(CW_ON_OFF, 0);
@@ -617,10 +717,16 @@ errno_t InitVFOs(void){
         return EFAIL;
     } else {
         bit_results.RF_Si5351_present = true;
+        // Disable all clock outputs.
+        // The ones we will actually use are enabled by the init functions below.
+        for (int k=0; k<8; k++){
+            si5351.output_enable((si5351_clock)k, 0);
+        }
     }
     MyDelay(100L);
 
-    InitSSBVFO();
+    InitRXVFO();
+    InitTXVFO();
     InitCWVFO();
     return ESUCCESS;
 }
