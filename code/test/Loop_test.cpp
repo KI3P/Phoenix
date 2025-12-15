@@ -122,7 +122,7 @@ TEST(Loop, ChangeVFO){
     // check ED.activeVFO
     EXPECT_NE(ED.activeVFO,vfo);
     // check frequency
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],GetSSBVFOFrequency());
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO],GetRXVFOFrequency());
 }
 
 TEST(Loop, CATFrequencyChangeViaRepeatedLoop){
@@ -177,7 +177,7 @@ TEST(Loop, CATFrequencyChangeViaRepeatedLoop){
     EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 0);
     
     // Verify that the tuning system has been updated with the new frequency
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetSSBVFOFrequency());
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetRXVFOFrequency());
     
     // Execute loop() one more time to ensure system stability
     loop();
@@ -645,7 +645,7 @@ TEST(Loop, HardwareStateMachineRFReceiveTimingDelays) {
     // The sequence should have multiple buffer entries with time gaps
     // RFReceive sequence: CWoff, DisableCWVFOOutput, SetTXAttenuation(31.5), TXBypassBPF,
     // SelectXVTR, Bypass100WPA, **10ms delay**, RXSelectBPF, UpdateTuneState, SetRXAttenuation,
-    // EnableSSBVFOOutput, SelectTXSSBModulation, DisableCalFeedback, **10ms delay**, SelectRXMode, **20ms delay**, SetTXAttenuation(31.5)
+    // EnableRXVFOOutput, SelectTXSSBModulation, DisableCalFeedback, **10ms delay**, SelectRXMode, **20ms delay**, SetTXAttenuation(31.5)
     //
     // Note: The final SetTXAttenuation(31.5) doesn't create a buffer entry because it's the same
     // value as the earlier SetTXAttenuation(31.5), so the third 20ms delay is not visible in the buffer.
@@ -707,7 +707,7 @@ TEST(Loop, HardwareStateMachineRFTransmitTimingDelays) {
 
     // The sequence should have multiple buffer entries
     // RFTransmit sequence: RXBypassBPF, DisableCalFeedback, **10ms delay**, SetTXAttenuation,
-    // DisableCWVFOOutput, CWoff, UpdateTuneState, EnableSSBVFOOutput, SelectTXSSBModulation,
+    // DisableCWVFOOutput, CWoff, UpdateTuneState, EnableTXVFOOutput, SelectTXSSBModulation,
     // TXSelectBPF, BypassXVTR, Bypass100WPA, **10ms delay**, SelectTXMode
 
     // Verify we have multiple buffer entries (should be 10+ hardware operations)
@@ -759,7 +759,7 @@ TEST(Loop, HardwareStateMachineRFCWMarkTimingDelays) {
 
     // The sequence should have multiple buffer entries
     // RFCWMark sequence (from non-CWSpace): RXBypassBPF, DisableCalFeedback, SetTXAttenuation,
-    // DisableSSBVFOOutput, UpdateTuneState, EnableCWVFOOutput, SelectTXCWModulation,
+    // DisableRXVFOOutput, UpdateTuneState, EnableCWVFOOutput, SelectTXCWModulation,
     // TXSelectBPF, BypassXVTR, Bypass100WPA, SelectTXMode, **20ms delay**, CWon
 
     // Verify we have multiple buffer entries (should be 10+ hardware operations)

@@ -895,3 +895,18 @@ bool getRXTXState(void){
 uint16_t GetRFMCPRegisters(void){
     return mcpAtten.readGPIOAB();
 }
+
+/**
+ * Reset VFO state for testing.
+ *
+ * Resets the static VFO multiple tracking variables to force fresh
+ * frequency calculations on the next SetRXVFOFrequency() or SetTXVFOFrequency() call.
+ * This is used by unit tests to ensure clean state between test runs.
+ */
+void ResetVFOState(void){
+    oldrxMultiple = 0;
+    oldtxMultiple = 0;
+    RXVFOFreq_dHz = 0;
+    TXVFOFreq_dHz = 0;
+    CWVFOFreq_dHz = 0;
+}

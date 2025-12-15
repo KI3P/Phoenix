@@ -770,9 +770,9 @@ TEST(TransmitChain, TwoTone){
  */
 TEST(TransmitChain, TransmitReceiveProcessingCalculatesPSD){
     // Initialize the signal processing filters
-    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 0
-    InitializeFilters(0, &RXTXfilters);
-    ZoomFFTPrep(0, &RXTXfilters);
+    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 3 (RXTXZoom is defined as 3 in DSP.cpp)
+    InitializeFilters(3, &RXTXfilters);
+    ZoomFFTPrep(3, &RXTXfilters);
 
     // Reset the PSD array to ensure we can detect when it's been updated
     ResetPSD();
@@ -793,8 +793,12 @@ TEST(TransmitChain, TransmitReceiveProcessingCalculatesPSD){
     // Set the state machine to SSB_TRANSMIT state (TransmitReceiveProcessing is called in this state)
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
 
-    // Call TransmitReceiveProcessing to process the IQ data and calculate the PSD
-    TransmitReceiveProcessing();
+    // Call TransmitReceiveProcessing multiple times to fill the zoom FFT ring buffer
+    // With zoom=3, each call processes 2048/8=256 samples, and we need 512 samples total
+    // So we need at least 2 calls to fill the buffer and trigger PSD calculation
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
 
     // Verify that psdupdated flag is set, indicating PSD was calculated
     EXPECT_TRUE(psdupdated);
@@ -820,14 +824,15 @@ TEST(TransmitChain, TransmitReceiveProcessingCalculatesPSD){
  */
 TEST(TransmitChain, TransmitReceiveProcessingPSDContainsCorrectTone){
     // Initialize the signal processing filters
-    InitializeFilters(0, &RXTXfilters);
-    ZoomFFTPrep(0, &RXTXfilters);
+    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 3 (RXTXZoom is defined as 3 in DSP.cpp)
+    InitializeFilters(3, &RXTXfilters);
+    ZoomFFTPrep(3, &RXTXfilters);
 
-    // Create IQ test data with a known tone at Fs/4 (48 kHz for 192 kHz sample rate)
-    // This is a convenient test frequency as it creates a simple pattern
+    // Create IQ test data with a known tone at 6 kHz
+    // With zoom=3, the FFT covers 24 kHz (decimated by 8), so we need a tone below Nyquist (12 kHz)
     uint32_t Nsamples = 2048 * 4; // Need enough samples to fill the mock buffer
     uint32_t sampleRate_Hz = 192000;
-    float32_t tone_Hz = 48000.0; // Fs/4
+    float32_t tone_Hz = 6000.0; // Within the zoomed spectrum range
     static int16_t testI[2048*4];
     static int16_t testQ[2048*4];
 
@@ -854,17 +859,21 @@ TEST(TransmitChain, TransmitReceiveProcessingPSDContainsCorrectTone){
     // Set the state machine to SSB_TRANSMIT state
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
 
-    // Call TransmitReceiveProcessing
-    TransmitReceiveProcessing();
+    // Call TransmitReceiveProcessing multiple times to fill the zoom FFT ring buffer
+    // With zoom=3, we need multiple calls to accumulate enough samples
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
 
     // Verify that psdupdated flag is set
     EXPECT_TRUE(psdupdated);
 
     // Calculate the expected bin for our tone
-    // For spectrum_zoom = 0, the FFT is 512 points covering 192 kHz
-    // Bin width = 192000 / 512 = 375 Hz
-    // For 48 kHz tone: bin = 512/2 + 48000/375 = 256 + 128 = 384
-    int32_t expectedBin = frequency_to_bin(tone_Hz, 512, sampleRate_Hz);
+    // For spectrum_zoom = 3, decimation by 8 gives effective sample rate of 24 kHz
+    // The FFT is 512 points covering 24 kHz
+    // Bin width = 24000 / 512 = 46.875 Hz
+    // For 6 kHz tone: bin = 512/2 + 512*6000/24000 = 256 + 128 = 384
+    int32_t expectedBin = frequency_to_bin(tone_Hz, 512, sampleRate_Hz / 8);
 
     // Find the peak in the PSD
     float32_t maxPsd = -1e10;
@@ -894,8 +903,9 @@ TEST(TransmitChain, TransmitReceiveProcessingPSDContainsCorrectTone){
  */
 TEST(TransmitChain, TransmitReceiveProcessingAppliesGainAndCorrection){
     // Initialize the signal processing filters
-    InitializeFilters(0, &RXTXfilters);
-    ZoomFFTPrep(0, &RXTXfilters);
+    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 3 (RXTXZoom is defined as 3 in DSP.cpp)
+    InitializeFilters(3, &RXTXfilters);
+    ZoomFFTPrep(3, &RXTXfilters);
 
     // Set up specific RF gain and IQ correction values
     float32_t originalRfGain = ED.rfGainAllBands_dB;
@@ -923,7 +933,10 @@ TEST(TransmitChain, TransmitReceiveProcessingAppliesGainAndCorrection){
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
 
     // First measurement with +10 dB RF gain
-    TransmitReceiveProcessing();
+    // Call multiple times to fill the zoom FFT ring buffer
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
     float32_t psdWithGain[SPECTRUM_RES];
     for (size_t i = 0; i < SPECTRUM_RES; i++){
         psdWithGain[i] = psdnew[i];
@@ -936,7 +949,10 @@ TEST(TransmitChain, TransmitReceiveProcessingAppliesGainAndCorrection){
     psdupdated = false;
 
     ED.rfGainAllBands_dB = 0.0; // 0 dB gain (no change)
-    TransmitReceiveProcessing();
+    // Call multiple times to fill the zoom FFT ring buffer
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
 
     // Find the peak bin in both measurements
     float32_t maxPsdWithGain = -1e10;

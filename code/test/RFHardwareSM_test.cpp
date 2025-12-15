@@ -62,10 +62,10 @@ TEST(RFHardwareState, StateTransitionToCWSpace){
     UpdateRFHardwareState();
 
     // CW TRANSMIT SPACE STATE
-    // We expect CLK0 and CLK1 to be disabled, and CLK2 to be enabled
+    // We expect CLK0 and CLK1 (RX VFO) to be disabled, CLK4/CLK5 (TX VFO) to be disabled, and CLK6 (CW VFO) to be enabled
     EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 0);
     EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 0);
-    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK6], 1);
     // CW is off
     EXPECT_EQ(getCWState(), 0); // CW off
     // TX mode
@@ -88,10 +88,10 @@ TEST(RFHardwareState, StateTransitionToCWMark){
     UpdateRFHardwareState();
 
     // CW TRANSMIT MARK STATE
-    // We expect CLK0 and CLK1 to be disabled, and CLK2 to be enabled
+    // We expect CLK0 and CLK1 (RX VFO) to be disabled, CLK4/CLK5 (TX VFO) to be disabled, and CLK6 (CW VFO) to be enabled
     EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 0);
     EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 0);
-    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK6], 1);
     // CW is on
     EXPECT_EQ(getCWState(), 1); // CW on
     // TX mode
@@ -123,8 +123,8 @@ and between SSB receive and SSB transmit mode? it changes from state to state.
 
     InitializeRFHardware();
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
-    UpdateRFHardwareState();    
-    EXPECT_EQ(GetSSBVFOFrequency(), 7100000L);
+    UpdateRFHardwareState();
+    EXPECT_EQ(GetRXVFOFrequency(), 7100000L);
     EXPECT_EQ(ED.fineTuneFreq_Hz[ED.activeVFO], 500L);
     EXPECT_EQ(GetTXRXFreq_dHz(),rxtx*100);
 
@@ -136,34 +136,37 @@ and between SSB receive and SSB transmit mode? it changes from state to state.
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromSSBReceive) {
     si5351 = Si5351(); // Reset mock
+    ResetVFOState(); // Reset VFO state for fresh frequency calculation
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_48K;
-    
+
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     UpdateTuneState();
-    
-    // Should set SSB VFO frequency to centerFreq_Hz * 100
+
+    // Should set RX VFO frequency to centerFreq_Hz * 100
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000);
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 707400000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWReceive) {
     si5351 = Si5351(); // Reset mock
+    ResetVFOState(); // Reset VFO state for fresh frequency calculation
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_48K;
-    
+
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
     UpdateTuneState();
-    
-    // Should set SSB VFO frequency to centerFreq_Hz * 100 (same as SSB receive)
+
+    // Should set RX VFO frequency to centerFreq_Hz * 100 (same as SSB receive)
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000);
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 707400000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromSSBTransmit) {
     si5351 = Si5351(); // Reset mock
+    ResetVFOState(); // Reset VFO state for fresh frequency calculation
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
     SampleRate = SAMPLE_RATE_48K;
@@ -171,10 +174,10 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromSSBTransmit) {
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     UpdateTuneState();
 
-    // Should set SSB VFO frequency to GetTXRXFreq_dHz()
+    // Should set TX VFO frequency to GetTXRXFreq_dHz()
     // Calculation: 7074000 - 100 - 48000/4 = 7061900 Hz * 100 = 706190000 (see Tune.cpp:98)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 706190000);
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 706190000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK4], 706190000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK5], 706190000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitMark) {
@@ -191,7 +194,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitMark) {
     // Should set CW VFO frequency to GetCWTXFreq_dHz()
     // GetTXRXFreq_dHz() = (7074000 - 100 - 12000) * 100 = 706190000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 706190000 - 75000 = 706115000 (LSB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 706115000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 706115000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitSpace) {
@@ -208,7 +211,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitSpace) {
     // Should set CW VFO frequency to GetCWTXFreq_dHz()
     // GetTXRXFreq_dHz() = (14074000 - 100 - 12000) * 100 = 1406190000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 1406190000 + 75000 = 1406265000 (USB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 1406265000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 1406265000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDitMark) {
@@ -225,7 +228,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDitMark) {
     // Should set CW VFO frequency to GetCWTXFreq_dHz()
     // GetTXRXFreq_dHz() = (7074000 - 100 - 12000) * 100 = 706190000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 706190000 - 65650 = 706124350 (LSB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 706124350);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 706124350);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDahMark) {
@@ -242,7 +245,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDahMark) {
     // Should set CW VFO frequency to GetCWTXFreq_dHz()
     // GetTXRXFreq_dHz() = (14074000 - 200 - 12000) * 100 = 1406180000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 1406180000 + 56250 = 1406236250 (USB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 1406236250);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 1406236250);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerSpace) {
@@ -259,7 +262,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerSpace) 
     // Should set CW VFO frequency to GetCWTXFreq_dHz()
     // GetTXRXFreq_dHz() = (3574000 - 50 - 12000) * 100 = 356195000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 356195000 - 40000 = 356155000 (LSB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 356155000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 356155000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerWait) {
@@ -276,7 +279,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerWait) {
     // Should set CW VFO frequency to GetCWTXFreq_dHz()
     // GetTXRXFreq_dHz() = (21074000 - (-50) - 12000) * 100 = 2106205000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 2106205000 + 84375 = 2106289375 (USB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 2106289375);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 2106289375);
 }
 
 TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceSSBToReceive) {
@@ -288,18 +291,18 @@ TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceSSBToReceive) {
     // Start in SSB receive
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     UpdateTuneState();
-    EXPECT_EQ(GetSSBVFOFrequency(), 14230000);
-    
+    EXPECT_EQ(GetRXVFOFrequency(), 14230000);
+
     // Transition to SSB transmit
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     UpdateTuneState();
     // GetTXRXFreq_dHz() = (14230000 - 100 - 12000) * 100 = 1421790000 (see Tune.cpp:98)
-    EXPECT_EQ(GetSSBVFOFrequency(), 14217900);
-    
+    EXPECT_EQ(GetTXVFOFrequency(), 14217900);
+
     // Back to SSB receive
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     UpdateTuneState();
-    EXPECT_EQ(GetSSBVFOFrequency(), 14230000);
+    EXPECT_EQ(GetRXVFOFrequency(), 14230000);
 }
 
 TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceCWReceiveToTransmit) {
@@ -321,12 +324,12 @@ TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceCWReceiveToTransmi
     UpdateTuneState();
     // GetTXRXFreq_dHz() = (7030000 - 200 - 12000) * 100 = 701780000 (see Tune.cpp:98)
     // GetCWTXFreq_dHz() = 701780000 - 75000 = 701705000 (LSB)
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 701705000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 701705000);
 
     // Transition to CW transmit space
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
     UpdateTuneState();
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 701705000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 701705000);
     
     // Back to CW receive
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
@@ -345,19 +348,19 @@ TEST(RFHardwareState, TuneStateMachine_DifferentSampleRates) {
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
     UpdateTuneState();
     // GetTXRXFreq_dHz() = (14074000 - 100 - 192000/4) * 100 = (14073900 - 48000) * 100 = 1402590000 (see Tune.cpp:98)
-    EXPECT_EQ(GetSSBVFOFrequency(), 14025900);
+    EXPECT_EQ(GetTXVFOFrequency(), 14025900);
 
     // Test with 96kHz sample rate
     SampleRate = SAMPLE_RATE_96K;
     UpdateTuneState();
     // GetTXRXFreq_dHz() = (14074000 - 100 - 96000/4) * 100 = (14073900 - 24000) * 100 = 1404990000 (see Tune.cpp:98)
-    EXPECT_EQ(GetSSBVFOFrequency(), 14049900);
+    EXPECT_EQ(GetTXVFOFrequency(), 14049900);
 
     // Test with 48kHz sample rate
     SampleRate = SAMPLE_RATE_48K;
     UpdateTuneState();
     // GetTXRXFreq_dHz() = (14074000 - 100 - 48000/4) * 100 = (14073900 - 12000) * 100 = 1406190000 (see Tune.cpp:98)
-    EXPECT_EQ(GetSSBVFOFrequency(), 14061900);
+    EXPECT_EQ(GetTXVFOFrequency(), 14061900);
 }
 
 // ================== BUFFER LOGGING TESTS ==================
@@ -368,8 +371,8 @@ TEST(RFHardwareState, BufferLogsSSBVFOStateChanges) {
     buffer.head = 0;
     buffer.count = 0;
 
-    // Test EnableSSBVFOOutput - should call SET_BIT which includes buffer_add()
-    EnableSSBVFOOutput();
+    // Test EnableRXVFOOutput - should call SET_BIT which includes buffer_add()
+    EnableRXVFOOutput();
 
     // Verify buffer has one entry
     EXPECT_EQ(buffer.count, 1);
@@ -378,8 +381,8 @@ TEST(RFHardwareState, BufferLogsSSBVFOStateChanges) {
     // Verify the register value was logged
     EXPECT_EQ(buffer.entries[0].register_value, hardwareRegister);
 
-    // Test DisableSSBVFOOutput - should call CLEAR_BIT which includes buffer_add()
-    DisableSSBVFOOutput();
+    // Test DisableRXVFOOutput - should call CLEAR_BIT which includes buffer_add()
+    DisableRXVFOOutput();
 
     // Verify buffer has two entries
     EXPECT_EQ(buffer.count, 2);
@@ -542,8 +545,8 @@ TEST(RFHardwareState, BufferLogsSequentialOperations) {
     size_t initial_count = buffer.count;
 
     // Perform a simple sequence of operations
-    EnableSSBVFOOutput();
-    DisableSSBVFOOutput();
+    EnableRXVFOOutput();
+    DisableRXVFOOutput();
 
     // Verify we have at least 2 new entries
     EXPECT_GE(buffer.count, initial_count + 2);

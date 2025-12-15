@@ -246,20 +246,36 @@ TEST(RFBoard, SetFreq_Test) {
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 707400000);
 }
 
-TEST(RFBoard, SetSSBVFOPower_Test) {
+TEST(RFBoard, SetRXVFOPower_Test) {
     si5351 = Si5351(); // Reset mock
-    SetSSBVFOPower(SI5351_DRIVE_4MA);
+    SetRXVFOPower(SI5351_DRIVE_4MA);
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_4MA);
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK1], SI5351_DRIVE_4MA);
 }
 
-TEST(RFBoard, InitSSBVFO_Test) {
+TEST(RFBoard, SetTXVFOPower_Test) {
     si5351 = Si5351(); // Reset mock
-    InitSSBVFO();
+    SetTXVFOPower(SI5351_DRIVE_4MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK4], SI5351_DRIVE_4MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK5], SI5351_DRIVE_4MA);
+}
+
+TEST(RFBoard, InitRXVFO_Test) {
+    si5351 = Si5351(); // Reset mock
+    InitRXVFO();
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_2MA);
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK1], SI5351_DRIVE_2MA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK0], SI5351_PLLA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK1], SI5351_PLLA);
+}
+
+TEST(RFBoard, InitTXVFO_Test) {
+    si5351 = Si5351(); // Reset mock
+    InitTXVFO();
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK4], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK5], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.pll_assignment[SI5351_CLK4], SI5351_PLLB);
+    EXPECT_EQ(si5351.pll_assignment[SI5351_CLK5], SI5351_PLLB);
 }
 
 TEST(RFBoard, SetCWVFOFrequency_Test) {
@@ -270,34 +286,34 @@ TEST(RFBoard, SetCWVFOFrequency_Test) {
     ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
     ED.CWToneIndex = 3; // 750 Hz
     SetCWVFOFrequency(GetCWTXFreq_dHz());
-    // Calculation is: 100 * (7074000 - 100 - 192000/4 - 750) 
-    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702515000);
+    // Calculation is: 100 * (7074000 - 100 - 192000/4 - 750)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 702515000);
 }
 
 TEST(RFBoard, EnableCWVFOOutput_Test) {
     si5351 = Si5351(); // Reset mock
     EnableCWVFOOutput();
-    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK6], 1);
 }
 
 TEST(RFBoard, DisableCWVFOOutput_Test) {
     si5351 = Si5351(); // Reset mock
     DisableCWVFOOutput();
-    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK6], 0);
 }
 
 TEST(RFBoard, SetCWVFOPower_Test) {
     si5351 = Si5351(); // Reset mock
     SetCWVFOPower(SI5351_DRIVE_6MA);
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK2], SI5351_DRIVE_6MA);
-    EXPECT_EQ(si5351.pll_assignment[SI5351_CLK2], SI5351_PLLA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK6], SI5351_DRIVE_6MA);
+    EXPECT_EQ(si5351.pll_assignment[SI5351_CLK6], SI5351_PLLB);
 }
 
 TEST(RFBoard, InitCWVFO_Test) {
     si5351 = Si5351(); // Reset mock
     InitCWVFO();
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK2], SI5351_DRIVE_2MA);
-    EXPECT_EQ(si5351.pll_assignment[SI5351_CLK1], SI5351_PLLA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK6], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.pll_assignment[SI5351_CLK6], SI5351_PLLB);
     EXPECT_EQ(getPinMode(CW_ON_OFF), OUTPUT);
     EXPECT_EQ(digitalRead(CW_ON_OFF),0);
 }
@@ -309,7 +325,7 @@ TEST(RFBoard, InitVFOs_Test) {
     // Not much to test here since the mock is simple
     // We can at least check that the VFOs were initialized
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_2MA);
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK2], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK6], SI5351_DRIVE_2MA);
 }
 
 TEST(RFBoard, InitTXModulation_Test) {

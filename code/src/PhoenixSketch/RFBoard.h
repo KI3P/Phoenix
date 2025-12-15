@@ -59,6 +59,12 @@ errno_t InitAttenuation(void);
  */
 uint16_t GetRFMCPRegisters(void);
 
+/**
+ * @brief Reset VFO state for testing purposes
+ * @note This function is intended for unit testing only
+ */
+void ResetVFOState(void);
+
 // VFO Control Functions
 
 void SetFrequencyCorrectionFactor(int32_t corr);

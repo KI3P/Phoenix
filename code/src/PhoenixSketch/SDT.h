@@ -386,6 +386,7 @@ struct ReceiveFilterConfig {
     arm_biquad_casd_df1_inst_f32 biquadZoomI;
     arm_biquad_casd_df1_inst_f32 biquadZoomQ;
     uint8_t zoom_M;
+    uint32_t zoom_sample_ptr = 0;  /** Tracks current position in FFT ring buffers for this filter config */
     const uint32_t IIR_biquad_Zoom_FFT_N_stages = 4;
 
     // Convolution FIR filter

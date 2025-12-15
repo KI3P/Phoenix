@@ -11,7 +11,7 @@ static float32_t DMAMEM last_sample_buffer_R[FFT_LENGTH];
 // Defined as static because we want their values to persist between calls
 static float32_t DMAMEM FFT_ring_buffer_x[SPECTRUM_RES];
 static float32_t DMAMEM FFT_ring_buffer_y[SPECTRUM_RES];
-static uint32_t zoom_sample_ptr; /** Tracks the current position in the ring buffers */
+// Note: zoom_sample_ptr moved to ReceiveFilterConfig struct so each filter has its own pointer
 static uint32_t iFSF;
 static float32_t audioPowerMax;
 
@@ -467,7 +467,7 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
  * @param spectrum_zoom The zoom selection, ranges from SPECTRUM_ZOOM_MIN to SPECTRUM_ZOOM_MAX
  * @param RXfilters Struct holding the filter variables and objects
  */
-void ZoomFFTPrep(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters){ 
+void ZoomFFTPrep(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters){
     // take value of spectrum_zoom and initialize IIR lowpass filter for the right values
     RXfilters->zoom_M = (1 << spectrum_zoom);
     // this sets the coefficients for the ZoomFFT decimation filter
@@ -475,7 +475,7 @@ void ZoomFFTPrep(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters){
     // for 0 the mag_coeffs will a NULL  ptr, since the filter is not going to be used in this mode!
     RXfilters->biquadZoomI.pCoeffs = mag_coeffs[spectrum_zoom];
     RXfilters->biquadZoomQ.pCoeffs = mag_coeffs[spectrum_zoom];
-    zoom_sample_ptr = 0;
+    RXfilters->zoom_sample_ptr = 0;
 }
 
 /**
@@ -523,21 +523,21 @@ bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, ReceiveFilterConfig *RX
     if (Nsamples > SPECTRUM_RES) {
         Nsamples = SPECTRUM_RES;
     }
-    // This multiplier overcomes the effects of the filter and decimate functions. Keeps 
+    // This multiplier overcomes the effects of the filter and decimate functions. Keeps
     // the amplitude in the PSD more stable as zoom increases.
     float32_t multiplier = zoomMultiplierCoeff[spectrum_zoom];
     for (size_t i = 0; i < Nsamples; i++) {
-        FFT_ring_buffer_x[zoom_sample_ptr] = multiplier*x_buffer[i];
-        FFT_ring_buffer_y[zoom_sample_ptr] = multiplier*y_buffer[i];
-        zoom_sample_ptr++;
+        FFT_ring_buffer_x[RXfilters->zoom_sample_ptr] = multiplier*x_buffer[i];
+        FFT_ring_buffer_y[RXfilters->zoom_sample_ptr] = multiplier*y_buffer[i];
+        RXfilters->zoom_sample_ptr++;
     }
 
-    if (zoom_sample_ptr < SPECTRUM_RES){
+    if (RXfilters->zoom_sample_ptr < SPECTRUM_RES){
         // we haven't filled up FFT_ring_buffers yet, do no more until they fill
         return false;
-    } 
+    }
     // FFT_ring_buffers are full, reset the sample pointer and then continue
-    zoom_sample_ptr = 0;
+    RXfilters->zoom_sample_ptr = 0;
     CalcPSD512(FFT_ring_buffer_x,FFT_ring_buffer_y);
 
     return true;

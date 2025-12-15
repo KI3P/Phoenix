@@ -526,7 +526,7 @@ TEST(CAT, CATSerialVFOChange){
     // Verify that changes happened as expected
     EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_20M);
     EXPECT_NE(ED.centerFreq_Hz[ED.activeVFO], initialCenterFreq);
-    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetSSBVFOFrequency());
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], GetRXVFOFrequency());
 
 }
 

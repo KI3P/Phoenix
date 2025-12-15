@@ -161,6 +161,10 @@ class CalibrationTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Initialize test environment before each test
+
+        // Initialize hardwareRegister to ensure clean starting state
+        hardwareRegister = 0;
+
         // Set up the queues so we get some simulated data through and start the "clock"
         Q_in_L.setChannel(0);
         Q_in_R.setChannel(1);
@@ -982,7 +986,7 @@ void CheckThatStateIsCalTransmitIQ(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
-    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[ED.currentBand[ED.activeVFO]]));  // RX attenuation
+    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), 63);  // RX attenuation always 31.5 dB (63 = 2*31.5) during transmit
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 0);  // TX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     // Now check that the GPIO registers match the hardware register
