@@ -295,7 +295,6 @@ void SetCWTXVFOFrequency(int64_t frequency_dHz){
  */
 errno_t InitVFOs(void){
     si5351.reset();
-    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor);
     MyDelay(100L);
     if (!si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
         bit_results.RF_Si5351_present = false;
@@ -305,7 +304,7 @@ errno_t InitVFOs(void){
         bit_results.RF_Si5351_present = true;
     }
     MyDelay(100L);
-
+    Serial.println("Set drive strengths");
     // Set driveCurrentSSB_mA to appropriate value
     si5351.drive_strength(SI5351_CLK0, SI5351_DRIVE_CURRENT);
     si5351.drive_strength(SI5351_CLK1, SI5351_DRIVE_CURRENT);
@@ -316,6 +315,7 @@ errno_t InitVFOs(void){
     si5351.drive_strength(SI5351_CLK6, SI5351_DRIVE_CURRENT);
     si5351.drive_strength(SI5351_CLK7, SI5351_DRIVE_CURRENT);
 
+    Serial.println("Set ms sources");
     si5351.set_ms_source(SI5351_CLK0, SI5351_PLLA);
     si5351.set_ms_source(SI5351_CLK1, SI5351_PLLA);
     si5351.set_ms_source(SI5351_CLK2, SI5351_PLLA);
@@ -325,6 +325,7 @@ errno_t InitVFOs(void){
     si5351.set_ms_source(SI5351_CLK6, SI5351_PLLB);
     si5351.set_ms_source(SI5351_CLK7, SI5351_PLLB);
 
+    Serial.println("Enable clock outputs");
     si5351.output_enable(SI5351_CLK0, 1);
     si5351.output_enable(SI5351_CLK1, 1);
     si5351.output_enable(SI5351_CLK2, 0);
@@ -334,25 +335,29 @@ errno_t InitVFOs(void){
     si5351.output_enable(SI5351_CLK6, 1);
     si5351.output_enable(SI5351_CLK7, 0);
 
+    Serial.println("Set RX freq");
     SetSSBRXVFOFrequency(10000000L*100);
+    Serial.println("Set TX freq");
     SetSSBTXVFOFrequency( 5000000L*100);
+    Serial.println("Set CW freq");
     SetCWTXVFOFrequency(  5000001L*100);
+
+    return ESUCCESS;
 }
-
-
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   delay(500);
-
+  Serial.println("Dual VFO test sketch");
   Wire.begin();
-
+  
   //scanner(&Wire);
 
   /* Initialise the LO */
+  Serial.println("Initialize VFOs...");
   InitVFOs();
-
+  Serial.println("Setup complete!");
 }
 
 void loop() {
@@ -364,7 +369,7 @@ void loop() {
   Serial.println("CW - CW TX Frequency  (CLK 6)");
   Serial.println("------------------------------");
 
-  Serial.setTimeout(10000);  // 10 second timeout for slower typing
+  Serial.setTimeout(2000);  // 2 second timeout for slower typing
   while (Serial.available() == 0) {}     //wait for data available
   String selection = Serial.readString();  //read until timeout
   selection.trim(); // remove any \r \n whitespace at the end of the String
