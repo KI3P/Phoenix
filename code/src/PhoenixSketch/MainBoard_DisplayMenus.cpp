@@ -557,6 +557,7 @@ void RestoreReceiveEQ(void){
 struct SecondaryMenuOption DiagnosticOptions[3] = {
     "I2C BIT test", functionOption, NULL, (void *)GotoDisplayBIT, NULL,
     "Restore receive EQ", functionOption, NULL, (void *)RestoreReceiveEQ, NULL,
+    "Buffer print", functionOption, NULL, (void *)buffer_pretty_print_last_entry, NULL,
 };
 
 
