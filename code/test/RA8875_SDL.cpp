@@ -14,22 +14,28 @@
 // Display dimensions
 static const int DISPLAY_WIDTH = 800;
 static const int DISPLAY_HEIGHT = 480;
+static const int REGISTER_PANEL_HEIGHT = 60;
 static const int HELP_PANEL_HEIGHT = 200;
-static const int WINDOW_HEIGHT = DISPLAY_HEIGHT + HELP_PANEL_HEIGHT;
+static const int WINDOW_HEIGHT = DISPLAY_HEIGHT + REGISTER_PANEL_HEIGHT + HELP_PANEL_HEIGHT;
 
 // SDL globals
 static SDL_Window* g_window = nullptr;
 static SDL_Renderer* g_renderer = nullptr;
 static SDL_Texture* g_texture = nullptr;
 static SDL_Texture* g_help_texture = nullptr;
+static SDL_Texture* g_register_texture = nullptr;
 static uint32_t* g_framebuffer = nullptr;  // ARGB8888 format
 static uint32_t* g_help_buffer = nullptr;  // Help panel buffer
+static uint32_t* g_register_buffer = nullptr;  // Hardware register panel buffer
 static bool g_initialized = false;
 static bool g_layers_enabled = false;
 static uint8_t g_current_layer = 0;
 static uint32_t* g_layer1 = nullptr;
 static uint32_t* g_layer2 = nullptr;
 static uint8_t g_layer_effect = 0;  // OR, AND, TRANSPARENT
+
+// Forward declaration
+static void update_register_panel();
 
 // Convert RGB565 to ARGB8888
 static uint32_t rgb565_to_argb8888(uint16_t color) {
@@ -80,7 +86,11 @@ static void update_display() {
         memcpy(g_framebuffer, g_layer1, DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint32_t));
     }
 
+    // Update register panel with current hardware state
+    update_register_panel();
+
     SDL_UpdateTexture(g_texture, nullptr, g_framebuffer, DISPLAY_WIDTH * sizeof(uint32_t));
+    SDL_UpdateTexture(g_register_texture, nullptr, g_register_buffer, DISPLAY_WIDTH * sizeof(uint32_t));
     SDL_UpdateTexture(g_help_texture, nullptr, g_help_buffer, DISPLAY_WIDTH * sizeof(uint32_t));
     SDL_RenderClear(g_renderer);
 
@@ -88,8 +98,12 @@ static void update_display() {
     SDL_Rect display_rect = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
     SDL_RenderCopy(g_renderer, g_texture, nullptr, &display_rect);
 
-    // Render help panel below
-    SDL_Rect help_rect = {0, DISPLAY_HEIGHT, DISPLAY_WIDTH, HELP_PANEL_HEIGHT};
+    // Render register panel in middle
+    SDL_Rect register_rect = {0, DISPLAY_HEIGHT, DISPLAY_WIDTH, REGISTER_PANEL_HEIGHT};
+    SDL_RenderCopy(g_renderer, g_register_texture, nullptr, &register_rect);
+
+    // Render help panel at bottom
+    SDL_Rect help_rect = {0, DISPLAY_HEIGHT + REGISTER_PANEL_HEIGHT, DISPLAY_WIDTH, HELP_PANEL_HEIGHT};
     SDL_RenderCopy(g_renderer, g_help_texture, nullptr, &help_rect);
 
     SDL_RenderPresent(g_renderer);
@@ -339,6 +353,45 @@ static void draw_help_string(int x, int y, const char* text, uint32_t color, int
     }
 }
 
+// Set a pixel in the register panel buffer
+static void set_register_pixel(int x, int y, uint32_t color) {
+    if (x < 0 || x >= DISPLAY_WIDTH || y < 0 || y >= REGISTER_PANEL_HEIGHT) return;
+    if (g_register_buffer) {
+        g_register_buffer[y * DISPLAY_WIDTH + x] = color;
+    }
+}
+
+// Draw a single character to the register panel buffer using built-in font
+static int draw_register_char(int x, int y, char c, uint32_t color, int scale = 1) {
+    if (c < 32 || c > 126) c = '?';
+    int idx = c - 32;
+
+    int char_width = 8 * scale;
+
+    for (int row = 0; row < 16; row++) {
+        uint8_t line = font_8x16[idx][row];
+        for (int col = 0; col < 8; col++) {
+            if (line & (0x80 >> col)) {
+                for (int sy = 0; sy < scale; sy++) {
+                    for (int sx = 0; sx < scale; sx++) {
+                        set_register_pixel(x + col * scale + sx, y + row * scale + sy, color);
+                    }
+                }
+            }
+        }
+    }
+
+    return char_width;
+}
+
+// Draw a string to the register panel buffer
+static void draw_register_string(int x, int y, const char* text, uint32_t color, int scale = 1) {
+    while (*text) {
+        x += draw_register_char(x, y, *text, color, scale);
+        text++;
+    }
+}
+
 // Initialize the help panel with keyboard map
 static void init_help_panel() {
     if (!g_help_buffer) return;
@@ -434,6 +487,125 @@ static void init_help_panel() {
     draw_help_string(col1, y, "9", key_color); draw_help_string(col1 + 16, y, "Main Tune+ (8)", desc_color);
     draw_help_string(col2, y, "H", key_color); draw_help_string(col2 + 16, y, "Home (17)", desc_color);
     draw_help_string(col4, y, "ESC", key_color); draw_help_string(col4 + 32, y, "Exit", desc_color);
+}
+
+// Initialize the hardware register panel (static layout)
+static void init_register_panel() {
+    if (!g_register_buffer) return;
+
+    // Fill with dark blue-gray background
+    uint32_t bg_color = 0xFF1a1a2e;
+    for (int i = 0; i < DISPLAY_WIDTH * REGISTER_PANEL_HEIGHT; i++) {
+        g_register_buffer[i] = bg_color;
+    }
+
+    // Draw separator lines at top and bottom
+    uint32_t separator_color = 0xFF404060;
+    for (int x = 0; x < DISPLAY_WIDTH; x++) {
+        g_register_buffer[x] = separator_color;
+        g_register_buffer[(REGISTER_PANEL_HEIGHT - 1) * DISPLAY_WIDTH + x] = separator_color;
+    }
+}
+
+// External reference to hardware register (defined in Globals.cpp)
+extern uint32_t hardwareRegister;
+
+// Update the hardware register panel with current state
+static void update_register_panel() {
+    if (!g_register_buffer) return;
+
+    // Color scheme
+    uint32_t bg_color = 0xFF1a1a2e;       // Dark blue-gray background
+    uint32_t title_color = 0xFFFFFF00;    // Yellow for titles
+    uint32_t on_color = 0xFF00FF00;       // Green for 1/ON bits
+    uint32_t off_color = 0xFF444444;      // Dark gray for 0/OFF bits
+    uint32_t label_color = 0xFFAAAAAA;    // Light gray for labels
+    uint32_t value_color = 0xFFFFFFFF;    // White for hex value
+    uint32_t separator_color = 0xFF404060;
+
+    // Clear buffer
+    for (int i = 0; i < DISPLAY_WIDTH * REGISTER_PANEL_HEIGHT; i++) {
+        g_register_buffer[i] = bg_color;
+    }
+
+    // Draw separator lines
+    for (int x = 0; x < DISPLAY_WIDTH; x++) {
+        g_register_buffer[x] = separator_color;
+        g_register_buffer[(REGISTER_PANEL_HEIGHT - 1) * DISPLAY_WIDTH + x] = separator_color;
+    }
+
+    int y = 4;
+    int line_height = 18;
+
+    // Row 1: Title and hex value
+    draw_register_string(10, y, "HARDWARE REGISTER:", title_color);
+    char hex_str[16];
+    snprintf(hex_str, sizeof(hex_str), "0x%08X", hardwareRegister);
+    draw_register_string(170, y, hex_str, value_color);
+
+    y += line_height;
+
+    // Row 2: Section labels with bit ranges and individual bit names
+    draw_register_string(10, y, "BPF", label_color);
+    draw_register_string(55, y, "RXATT", label_color);
+    draw_register_string(115, y, "TXATT", label_color);
+    // RF bit labels: SSBVFO(15), CWVFO(14), CAL(13), MODE(12), CW(11), RXTX(10)
+    draw_register_string(192, y, "SV CV CA MO CW RT", label_color);
+    // LPF bit labels: RXBPF(9), TXBPF(8), PA100W(7), XVTR(6), ANT1(5), ANT0(4), LPFBAND[3:0]
+    draw_register_string(342, y, "RB TB PA XV A1 A0  LPF", label_color);
+
+    y += line_height;
+
+    // Row 3: Binary bits with visual indicators
+    int x_pos = 10;
+
+    // BPF[31:28] - 4 bits
+    for (int bit = 31; bit >= 28; bit--) {
+        uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
+        draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
+        x_pos += 8;
+    }
+    x_pos += 12;  // gap to align with RXATT label
+
+    // RXATT[27:22] - 6 bits
+    for (int bit = 27; bit >= 22; bit--) {
+        uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
+        draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
+        x_pos += 8;
+    }
+    x_pos += 12;
+
+    // TXATT[21:16] - 6 bits
+    for (int bit = 21; bit >= 16; bit--) {
+        uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
+        draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
+        x_pos += 8;
+    }
+    x_pos += 30;
+
+    // RF[15:10] - 6 bits (SSBVFO, CWVFO, CAL, MODE, CW, RXTX)
+    for (int bit = 15; bit >= 10; bit--) {
+        uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
+        draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
+        x_pos += 8;
+        x_pos += 16;  // extra spacing to align with labels
+    }
+    x_pos += 6;
+
+    // LPF[9:0] - 10 bits (RXBPF, TXBPF, PA100W, XVTR, ANT1, ANT0, LPFBAND3-0)
+    for (int bit = 9; bit >= 4; bit--) {
+        uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
+        draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
+        x_pos += 8;
+        x_pos += 16;  // extra spacing to align with labels
+    }
+    // LPFBAND[3:0] - 4 bits grouped together
+    x_pos += 8;
+    for (int bit = 3; bit >= 0; bit--) {
+        uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
+        draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
+        x_pos += 8;
+    }
 }
 
 // Draw a single character using built-in font and return its width
@@ -588,11 +760,31 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         return false;
     }
 
+    // Create register panel texture
+    g_register_texture = SDL_CreateTexture(
+        g_renderer,
+        SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING,
+        DISPLAY_WIDTH,
+        REGISTER_PANEL_HEIGHT
+    );
+
+    if (!g_register_texture) {
+        std::cerr << "Register texture creation failed: " << SDL_GetError() << std::endl;
+        SDL_DestroyTexture(g_help_texture);
+        SDL_DestroyTexture(g_texture);
+        SDL_DestroyRenderer(g_renderer);
+        SDL_DestroyWindow(g_window);
+        SDL_Quit();
+        return false;
+    }
+
     // Allocate framebuffer and layer buffers
     g_framebuffer = new uint32_t[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     g_layer1 = new uint32_t[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     g_layer2 = new uint32_t[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     g_help_buffer = new uint32_t[DISPLAY_WIDTH * HELP_PANEL_HEIGHT];
+    g_register_buffer = new uint32_t[DISPLAY_WIDTH * REGISTER_PANEL_HEIGHT];
 
     // Clear to black
     uint32_t black = 0xFF000000;
@@ -604,6 +796,9 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
 
     // Initialize help panel with keyboard map
     init_help_panel();
+
+    // Initialize register panel
+    init_register_panel();
 
     g_initialized = true;
     update_display();
@@ -984,6 +1179,10 @@ void RA8875_SDL_Cleanup() {
         SDL_DestroyTexture(g_help_texture);
         g_help_texture = nullptr;
     }
+    if (g_register_texture) {
+        SDL_DestroyTexture(g_register_texture);
+        g_register_texture = nullptr;
+    }
     if (g_renderer) {
         SDL_DestroyRenderer(g_renderer);
         g_renderer = nullptr;
@@ -999,6 +1198,10 @@ void RA8875_SDL_Cleanup() {
     if (g_help_buffer) {
         delete[] g_help_buffer;
         g_help_buffer = nullptr;
+    }
+    if (g_register_buffer) {
+        delete[] g_register_buffer;
+        g_register_buffer = nullptr;
     }
     if (g_layer1) {
         delete[] g_layer1;

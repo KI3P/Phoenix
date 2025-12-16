@@ -7,6 +7,7 @@
 #include <sstream>
 #include <iostream>
 #include <type_traits>
+#include <cstdint>
 
 // Forward declarations
 class JsonDocument;
