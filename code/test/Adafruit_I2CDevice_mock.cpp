@@ -52,7 +52,36 @@ bool Adafruit_I2CDevice::write_then_read(const uint8_t *write_buffer, size_t wri
         return false;
     }
 
-    // Handle the read part by copying mock data
+    // Special handling for AD7991 ADC - extract channel from command byte
+    // and include it in the response
+    if (write_len >= 1 && read_len >= 2 && write_buffer != nullptr && read_buffer != nullptr) {
+        // AD7991 command byte format: bits 6-4 contain channel selection (one-hot encoded)
+        // Response format: bits 5-4 of first byte contain channel ID
+        uint8_t commandByte = write_buffer[0];
+        uint8_t channelSelect = (commandByte >> 4) & 0b0111;
+        uint8_t channelId = 0;
+
+        // Convert one-hot channel select to channel ID
+        if (channelSelect == 0b0001) channelId = 0;      // CH0
+        else if (channelSelect == 0b0010) channelId = 1; // CH1
+        else if (channelSelect == 0b0100) channelId = 2; // CH2
+
+        // Construct response with channel ID in bits 5-4 of first byte
+        // Use mock_read_data for the actual ADC value (12-bit)
+        uint16_t adcValue = 0;
+        if (mock_read_length >= 2) {
+            // Extract 12-bit value from mock data
+            adcValue = ((mock_read_data[0] & 0x0F) << 8) | mock_read_data[1];
+        }
+
+        // Format response: first byte has channel ID in bits 5-4, high 4 bits of value in bits 3-0
+        read_buffer[0] = (channelId << 4) | ((adcValue >> 8) & 0x0F);
+        read_buffer[1] = adcValue & 0xFF;
+
+        return true;
+    }
+
+    // Fall back to simple copy for other devices
     size_t copy_len = (read_len < mock_read_length) ? read_len : mock_read_length;
     if (copy_len > 0 && read_buffer != nullptr) {
         memcpy(read_buffer, mock_read_data, copy_len);
