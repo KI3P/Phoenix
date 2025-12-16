@@ -47,8 +47,8 @@ static uint8_t mcpB_old = 0x00;
 // Macros to get and set the relevant parts of the hardware register
 #define RF_GPA_RXATT_STATE (uint8_t)((hardwareRegister >> RXATTLSB) & 0x0000003F)
 #define RF_GPB_TXATT_STATE (uint8_t)((hardwareRegister >> TXATTLSB) & 0x0000003F)
-#define SET_RF_GPA_RXATT(val) (hardwareRegister = (hardwareRegister & 0xF03FFFFF) | (((uint32_t)val & 0x0000003F) << RXATTLSB));buffer_add()
-#define SET_RF_GPB_TXATT(val) (hardwareRegister = (hardwareRegister & 0xFFC0FFFF) | (((uint32_t)val & 0x0000003F) << TXATTLSB));buffer_add()
+#define SET_RF_GPA_RXATT(val) (hardwareRegister = (hardwareRegister & 0xF03FFFFF) | (((uint64_t)val & 0x0000003F) << RXATTLSB));buffer_add()
+#define SET_RF_GPB_TXATT(val) (hardwareRegister = (hardwareRegister & 0xFFC0FFFF) | (((uint64_t)val & 0x0000003F) << TXATTLSB));buffer_add()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions that are only visible from within this file

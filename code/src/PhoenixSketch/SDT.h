@@ -45,8 +45,8 @@ typedef int errno_t;
 #define REV         27
 #define CAL         38  // RX board calibration control (H=CAL,L=normal)
 
-// The 32 bit register that records the state of the radio hardware
-extern uint32_t hardwareRegister;
+// The 64 bit register that records the state of the radio hardware
+extern uint64_t hardwareRegister;
 
 // The bit map for hardwareRegister
 #define LPFBAND0BIT  0
@@ -686,7 +686,7 @@ extern elapsedMicros usec;
 /** Structure of a hardware register buffer entry */
 typedef struct {
     uint32_t timestamp;
-    uint32_t register_value;
+    uint64_t register_value;
 } BufferEntry;
 
 /** Rolling buffer to store hardware register changes */

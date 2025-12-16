@@ -7,7 +7,7 @@
 #include "RFBoard_si5351.h"
 
 
-uint32_t hardwareRegister;
+uint64_t hardwareRegister;
 
 struct config_t {
     int32_t freqCorrectionFactor = 0; /** Correction value for Si5351 VFO */

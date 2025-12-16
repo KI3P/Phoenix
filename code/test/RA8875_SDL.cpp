@@ -508,7 +508,7 @@ static void init_register_panel() {
 }
 
 // External reference to hardware register (defined in Globals.cpp)
-extern uint32_t hardwareRegister;
+extern uint64_t hardwareRegister;
 
 // Update the hardware register panel with current state
 static void update_register_panel() {

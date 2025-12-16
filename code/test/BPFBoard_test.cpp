@@ -24,62 +24,62 @@ TEST_F(BPFBoardTest, BPFWordMacroCalculation) {
     // Test BPF_WORD macro for different band values
 
     // Test band 0 (60M): should give 0x0100
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)0 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)0 & 0x0000000F) << BPFBAND0BIT);
     uint16_t result = BPF_WORD;
     EXPECT_EQ(result, 0x0100);
 
     // Test band 1 (160M): should give 0x0200
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)1 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)1 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0200);
 
     // Test band 2 (80M): should give 0x0400
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)2 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)2 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0400);
 
     // Test band 3 (40M): should give 0x0800
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)3 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)3 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0800);
 
     // Test band 4 (30M): should give 0x1000
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)4 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)4 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x1000);
 
     // Test band 5 (20M): should give 0x2000
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)5 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)5 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x2000);
 
     // Test band 6 (17M): should give 0x4000
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)6 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)6 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x4000);
 
     // Test band 7 (15M): should give 0x8000
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)7 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)7 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x8000);
 
     // Test band 8 (12M): should give 0x0001
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)8 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)8 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0001);
 
     // Test band 9 (10M): should give 0x0002
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)9 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)9 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0002);
 
     // Test band 10 (6M): should give 0x0004
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)10 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)10 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0004);
 
     // Test band 15 (BYPASS): should give 0x0008 (special case: 0x0080 >> 4)
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)15 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)15 & 0x0000000F) << BPFBAND0BIT);
     result = BPF_WORD;
     EXPECT_EQ(result, 0x0008);
 }
@@ -184,7 +184,7 @@ TEST_F(BPFBoardTest, SelectBPFBandSameBandTwice) {
 TEST_F(BPFBoardTest, BPFWordBypassSpecialCase) {
     // Test the special case for bypass band (value 15)
     // According to the comments, bypass should give 0x0008 (0x0080 >> 4)
-    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)15 & 0x0000000F) << BPFBAND0BIT);
+    hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)15 & 0x0000000F) << BPFBAND0BIT);
     uint16_t result = BPF_WORD;
     EXPECT_EQ(result, 0x0008);
 }
@@ -192,7 +192,7 @@ TEST_F(BPFBoardTest, BPFWordBypassSpecialCase) {
 TEST_F(BPFBoardTest, BandRangeTests) {
     // Test boundary conditions for band values
     for (int band = 0; band <= 15; band++) {
-        hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint32_t)band & 0x0000000F) << BPFBAND0BIT);
+        hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)band & 0x0000000F) << BPFBAND0BIT);
         uint16_t result = BPF_WORD;
 
         // Verify that the result is always a valid 16-bit value
@@ -243,8 +243,8 @@ TEST_F(BPFBoardTest, HardwareRegisterPreservation) {
     SET_BPF_BAND(7);
 
     // Verify that lower 28 bits are preserved
-    uint32_t lowerBits = hardwareRegister & 0x0FFFFFFF;
-    uint32_t originalLowerBits = originalValue & 0x0FFFFFFF;
+    uint64_t lowerBits = hardwareRegister & 0x0FFFFFFF;
+    uint64_t originalLowerBits = originalValue & 0x0FFFFFFF;
     EXPECT_EQ(lowerBits, originalLowerBits);
 
     // Verify that the band was set correctly in upper 4 bits
