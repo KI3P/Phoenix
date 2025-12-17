@@ -550,10 +550,10 @@ static void update_register_panel() {
     draw_register_string(10, y, "BPF", label_color);
     draw_register_string(55, y, "RXATT", label_color);
     draw_register_string(115, y, "TXATT", label_color);
-    // RF bit labels: SSBVFO(15), CWVFO(14), CAL(13), MODE(12), CW(11), RXTX(10)
-    draw_register_string(192, y, "SV CV CA MO CW RT", label_color);
+    // RF bit labels: TXVFO(32) RXVFO(15), CWVFO(14), CAL(13), MODE(12), CW(11), RXTX(10)
+    draw_register_string(192, y, "TV RV CV CA MO CW RT", label_color);
     // LPF bit labels: RXBPF(9), TXBPF(8), PA100W(7), XVTR(6), ANT1(5), ANT0(4), LPFBAND[3:0]
-    draw_register_string(342, y, "RB TB PA XV A1 A0  LPF", label_color);
+    draw_register_string(366, y, "RB TB PA XV A1 A0  LPF", label_color);
 
     y += line_height;
 
@@ -584,7 +584,13 @@ static void update_register_panel() {
     }
     x_pos += 30;
 
-    // RF[15:10] - 6 bits (SSBVFO, CWVFO, CAL, MODE, CW, RXTX)
+    // TXVFO bit which is off on its own boo hoo
+    uint32_t color = (hardwareRegister & (1UL << 32)) ? on_color : off_color;
+    draw_register_char(x_pos, y, (hardwareRegister & (1UL << 32)) ? '1' : '0', color);
+    x_pos += 8;
+    x_pos += 16;
+
+    // RF[15:10] - 6 bits (RXVFO, CWVFO, CAL, MODE, CW, RXTX)
     for (int bit = 15; bit >= 10; bit--) {
         uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
         draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
@@ -609,7 +615,7 @@ static void update_register_panel() {
     }
 
     // VFO Frequency Display (right side of panel)
-    int vfo_x = 540;  // Start position for VFO section
+    int vfo_x = 560;  // Start position for VFO section
     int vfo_y = 4;
 
     // Row 1: VFO section title

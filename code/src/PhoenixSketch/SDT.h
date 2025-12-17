@@ -89,10 +89,10 @@ extern uint64_t hardwareRegister;
 #define BAND_160M_BCD 0b0001
 
 // Macros used to manipulate the hardware register
-#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
-#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)));buffer_add()
-#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)));buffer_add()
-#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)));buffer_add()
+#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1ULL)
+#define SET_BIT(byte, bit) ((byte) |= (1ULL << (bit)));buffer_add()
+#define CLEAR_BIT(byte, bit) ((byte) &= ~(1ULL << (bit)));buffer_add()
+#define TOGGLE_BIT(byte, bit) ((byte) ^= (1ULL << (bit)));buffer_add()
 #define GET_LPF_BAND (uint8_t)(hardwareRegister & 0x0000000F)
 
 // Every time the value of hardwareRegister is updated, store this in a rolling buffer
@@ -177,16 +177,16 @@ float32_t AudioToDBM(float32_t audioVal);
 
 enum KeyTypeId {
     KeyTypeId_Straight = 0,
-    KeyTypeId_Keyer = 1,
-    KeyTypeId_Invalid = 8
+    KeyTypeId_Keyer =    1,
+    KeyTypeId_Invalid =  8
 };
 
 enum FilterType {
-    Lowpass = 0,
+    Lowpass =  0,
     Highpass = 1,
     Bandpass = 2,
-    Hilbert = 4,
-    Notch = 5
+    Hilbert =  4,
+    Notch =    5
 };
 
 enum TXRXType {

@@ -964,6 +964,7 @@ void CheckThatStateIsCalReceiveIQ(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be HI (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXVFOBIT), 0); // TX VFO should be LO (off)
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*31.5));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*31.5));  // TX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
@@ -976,18 +977,19 @@ void CheckThatStateIsCalTransmitIQ(){
     int32_t band = ED.currentBand[ED.activeVFO];
     EXPECT_EQ(GETHWRBITS(LPFBAND0BIT,4), BandToBCD(band)); // LPF filter
     EXPECT_EQ(GETHWRBITS(ANT0BIT,2), ED.antennaSelection[band]); // antenna
-    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 1);   // transverter should be HI (out of path) for receive
+    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 0);   // transverter should be LO (in path)
     EXPECT_EQ(GET_BIT(hardwareRegister,PA100WBIT), 0); // PA should always be LO (bypassed)
-    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 1);  // TX path should include BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 0);  // TX path should bypass BPF
     EXPECT_EQ(GET_BIT(hardwareRegister,RXBPFBIT), 0);  // RX path should bypass BPF
     EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 1);   // RXTX bit should be TX (1)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 0);     // CW bit should be 0 (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT),1);   // MODE should be HI (SSB)
-    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
-    EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // RX VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXVFOBIT), 1); // TX VFO should be HI (on)
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), 63);  // RX attenuation always 31.5 dB (63 = 2*31.5) during transmit
-    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 0);  // TX attenuation
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 63);  // TX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     // Now check that the GPIO registers match the hardware register
     CheckThatHardwareRegisterMatchesActualHardware();
@@ -1008,6 +1010,7 @@ void CheckThatRegisterStateIsReceive(){
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXVFOBIT), 0); // TX VFO should be LO (off)
     // Note: TX attenuation is not checked in receive mode because it doesn't affect RX operation
     // and the timing of when it gets reset during state transitions is implementation-dependent
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
@@ -1271,7 +1274,7 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     // Test incrementing the transmit attenuation by rotating finetune encoder clockwise
     SetInterrupt(iFINETUNE_INCREASE);
     loop(); MyDelay(10);
-
+    
     float32_t attenAfterIncrease = attLevel;
     EXPECT_NEAR(attenAfterIncrease, initialAtten + expectedIncrement, 0.00001);
     EXPECT_NEAR(attLevel,GetTXAttenuation(),0.51);
