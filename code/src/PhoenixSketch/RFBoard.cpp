@@ -473,7 +473,7 @@ void SetRXVFOFrequency(int64_t frequency_dHz){
             si5351.pll_reset(SI5351_PLLA);                   // reset PLLA to align outputs
             si5351.output_enable(CLK0RX, 1);                 // set outputs on or off
             si5351.output_enable(CLK90RX, 1);
-            SET_BIT(hardwareRegister,SSBVFOBIT);
+            SET_BIT(hardwareRegister,RXVFOBIT);
         } else {    // this is the timed delay technique for frequencies below 3.2MHz as detailed in
                     // https://tj-lab.org/2020/08/27/si5351単体で3mhz以下の直交信号を出力する/
             cli();                //__disable_irq(); or __enable_irq();     // or cli()/sei() pair; needed to get accurate timing??
@@ -491,7 +491,7 @@ void SetRXVFOFrequency(int64_t frequency_dHz){
             sei();
             si5351.output_enable(CLK0RX, 1);                            // switch them on to be sure
             si5351.output_enable(CLK90RX, 1);                           //    ""        ""
-            SET_BIT(hardwareRegister,SSBVFOBIT);
+            SET_BIT(hardwareRegister,RXVFOBIT);
         }
     }
     oldrxMultiple = rxmultiple;
@@ -524,7 +524,7 @@ void SetTXVFOFrequency(int64_t frequency_dHz){
             si5351.pll_reset(SI5351_PLLB);                   // reset PLLB to align outputs
             si5351.output_enable(CLK0TX, 1);                 // set outputs on or off
             si5351.output_enable(CLK90TX, 1);
-            SET_BIT(hardwareRegister,SSBVFOBIT);
+            SET_BIT(hardwareRegister,TXVFOBIT);
         } else {    // this is the timed delay technique for frequencies below 3.2MHz as detailed in
                     // https://tj-lab.org/2020/08/27/si5351単体で3mhz以下の直交信号を出力する/
             cli();                              // or cli()/sei() pair; needed to get accurate timing??
@@ -542,7 +542,7 @@ void SetTXVFOFrequency(int64_t frequency_dHz){
             sei();
             si5351.output_enable(CLK0TX, 1);                            // switch them on to be sure
             si5351.output_enable(CLK90TX, 1);                           //    ""        ""
-            SET_BIT(hardwareRegister,SSBVFOBIT);
+            SET_BIT(hardwareRegister,TXVFOBIT);
         }
     }
     oldtxMultiple = txmultiple;
@@ -554,7 +554,7 @@ void SetTXVFOFrequency(int64_t frequency_dHz){
 void EnableRXVFOOutput(void){
     si5351.output_enable(CLK0RX, 1);
     si5351.output_enable(CLK90RX, 1);
-    SET_BIT(hardwareRegister,SSBVFOBIT);
+    SET_BIT(hardwareRegister,RXVFOBIT);
 }
 
 /**
@@ -563,7 +563,7 @@ void EnableRXVFOOutput(void){
 void EnableTXVFOOutput(void){
     si5351.output_enable(CLK0TX, 1);
     si5351.output_enable(CLK90TX, 1);
-    SET_BIT(hardwareRegister,SSBVFOBIT);
+    SET_BIT(hardwareRegister,TXVFOBIT);
 }
 
 /**
@@ -572,7 +572,7 @@ void EnableTXVFOOutput(void){
 void DisableRXVFOOutput(void){
     si5351.output_enable(CLK0RX, 0);
     si5351.output_enable(CLK90RX, 0);
-    CLEAR_BIT(hardwareRegister,SSBVFOBIT);
+    CLEAR_BIT(hardwareRegister,RXVFOBIT);
 }
 
 /**
@@ -581,7 +581,7 @@ void DisableRXVFOOutput(void){
 void DisableTXVFOOutput(void){
     si5351.output_enable(CLK0TX, 0);
     si5351.output_enable(CLK90TX, 0);
-    CLEAR_BIT(hardwareRegister,SSBVFOBIT);
+    CLEAR_BIT(hardwareRegister,TXVFOBIT);
 }
 
 // CW VFO Control Functions

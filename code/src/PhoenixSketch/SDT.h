@@ -64,7 +64,7 @@ extern uint64_t hardwareRegister;
 #define MODEBIT      12
 #define CALBIT       13
 #define CWVFOBIT     14
-#define SSBVFOBIT    15
+#define RXVFOBIT     15
 #define TXATTLSB     16
 #define TXATTMSB     21
 #define RXATTLSB     22
@@ -73,6 +73,7 @@ extern uint64_t hardwareRegister;
 #define BPFBAND1BIT  29
 #define BPFBAND2BIT  30
 #define BPFBAND3BIT  31
+#define TXVFOBIT     32
 
 #define BAND_NF_BCD   0b1111
 #define BAND_6M_BCD   0b1010

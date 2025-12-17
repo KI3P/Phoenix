@@ -383,7 +383,9 @@ void pretty_print_line(BufferEntry entry){
   line += " ";
   line += regtostring(entry.register_value,CWVFOBIT,CWVFOBIT);
   line += " ";
-  line += regtostring(entry.register_value,SSBVFOBIT,SSBVFOBIT);
+  line += regtostring(entry.register_value,RXVFOBIT,RXVFOBIT);
+  line += " ";
+  line += regtostring(entry.register_value,TXVFOBIT,TXVFOBIT);
   line += " ";
   line += regtostring(entry.register_value,TXATTMSB,TXATTLSB);
   line += " ";
@@ -398,11 +400,11 @@ void pretty_print_line(BufferEntry entry){
  * Useful for quickly checking current hardware state.
  */
 void buffer_pretty_print_last_entry(void) {
-  Debug("|               |              X 1     R   M   C S               |");
-  Debug("|               |           A  V 0 T R X   O C A F F             |");
-  Debug("|               |           n  T 0 X X T C D L O O               |");
-  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
-  Debug("|---------------|------------------------------------------------|");
+  Debug("|               |              X 1     R   M   C R T               |");
+  Debug("|               |           A  V 0 T R X   O C V V V               |");
+  Debug("|               |           n  T 0 X X T C D A F F F               |");
+  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |");
+  Debug("|---------------|--------------------------------------------------|");
   BufferEntry entry;
   if (buffer.head > 0) entry = buffer.entries[buffer.head-1];
   else entry = buffer.entries[REGISTER_BUFFER_SIZE-1];
@@ -426,11 +428,11 @@ void buffer_pretty_buffer_array(void) {
     }
 
     Debug("Entries (oldest to newest):");
-    Debug("|               |              X 1     R   M   C S               |");
-    Debug("|               |           A  V 0 T R X   O C V V               |");
-    Debug("|               |           n  T 0 X X T C D A F F               |");
-    Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
-    Debug("|---------------|------------------------------------------------|");
+    Debug("|               |              X 1     R   M   C R T               |");
+    Debug("|               |           A  V 0 T R X   O C V V V               |");
+    Debug("|               |           n  T 0 X X T C D A F F F               |");
+    Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |");
+    Debug("|---------------|--------------------------------------------------|");
 
     // Calculate starting index for oldest entry
     size_t start_idx;

@@ -4,6 +4,7 @@
 
 #include "RA8875.h"
 #include "Arduino.h"
+#include "RFBoard.h"
 #include <iostream>
 #include <cstring>
 #include <cmath>
@@ -16,7 +17,7 @@ static const int DISPLAY_WIDTH = 800;
 static const int DISPLAY_HEIGHT = 480;
 static const int REGISTER_PANEL_HEIGHT = 60;
 static const int HELP_PANEL_HEIGHT = 200;
-static const int WINDOW_HEIGHT = DISPLAY_HEIGHT + REGISTER_PANEL_HEIGHT + HELP_PANEL_HEIGHT;
+static const int SDL_WINDOW_HEIGHT = DISPLAY_HEIGHT + REGISTER_PANEL_HEIGHT + HELP_PANEL_HEIGHT;
 
 // SDL globals
 static SDL_Window* g_window = nullptr;
@@ -539,8 +540,8 @@ static void update_register_panel() {
 
     // Row 1: Title and hex value
     draw_register_string(10, y, "HARDWARE REGISTER:", title_color);
-    char hex_str[16];
-    snprintf(hex_str, sizeof(hex_str), "0x%08X", hardwareRegister);
+    char hex_str[20];
+    snprintf(hex_str, sizeof(hex_str), "0x%016lX", hardwareRegister);
     draw_register_string(170, y, hex_str, value_color);
 
     y += line_height;
@@ -606,6 +607,36 @@ static void update_register_panel() {
         draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
         x_pos += 8;
     }
+
+    // VFO Frequency Display (right side of panel)
+    int vfo_x = 540;  // Start position for VFO section
+    int vfo_y = 4;
+
+    // Row 1: VFO section title
+    draw_register_string(vfo_x, vfo_y, "VFO FREQUENCIES", title_color);
+    vfo_y += line_height;
+
+    // Get current VFO frequencies (in Hz)
+    int64_t rx_freq_hz = GetRXVFOFrequency();
+    int64_t tx_freq_hz = GetTXVFOFrequency();
+    int64_t cw_freq_hz = GetCWVFOFrequency();
+
+    // Row 2: RX VFO
+    draw_register_string(vfo_x, vfo_y, "RX:", label_color);
+    char freq_str[20];
+    // Format as MHz with 3 decimal places (kHz resolution)
+    snprintf(freq_str, sizeof(freq_str), "%8.6f MHz", rx_freq_hz / 1000000.0);
+    draw_register_string(vfo_x + 25, vfo_y, freq_str, value_color);
+    vfo_y += line_height;
+
+    // Row 3: TX and CW VFOs
+    draw_register_string(vfo_x, vfo_y, "TX:", label_color);
+    snprintf(freq_str, sizeof(freq_str), "%8.6f", tx_freq_hz / 1000000.0);
+    draw_register_string(vfo_x + 25, vfo_y, freq_str, value_color);
+
+    draw_register_string(vfo_x + 130, vfo_y, "CW:", label_color);
+    snprintf(freq_str, sizeof(freq_str), "%8.6f", cw_freq_hz / 1000000.0);
+    draw_register_string(vfo_x + 130+25, vfo_y, freq_str, value_color);
 }
 
 // Draw a single character using built-in font and return its width
@@ -706,7 +737,7 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         DISPLAY_WIDTH,
-        WINDOW_HEIGHT,
+        SDL_WINDOW_HEIGHT,
         SDL_WINDOW_SHOWN
     );
 

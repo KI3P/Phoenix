@@ -37,7 +37,7 @@
  *   ;/'               - Fine tune encoder
  *
  *   ---- PTT and CW Keys ----
- *   p - PTT (hold to transmit SSB)
+ *   p - PTT (toggle to transmit SSB)
  *   . - CW Key 1 (straight key / dit)
  *   / - CW Key 2 (dah for iambic keyer)
  *
@@ -100,6 +100,7 @@ enum SimulatorAction {
 
 // Track key states for PTT and CW keys (need to detect release)
 static bool pttKeyDown = false;
+static bool pttEngaged = false;  // Track latching PTT state
 static bool cwKey1Down = false;
 
 #ifdef USE_SDL_DISPLAY
@@ -190,12 +191,18 @@ SimulatorAction processEvents() {
                     case SDLK_LEFT: SetInterrupt(iFILTER_DECREASE); break;
                     case SDLK_RIGHT: SetInterrupt(iFILTER_INCREASE); break;
 
-                    // ---- PTT (Press to transmit SSB) ----
+                    // ---- PTT (Toggle to transmit SSB) ----
                     case SDLK_p:
                         if (!pttKeyDown) {
                             pttKeyDown = true;
-                            SetInterrupt(iPTT_PRESSED);
-                            std::cout << "PTT PRESSED" << std::endl;
+                            pttEngaged = !pttEngaged;
+                            if (pttEngaged) {
+                                SetInterrupt(iPTT_PRESSED);
+                                std::cout << "PTT ENGAGED" << std::endl;
+                            } else {
+                                SetInterrupt(iPTT_RELEASED);
+                                std::cout << "PTT DISENGAGED" << std::endl;
+                            }
                         }
                         break;
 
@@ -240,13 +247,9 @@ SimulatorAction processEvents() {
 
             case SDL_KEYUP:
                 switch (event.key.keysym.sym) {
-                    // ---- PTT Release ----
+                    // ---- PTT Key Release (just clear key state, don't change PTT) ----
                     case SDLK_p:
-                        if (pttKeyDown) {
-                            pttKeyDown = false;
-                            SetInterrupt(iPTT_RELEASED);
-                            std::cout << "PTT RELEASED" << std::endl;
-                        }
+                        pttKeyDown = false;
                         break;
 
                     // ---- CW Key 1 Release ----
@@ -283,7 +286,7 @@ void printUsage() {
     std::cout << "  [ / ]         - Main tune encoder" << std::endl;
     std::cout << "  ; / '         - Fine tune encoder" << std::endl;
     std::cout << "\n  --- PTT and CW ---" << std::endl;
-    std::cout << "  p (hold)      - PTT (transmit SSB)" << std::endl;
+    std::cout << "  p (toggle)    - PTT (transmit SSB)" << std::endl;
     std::cout << "  . (hold)      - CW Key 1 (straight key / dit)" << std::endl;
     std::cout << "  /             - CW Key 2 (dah)" << std::endl;
     std::cout << "\n  --- Audio Source ---" << std::endl;
