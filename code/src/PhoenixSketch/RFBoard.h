@@ -198,6 +198,10 @@ void CWoff(void);
  */
 errno_t InitVFOs(void);
 
+bool HasDualVFOs(void);
+// Only used during unit tests!
+void SetDualVFOs(bool val);
+
 // Transmit Modulation Control
 
 /**

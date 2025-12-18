@@ -14,6 +14,8 @@ static char *filename = nullptr;
 void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
 static uint32_t swrTimer_ms = 0;
 
+#define RXTXZoom 3
+
 /**
  * Perform the appropriate IQ signal processing depending on the state we're in
  */
@@ -31,7 +33,8 @@ void PerformSignalProcessing(void){
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
-            TransmitReceiveProcessing();
+            if (HasDualVFOs())
+                TransmitReceiveProcessing();
             break;
         }
         default:{
@@ -709,8 +712,6 @@ void PlayBuffer(DataBlock *data){
     }
 }
 
-#define RXTXZoom 3
-
 /**
  * Initialize the global variables to their default startup values
  * 1) Configure the RXfilters
@@ -736,7 +737,8 @@ void setfilename(char *fnm){
 }
 
 /**
- * Truncated version of the receive processing that runs during transmit
+ * Truncated version of the receive processing that runs during transmit if we have
+ * dual VFOs installed on the RF board
  */
 void TransmitReceiveProcessing(void){
     data.I = float_buffer_L;
@@ -782,7 +784,7 @@ DataBlock * ReceiveProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    Flag(1);
+    //Flag(1);
     // Clear overfull buffers is not needed
     //ClearAudioBuffers();
 
@@ -892,7 +894,7 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
-    Flag(0);
+    //Flag(0);
 
     return &data;
 }
@@ -1053,7 +1055,7 @@ DataBlock * TransmitProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    Flag(2);
+    //Flag(2);
     TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
@@ -1072,6 +1074,6 @@ DataBlock * TransmitProcessing(const char *fname){
 
     // Play the data on the output buffer
     PlayIQData(&data);
-    Flag(0);
+    //Flag(0);
     return &data;
 }

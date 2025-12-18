@@ -4,6 +4,9 @@
 
 extern Si5351 si5351;
 
+// Mock control function for Si5351 address simulation
+extern void Si5351_Mock_SetDeviceAddress(uint8_t addr);
+
 TEST(RFHardwareState, StateStartInReceive){
     InitializeRFHardware();
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
@@ -57,6 +60,7 @@ TEST(RFHardwareState, StateTransitionToSSBTransmit){
 }
 
 TEST(RFHardwareState, StateTransitionToCWSpace){
+    Si5351_Mock_SetDeviceAddress(SI5351_DUAL_VFO_ADDR); // Simulate dual VFO hardware
     InitializeRFHardware();
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
     UpdateRFHardwareState();
@@ -83,6 +87,7 @@ TEST(RFHardwareState, StateTransitionToCWSpace){
 }
 
 TEST(RFHardwareState, StateTransitionToCWMark){
+    Si5351_Mock_SetDeviceAddress(SI5351_DUAL_VFO_ADDR); // Simulate dual VFO hardware
     InitializeRFHardware();
     modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
     UpdateRFHardwareState();
@@ -165,6 +170,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWReceive) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromSSBTransmit) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ResetVFOState(); // Reset VFO state for fresh frequency calculation
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
@@ -181,6 +187,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromSSBTransmit) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitMark) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
@@ -198,6 +205,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitMark) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitSpace) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
@@ -215,6 +223,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitSpace) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDitMark) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
@@ -232,6 +241,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDitMark) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDahMark) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 200L;
@@ -249,6 +259,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitDahMark) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerSpace) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 3574000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 50L;
@@ -266,6 +277,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerSpace) 
 }
 
 TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerWait) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 21074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = -50L;
@@ -283,6 +295,7 @@ TEST(RFHardwareState, TuneStateMachine_UpdateTuneStateFromCWTransmitKeyerWait) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceSSBToReceive) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 14230000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
@@ -306,6 +319,7 @@ TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceSSBToReceive) {
 }
 
 TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceCWReceiveToTransmit) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 7030000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 200L;
@@ -339,6 +353,7 @@ TEST(RFHardwareState, TuneStateMachine_StateTransitionSequenceCWReceiveToTransmi
 }
 
 TEST(RFHardwareState, TuneStateMachine_DifferentSampleRates) {
+    SetDualVFOs(true);
     si5351 = Si5351(); // Reset mock
     ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
     ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
@@ -554,4 +569,308 @@ TEST(RFHardwareState, BufferLogsSequentialOperations) {
     // Verify that buffer functionality is working by checking the count increased
     // This is a simple test that doesn't rely on complex buffer indexing
     EXPECT_GT(buffer.count, initial_count);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Single VFO Tests (dualVFO = false)
+// In single VFO mode:
+// - TX SSB uses CLK0/CLK1 (RX VFO) instead of CLK4/CLK5 (TX VFO)
+// - CW uses CLK2 instead of CLK6
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(RFHardwareState, SingleVFO_StateTransitionToCWSpace){
+    Si5351_Mock_SetDeviceAddress(SI5351_BUS_BASE_ADDR); // Simulate single VFO hardware
+    si5351 = Si5351(); // Reset mock
+    InitializeRFHardware();
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateRFHardwareState();
+
+    // CW TRANSMIT SPACE STATE (Single VFO)
+    // We expect CLK0 and CLK1 (RX VFO) to be disabled, and CLK2 (CW single VFO) to be enabled
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1); // CLK2 for single VFO CW
+    // CW is off (space)
+    EXPECT_EQ(getCWState(), 0); // CW off
+    // TX mode
+    EXPECT_EQ(getRXTXState(), 1); // TX
+    // Cal feedback on (for power reduction during space)
+    EXPECT_EQ(getCalFeedbackState(), 1); // CAL_ON
+    // CW mode
+    EXPECT_EQ(getModulationState(), 0); // XMIT_CW
+
+    // BPF/XVTR/PA control states for CW transmit space mode
+    EXPECT_EQ(GET_BIT(hardwareRegister, TXBPFBIT), 1); // TX BPF selected
+    EXPECT_EQ(GET_BIT(hardwareRegister, RXBPFBIT), 0); // RX BPF bypassed
+    EXPECT_EQ(GET_BIT(hardwareRegister, XVTRBIT), 1);  // XVTR bypassed
+    EXPECT_EQ(GET_BIT(hardwareRegister, PA100WBIT), 0); // 100W PA bypassed
+}
+
+TEST(RFHardwareState, SingleVFO_StateTransitionToCWMark){
+    Si5351_Mock_SetDeviceAddress(SI5351_BUS_BASE_ADDR); // Simulate single VFO hardware
+    si5351 = Si5351(); // Reset mock
+    InitializeRFHardware();
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+
+    // CW TRANSMIT MARK STATE (Single VFO)
+    // We expect CLK0 and CLK1 (RX VFO) to be disabled, and CLK2 (CW single VFO) to be enabled
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK0], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK1], 0);
+    EXPECT_EQ(si5351.output_enable_calls[SI5351_CLK2], 1); // CLK2 for single VFO CW
+    // CW is on (mark)
+    EXPECT_EQ(getCWState(), 1); // CW on
+    // TX mode
+    EXPECT_EQ(getRXTXState(), 1); // TX
+    // Cal feedback off
+    EXPECT_EQ(getCalFeedbackState(), 0); // CAL_OFF
+    // CW mode
+    EXPECT_EQ(getModulationState(), 0); // XMIT_CW
+
+    // BPF/XVTR/PA control states for CW transmit mark mode
+    EXPECT_EQ(GET_BIT(hardwareRegister, TXBPFBIT), 1); // TX BPF selected
+    EXPECT_EQ(GET_BIT(hardwareRegister, RXBPFBIT), 0); // RX BPF bypassed
+    EXPECT_EQ(GET_BIT(hardwareRegister, XVTRBIT), 1);  // XVTR bypassed
+    EXPECT_EQ(GET_BIT(hardwareRegister, PA100WBIT), 0); // 100W PA bypassed
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_SSBTransmit) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState(); // Reset VFO state for fresh frequency calculation
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+
+    // In single VFO mode, TX uses RX VFO (CLK0/CLK1) instead of TX VFO (CLK4/CLK5)
+    // Calculation: 7074000 - 100 - 48000/4 = 7061900 Hz * 100 = 706190000
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 706190000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 706190000);
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_CWTransmitMark) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 3; // 750 Hz
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateTuneState();
+
+    // In single VFO mode, CW uses CLK2 instead of CLK6
+    // GetTXRXFreq_dHz() = (7074000 - 100 - 12000) * 100 = 706190000
+    // GetCWTXFreq_dHz() = 706190000 - 75000 = 706115000 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 706115000);
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_CWTransmitSpace) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_20M; // USB
+    ED.CWToneIndex = 3; // 750 Hz
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateTuneState();
+
+    // In single VFO mode, CW uses CLK2 instead of CLK6
+    // GetTXRXFreq_dHz() = (14074000 - 100 - 12000) * 100 = 1406190000
+    // GetCWTXFreq_dHz() = 1406190000 + 75000 = 1406265000 (USB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 1406265000);
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_CWTransmitDitMark) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 7074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 2; // 656.5 Hz
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DIT_MARK;
+    UpdateTuneState();
+
+    // In single VFO mode, CW uses CLK2 instead of CLK6
+    // GetTXRXFreq_dHz() = (7074000 - 100 - 12000) * 100 = 706190000
+    // GetCWTXFreq_dHz() = 706190000 - 65650 = 706124350 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 706124350);
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_CWTransmitDahMark) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 200L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_20M; // USB
+    ED.CWToneIndex = 1; // 562.5 Hz
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_DAH_MARK;
+    UpdateTuneState();
+
+    // In single VFO mode, CW uses CLK2 instead of CLK6
+    // GetTXRXFreq_dHz() = (14074000 - 200 - 12000) * 100 = 1406180000
+    // GetCWTXFreq_dHz() = 1406180000 + 56250 = 1406236250 (USB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 1406236250);
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_CWTransmitKeyerSpace) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 3574000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 50L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_80M; // LSB
+    ED.CWToneIndex = 0; // 400 Hz
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE;
+    UpdateTuneState();
+
+    // In single VFO mode, CW uses CLK2 instead of CLK6
+    // GetTXRXFreq_dHz() = (3574000 - 50 - 12000) * 100 = 356195000
+    // GetCWTXFreq_dHz() = 356195000 - 40000 = 356155000 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 356155000);
+}
+
+TEST(RFHardwareState, SingleVFO_TuneStateMachine_CWTransmitKeyerWait) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 21074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = -50L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_15M; // USB
+    ED.CWToneIndex = 4; // 843.75 Hz
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT;
+    UpdateTuneState();
+
+    // In single VFO mode, CW uses CLK2 instead of CLK6
+    // GetTXRXFreq_dHz() = (21074000 - (-50) - 12000) * 100 = 2106205000
+    // GetCWTXFreq_dHz() = 2106205000 + 84375 = 2106289375 (USB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 2106289375);
+}
+
+TEST(RFHardwareState, SingleVFO_StateTransitionSequenceSSBToReceive) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 14230000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+    SampleRate = SAMPLE_RATE_48K;
+
+    // Start in SSB receive
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(GetRXVFOFrequency(), 14230000);
+
+    // Transition to SSB transmit - in single VFO mode, RX VFO is used for TX
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14230000 - 100 - 12000) * 100 = 1421790000
+    // In single VFO mode, GetTXVFOFrequency returns RX VFO frequency
+    EXPECT_EQ(GetRXVFOFrequency(), 14217900);
+
+    // Back to SSB receive
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(GetRXVFOFrequency(), 14230000);
+}
+
+TEST(RFHardwareState, SingleVFO_StateTransitionSequenceCWReceiveToTransmit) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 7030000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 200L;
+    SampleRate = SAMPLE_RATE_48K;
+    ED.currentBand[ED.activeVFO] = BAND_40M; // LSB
+    ED.CWToneIndex = 3; // 750 Hz
+
+    // Start in CW receive
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 703000000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 703000000);
+
+    // Transition to CW transmit mark - uses CLK2 in single VFO mode
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (7030000 - 200 - 12000) * 100 = 701780000
+    // GetCWTXFreq_dHz() = 701780000 - 75000 = 701705000 (LSB)
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 701705000);
+
+    // Transition to CW transmit space
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 701705000);
+
+    // Back to CW receive
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 703000000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK1], 703000000);
+}
+
+TEST(RFHardwareState, SingleVFO_DifferentSampleRates) {
+    SetDualVFOs(false);
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    ED.centerFreq_Hz[ED.activeVFO] = 14074000L;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 100L;
+
+    // Test with 192kHz sample rate
+    SampleRate = SAMPLE_RATE_192K;
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14074000 - 100 - 192000/4) * 100 = (14073900 - 48000) * 100 = 1402590000
+    // In single VFO mode, this is on RX VFO
+    EXPECT_EQ(GetRXVFOFrequency(), 14025900);
+
+    // Test with 96kHz sample rate
+    SampleRate = SAMPLE_RATE_96K;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14074000 - 100 - 96000/4) * 100 = (14073900 - 24000) * 100 = 1404990000
+    EXPECT_EQ(GetRXVFOFrequency(), 14049900);
+
+    // Test with 48kHz sample rate
+    SampleRate = SAMPLE_RATE_48K;
+    UpdateTuneState();
+    // GetTXRXFreq_dHz() = (14074000 - 100 - 48000/4) * 100 = (14073900 - 12000) * 100 = 1406190000
+    EXPECT_EQ(GetRXVFOFrequency(), 14061900);
+}
+
+TEST(RFHardwareState, SingleVFO_BufferLogsCWVFOStateChanges) {
+    SetDualVFOs(false);
+    // Initialize timing and buffer
+    StartMillis();
+    buffer.head = 0;
+    buffer.count = 0;
+
+    // Test EnableCWVFOOutput - in single VFO mode uses CLK2
+    EnableCWVFOOutput();
+
+    // Verify buffer has one entry
+    EXPECT_EQ(buffer.count, 1);
+
+    // Test DisableCWVFOOutput
+    DisableCWVFOOutput();
+
+    // Verify buffer has two entries with different register values
+    EXPECT_EQ(buffer.count, 2);
+    EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
 }

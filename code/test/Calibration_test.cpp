@@ -1020,6 +1020,9 @@ void CheckThatRegisterStateIsReceive(){
 }
 
 TEST_F(CalibrationTest, CalibrateTransmitIQState) {
+    // TX IQ calibration requires dual VFO mode
+    SetDualVFOs(true);
+
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 
     // Reset PA selection to ensure test isolation

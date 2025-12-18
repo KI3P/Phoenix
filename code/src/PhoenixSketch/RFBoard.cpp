@@ -16,6 +16,7 @@ static errno_t error_state;
 Si5351 si5351;
 #define SI5351_LOAD_CAPACITANCE SI5351_CRYSTAL_LOAD_8PF
 #define Si_5351_crystal 25000000L
+bool dualVFO = true; /** Set to true if we have separate RX and TX VFOs */
 
 // There are three VFOs: RX, TX, and CW. They are controlled separately.
 #define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_2MA
@@ -33,6 +34,7 @@ static int64_t TXVFOFreq_dHz;
 #define SI5351_DRIVE_CURRENT_CW SI5351_DRIVE_2MA
 static int64_t CWVFOFreq_dHz;
 #define CLKCW  SI5351_CLK6
+#define CLKCWSINGLEVFO SI5351_CLK2
 
 #define XMIT_SSB 1
 #define XMIT_CW  0
@@ -204,20 +206,6 @@ errno_t TXAttenuatorCreate(float32_t txAttenuation_dB){
 // Functions that are globally visible
 ///////////////////////////////////////////////////////////////////////////////
 
-void SetFrequencyCorrectionFactor(int32_t corr){
-    int64_t freq = GetRXVFOFrequency();
-    RXVFOFreq_dHz = 0;
-
-    si5351.reset();
-    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);
-    InitRXVFO();
-    InitTXVFO();
-    InitCWVFO();
-    SetRXVFOFrequency(freq*100);
-    SetRXVFOFrequency((freq+5000000)*100);
-    SetRXVFOFrequency(freq*100);
-}
-
 /**
  * Initialize the RX and TX attenuators. Sets up the I2C connection to the I2C
  * to GPIO chip that controls the attenuators.
@@ -299,6 +287,20 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 
 // RX & TX VFO Control Functions
 
+void SetFrequencyCorrectionFactor(int32_t corr){
+    int64_t freq = GetRXVFOFrequency();
+    RXVFOFreq_dHz = 0;
+
+    si5351.reset();
+    si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);
+    InitRXVFO();
+    InitTXVFO();
+    InitCWVFO();
+    SetRXVFOFrequency(freq*100);
+    SetRXVFOFrequency((freq+5000000)*100);
+    SetRXVFOFrequency(freq*100);
+}
+
 /**
  * Get the current RX VFO frequency setting.
  *
@@ -328,6 +330,9 @@ int64_t GetRXVFOFrequency(void){
  * @see TXVFOFreq_dHz internal storage variable
  */
 int64_t GetTXVFOFrequency(void){
+    if (!dualVFO){
+        return GetRXVFOFrequency();
+    }
     return TXVFOFreq_dHz/100;
 }
 
@@ -347,6 +352,10 @@ void SetRXVFOPower(int32_t power){
  * @param power Expect one of the SI5351_DRIVE_?MA parameters
  */
 void SetTXVFOPower(int32_t power){
+    if (!dualVFO){
+        SetRXVFOPower(power);
+        return;
+    }
     si5351.drive_strength(CLK0TX, (si5351_drive)power);
     si5351.drive_strength(CLK90TX, (si5351_drive)power);
 }
@@ -368,6 +377,9 @@ errno_t InitRXVFO(void){
  * Set the power and configure the PLL source, does not set the frequency.
  */
 errno_t InitTXVFO(void){
+    if (!dualVFO){
+        return InitRXVFO();
+    }
     // Set driveCurrentSSB_mA to appropriate value
     SetTXVFOPower( SI5351_DRIVE_CURRENT_TX );
     si5351.set_ms_source(CLK0TX, SI5351_PLLB);
@@ -503,6 +515,10 @@ void SetRXVFOFrequency(int64_t frequency_dHz){
  * @param frequency_dHz The desired clock frequency in (Hz * 100)
  */
 void SetTXVFOFrequency(int64_t frequency_dHz){
+    if (!dualVFO){
+        SetRXVFOFrequency(frequency_dHz);
+        return;
+    }
     // No need to change if it's already at this setting
     if (frequency_dHz == TXVFOFreq_dHz) return;
     TXVFOFreq_dHz = frequency_dHz;
@@ -561,6 +577,10 @@ void EnableRXVFOOutput(void){
  * Enable the TX VFO I & Q outputs
  */
 void EnableTXVFOOutput(void){
+    if (!dualVFO){
+        EnableRXVFOOutput();
+        return;
+    }
     si5351.output_enable(CLK0TX, 1);
     si5351.output_enable(CLK90TX, 1);
     SET_BIT(hardwareRegister,TXVFOBIT);
@@ -579,6 +599,10 @@ void DisableRXVFOOutput(void){
  * Disable the TX VFO I & Q outputs
  */
 void DisableTXVFOOutput(void){
+    if (!dualVFO){
+        DisableRXVFOOutput();
+        return;
+    }
     si5351.output_enable(CLK0TX, 0);
     si5351.output_enable(CLK90TX, 0);
     CLEAR_BIT(hardwareRegister,TXVFOBIT);
@@ -609,7 +633,10 @@ void SetCWVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == CWVFOFreq_dHz) return;
     CWVFOFreq_dHz = frequency_dHz;
-    si5351.set_freq(CWVFOFreq_dHz, CLKCW);
+    if (dualVFO)
+        si5351.set_freq(CWVFOFreq_dHz, CLKCW);
+    else
+        si5351.set_freq(CWVFOFreq_dHz, CLKCWSINGLEVFO);
 }
 
 /**
@@ -632,7 +659,10 @@ int64_t GetCWVFOFrequency(void){
  * Enable the CW VFO output (CLK2)
  */
 void EnableCWVFOOutput(void){
-    si5351.output_enable(CLKCW, 1);
+    if (dualVFO)
+        si5351.output_enable(CLKCW, 1);
+    else
+        si5351.output_enable(CLKCWSINGLEVFO, 1);
     SET_BIT(hardwareRegister,CWVFOBIT);
 }
 
@@ -640,7 +670,10 @@ void EnableCWVFOOutput(void){
  * Disable the CW VFO output (CLK2)
  */
 void DisableCWVFOOutput(void){
-    si5351.output_enable(CLKCW, 0);
+    if (dualVFO)
+        si5351.output_enable(CLKCW, 0);
+    else
+        si5351.output_enable(CLKCWSINGLEVFO, 0);
     CLEAR_BIT(hardwareRegister,CWVFOBIT);
 }
 
@@ -650,8 +683,13 @@ void DisableCWVFOOutput(void){
  * @param power Expect one of the SI5351_DRIVE_?MA parameters
  */
 void SetCWVFOPower(int32_t power){
-    si5351.drive_strength(CLKCW, (si5351_drive)power);
-    si5351.set_ms_source(CLKCW, SI5351_PLLB);
+    if (dualVFO){
+        si5351.drive_strength(CLKCW, (si5351_drive)power);
+        si5351.set_ms_source(CLKCW, SI5351_PLLB);
+    } else {
+        si5351.drive_strength(CLKCWSINGLEVFO, (si5351_drive)power);
+        si5351.set_ms_source(CLKCWSINGLEVFO, SI5351_PLLB);
+    }
 }
 
 /**
@@ -661,7 +699,10 @@ void SetCWVFOPower(int32_t power){
  */
 errno_t InitCWVFO(void){
     SetCWVFOPower( SI5351_DRIVE_CURRENT_CW );
-    si5351.set_ms_source(CLKCW, SI5351_PLLB);
+    if (dualVFO)
+        si5351.set_ms_source(CLKCW, SI5351_PLLB);
+    else
+        si5351.set_ms_source(CLKCWSINGLEVFO, SI5351_PLLB);
     pinMode(CW_ON_OFF, OUTPUT);
     CLEAR_BIT(hardwareRegister,CWBIT);
     digitalWrite(CW_ON_OFF, 0);
@@ -705,23 +746,48 @@ bool getCWState(void){
 
 /**
  * Set up the communication with the Si5351, initialize its capacitance and crystal
- * settings, and initialize the clock signals
+ * settings, and initialize the clock signals.
+ *
+ * Detects which I2C address the Si5351 is at:
+ * - SI5351_BUS_BASE_ADDR (0x60): Single VFO hardware, dualVFO = false
+ * - SI5351_DUAL_VFO_ADDR (0x61): Dual VFO hardware, dualVFO = true
  */
 errno_t InitVFOs(void){
+    bool foundDevice = false;
+
+    // Try single VFO address first (0x60)
+    si5351.set_address(SI5351_BUS_BASE_ADDR);
     si5351.reset();
     si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor);
     MyDelay(100L);
-    if (!si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
+    if (si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
+        dualVFO = false;
+        foundDevice = true;
+        Debug("Found Si5351 at single VFO address (0x60)");
+    } else {
+        // Try dual VFO address (0x61)
+        si5351.set_address(SI5351_DUAL_VFO_ADDR);
+        si5351.reset();
+        si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor);
+        MyDelay(100L);
+        if (si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
+            dualVFO = true;
+            foundDevice = true;
+            Debug("Found Si5351 at dual VFO address (0x61)");
+        }
+    }
+
+    if (!foundDevice) {
         bit_results.RF_Si5351_present = false;
         Debug("Initialize si5351 failed!");
         return EFAIL;
-    } else {
-        bit_results.RF_Si5351_present = true;
-        // Disable all clock outputs.
-        // The ones we will actually use are enabled by the init functions below.
-        for (int k=0; k<8; k++){
-            si5351.output_enable((si5351_clock)k, 0);
-        }
+    }
+
+    bit_results.RF_Si5351_present = true;
+    // Disable all clock outputs.
+    // The ones we will actually use are enabled by the init functions below.
+    for (int k=0; k<8; k++){
+        si5351.output_enable((si5351_clock)k, 0);
     }
     MyDelay(100L);
 
@@ -729,6 +795,15 @@ errno_t InitVFOs(void){
     InitTXVFO();
     InitCWVFO();
     return ESUCCESS;
+}
+
+bool HasDualVFOs(void){
+    return dualVFO;
+}
+
+// Only used during unit tests!
+void SetDualVFOs(bool val){
+    dualVFO = val;
 }
 
 // Transmit Modulation Control
