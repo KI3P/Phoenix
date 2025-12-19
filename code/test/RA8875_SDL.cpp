@@ -5,6 +5,7 @@
 #include "RA8875.h"
 #include "Arduino.h"
 #include "RFBoard.h"
+#include "OpenAudio_ArduinoLibrary.h"
 #include <iostream>
 #include <cstring>
 #include <cmath>
@@ -37,6 +38,7 @@ static uint8_t g_layer_effect = 0;  // OR, AND, TRANSPARENT
 
 // Forward declaration
 static void update_register_panel();
+static void update_help_panel_audio_source();
 
 // Convert RGB565 to ARGB8888
 static uint32_t rgb565_to_argb8888(uint16_t color) {
@@ -89,6 +91,9 @@ static void update_display() {
 
     // Update register panel with current hardware state
     update_register_panel();
+
+    // Update audio source indicator in help panel
+    update_help_panel_audio_source();
 
     SDL_UpdateTexture(g_texture, nullptr, g_framebuffer, DISPLAY_WIDTH * sizeof(uint32_t));
     SDL_UpdateTexture(g_register_texture, nullptr, g_register_buffer, DISPLAY_WIDTH * sizeof(uint32_t));
@@ -488,6 +493,48 @@ static void init_help_panel() {
     draw_help_string(col1, y, "9", key_color); draw_help_string(col1 + 16, y, "Main Tune+ (8)", desc_color);
     draw_help_string(col2, y, "H", key_color); draw_help_string(col2 + 16, y, "Home (17)", desc_color);
     draw_help_string(col4, y, "ESC", key_color); draw_help_string(col4 + 32, y, "Exit", desc_color);
+}
+
+// Update the audio source indicator in the help panel
+// This is called each frame to show the current audio source
+static void update_help_panel_audio_source() {
+    if (!g_help_buffer) return;
+
+    // Position for audio source indicator (prominent location)
+    int x_start = 350;  // 550 - 200 (moved left by 1/4 screen width)
+    int y_pos = 8;  // Same line as title
+    int box_width = 370;  // Wide enough for "Audio Source: Two-Tone (700/1900Hz @ 48kHz)"
+    int box_height = 20;
+
+    // Colors
+    uint32_t bg_color = 0xFF303030;       // Slightly lighter than panel bg
+    uint32_t border_color = 0xFF505050;   // Border
+    uint32_t label_color = 0xFFCCCCCC;    // Light gray for label
+    uint32_t source_color = 0xFF00FFFF;   // Cyan for source name (stands out)
+
+    // Clear the area with background
+    for (int py = y_pos; py < y_pos + box_height && py < HELP_PANEL_HEIGHT; py++) {
+        for (int px = x_start; px < x_start + box_width && px < DISPLAY_WIDTH; px++) {
+            g_help_buffer[py * DISPLAY_WIDTH + px] = bg_color;
+        }
+    }
+
+    // Draw border
+    for (int px = x_start; px < x_start + box_width && px < DISPLAY_WIDTH; px++) {
+        g_help_buffer[y_pos * DISPLAY_WIDTH + px] = border_color;
+        g_help_buffer[(y_pos + box_height - 1) * DISPLAY_WIDTH + px] = border_color;
+    }
+    for (int py = y_pos; py < y_pos + box_height && py < HELP_PANEL_HEIGHT; py++) {
+        g_help_buffer[py * DISPLAY_WIDTH + x_start] = border_color;
+        g_help_buffer[py * DISPLAY_WIDTH + x_start + box_width - 1] = border_color;
+    }
+
+    // Draw label and current source
+    draw_help_string(x_start + 5, y_pos + 2, "Audio Source:", label_color);
+
+    // Get current audio source name
+    const char* source_name = getAudioInputSourceName();
+    draw_help_string(x_start + 115, y_pos + 2, source_name, source_color);
 }
 
 // Initialize the hardware register panel (static layout)
