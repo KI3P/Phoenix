@@ -19,17 +19,17 @@ Si5351 si5351;
 bool dualVFO = true; /** Set to true if we have separate RX and TX VFOs */
 
 // There are three VFOs: RX, TX, and CW. They are controlled separately.
-#define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_2MA
+#define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_8MA
 static int32_t rxmultiple, oldrxMultiple;
 static int64_t RXVFOFreq_dHz;
-#define CLK0RX   SI5351_CLK0 
-#define CLK90RX  SI5351_CLK1
+#define CLK0RX   SI5351_CLK1 
+#define CLK90RX  SI5351_CLK0
 
 #define SI5351_DRIVE_CURRENT_TX SI5351_DRIVE_2MA
 static int32_t txmultiple, oldtxMultiple;
 static int64_t TXVFOFreq_dHz;
-#define CLK0TX   SI5351_CLK4 
-#define CLK90TX  SI5351_CLK5
+#define CLK0TX   SI5351_CLK5 
+#define CLK90TX  SI5351_CLK4
 
 #define SI5351_DRIVE_CURRENT_CW SI5351_DRIVE_2MA
 static int64_t CWVFOFreq_dHz;
