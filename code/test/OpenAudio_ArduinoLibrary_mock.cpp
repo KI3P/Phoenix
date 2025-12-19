@@ -19,7 +19,8 @@ static bool toneTimerInitialized = false;
 void setAudioInputSource(AudioInputSource source) {
     currentAudioSource = source;
     // Reset tone timing when switching to a tone source
-    if (source == AUDIO_SOURCE_TWO_TONE || source == AUDIO_SOURCE_SINGLE_TONE) {
+    if (source == AUDIO_SOURCE_TWO_TONE || source == AUDIO_SOURCE_SINGLE_TONE ||
+        source == AUDIO_SOURCE_RXIQ_LSB || source == AUDIO_SOURCE_RXIQ_USB) {
         toneTimerInitialized = false;  // Will reinitialize on next use
     }
 }
@@ -33,6 +34,8 @@ const char* getAudioInputSourceName(void) {
         case AUDIO_SOURCE_COMPUTER:    return "Computer Audio";
         case AUDIO_SOURCE_TWO_TONE:    return "Two-Tone (700/1900Hz @ 48kHz)";
         case AUDIO_SOURCE_SINGLE_TONE: return "Single-Tone (1kHz @ 49kHz)";
+        case AUDIO_SOURCE_RXIQ_LSB:    return "RX IQ tones (LSB)";
+        case AUDIO_SOURCE_RXIQ_USB:    return "RX IQ tones (USB)";
         case AUDIO_SOURCE_MOCK_DATA:   return "Mock Data (unit tests)";
         default:                       return "Unknown";
     }
@@ -137,6 +140,54 @@ static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int 
 
     for (int i = 0; i < numSamples; i++) {
         double I = amplitude * cos(tonePhase1) + noiseAmp * randomNoise();
+        double Q = amplitude * -sin(tonePhase1) + noiseAmp * randomNoise();
+
+        samplesI[i] = (int16_t)I;
+        samplesQ[i] = (int16_t)Q;
+
+        tonePhase1 += phaseInc;
+
+        // Keep phase in reasonable range
+        if (tonePhase1 > TONE_TWO_PI) tonePhase1 -= TONE_TWO_PI;
+        if (tonePhase1 < -TONE_TWO_PI) tonePhase1 += TONE_TWO_PI;
+    }
+}
+
+// Generate I/Q samples for RX LSB IQ calibration case
+// Tone at 48kHz carrier, with a small error included
+static void generateRXIQLSBSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    const double freq = 48000.0;  // Hz
+    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
+    // Noise amplitude is 1/40th of signal amplitude
+    const double noiseAmp = amplitude / 40.0;
+
+    for (int i = 0; i < numSamples; i++) {
+        double I = 0.9*amplitude * cos(tonePhase1) + noiseAmp * randomNoise();
+        double Q = amplitude * -sin(tonePhase1) + noiseAmp * randomNoise();
+
+        samplesI[i] = (int16_t)I;
+        samplesQ[i] = (int16_t)Q;
+
+        tonePhase1 += phaseInc;
+
+        // Keep phase in reasonable range
+        if (tonePhase1 > TONE_TWO_PI) tonePhase1 -= TONE_TWO_PI;
+        if (tonePhase1 < -TONE_TWO_PI) tonePhase1 += TONE_TWO_PI;
+    }
+}
+
+// Generate I/Q samples for RX USB IQ calibration case
+// Tone at -48kHz carrier, with a small error included
+static void generateRXIQUSBSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    const double freq = -48000.0;  // Hz
+    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
+    // Noise amplitude is 1/40th of signal amplitude
+    const double noiseAmp = amplitude / 40.0;
+
+    for (int i = 0; i < numSamples; i++) {
+        double I = 0.9*amplitude * cos(tonePhase1) + noiseAmp * randomNoise();
         double Q = amplitude * -sin(tonePhase1) + noiseAmp * randomNoise();
 
         samplesI[i] = (int16_t)I;
@@ -491,7 +542,9 @@ int AudioRecordQueue::available(void) {
     // For tone generators in simulator: pace based on output buffer level
     // Run DSP when output buffer needs data, sleep when buffer is full
     if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
-        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE ||
+        currentAudioSource == AUDIO_SOURCE_RXIQ_LSB ||
+        currentAudioSource == AUDIO_SOURCE_RXIQ_USB) {
         size_t bufLevel = SDL_Audio_OutputBufferLevel();
         if (bufLevel > TARGET_BUFFER_LEVEL * 2) {
             // Buffer is well above target - sleep to let it drain
@@ -517,7 +570,9 @@ int AudioRecordQueue::available(void) {
 
     // Fallback to mock behavior (for unit tests without SDL)
     if (currentAudioSource == AUDIO_SOURCE_TWO_TONE ||
-        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
+        currentAudioSource == AUDIO_SOURCE_SINGLE_TONE ||
+        currentAudioSource == AUDIO_SOURCE_RXIQ_LSB ||
+        currentAudioSource == AUDIO_SOURCE_RXIQ_USB) {
         size_t samplesAvailable = getToneSamplesAvailable();
         return samplesAvailable / BUFFER_SIZE;
     }
@@ -581,6 +636,48 @@ int16_t* AudioRecordQueue::readBuffer(void) {
             } else {
                 // Q requested before I - generate fresh data
                 generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
+    if (currentAudioSource == AUDIO_SOURCE_RXIQ_LSB) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateRXIQLSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            // Track samples consumed when Q is read (I+Q pair complete)
+            toneSamplesConsumed += BUFFER_SIZE;
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateRXIQLSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
+    if (currentAudioSource == AUDIO_SOURCE_RXIQ_USB) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateRXIQUSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            // Track samples consumed when Q is read (I+Q pair complete)
+            toneSamplesConsumed += BUFFER_SIZE;
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateRXIQUSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
                 return toneBuf_Q;
             }
         }

@@ -234,6 +234,12 @@ SimulatorAction processEvents() {
                                 next = AUDIO_SOURCE_SINGLE_TONE;
                                 break;
                             case AUDIO_SOURCE_SINGLE_TONE:
+                                next = AUDIO_SOURCE_RXIQ_LSB;
+                                break;
+                            case AUDIO_SOURCE_RXIQ_LSB:
+                                next = AUDIO_SOURCE_RXIQ_USB;
+                                break;
+                            case AUDIO_SOURCE_RXIQ_USB:
                             default:
                                 next = AUDIO_SOURCE_COMPUTER;
                                 break;
