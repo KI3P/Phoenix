@@ -11,6 +11,7 @@ enum AudioInputSource {
     AUDIO_SOURCE_SINGLE_TONE, // Single-tone test signal (1000Hz at -49kHz)
     AUDIO_SOURCE_RXIQ_LSB,    // RX IQ tone (-48kHz)
     AUDIO_SOURCE_RXIQ_USB,    // RX IQ tone (+48kHz)
+    AUDIO_SOURCE_FEEDBACK,    // Feedback: audio output piped back as input
     AUDIO_SOURCE_MOCK_DATA    // Mock data from files (for unit tests)
 };
 

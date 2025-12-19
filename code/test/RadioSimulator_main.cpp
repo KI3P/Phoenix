@@ -42,7 +42,7 @@
  *   / - CW Key 2 (dah for iambic keyer)
  *
  *   ---- Audio Source ----
- *   a - Cycle audio input source (Computer/Two-Tone/Single-Tone)
+ *   a - Cycle audio input source (Computer/Two-Tone/Single-Tone/RXIQ/Feedback)
  */
 
 
@@ -70,6 +70,7 @@ static std::thread timer_thread;
 #include "Config.h"
 #include "OpenAudio_ArduinoLibrary.h"
 #include "LittleFS_mock.h"
+#include "HardwareSm.h"
 
 // External declarations
 extern RA8875 tft;
@@ -89,6 +90,51 @@ extern void RA8875_SDL_Cleanup();
 
 // Flag to signal shutdown was requested
 static bool shutdownRequested = false;
+
+// Track the previous RF hardware state to detect changes
+static RFHardwareState previousRFState = RFInvalid;
+static int32_t oldband = -1;
+
+/**
+ * Update audio input source based on RF hardware state.
+ * Automatically switches to appropriate audio sources for calibration modes:
+ * - RFCalReceiveIQ: Use RXIQ_LSB for USB mode, RXIQ_USB for LSB mode
+ * - RFCalTransmitIQ: Use Feedback mode to loop TX audio back as RX input
+ */
+static void updateAudioSourceForRFState() {
+    RFHardwareState currentState = GetRFHardwareState();
+
+    // Only update when state changes
+    if ((currentState == previousRFState) && (ED.currentBand[ED.activeVFO] == oldband)) {
+        return;
+    }
+    oldband = ED.currentBand[ED.activeVFO];
+    switch (currentState) {
+        case RFCalReceiveIQ:
+            // For RX IQ calibration, use the opposite sideband tone source
+            // USB mode needs LSB tone, LSB mode needs USB tone
+            if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
+                setAudioInputSource(AUDIO_SOURCE_RXIQ_LSB);
+                std::cout << "Audio Source (auto): RX IQ tones (LSB) for USB calibration" << std::endl;
+            } else {
+                setAudioInputSource(AUDIO_SOURCE_RXIQ_USB);
+                std::cout << "Audio Source (auto): RX IQ tones (USB) for LSB calibration" << std::endl;
+            }
+            break;
+
+        case RFCalTransmitIQ:
+            // For TX IQ calibration, use feedback mode to loop TX back to RX
+            setAudioInputSource(AUDIO_SOURCE_FEEDBACK);
+            std::cout << "Audio Source (auto): Feedback for TX IQ calibration" << std::endl;
+            break;
+
+        default:
+            // For other states, don't automatically change the audio source
+            break;
+    }
+
+    previousRFState = currentState;
+}
 
 // Simulated time is handled by Arduino_mock.cpp
 
@@ -240,6 +286,9 @@ SimulatorAction processEvents() {
                                 next = AUDIO_SOURCE_RXIQ_USB;
                                 break;
                             case AUDIO_SOURCE_RXIQ_USB:
+                                next = AUDIO_SOURCE_FEEDBACK;
+                                break;
+                            case AUDIO_SOURCE_FEEDBACK:
                             default:
                                 next = AUDIO_SOURCE_COMPUTER;
                                 break;
@@ -296,7 +345,7 @@ void printUsage() {
     std::cout << "  . (hold)      - CW Key 1 (straight key / dit)" << std::endl;
     std::cout << "  /             - CW Key 2 (dah)" << std::endl;
     std::cout << "\n  --- Audio Source ---" << std::endl;
-    std::cout << "  a             - Cycle audio source (Computer/Two-Tone/Single-Tone)" << std::endl;
+    std::cout << "  a             - Cycle audio source (Computer/Two-Tone/Single-Tone/RXIQ/Feedback)" << std::endl;
     std::cout << "============================================\n" << std::endl;
 }
 
@@ -432,6 +481,9 @@ int main(int argc, char* argv[]) {
         // Run the main radio loop
         // This processes interrupts, dispatches to state machines, and updates the display
         loop();
+
+        // Update audio source based on RF hardware state (for calibration modes)
+        updateAudioSourceForRFState();
 
         // Update the SDL display once per frame (not on every draw call)
         tft.updateScreen();

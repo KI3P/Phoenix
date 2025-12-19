@@ -36,6 +36,7 @@ const char* getAudioInputSourceName(void) {
         case AUDIO_SOURCE_SINGLE_TONE: return "Single-Tone (1kHz @ 49kHz)";
         case AUDIO_SOURCE_RXIQ_LSB:    return "RX IQ tones (LSB)";
         case AUDIO_SOURCE_RXIQ_USB:    return "RX IQ tones (USB)";
+        case AUDIO_SOURCE_FEEDBACK:    return "Feedback (output to input)";
         case AUDIO_SOURCE_MOCK_DATA:   return "Mock Data (unit tests)";
         default:                       return "Unknown";
     }
@@ -514,6 +515,96 @@ bool SDL_Audio_OutputNeedsData(void) {
     return true;
 }
 
+// ============== Feedback Mode ==============
+// Reads audio from output buffer and modulates it back to I/Q format
+// This creates a loopback where demodulated audio is re-modulated as an RF signal
+
+// Feedback read position - tracks where we are in the output buffer
+static std::atomic<size_t> feedbackReadPos{0};
+static double feedbackPhase = 0.0;  // Phase accumulator for feedback modulation
+
+// Generate I/Q samples from feedback (output buffer)
+// Reads demodulated audio, upsamples 4x, and modulates onto 48kHz carrier
+static void generateFeedbackSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
+    // Carrier frequency for modulation (same as other sources)
+    const double carrierFreq = 48000.0;  // Hz
+    const double phaseInc = TONE_TWO_PI * carrierFreq / TONE_SAMPLE_RATE;
+
+    // Read from output buffer (48kHz stereo interleaved)
+    // We need numSamples at 192kHz, so we need numSamples/4 at 48kHz
+    const int samplesNeeded48k = numSamples / 4;
+
+    size_t readPos = feedbackReadPos.load();
+    size_t writePos = outWritePos.load();
+
+    // Calculate available stereo samples
+    size_t available;
+    if (writePos >= readPos) {
+        available = (writePos - readPos) / 2;  // Divide by 2 for stereo pairs
+    } else {
+        available = (AUDIO_OUT_BUFFER_SIZE - readPos + writePos) / 2;
+    }
+
+    // Temporary buffer for 48kHz audio (mono - average L and R)
+    static int16_t audioBuffer48k[BUFFER_SIZE / 4 + 1];
+    int samplesRead = 0;
+
+    // Read and average stereo to mono
+    for (int i = 0; i < samplesNeeded48k && samplesRead < (int)available; i++) {
+        int16_t left = audioOutBuffer[readPos];
+        readPos = (readPos + 1) % AUDIO_OUT_BUFFER_SIZE;
+        int16_t right = audioOutBuffer[readPos];
+        readPos = (readPos + 1) % AUDIO_OUT_BUFFER_SIZE;
+
+        // Average L and R for mono
+        audioBuffer48k[i] = (left + right) / 2;
+        samplesRead++;
+    }
+
+    feedbackReadPos.store(readPos);
+
+    // Fill remaining with silence if not enough samples
+    for (int i = samplesRead; i < samplesNeeded48k; i++) {
+        audioBuffer48k[i] = 0;
+    }
+
+    // Upsample 4x (48kHz -> 192kHz) with linear interpolation
+    // and modulate onto carrier
+    for (int i = 0; i < numSamples; i++) {
+        // Linear interpolation for upsampling
+        int srcIdx = i / 4;
+        int srcNext = (srcIdx + 1 < samplesNeeded48k) ? srcIdx + 1 : srcIdx;
+        double frac = (i % 4) / 4.0;
+
+        double audioSample = audioBuffer48k[srcIdx] * (1.0 - frac) + audioBuffer48k[srcNext] * frac;
+
+        // Modulate onto carrier to create I/Q
+        // Amplitude scaling to match other sources
+        double amplitude = audioSample * 1.0;  // Direct mapping
+        samplesI[i] = (int16_t)(amplitude * cos(feedbackPhase));
+        samplesQ[i] = (int16_t)(amplitude * -sin(feedbackPhase));
+
+        feedbackPhase += phaseInc;
+        if (feedbackPhase > TONE_TWO_PI) feedbackPhase -= TONE_TWO_PI;
+    }
+}
+
+// Check how many samples are available for feedback
+static size_t getFeedbackSamplesAvailable() {
+    size_t readPos = feedbackReadPos.load();
+    size_t writePos = outWritePos.load();
+
+    size_t available;
+    if (writePos >= readPos) {
+        available = (writePos - readPos) / 2;  // Stereo pairs at 48kHz
+    } else {
+        available = (AUDIO_OUT_BUFFER_SIZE - readPos + writePos) / 2;
+    }
+
+    // Convert to 192kHz equivalent (multiply by 4 for upsampling)
+    return available * 4;
+}
+
 #endif // USE_SDL_DISPLAY
 
 #include "mock_R_data_int.c"
@@ -556,8 +647,20 @@ int AudioRecordQueue::available(void) {
         return 17;
     }
 
+    // For feedback mode: pace based on available output samples
+    if (currentAudioSource == AUDIO_SOURCE_FEEDBACK) {
+        size_t feedbackAvailable = getFeedbackSamplesAvailable();
+        // Need at least one buffer worth (BUFFER_SIZE samples at 192kHz)
+        if (feedbackAvailable < BUFFER_SIZE) {
+            // Not enough feedback data yet - sleep briefly
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            return 0;
+        }
+        return feedbackAvailable / BUFFER_SIZE;
+    }
+
     // For computer audio input: use actual sample availability
-    if (SDL_Audio_InputAvailable()) {
+    if (currentAudioSource == AUDIO_SOURCE_COMPUTER && SDL_Audio_InputAvailable()) {
         // Still pace based on output buffer to prevent overrun
         if (!SDL_Audio_OutputNeedsData()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -705,6 +808,25 @@ int16_t* AudioRecordQueue::readBuffer(void) {
     }
 
 #ifdef USE_SDL_DISPLAY
+    if (currentAudioSource == AUDIO_SOURCE_FEEDBACK) {
+        if (channel == 0 || channel == 2) {
+            // I channel (Left) request - generate fresh data for both I and Q
+            generateFeedbackSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            qDataReady = true;
+            return toneBuf_I;
+        } else {
+            // Q channel (Right) request - return cached Q data
+            if (qDataReady) {
+                qDataReady = false;
+                return toneBuf_Q;
+            } else {
+                // Q requested before I - generate fresh data
+                generateFeedbackSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                return toneBuf_Q;
+            }
+        }
+    }
+
     if (currentAudioSource == AUDIO_SOURCE_COMPUTER && SDL_Audio_InputAvailable()) {
         // Static buffers for L and R channels
         // We read both channels together when L is requested,
