@@ -703,14 +703,8 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case 16:{
-                    // Change to the first band
-                    ED.currentBand[ED.activeVFO] = FIRST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-                    ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
-                    UpdateRFHardwareState();
-                    // Engage autotune
-                    EngageRXIQAutotune();
+                    // Engage autocal process, which is handled by its own state machine
+                    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_AUTO);
                     break;
                 }
                 case BAND_UP:{
@@ -1314,6 +1308,7 @@ void ConsumeInterrupt(void){
         case (iCALIBRATE_RX_IQ):{
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_RX_IQ);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_RX_IQ);
+            InitializeRXIQCalibration();
             break;
         }
         case (iCALIBRATE_TX_IQ):{

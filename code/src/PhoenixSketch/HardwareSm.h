@@ -43,5 +43,15 @@ float32_t GetTargetPower(void);
 uint8_t GetPowerUnit(void);
 void InitializePowerCalibration(void);
 
+// Receive IQ calibration routines
+void InitializeRXIQCalibration(void);
+void ResetRXIQCalBand(void);
+void AdjustRXIQBand(void);
+void ResetRXIQCalSettings(void);
+void AdjustRXIQCalSetting(void);
+void ReadRXIQDelta(void);
+void UpdateDeltaVal(void);
+float32_t GetDeltaVals(int32_t band);
+
 #endif //HARDWARESM_H
 

@@ -357,6 +357,7 @@ void timer1ms(void) {
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
     PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
 }
 
 /**

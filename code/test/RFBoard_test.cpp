@@ -272,8 +272,8 @@ TEST(RFBoard, SetTXVFOPower_Test) {
 TEST(RFBoard, InitRXVFO_Test) {
     si5351 = Si5351(); // Reset mock
     InitRXVFO();
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_2MA);
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK1], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_8MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK1], SI5351_DRIVE_8MA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK0], SI5351_PLLA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK1], SI5351_PLLA);
 }
@@ -289,8 +289,8 @@ TEST(RFBoard, InitTXVFO_Test) {
     si5351 = Si5351(); // Reset mock
     SetDualVFOs(false);
     InitTXVFO();
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_2MA);
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK1], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_8MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK1], SI5351_DRIVE_8MA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK0], SI5351_PLLA);
     EXPECT_EQ(si5351.pll_assignment[SI5351_CLK1], SI5351_PLLA);
 }
@@ -377,7 +377,7 @@ TEST(RFBoard, InitVFOs_Test) {
     // Check that dual VFO was detected
     EXPECT_TRUE(HasDualVFOs());
     // Check that the VFOs were initialized with correct CLK outputs
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_8MA);
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK6], SI5351_DRIVE_2MA);
 
     // Test single VFO mode: device at address 0x60
@@ -387,7 +387,7 @@ TEST(RFBoard, InitVFOs_Test) {
     // Check that single VFO was detected
     EXPECT_FALSE(HasDualVFOs());
     // Check that the VFOs were initialized with correct CLK outputs (CLK2 for CW in single VFO mode)
-    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_2MA);
+    EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK0], SI5351_DRIVE_8MA);
     EXPECT_EQ(si5351.drive_strength_values[SI5351_CLK2], SI5351_DRIVE_2MA);
 }
 
