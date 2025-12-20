@@ -317,9 +317,9 @@ void UpdateAudioIOState(void){
         }
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
-            // IQ from receive stops
-            Q_in_L.end(); 
-            Q_in_R.end();
+            // IQ from receive continues
+            Q_in_L.begin(); 
+            Q_in_R.begin();
             // Start up the input queues
             Q_in_L_Ex.begin();
             Q_in_R_Ex.begin();
@@ -330,9 +330,9 @@ void UpdateAudioIOState(void){
             // Output is samples to RF transmit
             SelectMixerChannel(&modeSelectOutExL,0);
             SelectMixerChannel(&modeSelectOutExR,0);
-            // Mute IQ samples from the receive board
-            MuteMixerChannels(&modeSelectInL);
-            MuteMixerChannels(&modeSelectInR);
+            // Input is IQ samples from the receive board
+            SelectMixerChannel(&modeSelectInL, 0);
+            SelectMixerChannel(&modeSelectInR, 0);
             // Mute speaker audio
             MuteMixerChannels(&modeSelectOutL);
             MuteMixerChannels(&modeSelectOutR);
@@ -454,11 +454,11 @@ void InitializeAudio(void){
     MuteMixerChannels(&modeSelectOutL); // sidetone
     MuteMixerChannels(&modeSelectOutR); // sidetone
     sidetone_oscillator.amplitude(ED.sidetoneVolume / 500);
-    sidetone_oscillator.frequency(SIDETONE_FREQUENCY);
+    sidetone_oscillator.frequency(SIDETONE_FREQUENCY*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate);
 
     // The transmit IQ cal oscillator. Only used during the TXIQ calibration state
     transmitIQcal_oscillator.amplitude(40.0/500);
-    transmitIQcal_oscillator.frequency(200); // 800 Hz
+    transmitIQcal_oscillator.frequency(800.0f*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate);
 }
 
 /**
