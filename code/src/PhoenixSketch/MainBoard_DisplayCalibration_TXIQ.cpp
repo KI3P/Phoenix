@@ -28,7 +28,7 @@ const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
 float32_t attLevel = 0.0;
 
-static const int8_t NUMBER_OF_TXIQ_PANES = 6;
+static const int8_t NUMBER_OF_TXIQ_PANES = 7;
 // Forward declaration of the pane drawing functions
 static void DrawTXIQAtt(void);
 static void DrawTXIQStatus(void);
@@ -36,20 +36,107 @@ static void DrawTXIQFrequency(void);
 static void DrawTXIQAdjustPane(void);
 static void DrawTXIQTablePane(void);
 static void DrawTXIQInstructionsPane(void);
+static void DrawTXIQSpectrumPane(void);
 
 // Pane instances
-static Pane PaneTXIQAtt =      {310,50,120,40,DrawTXIQAtt,1};
-static Pane PaneTXIQStatus =   {310,130,120,40,DrawTXIQStatus,1};
-static Pane PaneTXIQFrequency ={310,200,140,40,DrawTXIQFrequency,1};
+static Pane PaneTXIQAtt =      {660,330,120,40,DrawTXIQAtt,1};
+static Pane PaneTXIQStatus =   {660,380,120,40,DrawTXIQStatus,1};
+static Pane PaneTXIQFrequency ={660,430,140,40,DrawTXIQFrequency,1};
 static Pane PaneTXIQAdjust =   {3,250,300,230,DrawTXIQAdjustPane,1};
 static Pane PaneTXIQTable =    {320,250,200,230,DrawTXIQTablePane,1};
-static Pane PaneTXIQInstructions = {537,7,260,470,DrawTXIQInstructionsPane,1};
+static Pane PaneTXIQInstructions = {537,7,260,320,DrawTXIQInstructionsPane,1};
+static Pane PaneTXIQSpectrum = {3,95,517,150,DrawTXIQSpectrumPane,1};
 
 // Array of all panes for iteration
 static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,
                                     &PaneTXIQInstructions, &PaneTXIQAtt,
-                                    &PaneTXIQStatus, &PaneTXIQFrequency};
+                                    &PaneTXIQStatus,&PaneTXIQFrequency,&PaneTXIQSpectrum};
 
+
+extern struct dispSc displayScale[];
+
+/**
+ * Calculate vertical pixel position for a spectrum FFT bin.
+ */
+FASTRUN static int16_t pixeln(uint32_t i){
+    int16_t zeroPoint = -1*(int16_t)((-124.0 - RECEIVE_POWER_OFFSET)/10.0*displayScale[ED.spectrumScale].dBScale);
+    int16_t result = zeroPoint+(int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
+    return result;
+}
+
+static const uint16_t MAX_WATERFALL_WIDTH = SPECTRUM_RES;
+static const uint16_t SPECTRUM_LEFT_X = PaneTXIQSpectrum.x0+2; 
+static const uint16_t SPECTRUM_TOP_Y  = PaneTXIQSpectrum.y0;
+static const uint16_t SPECTRUM_HEIGHT = PaneTXIQSpectrum.height;
+
+static uint16_t pixelold[MAX_WATERFALL_WIDTH];
+static int16_t x1 = 0;
+static int16_t y_left;
+static int16_t y_prev = pixelold[0];
+static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-10);
+static int16_t y_current = offset;
+#define WIN_WIDTH 256
+#define DARK_RED tft.Color565(64, 0, 0)
+static int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+
+/**
+ * @brief Render TX IQ calibration spectrum display
+ * @note Shows two highlighted regions for upper/lower sideband measurement
+ * @note Blue region = desired sideband, dark red = unwanted sideband
+ * @note Measures sideband separation and updates Delta display
+ * @note Runs in real-time from ISR when new PSD data available
+ */
+FASTRUN void PlotTXIQSpectrum(void){
+    offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
+
+    x1 = MAX_WATERFALL_WIDTH/4-WIN_WIDTH/2;
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
+        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
+    else
+        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
+    for (int j = 0; j < WIN_WIDTH; j++){
+        y_left = y_current;
+        y_current = offset - pixeln(x1);
+        if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
+        if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
+        tft.drawLine(SPECTRUM_LEFT_X+x1, y_prev, SPECTRUM_LEFT_X+x1, pixelold[x1], RA8875_BLACK);
+        tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
+        y_prev = pixelold[x1];
+        pixelold[x1] = y_current;
+        x1++;
+    }
+
+    x1 = MAX_WATERFALL_WIDTH*3/4-WIN_WIDTH/2;
+    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
+        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
+    else
+        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
+    for (int j = 0; j < WIN_WIDTH; j++){
+        y_left = y_current;
+        y_current = offset - pixeln(x1);
+        if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
+        if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
+
+        tft.drawLine(SPECTRUM_LEFT_X+x1, y_prev, SPECTRUM_LEFT_X+x1, pixelold[x1], RA8875_BLACK);
+        tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
+        y_prev = pixelold[x1];
+        pixelold[x1] = y_current;
+        x1++;
+    }
+    psdupdated = false;
+}
+
+/**
+ * @brief Render the TX IQ calibration spectrum pane
+ * @note Calls PlotTXIQSpectrum() when new PSD data available
+ */
+static void DrawTXIQSpectrumPane(void){
+    // Only draw the spectrum if we have dual VFOs and updated spectrum
+    // is available
+    if (psdupdated && HasDualVFOs()){
+        PlotTXIQSpectrum();
+    }
+}
 
 float32_t oldatt = -5.0;
 /**
@@ -63,7 +150,7 @@ static void DrawTXIQAtt(void){
     if (!PaneTXIQAtt.stale) return;
     
     tft.setFontDefault();
-    tft.setFontScale((enum RA8875tsize)1);
+    tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
     tft.fillRect(PaneTXIQAtt.x0-tft.getFontWidth()*15, PaneTXIQAtt.y0, PaneTXIQAtt.width+tft.getFontWidth()*15, PaneTXIQAtt.height, RA8875_BLACK);
@@ -89,7 +176,7 @@ static void DrawTXIQStatus(void){
     if (!PaneTXIQStatus.stale) return;
     
     tft.setFontDefault();
-    tft.setFontScale((enum RA8875tsize)1);
+    tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
     tft.fillRect(PaneTXIQStatus.x0-tft.getFontWidth()*10, PaneTXIQStatus.y0, PaneTXIQStatus.width+tft.getFontWidth()*10, PaneTXIQStatus.height, RA8875_BLACK);
@@ -128,7 +215,7 @@ static void DrawTXIQFrequency(void){
     if (!PaneTXIQFrequency.stale) return;
     
     tft.setFontDefault();
-    tft.setFontScale((enum RA8875tsize)1);
+    tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
     tft.fillRect(PaneTXIQFrequency.x0-tft.getFontWidth()*11, PaneTXIQFrequency.y0, PaneTXIQFrequency.width+tft.getFontWidth()*11, PaneTXIQFrequency.height, RA8875_BLACK);

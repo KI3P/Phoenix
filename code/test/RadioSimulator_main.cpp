@@ -406,11 +406,13 @@ int main(int argc, char* argv[]) {
     Q_in_L_Ex.clear();
     Q_in_R_Ex.clear();
 
-    // Set up audio output queues with left/right channel assignment
-    Q_out_L.setAudioChannel(0);  // Left channel
-    Q_out_R.setAudioChannel(1);  // Right channel
-    Q_out_L_Ex.setAudioChannel(0);
-    Q_out_R_Ex.setAudioChannel(1);
+    // Set up audio output queues with channel assignment
+    // Channels 0/1: Audio output (speaker playback, downsampled to 48kHz)
+    // Channels 2/3: IQ output (for feedback loopback, full 192kHz)
+    Q_out_L.setAudioChannel(0);    // Left audio channel
+    Q_out_R.setAudioChannel(1);    // Right audio channel
+    Q_out_L_Ex.setAudioChannel(2); // I channel (IQ output)
+    Q_out_R_Ex.setAudioChannel(3); // Q channel (IQ output)
 
     // Initialize SDL audio for demodulated audio playback
     // Using 192kHz to match the DSP output sample rate (SR[SampleRate].rate)

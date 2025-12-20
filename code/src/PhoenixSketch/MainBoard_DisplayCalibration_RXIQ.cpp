@@ -49,7 +49,7 @@ extern struct dispSc displayScale[];
 /**
  * Calculate vertical pixel position for a spectrum FFT bin.
  */
-FASTRUN int16_t pixeln(uint32_t i){
+FASTRUN static int16_t pixeln(uint32_t i){
     int16_t zeroPoint = -1*(int16_t)((-124.0 - RECEIVE_POWER_OFFSET)/10.0*displayScale[ED.spectrumScale].dBScale);
     int16_t result = zeroPoint+(int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
     return result;
@@ -69,7 +69,7 @@ static int16_t y_current = offset;
 #define WIN_WIDTH 20
 #define DARK_RED tft.Color565(64, 0, 0)
 static char buff[100];
-int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+static int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
 //static int32_t Nreadings = 0;                  // Reading counter for measurement averaging
 
 /**
@@ -116,19 +116,6 @@ FASTRUN void PlotSpectrum(void){
         pixelold[x1] = y_current;
         x1++;
     }
-
-    // Because we set the CW tone to be 48 kHz above or below the LO, the upper
-    // and lower sideband products will be in very specific bins. Upper will be
-    // in bin 3/4*512 = 384, lower will be in bin 1/4*512 = 128
-    /*float32_t upper = psdnew[384]; 
-    float32_t lower = psdnew[128]; 
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-        sideband_separation = (upper-lower)*10;
-    } else {
-        sideband_separation = (lower-upper)*10;
-    }
-    deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
-    Nreadings++;*/
     psdupdated = false;
 }
 

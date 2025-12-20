@@ -223,6 +223,21 @@ static SDL_AudioDeviceID audioOutDevice = 0;
 static int16_t pendingL[128];
 static int pendingLCount = 0;
 
+// ============== IQ Output Buffer (for Feedback) ==============
+// Separate ring buffer for IQ output from PlayIQData (channels 2/3)
+// This is at 192kHz (no downsampling) for feedback loopback
+static const size_t IQ_OUT_BUFFER_SIZE = 192000 * 2;  // 1 second stereo at 192kHz
+static int16_t iqOutBuffer[IQ_OUT_BUFFER_SIZE];
+static std::atomic<size_t> iqOutWritePos{0};
+static std::atomic<size_t> iqOutReadPos{0};
+
+// Temporary buffer to accumulate I samples until Q arrives
+static int16_t pendingI[128];
+static int pendingICount = 0;
+
+// Feedback read position - tracks where we are in the IQ output buffer
+static std::atomic<size_t> feedbackReadPos{0};
+
 // ============== Audio Input (Capture) ==============
 // Ring buffer for stereo audio input - 1 second at 192kHz
 static const size_t AUDIO_IN_BUFFER_SIZE = 192000;
@@ -360,11 +375,16 @@ bool SDL_Audio_Init(int sampleRate) {
     memset(audioOutBuffer, 0, sizeof(audioOutBuffer));
     memset(audioInBuffer_L, 0, sizeof(audioInBuffer_L));
     memset(audioInBuffer_R, 0, sizeof(audioInBuffer_R));
+    memset(iqOutBuffer, 0, sizeof(iqOutBuffer));
 
     // No prefill - we'll start playback once DSP has produced enough data
     outWritePos.store(0);
     outReadPos.store(0);
     pendingLCount = 0;
+    iqOutWritePos.store(0);
+    iqOutReadPos.store(0);
+    pendingICount = 0;
+    feedbackReadPos.store(0);
     inWritePos.store(0);
     inReadPos.store(0);
     samplesPlayed.store(0);
@@ -407,12 +427,14 @@ void SDL_Audio_Cleanup(void) {
 void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t channel) {
     if (audioOutDevice == 0) return;
 
+    // Channels 0/1: Audio output (downsampled to 48kHz for speaker playback)
+    // Channels 2/3: IQ output (full 192kHz for feedback loopback)
     if (channel == 0) {
-        // Left channel - save samples for later interleaving
+        // Left audio channel - save samples for later interleaving
         memcpy(pendingL, samples, numSamples * sizeof(int16_t));
         pendingLCount = numSamples;
-    } else {
-        // Right channel - interleave with pending L and write to buffer
+    } else if (channel == 1) {
+        // Right audio channel - interleave with pending L and write to buffer
         if (pendingLCount != numSamples) {
             // Mismatch - shouldn't happen, but handle gracefully
             pendingLCount = 0;
@@ -450,6 +472,30 @@ void SDL_Audio_QueueSamples(const int16_t* samples, int numSamples, uint8_t chan
                        buffered/2, (buffered/2) * 1000.0 / 48000);
             }
         }
+    } else if (channel == 2) {
+        // I channel (IQ output) - save samples for later interleaving
+        memcpy(pendingI, samples, numSamples * sizeof(int16_t));
+        pendingICount = numSamples;
+    } else if (channel == 3) {
+        // Q channel (IQ output) - interleave with pending I and write to IQ buffer
+        if (pendingICount != numSamples) {
+            // Mismatch - shouldn't happen, but handle gracefully
+            pendingICount = 0;
+            return;
+        }
+
+        size_t pos = iqOutWritePos.load();
+
+        // Write at full 192kHz (no downsampling) for feedback
+        for (int i = 0; i < numSamples; i++) {
+            iqOutBuffer[pos] = pendingI[i];  // I
+            pos = (pos + 1) % IQ_OUT_BUFFER_SIZE;
+            iqOutBuffer[pos] = samples[i];   // Q
+            pos = (pos + 1) % IQ_OUT_BUFFER_SIZE;
+        }
+
+        iqOutWritePos.store(pos);
+        pendingICount = 0;
     }
 }
 
@@ -516,93 +562,57 @@ bool SDL_Audio_OutputNeedsData(void) {
 }
 
 // ============== Feedback Mode ==============
-// Reads audio from output buffer and modulates it back to I/Q format
-// This creates a loopback where demodulated audio is re-modulated as an RF signal
+// Reads IQ samples from PlayIQData output and feeds them back as input
+// This creates a loopback for TX IQ calibration testing
 
-// Feedback read position - tracks where we are in the output buffer
-static std::atomic<size_t> feedbackReadPos{0};
-static double feedbackPhase = 0.0;  // Phase accumulator for feedback modulation
-
-// Generate I/Q samples from feedback (output buffer)
-// Reads demodulated audio, upsamples 4x, and modulates onto 48kHz carrier
+// Generate I/Q samples from feedback (IQ output buffer from PlayIQData)
+// Reads I/Q samples directly at 192kHz - no resampling or modulation needed
 static void generateFeedbackSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
-    // Carrier frequency for modulation (same as other sources)
-    const double carrierFreq = 48000.0;  // Hz
-    const double phaseInc = TONE_TWO_PI * carrierFreq / TONE_SAMPLE_RATE;
-
-    // Read from output buffer (48kHz stereo interleaved)
-    // We need numSamples at 192kHz, so we need numSamples/4 at 48kHz
-    const int samplesNeeded48k = numSamples / 4;
-
     size_t readPos = feedbackReadPos.load();
-    size_t writePos = outWritePos.load();
+    size_t writePos = iqOutWritePos.load();
 
-    // Calculate available stereo samples
+    // Calculate available I/Q sample pairs
     size_t available;
     if (writePos >= readPos) {
-        available = (writePos - readPos) / 2;  // Divide by 2 for stereo pairs
+        available = (writePos - readPos) / 2;  // Divide by 2 for I/Q pairs
     } else {
-        available = (AUDIO_OUT_BUFFER_SIZE - readPos + writePos) / 2;
+        available = (IQ_OUT_BUFFER_SIZE - readPos + writePos) / 2;
     }
 
-    // Temporary buffer for 48kHz audio (mono - average L and R)
-    static int16_t audioBuffer48k[BUFFER_SIZE / 4 + 1];
     int samplesRead = 0;
 
-    // Read and average stereo to mono
-    for (int i = 0; i < samplesNeeded48k && samplesRead < (int)available; i++) {
-        int16_t left = audioOutBuffer[readPos];
-        readPos = (readPos + 1) % AUDIO_OUT_BUFFER_SIZE;
-        int16_t right = audioOutBuffer[readPos];
-        readPos = (readPos + 1) % AUDIO_OUT_BUFFER_SIZE;
-
-        // Average L and R for mono
-        audioBuffer48k[i] = (left + right) / 2;
+    // Read I/Q pairs directly from the IQ output buffer
+    for (int i = 0; i < numSamples && samplesRead < (int)available; i++) {
+        samplesI[i] = iqOutBuffer[readPos];
+        readPos = (readPos + 1) % IQ_OUT_BUFFER_SIZE;
+        samplesQ[i] = iqOutBuffer[readPos];
+        readPos = (readPos + 1) % IQ_OUT_BUFFER_SIZE;
         samplesRead++;
     }
 
     feedbackReadPos.store(readPos);
 
     // Fill remaining with silence if not enough samples
-    for (int i = samplesRead; i < samplesNeeded48k; i++) {
-        audioBuffer48k[i] = 0;
-    }
-
-    // Upsample 4x (48kHz -> 192kHz) with linear interpolation
-    // and modulate onto carrier
-    for (int i = 0; i < numSamples; i++) {
-        // Linear interpolation for upsampling
-        int srcIdx = i / 4;
-        int srcNext = (srcIdx + 1 < samplesNeeded48k) ? srcIdx + 1 : srcIdx;
-        double frac = (i % 4) / 4.0;
-
-        double audioSample = audioBuffer48k[srcIdx] * (1.0 - frac) + audioBuffer48k[srcNext] * frac;
-
-        // Modulate onto carrier to create I/Q
-        // Amplitude scaling to match other sources
-        double amplitude = audioSample * 1.0;  // Direct mapping
-        samplesI[i] = (int16_t)(amplitude * cos(feedbackPhase));
-        samplesQ[i] = (int16_t)(amplitude * -sin(feedbackPhase));
-
-        feedbackPhase += phaseInc;
-        if (feedbackPhase > TONE_TWO_PI) feedbackPhase -= TONE_TWO_PI;
+    for (int i = samplesRead; i < numSamples; i++) {
+        samplesI[i] = 0;
+        samplesQ[i] = 0;
     }
 }
 
 // Check how many samples are available for feedback
 static size_t getFeedbackSamplesAvailable() {
     size_t readPos = feedbackReadPos.load();
-    size_t writePos = outWritePos.load();
+    size_t writePos = iqOutWritePos.load();
 
     size_t available;
     if (writePos >= readPos) {
-        available = (writePos - readPos) / 2;  // Stereo pairs at 48kHz
+        available = (writePos - readPos) / 2;  // I/Q pairs at 192kHz
     } else {
-        available = (AUDIO_OUT_BUFFER_SIZE - readPos + writePos) / 2;
+        available = (IQ_OUT_BUFFER_SIZE - readPos + writePos) / 2;
     }
 
-    // Convert to 192kHz equivalent (multiply by 4 for upsampling)
-    return available * 4;
+    // Already at 192kHz, no conversion needed
+    return available;
 }
 
 #endif // USE_SDL_DISPLAY
@@ -647,16 +657,19 @@ int AudioRecordQueue::available(void) {
         return 17;
     }
 
-    // For feedback mode: pace based on available output samples
+    // For feedback mode: always allow DSP to run
+    // generateFeedbackSamples will fill with zeros if IQ buffer is empty
+    // This prevents deadlock at startup when IQ buffer hasn't been filled yet
     if (currentAudioSource == AUDIO_SOURCE_FEEDBACK) {
-        size_t feedbackAvailable = getFeedbackSamplesAvailable();
-        // Need at least one buffer worth (BUFFER_SIZE samples at 192kHz)
-        if (feedbackAvailable < BUFFER_SIZE) {
-            // Not enough feedback data yet - sleep briefly
+        size_t bufLevel = SDL_Audio_OutputBufferLevel();
+        if (bufLevel > TARGET_BUFFER_LEVEL * 2) {
+            // Buffer is well above target - sleep to let it drain
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             return 0;
         }
-        return feedbackAvailable / BUFFER_SIZE;
+        // Always return non-zero to keep DSP running
+        // This allows PlayIQData to fill the IQ buffer
+        return 17;
     }
 
     // For computer audio input: use actual sample availability
