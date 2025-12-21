@@ -48,7 +48,7 @@ void FFT512Reverse(float32_t *buffer){
 
 // These really don't belong here, but it saves the bother of creating another stub
 void WriteIQFile(DataBlock *data, const char* fname){
-    FILE *file2 = fopen(fname, "w");
+    FILE *file2 = fopen(fname, "a");
     for (size_t i = 0; i < data->N; i++) {
         fprintf(file2, "%zu,%7.6f,%7.6f\n", i,data->I[i],data->Q[i]);
     }

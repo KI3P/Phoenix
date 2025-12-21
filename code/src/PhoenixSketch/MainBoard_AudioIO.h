@@ -11,6 +11,9 @@
 
 #define SIDETONE_FREQUENCY 400.0f // Hz
 
+// TX IQ calibration oscillator - used for transmit IQ calibration
+extern AudioSynthWaveformSine transmitIQcal_oscillator;
+
 /**
  * @brief Configure I2S sample rate via PLL clock calculations
  * @param freq Desired sample rate in Hz (typically 48000, 96000, or 192000)

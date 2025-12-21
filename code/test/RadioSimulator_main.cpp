@@ -61,6 +61,7 @@ static std::thread timer_thread;
 
 #include "SDT.h"
 #include "MainBoard_Display.h"
+#include "MainBoard_AudioIO.h"
 #include "RA8875.h"
 #include "Loop.h"
 #include "UISm.h"
@@ -99,7 +100,8 @@ static int32_t oldband = -1;
  * Update audio input source based on RF hardware state.
  * Automatically switches to appropriate audio sources for calibration modes:
  * - RFCalReceiveIQ: Use RXIQ_LSB for USB mode, RXIQ_USB for LSB mode
- * - RFCalTransmitIQ: Use Feedback mode to loop TX audio back as RX input
+ * - RFCalTransmitIQ: Configure Q_in_L_Ex/Q_in_R_Ex to use transmitIQcal_oscillator,
+ *                    and use Feedback mode to loop TX IQ back to RX input
  */
 static void updateAudioSourceForRFState() {
     RFHardwareState currentState = GetRFHardwareState();
@@ -113,6 +115,9 @@ static void updateAudioSourceForRFState() {
         case RFCalReceiveIQ:
             // For RX IQ calibration, use the opposite sideband tone source
             // USB mode needs LSB tone, LSB mode needs USB tone
+            // Also disable oscillator mode for Q_in_L_Ex/Q_in_R_Ex
+            Q_in_L_Ex.setOscillatorSource(nullptr);
+            Q_in_R_Ex.setOscillatorSource(nullptr);
             if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
                 setAudioInputSource(AUDIO_SOURCE_RXIQ_LSB);
                 std::cout << "Audio Source (auto): RX IQ tones (LSB) for USB calibration" << std::endl;
@@ -123,13 +128,25 @@ static void updateAudioSourceForRFState() {
             break;
 
         case RFCalTransmitIQ:
-            // For TX IQ calibration, use feedback mode to loop TX back to RX
+            // For TX IQ calibration:
+            // 1. Configure Q_in_L_Ex and Q_in_R_Ex to use transmitIQcal_oscillator
+            //    This simulates the audio routing where the oscillator feeds the
+            //    input mixers in CALIBRATE_TX_IQ_MARK state
+            Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+            Q_in_R_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+            std::cout << "TX IQ Cal: Q_in_L_Ex/Q_in_R_Ex using transmitIQcal_oscillator ("
+                      << transmitIQcal_oscillator.getFrequency() << " Hz, amp="
+                      << transmitIQcal_oscillator.getAmplitude() << ")" << std::endl;
+
+            // 2. Use feedback mode to loop TX IQ output back to RX input
             setAudioInputSource(AUDIO_SOURCE_FEEDBACK);
             std::cout << "Audio Source (auto): Feedback for TX IQ calibration" << std::endl;
             break;
 
         default:
-            // For other states, don't automatically change the audio source
+            // For other states, disable oscillator mode and don't change audio source
+            Q_in_L_Ex.setOscillatorSource(nullptr);
+            Q_in_R_Ex.setOscillatorSource(nullptr);
             break;
     }
 

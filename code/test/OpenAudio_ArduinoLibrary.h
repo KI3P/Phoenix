@@ -35,6 +35,9 @@ bool SDL_Audio_OutputNeedsData(void);      // True if output buffer is below tar
 #define AUDIO_INPUT_MIC 1
 #define AUDIO_INPUT_LINEIN 2
 
+// Audio sample rate constant - Teensy's native audio sample rate
+#define AUDIO_SAMPLE_RATE_EXACT 44117.64706f
+
 void AudioMemory(uint16_t mem);
 void AudioMemory_F32(uint16_t mem);
 void set_audioClock(int c0, int c1, int c2, bool b);
@@ -49,10 +52,17 @@ extern uint32_t CCM_CS2CDR;
 extern uint32_t CCM_CS2CDR_SAI2_CLK_PRED_MASK;
 extern uint32_t CCM_CS2CDR_SAI2_CLK_PODF_MASK;
 
+// Forward declaration
+class AudioSynthWaveformSine;
+
+// Maximum number of blocks that can be buffered (1 second at 192kHz / 128 samples per block)
+#define AUDIO_RECORD_QUEUE_MAX_BLOCKS 1500
+#define AUDIO_RECORD_QUEUE_BLOCK_SIZE 128
+
 class AudioRecordQueue
 {
     public:
-        AudioRecordQueue(void){ }
+        AudioRecordQueue(void);
         void begin(void) {
             clear();
             enabled = 1;
@@ -68,10 +78,26 @@ class AudioRecordQueue
             enabled = 0;
         }
         virtual void update(void);
+
+        // Timer-driven oscillator mode for TX IQ calibration
+        void setOscillatorSource(AudioSynthWaveformSine* osc);
+        void generateOscillatorSamples(void);  // Call from timer to generate samples
+
     private:
         volatile uint8_t channel, enabled;
         volatile uint32_t head;
         int16_t *data;
+
+        // Oscillator-driven mode
+        AudioSynthWaveformSine* oscillatorSource;
+        double oscillatorPhase;
+
+        // Internal block buffer for timer-driven mode
+        int16_t blockBuffer[AUDIO_RECORD_QUEUE_MAX_BLOCKS][AUDIO_RECORD_QUEUE_BLOCK_SIZE];
+        volatile uint32_t writeBlock;  // Next block to write
+        volatile uint32_t readBlock;   // Next block to read
+        uint64_t lastGenerateTime;     // Microseconds timestamp of last generation
+        bool useOscillatorMode;
 };
 
 class AudioPlayQueue
@@ -128,11 +154,16 @@ class AudioMixer4
 class AudioSynthWaveformSine
 {
     public:
-        AudioSynthWaveformSine(void){ }
+        AudioSynthWaveformSine(void) : freq(0.0f), amp(0.0f) { }
         void begin(void) { }
         void end(void) {  }
-        void frequency(float f) { }
-        void amplitude(float f) { }
+        void frequency(float f) { freq = f; }
+        void amplitude(float f) { amp = f; }
+        float getFrequency(void) const { return freq; }
+        float getAmplitude(void) const { return amp; }
+    private:
+        float freq;
+        float amp;
 };
 
 class AudioControlSGTL5000

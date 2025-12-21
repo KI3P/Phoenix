@@ -203,6 +203,38 @@ void FreqShiftFs4(DataBlock *data)
 }
 
 /**
+ * Frequency translation by -Fs/4 without multiplication from Lyons (2011): 
+ * chapter 13.1.2 page 646, 13-3.
+ * 
+ * This is for -Fs/4 [moves receive frequency to the right in the spectrum display]
+ *   xnew(0) =  xreal(0) + jximag(0)
+ *     leave first value (DC component) as it is!
+ *   xnew(1) =  - ximag(1) + jxreal(1)
+ * 
+ * @param data DataBlock containing the I & Q samples
+ * 
+ * Frequency translation is performed in-place.
+ */
+void FreqShiftMFs4(DataBlock *data)
+{
+    float32_t hh1,hh2;
+    for (size_t i = 0; i < data->N; i += 4) {
+        hh1 =   data->Q[i + 1];  // xnew(1) =  - ximag(1) + jxreal(1)
+        hh2 = - data->I[i + 1];
+        data->I[i + 1] = hh1;
+        data->Q[i + 1] = hh2;
+        hh1 = - data->I[i + 2];
+        hh2 = - data->Q[i + 2];
+        data->I[i + 2] = hh1;
+        data->Q[i + 2] = hh2;
+        hh1 = - data->Q[i + 3];
+        hh2 =   data->I[i + 3];
+        data->I[i + 3] = hh1;
+        data->Q[i + 3] = hh2;
+    }
+}
+
+/**
  * Frequency translation by frequency F. 
  * 
  * @param data DataBlock to act upon

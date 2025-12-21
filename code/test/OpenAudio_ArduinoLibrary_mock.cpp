@@ -1,9 +1,13 @@
 #include "../src/PhoenixSketch/SDT.h"
+#include "../src/PhoenixSketch/DSP_FFT.h"
 #include "OpenAudio_ArduinoLibrary.h"
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <chrono>
 #include <thread>
+#include <atomic>
+#include <mutex>
 
 // ============== Audio Source Selection ==============
 // Default: MOCK_DATA for unit tests, TWO_TONE for simulator with SDL
@@ -41,6 +45,137 @@ const char* getAudioInputSourceName(void) {
         default:                       return "Unknown";
     }
 }
+
+// ============== Direct Feedback Buffer ==============
+// Simple ring buffer for feedback: Q_out_L_Ex → Q_in_L, Q_out_R_Ex → Q_in_R
+// This provides a direct path from transmit IQ output to receive IQ input.
+// A frequency shift (FreqShiftMFs4) is applied to simulate the RF path.
+
+static const int FEEDBACK_BLOCK_SIZE = 128;
+static const int FEEDBACK_MAX_BLOCKS = 100;  // ~65ms of audio at 192kHz
+
+class DirectFeedbackBuffer {
+public:
+    DirectFeedbackBuffer() : writeBlock(0), readBlock(0) {
+        memset(buffer, 0, sizeof(buffer));
+    }
+
+    void clear() {
+        writeBlock = 0;
+        readBlock = 0;
+    }
+
+    // Write a block of samples (called by AudioPlayQueue::playBuffer)
+    void writeBuffer(const int16_t* samples) {
+        memcpy(buffer[writeBlock], samples, FEEDBACK_BLOCK_SIZE * sizeof(int16_t));
+        writeBlock = (writeBlock + 1) % FEEDBACK_MAX_BLOCKS;
+        // If we've caught up to the read pointer, advance it (overwrite oldest)
+        if (writeBlock == readBlock) {
+            readBlock = (readBlock + 1) % FEEDBACK_MAX_BLOCKS;
+        }
+    }
+
+    // Get number of blocks available to read
+    int available() const {
+        if (writeBlock >= readBlock) {
+            return writeBlock - readBlock;
+        } else {
+            return FEEDBACK_MAX_BLOCKS - readBlock + writeBlock;
+        }
+    }
+
+    // Read a block of samples (called by AudioRecordQueue::readBuffer)
+    int16_t* readBuffer() {
+        if (readBlock == writeBlock) {
+            // Buffer empty - return zeros
+            static int16_t emptyBuffer[FEEDBACK_BLOCK_SIZE] = {0};
+            return emptyBuffer;
+        }
+        int16_t* ptr = buffer[readBlock];
+        readBlock = (readBlock + 1) % FEEDBACK_MAX_BLOCKS;
+        return ptr;
+    }
+
+private:
+    int16_t buffer[FEEDBACK_MAX_BLOCKS][FEEDBACK_BLOCK_SIZE];
+    volatile int writeBlock;
+    volatile int readBlock;
+};
+
+// Global feedback buffers: L_Ex output → L input, R_Ex output → R input
+static DirectFeedbackBuffer g_feedbackL;  // Q_out_L_Ex → Q_in_L
+static DirectFeedbackBuffer g_feedbackR;  // Q_out_R_Ex → Q_in_R
+
+// ============== Frequency-Shifted Feedback Processing ==============
+// Buffers I channel (Q_out_L_Ex), waits for Q channel (Q_out_R_Ex),
+// combines into DataBlock, applies FreqShiftMFs4, then writes to feedback buffers.
+
+class FreqShiftedFeedback {
+public:
+    FreqShiftedFeedback() : pendingI(false) {
+        memset(iBuffer, 0, sizeof(iBuffer));
+        // Initialize DataBlock
+        dataBlock.N = FEEDBACK_BLOCK_SIZE;
+        dataBlock.sampleRate_Hz = 192000;
+        dataBlock.I = iFloat;
+        dataBlock.Q = qFloat;
+    }
+
+    // Called when Q_out_L_Ex (channel 2) writes - buffer the I channel
+    void writeI(const int16_t* samples) {
+        memcpy(iBuffer, samples, FEEDBACK_BLOCK_SIZE * sizeof(int16_t));
+        pendingI = true;
+    }
+
+    // Called when Q_out_R_Ex (channel 3) writes - combine, shift, and write to feedback
+    void writeQ(const int16_t* samples) {
+        if (!pendingI) {
+            // Q arrived before I - just buffer Q and wait
+            // This shouldn't normally happen if L is always written before R
+            return;
+        }
+
+        // Convert int16_t to float32_t for DataBlock
+        for (int i = 0; i < FEEDBACK_BLOCK_SIZE; i++) {
+            iFloat[i] = (float32_t)iBuffer[i];
+            qFloat[i] = (float32_t)samples[i];
+        }
+
+        // Apply frequency shift (Fs/4 = 48kHz at 192kHz sample rate)
+        FreqShiftMFs4(&dataBlock);
+
+        // Convert back to int16_t and write to feedback buffers
+        int16_t shiftedI[FEEDBACK_BLOCK_SIZE];
+        int16_t shiftedQ[FEEDBACK_BLOCK_SIZE];
+        for (int i = 0; i < FEEDBACK_BLOCK_SIZE; i++) {
+            // Clamp to int16_t range
+            float32_t iVal = iFloat[i];
+            float32_t qVal = qFloat[i];
+            if (iVal > 32767.0f) iVal = 32767.0f;
+            if (iVal < -32768.0f) iVal = -32768.0f;
+            if (qVal > 32767.0f) qVal = 32767.0f;
+            if (qVal < -32768.0f) qVal = -32768.0f;
+            shiftedI[i] = (int16_t)iVal;
+            shiftedQ[i] = (int16_t)qVal;
+        }
+
+        // Write shifted data to feedback buffers
+        g_feedbackL.writeBuffer(shiftedI);
+        g_feedbackR.writeBuffer(shiftedQ);
+
+        pendingI = false;
+    }
+
+private:
+    int16_t iBuffer[FEEDBACK_BLOCK_SIZE];   // Buffered I channel samples
+    float32_t iFloat[FEEDBACK_BLOCK_SIZE];  // Float buffer for DataBlock I
+    float32_t qFloat[FEEDBACK_BLOCK_SIZE];  // Float buffer for DataBlock Q
+    DataBlock dataBlock;                     // DataBlock for FreqShiftMFs4
+    bool pendingI;                           // True if I channel is buffered, waiting for Q
+};
+
+// Global frequency-shifted feedback processor
+static FreqShiftedFeedback g_freqShiftFeedback;
 
 // ============== Tone Generator ==============
 // Sample rate is 192kHz
@@ -204,10 +339,7 @@ static void generateRXIQUSBSamples(int16_t* samplesI, int16_t* samplesQ, int num
 
 #ifdef USE_SDL_DISPLAY
 #include <SDL2/SDL.h>
-#include <atomic>
-#include <mutex>
 #include <condition_variable>
-#include <cstring>
 
 // ============== Audio Output (Playback) ==============
 // Ring buffer for stereo audio output - 1 second at 48kHz (downsampled from 192kHz)
@@ -622,6 +754,253 @@ static size_t getFeedbackSamplesAvailable() {
 #include "mock_L_data_int_1khz.c"
 #include "mock_R_data_int_1khz.c"
 
+// ============== Oscillator-Driven Mode for TX IQ Calibration ==============
+// Sample rate is 192kHz, block size is 128 samples
+static const double OSC_SAMPLE_RATE = 192000.0;
+static const double OSC_TWO_PI = 2.0 * M_PI;
+
+// ============== Synchronized L/R Oscillator Generator ==============
+// This generates both L and R samples together with a single phase accumulator
+// to ensure phase continuity and correct frequency. We use I buffer for the left 
+// channel and Q for the right channel.
+
+class SynchronizedOscillatorGenerator {
+public:
+    static constexpr int BLOCK_SIZE = 128;
+    static constexpr int MAX_BLOCKS = 1500;
+
+    SynchronizedOscillatorGenerator() :
+        oscillatorSource(nullptr),
+        sampleIndex(0),
+        writeBlock(0),
+        readBlockI(0),
+        readBlockQ(0),
+        lastGenerateTime(0),
+        enabled(false)
+    {
+        memset(bufferI, 0, sizeof(bufferI));
+        memset(bufferQ, 0, sizeof(bufferQ));
+    }
+
+    void setSource(AudioSynthWaveformSine* osc) {
+        oscillatorSource = osc;
+        sampleIndex = 0;
+        writeBlock = 0;
+        readBlockI = 0;
+        readBlockQ = 0;
+        enabled = (osc != nullptr);
+
+        // Initialize timing and pre-generate initial blocks
+        if (enabled) {
+            auto now = std::chrono::steady_clock::now();
+            lastGenerateTime = std::chrono::duration_cast<std::chrono::microseconds>(
+                now.time_since_epoch()).count();
+            // Pre-generate 20 blocks (~13ms of audio) to ensure data is always available
+            preGenerateBlocks(20);
+        } else {
+            lastGenerateTime = 0;
+        }
+    }
+
+    // Pre-generate a specified number of blocks immediately (not time-based)
+    void preGenerateBlocks(int numBlocks) {
+        if (!enabled || oscillatorSource == nullptr) {
+            return;
+        }
+
+        float freq = oscillatorSource->getFrequency();
+        float amp = oscillatorSource->getAmplitude();
+
+        // Convert amplitude - the oscillator amplitude is set as amp/500 in InitializeAudio
+        double amplitude = amp * 500.0 * 30.0;
+        // Convert frequency
+        freq = freq * 192000.0f / AUDIO_SAMPLE_RATE_EXACT;
+
+        if (amplitude > 32767.0) amplitude = 32767.0;
+        const double noiseAmp = amplitude / 20.0;
+        double phaseInc = OSC_TWO_PI * freq / OSC_SAMPLE_RATE;
+
+        for (int blk = 0; blk < numBlocks; blk++) {
+            uint32_t nextWriteBlock = (writeBlock + 1) % MAX_BLOCKS;
+            if (nextWriteBlock == readBlockI || nextWriteBlock == readBlockQ) {
+                break;  // Buffer full
+            }
+
+            int16_t* blockL = bufferI[writeBlock];
+            int16_t* blockR = bufferQ[writeBlock];
+
+            for (int i = 0; i < BLOCK_SIZE; i++) {
+                double theta = phaseInc * sampleIndex;
+                blockL[i] = (int16_t)(amplitude * cos(theta) + noiseAmp * randomNoise());
+                blockR[i] = blockL[i];
+                sampleIndex++;
+                if (sampleIndex >= 192000) {
+                    sampleIndex = 0;
+                }
+            }
+            writeBlock = nextWriteBlock;
+        }
+    }
+
+    void clear() {
+        sampleIndex = 0;
+        writeBlock = 0;
+        readBlockI = 0;
+        readBlockQ = 0;
+        lastGenerateTime = 0;
+    }
+
+    bool isEnabled() const { return enabled && oscillatorSource != nullptr; }
+
+    // Generate synchronized I/Q samples based on elapsed time
+    void generateSamples() {
+        if (!enabled || oscillatorSource == nullptr) {
+            return;
+        }
+
+        // Get current time in microseconds
+        auto now = std::chrono::steady_clock::now();
+        auto nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
+            now.time_since_epoch()).count();
+
+        // Initialize timing on first call
+        if (lastGenerateTime == 0) {
+            lastGenerateTime = nowUs;
+            return;
+        }
+
+        // Calculate how many samples should have been generated since last call
+        uint64_t elapsedUs = nowUs - lastGenerateTime;
+        uint64_t samplesExpected = (elapsedUs * 192000) / 1000000;
+
+        // Generate complete blocks only
+        uint64_t blocksToGenerate = samplesExpected / BLOCK_SIZE;
+
+        if (blocksToGenerate == 0) {
+            return;
+        }
+
+        // Get oscillator parameters
+        float freq = oscillatorSource->getFrequency();
+        float amp = oscillatorSource->getAmplitude();
+
+        // Convert amplitude - the oscillator amplitude is set as amp/500 in InitializeAudio
+        double amplitude = amp * 500.0 * 300.0;
+        // Convert frequency
+        freq = freq*192000.0f/AUDIO_SAMPLE_RATE_EXACT;
+
+        // Clamp amplitude to avoid int16 overflow
+        if (amplitude > 32767.0) amplitude = 32767.0;
+
+        // Noise amplitude is 1/20th of signal amplitude
+        const double noiseAmp = amplitude / 40.0;
+
+        // NCO increment per sample
+        double phaseInc = OSC_TWO_PI * freq / OSC_SAMPLE_RATE;
+
+        // Generate the blocks - both I and Q together
+        for (uint64_t blk = 0; blk < blocksToGenerate; blk++) {
+            // Check if buffer is full (use I read pointer as reference)
+            uint32_t nextWriteBlock = (writeBlock + 1) % MAX_BLOCKS;
+            if (nextWriteBlock == readBlockI || nextWriteBlock == readBlockQ) {
+                // Buffer full, stop generating
+                break;
+            }
+
+            // Generate one block of synchronized L/R samples
+            int16_t* blockL = bufferI[writeBlock];
+            int16_t* blockR = bufferQ[writeBlock];
+
+            for (int i = 0; i < BLOCK_SIZE; i++) {
+                double theta = phaseInc * sampleIndex;
+
+                // L channel: nice clean tone)
+                blockL[i] = (int16_t)(amplitude * cos(theta)+ noiseAmp * randomNoise());
+
+                // R channel: same as L for mono microphone simulation
+                blockR[i] = blockL[i];
+
+                // Increment sample index (single increment for both I and Q)
+                sampleIndex++;
+
+                // Wrap at one second of samples to prevent floating point precision issues
+                if (sampleIndex >= 192000) {
+                    sampleIndex = 0;
+                }
+            }
+
+            writeBlock = nextWriteBlock;
+        }
+
+        // Update timestamp
+        lastGenerateTime += blocksToGenerate * (BLOCK_SIZE * 1000000 / 192000);
+    }
+
+    // Get number of blocks available for I channel
+    int availableI() {
+        generateSamples();
+        uint32_t w = writeBlock;
+        uint32_t r = readBlockI;
+        if (w >= r) {
+            return w - r;
+        } else {
+            return MAX_BLOCKS - r + w;
+        }
+    }
+
+    // Get number of blocks available for Q channel
+    int availableQ() {
+        generateSamples();
+        uint32_t w = writeBlock;
+        uint32_t r = readBlockQ;
+        if (w >= r) {
+            return w - r;
+        } else {
+            return MAX_BLOCKS - r + w;
+        }
+    }
+
+    // Read a block from I channel
+    int16_t* readBufferI() {
+        if (readBlockI == writeBlock) {
+            // Buffer empty
+            static int16_t emptyBuffer[BLOCK_SIZE] = {0};
+            return emptyBuffer;
+        }
+        int16_t* ptr = bufferI[readBlockI];
+        readBlockI = (readBlockI + 1) % MAX_BLOCKS;
+        return ptr;
+    }
+
+    // Read a block from Q channel
+    int16_t* readBufferQ() {
+        if (readBlockQ == writeBlock) {
+            // Buffer empty
+            static int16_t emptyBuffer[BLOCK_SIZE] = {0};
+            return emptyBuffer;
+        }
+        int16_t* ptr = bufferQ[readBlockQ];
+        readBlockQ = (readBlockQ + 1) % MAX_BLOCKS;
+        return ptr;
+    }
+
+private:
+    AudioSynthWaveformSine* oscillatorSource;
+    uint64_t sampleIndex;           // Single sample counter for both channels
+    uint32_t writeBlock;            // Next block to write (shared for I and Q)
+    uint32_t readBlockI;            // Next block to read for I channel
+    uint32_t readBlockQ;            // Next block to read for Q channel
+    uint64_t lastGenerateTime;      // Timestamp for timing
+    bool enabled;
+
+    // Separate buffers for I and Q channels
+    int16_t bufferI[MAX_BLOCKS][BLOCK_SIZE];
+    int16_t bufferQ[MAX_BLOCKS][BLOCK_SIZE];
+};
+
+// Global synchronized oscillator generator instance
+static SynchronizedOscillatorGenerator g_syncOscillator;
+
 // Helper to get number of samples available in SDL input buffer
 #ifdef USE_SDL_DISPLAY
 static size_t SDL_Audio_SamplesAvailable(void) {
@@ -639,6 +1018,17 @@ static size_t SDL_Audio_SamplesAvailable(void) {
 #endif
 
 int AudioRecordQueue::available(void) {
+    // If oscillator mode is enabled, use synchronized generator
+    if (useOscillatorMode && g_syncOscillator.isEnabled()) {
+        // Use channel to determine L or R
+        // Channels 0 and 2 are left (L, L_Ex), channels 1 and 3 are right (R, R_Ex)
+        if (channel == 0 || channel == 2) {
+            return g_syncOscillator.availableI();
+        } else {
+            return g_syncOscillator.availableQ();
+        }
+    }
+
 #ifdef USE_SDL_DISPLAY
     // For tone generators in simulator: pace based on output buffer level
     // Run DSP when output buffer needs data, sleep when buffer is full
@@ -657,19 +1047,18 @@ int AudioRecordQueue::available(void) {
         return 17;
     }
 
-    // For feedback mode: always allow DSP to run
-    // generateFeedbackSamples will fill with zeros if IQ buffer is empty
-    // This prevents deadlock at startup when IQ buffer hasn't been filled yet
+    // For feedback mode: use direct feedback buffers
+    // Q_out_L_Ex → g_feedbackL → Q_in_L (channel 0)
+    // Q_out_R_Ex → g_feedbackR → Q_in_R (channel 1)
     if (currentAudioSource == AUDIO_SOURCE_FEEDBACK) {
-        size_t bufLevel = SDL_Audio_OutputBufferLevel();
-        if (bufLevel > TARGET_BUFFER_LEVEL * 2) {
-            // Buffer is well above target - sleep to let it drain
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            return 0;
+        // Channels 0 and 1 read from feedback buffers
+        if (channel == 0) {
+            return g_feedbackL.available();
+        } else if (channel == 1) {
+            return g_feedbackR.available();
         }
-        // Always return non-zero to keep DSP running
-        // This allows PlayIQData to fill the IQ buffer
-        return 17;
+        // Channels 2 and 3 (extended) use oscillator - handled above
+        // Fall through to other sources if not handled
     }
 
     // For computer audio input: use actual sample availability
@@ -702,6 +1091,10 @@ int AudioRecordQueue::available(void) {
 
 void AudioRecordQueue::clear(void) {
     head = 0;
+    // Also reset synchronized generator if in oscillator mode
+    if (useOscillatorMode && g_syncOscillator.isEnabled()) {
+        g_syncOscillator.clear();
+    }
 }
 
 void AudioRecordQueue::setChannel(uint8_t chan) {
@@ -730,6 +1123,17 @@ uint8_t AudioRecordQueue::getChannel(void) {
 }
 
 int16_t* AudioRecordQueue::readBuffer(void) {
+    // If oscillator mode is enabled, use synchronized generator
+    if (useOscillatorMode && g_syncOscillator.isEnabled()) {
+        // Use channel to determine L or R
+        // Channels 0 and 2 are left (L, L_Ex), channels 1 and 3 are right (R, R_Ex)
+        if (channel == 0 || channel == 2) {
+            return g_syncOscillator.readBufferI();
+        } else {
+            return g_syncOscillator.readBufferQ();
+        }
+    }
+
     // Static buffers for generated I/Q samples
     static int16_t toneBuf_I[BUFFER_SIZE];
     static int16_t toneBuf_Q[BUFFER_SIZE];
@@ -820,25 +1224,19 @@ int16_t* AudioRecordQueue::readBuffer(void) {
         }
     }
 
-#ifdef USE_SDL_DISPLAY
+    // For feedback mode: use direct feedback buffers
+    // Q_out_L_Ex (ch 2) → g_feedbackL → Q_in_L (ch 0)
+    // Q_out_R_Ex (ch 3) → g_feedbackR → Q_in_R (ch 1)
     if (currentAudioSource == AUDIO_SOURCE_FEEDBACK) {
-        if (channel == 0 || channel == 2) {
-            // I channel (Left) request - generate fresh data for both I and Q
-            generateFeedbackSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
-            qDataReady = true;
-            return toneBuf_I;
-        } else {
-            // Q channel (Right) request - return cached Q data
-            if (qDataReady) {
-                qDataReady = false;
-                return toneBuf_Q;
-            } else {
-                // Q requested before I - generate fresh data
-                generateFeedbackSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
-                return toneBuf_Q;
-            }
+        if (channel == 0) {
+            return g_feedbackL.readBuffer();
+        } else if (channel == 1) {
+            return g_feedbackR.readBuffer();
         }
+        // Channels 2 and 3 use oscillator mode (handled above)
     }
+
+#ifdef USE_SDL_DISPLAY
 
     if (currentAudioSource == AUDIO_SOURCE_COMPUTER && SDL_Audio_InputAvailable()) {
         // Static buffers for L and R channels
@@ -882,6 +1280,41 @@ void AudioRecordQueue::update(void) {
     return;
 }
 
+// ============== AudioRecordQueue Constructor ==============
+AudioRecordQueue::AudioRecordQueue(void) :
+    channel(0),
+    enabled(0),
+    head(0),
+    data(nullptr),
+    oscillatorSource(nullptr),
+    oscillatorPhase(0.0),
+    writeBlock(0),
+    readBlock(0),
+    lastGenerateTime(0),
+    useOscillatorMode(false)
+{
+    // Initialize block buffer to zeros
+    memset(blockBuffer, 0, sizeof(blockBuffer));
+}
+
+void AudioRecordQueue::setOscillatorSource(AudioSynthWaveformSine* osc) {
+    useOscillatorMode = (osc != nullptr);
+
+    // Configure the synchronized generator
+    // Set up once when first channel enables (either I or Q can be first)
+    if (osc != nullptr && !g_syncOscillator.isEnabled()) {
+        g_syncOscillator.setSource(osc);
+    } else if (osc == nullptr) {
+        // If either channel disables, disable the generator
+        g_syncOscillator.setSource(nullptr);
+    }
+}
+
+void AudioRecordQueue::generateOscillatorSamples(void) {
+    // This is now a no-op - generation is handled by the synchronized generator
+    // when available() or readBuffer() is called
+}
+
 int16_t *AudioPlayQueue::getBuffer(void){
     return buf;
 }
@@ -897,6 +1330,19 @@ void AudioPlayQueue::playBuffer(void){
     // Send audio to SDL for playback
     SDL_Audio_QueueSamples(buf, 128, audioChannel);
 #endif
+
+    // In feedback mode, apply frequency shift and write to feedback buffers
+    // Q_out_L_Ex (channel 2) + Q_out_R_Ex (channel 3) → FreqShiftMFs4 → g_feedbackL/R
+    if (currentAudioSource == AUDIO_SOURCE_FEEDBACK) {
+        if (audioChannel == 2) {
+            // Buffer I channel, wait for Q channel
+            g_freqShiftFeedback.writeI(buf);
+        } else if (audioChannel == 3) {
+            // Combine with buffered I, apply freq shift, write to feedback buffers
+            g_freqShiftFeedback.writeQ(buf);
+        }
+    }
+
     // Also write to file if enabled (for debugging/analysis)
     if (fopened){
         for (size_t k=0; k<128; k++){
