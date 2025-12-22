@@ -15,6 +15,7 @@ void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
 static uint32_t swrTimer_ms = 0;
 
 #define RXTXZoom 3
+#define TXIQZOOM 3
 
 /**
  * Perform the appropriate IQ signal processing depending on the state we're in
@@ -30,11 +31,16 @@ void PerformSignalProcessing(void){
             break;
         }
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
-        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
             if (HasDualVFOs())
                 TransmitReceiveProcessing();
+            break;
+        }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
+            TransmitProcessing(nullptr);
+            if (HasDualVFOs())
+                TransmitIQReceiveProcessing();
             break;
         }
         default:{
@@ -721,6 +727,7 @@ void PlayBuffer(DataBlock *data){
 void InitializeSignalProcessing(void){
     InitializeFilters(ED.spectrum_zoom,&RXfilters);
     InitializeFilters(RXTXZoom,&RXTXfilters);
+    InitializeFilters(TXIQZOOM,&TXIQfilters);
     InitializeTransmitFilters(&TXfilters);
     InitializeAGC(&agc, SR[SampleRate].rate/RXfilters.DF);
     InitializeKim1NoiseReduction();
@@ -760,6 +767,34 @@ void TransmitReceiveProcessing(void){
     // Perform FFT for spectral display
     ZoomFFTExe(&data, RXTXZoom, &RXTXfilters);
 }
+
+/**
+ * Truncated version of the receive processing that runs during transmit IQ if 
+ * we have dual VFOs installed on the RF board
+ */
+void TransmitIQReceiveProcessing(void){
+    data.I = float_buffer_L;
+    data.Q = float_buffer_R;
+
+    // Read data from buffer
+    if (ReadIQInputBuffer(&data)){
+        // There is no data available, skip the rest
+        return;
+    }    
+    // Scale data channels by the overall system RF gain and the band-specified gain adjustment
+    ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
+
+    // Perform IQ correction
+    ApplyIQCorrection(&data,
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+
+    // Shift the frequency
+    FreqShiftFs4(&data);
+    // Perform FFT for spectral display
+    ZoomFFTExe(&data, TXIQZOOM, &TXIQfilters);
+}
+
 
 /**
  * Used by the unit tests. Saves data to a file for offline examination.
@@ -1071,6 +1106,10 @@ DataBlock * TransmitProcessing(const char *fname){
     SidebandSelection(&data);
     TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
     TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
+
+    // Swap I and Q at this point to get correct USB and LSB formation on transmit
+    data.I = float_buffer_R;
+    data.Q = float_buffer_L;
 
     // Play the data on the output buffer
     PlayIQData(&data);

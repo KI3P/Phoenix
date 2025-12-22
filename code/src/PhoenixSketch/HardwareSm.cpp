@@ -186,8 +186,9 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             CWoff();                                            // <<1ms  | < 1ms
             // Set clockEnableCW to LO
             DisableCWVFOOutput();                               // ~ 1ms  | < 2ms
-            if (HasDualVFOs())
+            if (HasDualVFOs()){
                 DisableTXVFOOutput();
+            }
             SetTXAttenuation(31.5);                             // ~ 1ms  | < 3ms
             TXBypassBPF(); // BPF out of TX path                // ~ 1ms  | < 4ms
             SelectXVTR();  // Shunt the TX path to nothing      // ~ 1ms  | < 5ms
@@ -307,7 +308,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             break;
         }
         case RFCalTransmitIQ:{
-            SetRXAttenuation( 31.5 );
+            SetRXAttenuation( 10.0 );
             SetTXAttenuation( 31.5 );
 
             // Get all the receive hardware out of the path

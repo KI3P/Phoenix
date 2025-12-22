@@ -656,6 +656,7 @@ extern struct band bands[];
 extern const struct SR_Descriptor SR[];
 extern ReceiveFilterConfig RXfilters;
 extern ReceiveFilterConfig RXTXfilters;
+extern ReceiveFilterConfig TXIQfilters;
 extern TransmitFilterConfig TXfilters;
 extern AGCConfig agc;
 extern UISm uiSM;

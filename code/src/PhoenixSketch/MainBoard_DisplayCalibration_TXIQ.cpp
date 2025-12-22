@@ -22,7 +22,9 @@ extern RA8875 tft;
 // 6. Repeat for all bands
 //
 ///////////////////////////////////////////////////////////////////////////////
+#define TXIQ_SPECTRUM_REFRESH_MS 100
 static char buff[100];
+static bool redrawSpectrum;
 static uint8_t incindex = 0;
 const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
@@ -75,7 +77,7 @@ static int16_t y_left;
 static int16_t y_prev = pixelold[0];
 static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-10);
 static int16_t y_current = offset;
-#define WIN_WIDTH 256
+#define WIN_WIDTH 32
 #define DARK_RED tft.Color565(64, 0, 0)
 static int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
 
@@ -88,8 +90,8 @@ static int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
  */
 FASTRUN void PlotTXIQSpectrum(void){
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
-
-    x1 = MAX_WATERFALL_WIDTH/4-WIN_WIDTH/2;
+    // Draw the lower sideband
+    x1 = MAX_WATERFALL_WIDTH/2-WIN_WIDTH;
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
     else
@@ -105,8 +107,8 @@ FASTRUN void PlotTXIQSpectrum(void){
         pixelold[x1] = y_current;
         x1++;
     }
-
-    x1 = MAX_WATERFALL_WIDTH*3/4-WIN_WIDTH/2;
+    // Draw the upper sideband
+    x1 = MAX_WATERFALL_WIDTH/2;
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
     else
@@ -133,8 +135,9 @@ FASTRUN void PlotTXIQSpectrum(void){
 static void DrawTXIQSpectrumPane(void){
     // Only draw the spectrum if we have dual VFOs and updated spectrum
     // is available
-    if (psdupdated && HasDualVFOs()){
+    if (psdupdated && HasDualVFOs() && redrawSpectrum){
         PlotTXIQSpectrum();
+        redrawSpectrum = false;
     }
 }
 
@@ -495,6 +498,9 @@ static void DrawTXIQInstructionsPane(void){
     PaneTXIQInstructions.stale = false;
 }
 
+// State tracking for periodic display updates
+static uint32_t timerDisplay_ms = 0;
+
 /**
  * @brief Main TX IQ calibration screen rendering function
  * @note Called from DrawDisplay() when in CALIBRATE_TX_IQ UI state
@@ -527,6 +533,12 @@ void DrawCalibrateTXIQ(void){
             TXIQWindowPanes[i]->stale = true;
         }
 
+    }
+
+    if (millis()-timerDisplay_ms > TXIQ_SPECTRUM_REFRESH_MS) {
+        timerDisplay_ms = millis();
+        if (redrawSpectrum == false)
+            redrawSpectrum = true;
     }
 
     for (size_t i = 0; i < NUMBER_OF_TXIQ_PANES; i++){

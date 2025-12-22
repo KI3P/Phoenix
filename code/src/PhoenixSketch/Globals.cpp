@@ -85,6 +85,7 @@ const struct SR_Descriptor SR[18] = {
 
 ReceiveFilterConfig RXfilters;
 ReceiveFilterConfig RXTXfilters;
+ReceiveFilterConfig TXIQfilters;
 TransmitFilterConfig TXfilters;
 AGCConfig agc;
 uint8_t SampleRate = SAMPLE_RATE_192K;

@@ -36,7 +36,7 @@ void MyDelay(unsigned long millisWait) {
 
 // VFO related
 Si5351 si5351;
-#define SI5351_DRIVE_CURRENT SI5351_DRIVE_2MA
+#define SI5351_DRIVE_CURRENT SI5351_DRIVE_8MA
 #define SI5351_LOAD_CAPACITANCE SI5351_CRYSTAL_LOAD_8PF
 #define Si_5351_crystal 25000000L
 static int32_t txmultiple, oldtxMultiple;
@@ -165,6 +165,8 @@ int32_t EvenDivisor(int64_t freq2_Hz) {
 void SetSSBRXVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == SSBRXVFOFreq_dHz) return;
+    Serial.print("Setting RX to: ");
+    Serial.println(frequency_dHz/100);
     SSBRXVFOFreq_dHz = frequency_dHz;
     int64_t Clk1SetFreq = frequency_dHz;
     rxmultiple = EvenDivisor(Clk1SetFreq / SI5351_FREQ_MULT);
@@ -217,6 +219,8 @@ void SetSSBRXVFOFrequency(int64_t frequency_dHz){
 void SetSSBTXVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == SSBTXVFOFreq_dHz) return;
+    Serial.print("Setting TX to: ");
+    Serial.println(frequency_dHz/100);
     SSBTXVFOFreq_dHz = frequency_dHz;
     int64_t Clk5SetFreq = frequency_dHz;
     txmultiple = EvenDivisor(Clk5SetFreq / SI5351_FREQ_MULT);
@@ -267,7 +271,7 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
  * Set the CW VFO frequency for Morse code transmission.
  *
  * Configures the Si5351 CLK6 output frequency used for CW (Morse code) operation.
- * The frequency is stored and set in deci-Hertz units (Hz × 10) for high precision.
+ * The frequency is stored and set in deca-Hertz units (Hz × 100) for high precision.
  *
  * Optimization: Skips the Si5351 write if the requested frequency matches the
  * current setting, preventing unnecessary I2C transactions.
@@ -276,7 +280,7 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
  * (e.g., centerFreq + 700Hz for a 700Hz tone). The tune state machine handles
  * this offset calculation.
  *
- * @param frequency_dHz Desired CW VFO frequency in deci-Hertz (Hz × 10)
+ * @param frequency_dHz Desired CW VFO frequency in deca-Hertz (Hz × 100)
  *
  * @see GetCWVFOFrequency() to read current frequency
  * @see EnableCWVFOOutput() to enable CLK6 output
@@ -285,6 +289,8 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
 void SetCWTXVFOFrequency(int64_t frequency_dHz){
     // No need to change if it's already at this setting
     if (frequency_dHz == CWTXVFOFreq_dHz) return;
+    Serial.print("Setting CW to: ");
+    Serial.println(frequency_dHz/100);
     CWTXVFOFreq_dHz = frequency_dHz;
     si5351.set_freq(CWTXVFOFreq_dHz, SI5351_CLK6);
 }
@@ -368,7 +374,7 @@ void loop() {
   Serial.println("CW - CW TX Frequency  (CLK 6)");
   Serial.println("------------------------------");
 
-  Serial.setTimeout(2000);  // 2 second timeout for slower typing
+  //Serial.setTimeout(10000);  // 2 second timeout for slower typing
   while (Serial.available() == 0) {}     //wait for data available
   String selection = Serial.readString();  //read until timeout
   selection.trim(); // remove any \r \n whitespace at the end of the String

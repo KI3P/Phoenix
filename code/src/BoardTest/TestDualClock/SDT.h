@@ -7,7 +7,7 @@ typedef int errno_t;
 #define EGPIOWRITEFAIL      -2
 #define EFAIL               -10
 
-#define SI5351_BUS_BASE_ADDR    0x60
+#define SI5351_BUS_BASE_ADDR    0x61
 
 // Teensy pins used for particular functions
 #define CW_ON_OFF   5 // CW on / off (H=ON,L=OFF) (V12 hardware)
