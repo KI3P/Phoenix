@@ -747,7 +747,6 @@ void HandleButtonPress(int32_t button){
                     // Engage autocal process, which is handled by its own state machine
                     // Engage PTT
                     SetInterrupt(iPTT_PRESSED);
-                    Debug("Pressed button to engage autocal");
                     TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
                     break;
                 }

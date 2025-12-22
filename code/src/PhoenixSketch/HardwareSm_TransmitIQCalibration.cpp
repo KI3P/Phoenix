@@ -107,6 +107,10 @@ void AdjustTXIQBand(void){
     }
     // Set the hardware to the current band
     ED.currentBand[ED.activeVFO] = currentBand;
+    // Set center frequency to band center, modulation mode based on the band (USB or LSB)
+    ED.centerFreq_Hz[ED.activeVFO] = (bands[currentBand].fBandHigh_Hz + bands[currentBand].fBandLow_Hz) / 2 + SR[SampleRate].rate / 4;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+    ED.modulation[ED.activeVFO] = bands[currentBand].mode;
     UpdateRFHardwareState();
 
     // Go to find minimum loop

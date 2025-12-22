@@ -452,6 +452,10 @@ static void DrawTXIQTablePane(void){
     tft.print("Amp");
     tft.setCursor(PaneTXIQTable.x0+100, PaneTXIQTable.y0+3);
     tft.print("Phs");
+    if (HasDualVFOs()){
+        tft.setCursor(PaneTXIQTable.x0+160, PaneTXIQTable.y0+3);
+        tft.print("Val");
+    }
 
     for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
         int16_t y = PaneTXIQTable.y0 + 20 + (k - FIRST_BAND)*17;
@@ -464,8 +468,15 @@ static void DrawTXIQTablePane(void){
         
         tft.setCursor(PaneTXIQTable.x0+100, y);
         sprintf(buff,"%4.3f",ED.IQXPhaseCorrectionFactor[k]);
-        tft.print(buff);        
+        tft.print(buff);   
 
+        if (HasDualVFOs()){
+            if (GetTXDeltaVals(k) != 0.0){
+                tft.setCursor(PaneTXIQTable.x0+160, y);
+                sprintf(buff,"%2.1f",GetTXDeltaVals(k));
+                tft.print(buff);
+            }
+        }
     }
     PaneTXIQTable.stale = false;
 }
@@ -549,7 +560,10 @@ void DrawCalibrateTXIQ(void){
         tft.setFontScale((enum RA8875tsize)1);
         tft.setCursor(10,10);
         tft.print("Transmit IQ calibration");
-
+        if (HasDualVFOs()){
+            tft.setCursor(120,  PaneTXIQDelta.y0);
+            tft.print("Delta:");
+        }
         ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
         ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
         ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
