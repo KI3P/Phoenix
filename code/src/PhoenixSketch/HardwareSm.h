@@ -50,8 +50,11 @@ void AdjustRXIQBand(void);
 void ResetRXIQCalSettings(void);
 void AdjustRXIQCalSetting(void);
 void ReadRXIQDelta(void);
-void UpdateDeltaVal(void);
-float32_t GetDeltaVals(int32_t band);
+void UpdateRXDeltaVal(void);
+float32_t GetRXDeltaVals(int32_t band);
+void InitializeTXIQCalibration(void);
+float32_t GetTXDeltaVals(int32_t band);
+void SetTXIQCurrentBand(int32_t band);
 
 #endif //HARDWARESM_H
 

@@ -632,6 +632,7 @@ struct AGCConfig {
 #include "HardwareSm.h"
 #include "PowerCalSm.h"
 #include "ReceiveIQCalSm.h"
+#include "TransmitIQCalSm.h"
 // Others
 #include "ParamSave.h"
 #include "Loop.h"
@@ -663,6 +664,7 @@ extern UISm uiSM;
 extern ModeSm modeSM;
 extern PowerCalSm powerSM;
 extern ReceiveIQCalSm rxiqSM;
+extern TransmitIQCalSm txiqSM;
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t audioYPixel[];

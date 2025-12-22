@@ -4,79 +4,79 @@
 // Whatever you put in this `FileTop` section will end up 
 // being printed at the top of every generated code file.
 
-#include "ReceiveIQCalSm.h"
+#include "TransmitIQCalSm.h"
 #include <stdbool.h> // required for `consume_event` flag
 #include <string.h> // for memset
 // #include "your_header_here.h"
 // Forward declarations
 #include <stdint.h> // for count var
-void ResetRXIQCalBand(void);
-void AdjustRXIQBand(void);
-void ResetRXIQCalSettings(void);
-void UpdateRXDeltaVal(void);
-void AdjustRXIQCalSetting(void);
-void ReadRXIQDelta(void);
+void ResetTXIQCalBand(void);
+void AdjustTXIQBand(void);
+void ResetTXIQCalSettings(void);
+void UpdateTXDeltaVal(void);
+void AdjustTXIQCalSetting(void);
+void ReadTXIQDelta(void);
 
 
 // This function is used when StateSmith doesn't know what the active leaf state is at
 // compile time due to sub states or when multiple states need to be exited.
-static void exit_up_to_state_handler(ReceiveIQCalSm* sm, ReceiveIQCalSm_StateId desired_state);
+static void exit_up_to_state_handler(TransmitIQCalSm* sm, TransmitIQCalSm_StateId desired_state);
 
-static void ROOT_enter(ReceiveIQCalSm* sm);
+static void ROOT_enter(TransmitIQCalSm* sm);
 
-static void BAND_ADJUST_enter(ReceiveIQCalSm* sm);
+static void BAND_ADJUST_enter(TransmitIQCalSm* sm);
 
-static void BAND_ADJUST_exit(ReceiveIQCalSm* sm);
+static void BAND_ADJUST_exit(TransmitIQCalSm* sm);
 
-static void BAND_ADJUST_auto_complete(ReceiveIQCalSm* sm);
+static void BAND_ADJUST_auto_complete(TransmitIQCalSm* sm);
 
-static void BAND_ADJUST_find_minimum(ReceiveIQCalSm* sm);
+static void BAND_ADJUST_find_minimum(TransmitIQCalSm* sm);
 
-static void FIND_MINIMUM_enter(ReceiveIQCalSm* sm);
+static void FIND_MINIMUM_enter(TransmitIQCalSm* sm);
 
-static void FIND_MINIMUM_exit(ReceiveIQCalSm* sm);
+static void FIND_MINIMUM_exit(TransmitIQCalSm* sm);
 
-static void FIND_MINIMUM_do(ReceiveIQCalSm* sm);
+static void FIND_MINIMUM_do(TransmitIQCalSm* sm);
 
-static void FIND_MINIMUM_ExitPoint_done__transition(ReceiveIQCalSm* sm);
+static void FIND_MINIMUM_ExitPoint_done__transition(TransmitIQCalSm* sm);
 
-static void ADJUST_enter(ReceiveIQCalSm* sm);
+static void ADJUST_enter(TransmitIQCalSm* sm);
 
-static void ADJUST_exit(ReceiveIQCalSm* sm);
+static void ADJUST_exit(TransmitIQCalSm* sm);
 
-static void ADJUST_min_exit(ReceiveIQCalSm* sm);
+static void ADJUST_min_exit(TransmitIQCalSm* sm);
 
-static void ADJUST_read_delta(ReceiveIQCalSm* sm);
+static void ADJUST_read_delta(TransmitIQCalSm* sm);
 
-static void READ_enter(ReceiveIQCalSm* sm);
+static void READ_enter(TransmitIQCalSm* sm);
 
-static void READ_exit(ReceiveIQCalSm* sm);
+static void READ_exit(TransmitIQCalSm* sm);
 
-static void READ_min_exit(ReceiveIQCalSm* sm);
+static void READ_min_exit(TransmitIQCalSm* sm);
 
-static void READ_next_point(ReceiveIQCalSm* sm);
+static void READ_next_point(TransmitIQCalSm* sm);
 
-static void WAIT_enter(ReceiveIQCalSm* sm);
+static void WAIT_enter(TransmitIQCalSm* sm);
 
-static void WAIT_exit(ReceiveIQCalSm* sm);
+static void WAIT_exit(TransmitIQCalSm* sm);
 
-static void WAIT_do(ReceiveIQCalSm* sm);
+static void WAIT_do(TransmitIQCalSm* sm);
 
-static void STANDBY_enter(ReceiveIQCalSm* sm);
+static void STANDBY_enter(TransmitIQCalSm* sm);
 
-static void STANDBY_exit(ReceiveIQCalSm* sm);
+static void STANDBY_exit(TransmitIQCalSm* sm);
 
-static void STANDBY_auto(ReceiveIQCalSm* sm);
+static void STANDBY_auto(TransmitIQCalSm* sm);
 
 
 // State machine constructor. Must be called before start or dispatch event functions. Not thread safe.
-void ReceiveIQCalSm_ctor(ReceiveIQCalSm* sm)
+void TransmitIQCalSm_ctor(TransmitIQCalSm* sm)
 {
     memset(sm, 0, sizeof(*sm));
 }
 
 // Starts the state machine. Must be called before dispatching events. Not thread safe.
-void ReceiveIQCalSm_start(ReceiveIQCalSm* sm)
+void TransmitIQCalSm_start(TransmitIQCalSm* sm)
 {
     ROOT_enter(sm);
     // ROOT behavior
@@ -107,75 +107,75 @@ void ReceiveIQCalSm_start(ReceiveIQCalSm* sm)
 
 // Dispatches an event to the state machine. Not thread safe.
 // Note! This function assumes that the `event_id` parameter is valid.
-void ReceiveIQCalSm_dispatch_event(ReceiveIQCalSm* sm, ReceiveIQCalSm_EventId event_id)
+void TransmitIQCalSm_dispatch_event(TransmitIQCalSm* sm, TransmitIQCalSm_EventId event_id)
 {
     switch (sm->state_id)
     {
-        // STATE: ReceiveIQCalSm
-        case ReceiveIQCalSm_StateId_ROOT:
+        // STATE: TransmitIQCalSm
+        case TransmitIQCalSm_StateId_ROOT:
             // No events handled by this state (or its ancestors).
             break;
         
         // STATE: BAND_ADJUST
-        case ReceiveIQCalSm_StateId_BAND_ADJUST:
+        case TransmitIQCalSm_StateId_BAND_ADJUST:
             switch (event_id)
             {
-                case ReceiveIQCalSm_EventId_FIND_MINIMUM: BAND_ADJUST_find_minimum(sm); break;
-                case ReceiveIQCalSm_EventId_AUTO_COMPLETE: BAND_ADJUST_auto_complete(sm); break;
+                case TransmitIQCalSm_EventId_FIND_MINIMUM: BAND_ADJUST_find_minimum(sm); break;
+                case TransmitIQCalSm_EventId_AUTO_COMPLETE: BAND_ADJUST_auto_complete(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
             break;
         
         // STATE: FIND_MINIMUM
-        case ReceiveIQCalSm_StateId_FIND_MINIMUM:
+        case TransmitIQCalSm_StateId_FIND_MINIMUM:
             switch (event_id)
             {
-                case ReceiveIQCalSm_EventId_DO: FIND_MINIMUM_do(sm); break;
+                case TransmitIQCalSm_EventId_DO: FIND_MINIMUM_do(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
             break;
         
         // STATE: ADJUST
-        case ReceiveIQCalSm_StateId_ADJUST:
+        case TransmitIQCalSm_StateId_ADJUST:
             switch (event_id)
             {
-                case ReceiveIQCalSm_EventId_MIN_EXIT: ADJUST_min_exit(sm); break;
-                case ReceiveIQCalSm_EventId_READ_DELTA: ADJUST_read_delta(sm); break;
-                case ReceiveIQCalSm_EventId_DO: FIND_MINIMUM_do(sm); break; // First ancestor handler for this event
+                case TransmitIQCalSm_EventId_MIN_EXIT: ADJUST_min_exit(sm); break;
+                case TransmitIQCalSm_EventId_READ_DELTA: ADJUST_read_delta(sm); break;
+                case TransmitIQCalSm_EventId_DO: FIND_MINIMUM_do(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
             break;
         
         // STATE: READ
-        case ReceiveIQCalSm_StateId_READ:
+        case TransmitIQCalSm_StateId_READ:
             switch (event_id)
             {
-                case ReceiveIQCalSm_EventId_NEXT_POINT: READ_next_point(sm); break;
-                case ReceiveIQCalSm_EventId_MIN_EXIT: READ_min_exit(sm); break;
-                case ReceiveIQCalSm_EventId_DO: FIND_MINIMUM_do(sm); break; // First ancestor handler for this event
+                case TransmitIQCalSm_EventId_NEXT_POINT: READ_next_point(sm); break;
+                case TransmitIQCalSm_EventId_MIN_EXIT: READ_min_exit(sm); break;
+                case TransmitIQCalSm_EventId_DO: FIND_MINIMUM_do(sm); break; // First ancestor handler for this event
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
             break;
         
         // STATE: WAIT
-        case ReceiveIQCalSm_StateId_WAIT:
+        case TransmitIQCalSm_StateId_WAIT:
             switch (event_id)
             {
-                case ReceiveIQCalSm_EventId_DO: WAIT_do(sm); break;
+                case TransmitIQCalSm_EventId_DO: WAIT_do(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
             break;
         
         // STATE: STANDBY
-        case ReceiveIQCalSm_StateId_STANDBY:
+        case TransmitIQCalSm_StateId_STANDBY:
             switch (event_id)
             {
-                case ReceiveIQCalSm_EventId_AUTO: STANDBY_auto(sm); break;
+                case TransmitIQCalSm_EventId_AUTO: STANDBY_auto(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
             }
@@ -186,23 +186,23 @@ void ReceiveIQCalSm_dispatch_event(ReceiveIQCalSm* sm, ReceiveIQCalSm_EventId ev
 
 // This function is used when StateSmith doesn't know what the active leaf state is at
 // compile time due to sub states or when multiple states need to be exited.
-static void exit_up_to_state_handler(ReceiveIQCalSm* sm, ReceiveIQCalSm_StateId desired_state)
+static void exit_up_to_state_handler(TransmitIQCalSm* sm, TransmitIQCalSm_StateId desired_state)
 {
     while (sm->state_id != desired_state)
     {
         switch (sm->state_id)
         {
-            case ReceiveIQCalSm_StateId_BAND_ADJUST: BAND_ADJUST_exit(sm); break;
+            case TransmitIQCalSm_StateId_BAND_ADJUST: BAND_ADJUST_exit(sm); break;
             
-            case ReceiveIQCalSm_StateId_FIND_MINIMUM: FIND_MINIMUM_exit(sm); break;
+            case TransmitIQCalSm_StateId_FIND_MINIMUM: FIND_MINIMUM_exit(sm); break;
             
-            case ReceiveIQCalSm_StateId_ADJUST: ADJUST_exit(sm); break;
+            case TransmitIQCalSm_StateId_ADJUST: ADJUST_exit(sm); break;
             
-            case ReceiveIQCalSm_StateId_READ: READ_exit(sm); break;
+            case TransmitIQCalSm_StateId_READ: READ_exit(sm); break;
             
-            case ReceiveIQCalSm_StateId_WAIT: WAIT_exit(sm); break;
+            case TransmitIQCalSm_StateId_WAIT: WAIT_exit(sm); break;
             
-            case ReceiveIQCalSm_StateId_STANDBY: STANDBY_exit(sm); break;
+            case TransmitIQCalSm_StateId_STANDBY: STANDBY_exit(sm); break;
             
             default: return;  // Just to be safe. Prevents infinite loop if state ID memory is somehow corrupted.
         }
@@ -214,9 +214,9 @@ static void exit_up_to_state_handler(ReceiveIQCalSm* sm, ReceiveIQCalSm_StateId 
 // event handlers for state ROOT
 ////////////////////////////////////////////////////////////////////////////////
 
-static void ROOT_enter(ReceiveIQCalSm* sm)
+static void ROOT_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_ROOT;
+    sm->state_id = TransmitIQCalSm_StateId_ROOT;
 }
 
 
@@ -224,24 +224,24 @@ static void ROOT_enter(ReceiveIQCalSm* sm)
 // event handlers for state BAND_ADJUST
 ////////////////////////////////////////////////////////////////////////////////
 
-static void BAND_ADJUST_enter(ReceiveIQCalSm* sm)
+static void BAND_ADJUST_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_BAND_ADJUST;
+    sm->state_id = TransmitIQCalSm_StateId_BAND_ADJUST;
     
     // BAND_ADJUST behavior
-    // uml: enter / { AdjustRXIQBand(); }
+    // uml: enter / { AdjustTXIQBand(); }
     {
-        // Step 1: execute action `AdjustRXIQBand();`
-        AdjustRXIQBand();
+        // Step 1: execute action `AdjustTXIQBand();`
+        AdjustTXIQBand();
     } // end of behavior for BAND_ADJUST
 }
 
-static void BAND_ADJUST_exit(ReceiveIQCalSm* sm)
+static void BAND_ADJUST_exit(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_ROOT;
+    sm->state_id = TransmitIQCalSm_StateId_ROOT;
 }
 
-static void BAND_ADJUST_auto_complete(ReceiveIQCalSm* sm)
+static void BAND_ADJUST_auto_complete(TransmitIQCalSm* sm)
 {
     // BAND_ADJUST behavior
     // uml: AUTO_COMPLETE TransitionTo(STANDBY)
@@ -261,7 +261,7 @@ static void BAND_ADJUST_auto_complete(ReceiveIQCalSm* sm)
     // No ancestor handles this event.
 }
 
-static void BAND_ADJUST_find_minimum(ReceiveIQCalSm* sm)
+static void BAND_ADJUST_find_minimum(TransmitIQCalSm* sm)
 {
     // BAND_ADJUST behavior
     // uml: FIND_MINIMUM TransitionTo(FIND_MINIMUM)
@@ -297,19 +297,19 @@ static void BAND_ADJUST_find_minimum(ReceiveIQCalSm* sm)
 // event handlers for state FIND_MINIMUM
 ////////////////////////////////////////////////////////////////////////////////
 
-static void FIND_MINIMUM_enter(ReceiveIQCalSm* sm)
+static void FIND_MINIMUM_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_FIND_MINIMUM;
+    sm->state_id = TransmitIQCalSm_StateId_FIND_MINIMUM;
     
     // FIND_MINIMUM behavior
-    // uml: enter / { ResetRXIQCalSettings(); }
+    // uml: enter / { ResetTXIQCalSettings(); }
     {
-        // Step 1: execute action `ResetRXIQCalSettings();`
-        ResetRXIQCalSettings();
+        // Step 1: execute action `ResetTXIQCalSettings();`
+        ResetTXIQCalSettings();
     } // end of behavior for FIND_MINIMUM
 }
 
-static void FIND_MINIMUM_exit(ReceiveIQCalSm* sm)
+static void FIND_MINIMUM_exit(TransmitIQCalSm* sm)
 {
     // FIND_MINIMUM behavior
     // uml: exit
@@ -317,10 +317,10 @@ static void FIND_MINIMUM_exit(ReceiveIQCalSm* sm)
         // Step 1: execute action ``
     } // end of behavior for FIND_MINIMUM
     
-    sm->state_id = ReceiveIQCalSm_StateId_ROOT;
+    sm->state_id = TransmitIQCalSm_StateId_ROOT;
 }
 
-static void FIND_MINIMUM_do(ReceiveIQCalSm* sm)
+static void FIND_MINIMUM_do(TransmitIQCalSm* sm)
 {
     // FIND_MINIMUM behavior
     // uml: do
@@ -331,7 +331,7 @@ static void FIND_MINIMUM_do(ReceiveIQCalSm* sm)
     // No ancestor handles this event.
 }
 
-static void FIND_MINIMUM_ExitPoint_done__transition(ReceiveIQCalSm* sm)
+static void FIND_MINIMUM_ExitPoint_done__transition(TransmitIQCalSm* sm)
 {
     // FIND_MINIMUM.<ExitPoint>(done) behavior
     // uml: TransitionTo(BAND_ADJUST)
@@ -354,24 +354,24 @@ static void FIND_MINIMUM_ExitPoint_done__transition(ReceiveIQCalSm* sm)
 // event handlers for state ADJUST
 ////////////////////////////////////////////////////////////////////////////////
 
-static void ADJUST_enter(ReceiveIQCalSm* sm)
+static void ADJUST_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_ADJUST;
+    sm->state_id = TransmitIQCalSm_StateId_ADJUST;
     
     // ADJUST behavior
-    // uml: enter / { AdjustRXIQCalSetting(); }
+    // uml: enter / { AdjustTXIQCalSetting(); }
     {
-        // Step 1: execute action `AdjustRXIQCalSetting();`
-        AdjustRXIQCalSetting();
+        // Step 1: execute action `AdjustTXIQCalSetting();`
+        AdjustTXIQCalSetting();
     } // end of behavior for ADJUST
 }
 
-static void ADJUST_exit(ReceiveIQCalSm* sm)
+static void ADJUST_exit(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_FIND_MINIMUM;
+    sm->state_id = TransmitIQCalSm_StateId_FIND_MINIMUM;
 }
 
-static void ADJUST_min_exit(ReceiveIQCalSm* sm)
+static void ADJUST_min_exit(TransmitIQCalSm* sm)
 {
     // ADJUST behavior
     // uml: MIN_EXIT TransitionTo(FIND_MINIMUM.<ExitPoint>(done))
@@ -392,7 +392,7 @@ static void ADJUST_min_exit(ReceiveIQCalSm* sm)
     // No ancestor handles this event.
 }
 
-static void ADJUST_read_delta(ReceiveIQCalSm* sm)
+static void ADJUST_read_delta(TransmitIQCalSm* sm)
 {
     // ADJUST behavior
     // uml: READ_DELTA TransitionTo(WAIT)
@@ -417,24 +417,24 @@ static void ADJUST_read_delta(ReceiveIQCalSm* sm)
 // event handlers for state READ
 ////////////////////////////////////////////////////////////////////////////////
 
-static void READ_enter(ReceiveIQCalSm* sm)
+static void READ_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_READ;
+    sm->state_id = TransmitIQCalSm_StateId_READ;
     
     // READ behavior
-    // uml: enter / { ReadRXIQDelta(); }
+    // uml: enter / { ReadTXIQDelta(); }
     {
-        // Step 1: execute action `ReadRXIQDelta();`
-        ReadRXIQDelta();
+        // Step 1: execute action `ReadTXIQDelta();`
+        ReadTXIQDelta();
     } // end of behavior for READ
 }
 
-static void READ_exit(ReceiveIQCalSm* sm)
+static void READ_exit(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_FIND_MINIMUM;
+    sm->state_id = TransmitIQCalSm_StateId_FIND_MINIMUM;
 }
 
-static void READ_min_exit(ReceiveIQCalSm* sm)
+static void READ_min_exit(TransmitIQCalSm* sm)
 {
     // READ behavior
     // uml: MIN_EXIT TransitionTo(FIND_MINIMUM.<ExitPoint>(done))
@@ -455,7 +455,7 @@ static void READ_min_exit(ReceiveIQCalSm* sm)
     // No ancestor handles this event.
 }
 
-static void READ_next_point(ReceiveIQCalSm* sm)
+static void READ_next_point(TransmitIQCalSm* sm)
 {
     // READ behavior
     // uml: NEXT_POINT TransitionTo(ADJUST)
@@ -480,9 +480,9 @@ static void READ_next_point(ReceiveIQCalSm* sm)
 // event handlers for state WAIT
 ////////////////////////////////////////////////////////////////////////////////
 
-static void WAIT_enter(ReceiveIQCalSm* sm)
+static void WAIT_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_WAIT;
+    sm->state_id = TransmitIQCalSm_StateId_WAIT;
     
     // WAIT behavior
     // uml: enter / { count_ms = 0; }
@@ -492,22 +492,22 @@ static void WAIT_enter(ReceiveIQCalSm* sm)
     } // end of behavior for WAIT
 }
 
-static void WAIT_exit(ReceiveIQCalSm* sm)
+static void WAIT_exit(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_FIND_MINIMUM;
+    sm->state_id = TransmitIQCalSm_StateId_FIND_MINIMUM;
 }
 
-static void WAIT_do(ReceiveIQCalSm* sm)
+static void WAIT_do(TransmitIQCalSm* sm)
 {
     bool consume_event = false;
     
     // WAIT behavior
-    // uml: 1. do / { count_ms++;\nUpdateRXDeltaVal(); }
+    // uml: 1. do / { count_ms++;\nUpdateTXDeltaVal(); }
     {
         // `do` events are not normally consumed.
-        // Step 1: execute action `count_ms++;\nUpdateRXDeltaVal();`
+        // Step 1: execute action `count_ms++;\nUpdateTXDeltaVal();`
         sm->vars.count_ms++;
-        UpdateRXDeltaVal();
+        UpdateTXDeltaVal();
     } // end of behavior for WAIT
     
     // WAIT behavior
@@ -538,24 +538,24 @@ static void WAIT_do(ReceiveIQCalSm* sm)
 // event handlers for state STANDBY
 ////////////////////////////////////////////////////////////////////////////////
 
-static void STANDBY_enter(ReceiveIQCalSm* sm)
+static void STANDBY_enter(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_STANDBY;
+    sm->state_id = TransmitIQCalSm_StateId_STANDBY;
     
     // STANDBY behavior
-    // uml: enter / { ResetRXIQCalBand(); }
+    // uml: enter / { ResetTXIQCalBand(); }
     {
-        // Step 1: execute action `ResetRXIQCalBand();`
-        ResetRXIQCalBand();
+        // Step 1: execute action `ResetTXIQCalBand();`
+        ResetTXIQCalBand();
     } // end of behavior for STANDBY
 }
 
-static void STANDBY_exit(ReceiveIQCalSm* sm)
+static void STANDBY_exit(TransmitIQCalSm* sm)
 {
-    sm->state_id = ReceiveIQCalSm_StateId_ROOT;
+    sm->state_id = TransmitIQCalSm_StateId_ROOT;
 }
 
-static void STANDBY_auto(ReceiveIQCalSm* sm)
+static void STANDBY_auto(TransmitIQCalSm* sm)
 {
     // STANDBY behavior
     // uml: AUTO TransitionTo(BAND_ADJUST)
@@ -576,33 +576,33 @@ static void STANDBY_auto(ReceiveIQCalSm* sm)
 }
 
 // Thread safe.
-char const * ReceiveIQCalSm_state_id_to_string(ReceiveIQCalSm_StateId id)
+char const * TransmitIQCalSm_state_id_to_string(TransmitIQCalSm_StateId id)
 {
     switch (id)
     {
-        case ReceiveIQCalSm_StateId_ROOT: return "ROOT";
-        case ReceiveIQCalSm_StateId_BAND_ADJUST: return "BAND_ADJUST";
-        case ReceiveIQCalSm_StateId_FIND_MINIMUM: return "FIND_MINIMUM";
-        case ReceiveIQCalSm_StateId_ADJUST: return "ADJUST";
-        case ReceiveIQCalSm_StateId_READ: return "READ";
-        case ReceiveIQCalSm_StateId_WAIT: return "WAIT";
-        case ReceiveIQCalSm_StateId_STANDBY: return "STANDBY";
+        case TransmitIQCalSm_StateId_ROOT: return "ROOT";
+        case TransmitIQCalSm_StateId_BAND_ADJUST: return "BAND_ADJUST";
+        case TransmitIQCalSm_StateId_FIND_MINIMUM: return "FIND_MINIMUM";
+        case TransmitIQCalSm_StateId_ADJUST: return "ADJUST";
+        case TransmitIQCalSm_StateId_READ: return "READ";
+        case TransmitIQCalSm_StateId_WAIT: return "WAIT";
+        case TransmitIQCalSm_StateId_STANDBY: return "STANDBY";
         default: return "?";
     }
 }
 
 // Thread safe.
-char const * ReceiveIQCalSm_event_id_to_string(ReceiveIQCalSm_EventId id)
+char const * TransmitIQCalSm_event_id_to_string(TransmitIQCalSm_EventId id)
 {
     switch (id)
     {
-        case ReceiveIQCalSm_EventId_AUTO: return "AUTO";
-        case ReceiveIQCalSm_EventId_AUTO_COMPLETE: return "AUTO_COMPLETE";
-        case ReceiveIQCalSm_EventId_DO: return "DO";
-        case ReceiveIQCalSm_EventId_FIND_MINIMUM: return "FIND_MINIMUM";
-        case ReceiveIQCalSm_EventId_MIN_EXIT: return "MIN_EXIT";
-        case ReceiveIQCalSm_EventId_NEXT_POINT: return "NEXT_POINT";
-        case ReceiveIQCalSm_EventId_READ_DELTA: return "READ_DELTA";
+        case TransmitIQCalSm_EventId_AUTO: return "AUTO";
+        case TransmitIQCalSm_EventId_AUTO_COMPLETE: return "AUTO_COMPLETE";
+        case TransmitIQCalSm_EventId_DO: return "DO";
+        case TransmitIQCalSm_EventId_FIND_MINIMUM: return "FIND_MINIMUM";
+        case TransmitIQCalSm_EventId_MIN_EXIT: return "MIN_EXIT";
+        case TransmitIQCalSm_EventId_NEXT_POINT: return "NEXT_POINT";
+        case TransmitIQCalSm_EventId_READ_DELTA: return "READ_DELTA";
         default: return "?";
     }
 }

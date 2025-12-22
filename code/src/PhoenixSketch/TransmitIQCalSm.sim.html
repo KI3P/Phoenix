@@ -4,8 +4,8 @@
   -- It also serves as an interactive console that you can use to validate the
   -- state machine's behavior.
   --
-  -- Using ReceiveIQCalSm.js generally looks like:
-  --   var sm = new ReceiveIQCalSm();
+  -- Using TransmitIQCalSm.js generally looks like:
+  --   var sm = new TransmitIQCalSm();
   --   sm.start();
   --
   -- And then using sm.dispatchEvent() to dispatch events to the state machine.
@@ -224,7 +224,7 @@ STANDBY
 
 STANDBY : STANDBY
 
-STANDBY : enter / #123; ResetRXIQCalBand()#59; #125;
+STANDBY : enter / #123; ResetTXIQCalBand()#59; #125;
 
 state FIND_MINIMUM {
 
@@ -234,19 +234,19 @@ state FIND_MINIMUM {
 
         WAIT : enter / #123; count_ms = 0#59; #125;
 
-        WAIT : 1. do / #123; count_ms++#59;\nUpdateRXDeltaVal()#59; #125;
+        WAIT : 1. do / #123; count_ms++#59;\nUpdateTXDeltaVal()#59; #125;
 
         ADJUST
 
         ADJUST : ADJUST
 
-        ADJUST : enter / #123; AdjustRXIQCalSetting()#59; #125;
+        ADJUST : enter / #123; AdjustTXIQCalSetting()#59; #125;
 
         READ
 
         READ : READ
 
-        READ : enter / #123; ReadRXIQDelta()#59; #125;
+        READ : enter / #123; ReadTXIQDelta()#59; #125;
 
         %% Initial state name as "." so that it fits in black circle shape.
         %% See https://github.com/StateSmith/StateSmith/issues/404
@@ -260,7 +260,7 @@ BAND_ADJUST
 
 BAND_ADJUST : BAND_ADJUST
 
-BAND_ADJUST : enter / #123; AdjustRXIQBand()#59; #125;
+BAND_ADJUST : enter / #123; AdjustTXIQBand()#59; #125;
 
 ROOT.(InitialState) --> STANDBY
 
@@ -320,7 +320,7 @@ BAND_ADJUST --> STANDBY : AUTO_COMPLETE
 // Algorithm: Balanced2. See https://github.com/StateSmith/StateSmith/wiki/Algorithms
 
 // Generated state machine
-class ReceiveIQCalSm
+class TransmitIQCalSm
 {
 // Null by default.
 // May be overridden to override guard evaluation (eg. in a simulator)
@@ -395,61 +395,61 @@ evaluateGuard = null;
     {
         switch (this.stateId)
         {
-            // STATE: ReceiveIQCalSm
-            case ReceiveIQCalSm.StateId.ROOT:
+            // STATE: TransmitIQCalSm
+            case TransmitIQCalSm.StateId.ROOT:
                 // No events handled by this state (or its ancestors).
                 break;
             
             // STATE: BAND_ADJUST
-            case ReceiveIQCalSm.StateId.BAND_ADJUST:
+            case TransmitIQCalSm.StateId.BAND_ADJUST:
                 switch (eventId)
                 {
-                    case ReceiveIQCalSm.EventId.FIND_MINIMUM: this.#BAND_ADJUST_find_minimum(); break;
-                    case ReceiveIQCalSm.EventId.AUTO_COMPLETE: this.#BAND_ADJUST_auto_complete(); break;
+                    case TransmitIQCalSm.EventId.FIND_MINIMUM: this.#BAND_ADJUST_find_minimum(); break;
+                    case TransmitIQCalSm.EventId.AUTO_COMPLETE: this.#BAND_ADJUST_auto_complete(); break;
                 }
                 break;
             
             // STATE: FIND_MINIMUM
-            case ReceiveIQCalSm.StateId.FIND_MINIMUM:
+            case TransmitIQCalSm.StateId.FIND_MINIMUM:
                 switch (eventId)
                 {
-                    case ReceiveIQCalSm.EventId.DO: this.#FIND_MINIMUM_do(); break;
+                    case TransmitIQCalSm.EventId.DO: this.#FIND_MINIMUM_do(); break;
                 }
                 break;
             
             // STATE: ADJUST
-            case ReceiveIQCalSm.StateId.ADJUST:
+            case TransmitIQCalSm.StateId.ADJUST:
                 switch (eventId)
                 {
-                    case ReceiveIQCalSm.EventId.MIN_EXIT: this.#ADJUST_min_exit(); break;
-                    case ReceiveIQCalSm.EventId.READ_DELTA: this.#ADJUST_read_delta(); break;
-                    case ReceiveIQCalSm.EventId.DO: this.#FIND_MINIMUM_do(); break; // First ancestor handler for this event
+                    case TransmitIQCalSm.EventId.MIN_EXIT: this.#ADJUST_min_exit(); break;
+                    case TransmitIQCalSm.EventId.READ_DELTA: this.#ADJUST_read_delta(); break;
+                    case TransmitIQCalSm.EventId.DO: this.#FIND_MINIMUM_do(); break; // First ancestor handler for this event
                 }
                 break;
             
             // STATE: READ
-            case ReceiveIQCalSm.StateId.READ:
+            case TransmitIQCalSm.StateId.READ:
                 switch (eventId)
                 {
-                    case ReceiveIQCalSm.EventId.NEXT_POINT: this.#READ_next_point(); break;
-                    case ReceiveIQCalSm.EventId.MIN_EXIT: this.#READ_min_exit(); break;
-                    case ReceiveIQCalSm.EventId.DO: this.#FIND_MINIMUM_do(); break; // First ancestor handler for this event
+                    case TransmitIQCalSm.EventId.NEXT_POINT: this.#READ_next_point(); break;
+                    case TransmitIQCalSm.EventId.MIN_EXIT: this.#READ_min_exit(); break;
+                    case TransmitIQCalSm.EventId.DO: this.#FIND_MINIMUM_do(); break; // First ancestor handler for this event
                 }
                 break;
             
             // STATE: WAIT
-            case ReceiveIQCalSm.StateId.WAIT:
+            case TransmitIQCalSm.StateId.WAIT:
                 switch (eventId)
                 {
-                    case ReceiveIQCalSm.EventId.DO: this.#WAIT_do(); break;
+                    case TransmitIQCalSm.EventId.DO: this.#WAIT_do(); break;
                 }
                 break;
             
             // STATE: STANDBY
-            case ReceiveIQCalSm.StateId.STANDBY:
+            case TransmitIQCalSm.StateId.STANDBY:
                 switch (eventId)
                 {
-                    case ReceiveIQCalSm.EventId.AUTO: this.#STANDBY_auto(); break;
+                    case TransmitIQCalSm.EventId.AUTO: this.#STANDBY_auto(); break;
                 }
                 break;
         }
@@ -464,17 +464,17 @@ evaluateGuard = null;
         {
             switch (this.stateId)
             {
-                case ReceiveIQCalSm.StateId.BAND_ADJUST: this.#BAND_ADJUST_exit(); break;
+                case TransmitIQCalSm.StateId.BAND_ADJUST: this.#BAND_ADJUST_exit(); break;
                 
-                case ReceiveIQCalSm.StateId.FIND_MINIMUM: this.#FIND_MINIMUM_exit(); break;
+                case TransmitIQCalSm.StateId.FIND_MINIMUM: this.#FIND_MINIMUM_exit(); break;
                 
-                case ReceiveIQCalSm.StateId.ADJUST: this.#ADJUST_exit(); break;
+                case TransmitIQCalSm.StateId.ADJUST: this.#ADJUST_exit(); break;
                 
-                case ReceiveIQCalSm.StateId.READ: this.#READ_exit(); break;
+                case TransmitIQCalSm.StateId.READ: this.#READ_exit(); break;
                 
-                case ReceiveIQCalSm.StateId.WAIT: this.#WAIT_exit(); break;
+                case TransmitIQCalSm.StateId.WAIT: this.#WAIT_exit(); break;
                 
-                case ReceiveIQCalSm.StateId.STANDBY: this.#STANDBY_exit(); break;
+                case TransmitIQCalSm.StateId.STANDBY: this.#STANDBY_exit(); break;
                 
                 default: return;  // Just to be safe. Prevents infinite loop if state ID memory is somehow corrupted.
             }
@@ -488,7 +488,7 @@ evaluateGuard = null;
     
     #ROOT_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.ROOT;
+        this.stateId = TransmitIQCalSm.StateId.ROOT;
     }
     
     
@@ -498,7 +498,7 @@ evaluateGuard = null;
     
     #BAND_ADJUST_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.BAND_ADJUST;
+        this.stateId = TransmitIQCalSm.StateId.BAND_ADJUST;
         
         // BAND_ADJUST behavior
         // uml: enter / { this.tracer?.enterState('BAND_ADJUST'); }
@@ -508,10 +508,10 @@ evaluateGuard = null;
         } // end of behavior for BAND_ADJUST
         
         // BAND_ADJUST behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AdjustRXIQBand();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AdjustTXIQBand();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AdjustRXIQBand();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "AdjustRXIQBand();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AdjustTXIQBand();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AdjustTXIQBand();");
         } // end of behavior for BAND_ADJUST
     }
     
@@ -524,7 +524,7 @@ evaluateGuard = null;
             this.tracer?.exitState('BAND_ADJUST');
         } // end of behavior for BAND_ADJUST
         
-        this.stateId = ReceiveIQCalSm.StateId.ROOT;
+        this.stateId = TransmitIQCalSm.StateId.ROOT;
     }
     
     #BAND_ADJUST_auto_complete()
@@ -588,7 +588,7 @@ evaluateGuard = null;
     
     #FIND_MINIMUM_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.FIND_MINIMUM;
+        this.stateId = TransmitIQCalSm.StateId.FIND_MINIMUM;
         
         // FIND_MINIMUM behavior
         // uml: enter / { this.tracer?.enterState('FIND_MINIMUM'); }
@@ -598,10 +598,10 @@ evaluateGuard = null;
         } // end of behavior for FIND_MINIMUM
         
         // FIND_MINIMUM behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ResetRXIQCalSettings();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ResetTXIQCalSettings();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ResetRXIQCalSettings();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ResetRXIQCalSettings();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ResetTXIQCalSettings();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "ResetTXIQCalSettings();");
         } // end of behavior for FIND_MINIMUM
     }
     
@@ -620,7 +620,7 @@ evaluateGuard = null;
             this.tracer?.exitState('FIND_MINIMUM');
         } // end of behavior for FIND_MINIMUM
         
-        this.stateId = ReceiveIQCalSm.StateId.ROOT;
+        this.stateId = TransmitIQCalSm.StateId.ROOT;
     }
     
     #FIND_MINIMUM_do()
@@ -660,7 +660,7 @@ evaluateGuard = null;
     
     #ADJUST_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.ADJUST;
+        this.stateId = TransmitIQCalSm.StateId.ADJUST;
         
         // ADJUST behavior
         // uml: enter / { this.tracer?.enterState('ADJUST'); }
@@ -670,10 +670,10 @@ evaluateGuard = null;
         } // end of behavior for ADJUST
         
         // ADJUST behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AdjustRXIQCalSetting();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AdjustTXIQCalSetting();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AdjustRXIQCalSetting();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "AdjustRXIQCalSetting();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AdjustTXIQCalSetting();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AdjustTXIQCalSetting();");
         } // end of behavior for ADJUST
     }
     
@@ -686,7 +686,7 @@ evaluateGuard = null;
             this.tracer?.exitState('ADJUST');
         } // end of behavior for ADJUST
         
-        this.stateId = ReceiveIQCalSm.StateId.FIND_MINIMUM;
+        this.stateId = TransmitIQCalSm.StateId.FIND_MINIMUM;
     }
     
     #ADJUST_min_exit()
@@ -739,7 +739,7 @@ evaluateGuard = null;
     
     #READ_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.READ;
+        this.stateId = TransmitIQCalSm.StateId.READ;
         
         // READ behavior
         // uml: enter / { this.tracer?.enterState('READ'); }
@@ -749,10 +749,10 @@ evaluateGuard = null;
         } // end of behavior for READ
         
         // READ behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ReadRXIQDelta();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ReadTXIQDelta();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ReadRXIQDelta();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ReadRXIQDelta();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ReadTXIQDelta();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "ReadTXIQDelta();");
         } // end of behavior for READ
     }
     
@@ -765,7 +765,7 @@ evaluateGuard = null;
             this.tracer?.exitState('READ');
         } // end of behavior for READ
         
-        this.stateId = ReceiveIQCalSm.StateId.FIND_MINIMUM;
+        this.stateId = TransmitIQCalSm.StateId.FIND_MINIMUM;
     }
     
     #READ_min_exit()
@@ -818,7 +818,7 @@ evaluateGuard = null;
     
     #WAIT_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.WAIT;
+        this.stateId = TransmitIQCalSm.StateId.WAIT;
         
         // WAIT behavior
         // uml: enter / { this.tracer?.enterState('WAIT'); }
@@ -844,7 +844,7 @@ evaluateGuard = null;
             this.tracer?.exitState('WAIT');
         } // end of behavior for WAIT
         
-        this.stateId = ReceiveIQCalSm.StateId.FIND_MINIMUM;
+        this.stateId = TransmitIQCalSm.StateId.FIND_MINIMUM;
     }
     
     #WAIT_do()
@@ -852,11 +852,11 @@ evaluateGuard = null;
         let consume_event = false;
         
         // WAIT behavior
-        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;\nUpdateRXDeltaVal();"); }
+        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;\nUpdateTXDeltaVal();"); }
         {
             // `do` events are not normally consumed.
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;\nUpdateRXDeltaVal();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;\nUpdateRXDeltaVal();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;\nUpdateTXDeltaVal();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;\nUpdateTXDeltaVal();");
         } // end of behavior for WAIT
         
         // WAIT behavior
@@ -890,7 +890,7 @@ evaluateGuard = null;
     
     #STANDBY_enter()
     {
-        this.stateId = ReceiveIQCalSm.StateId.STANDBY;
+        this.stateId = TransmitIQCalSm.StateId.STANDBY;
         
         // STANDBY behavior
         // uml: enter / { this.tracer?.enterState('STANDBY'); }
@@ -900,10 +900,10 @@ evaluateGuard = null;
         } // end of behavior for STANDBY
         
         // STANDBY behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ResetRXIQCalBand();"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ResetTXIQCalBand();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ResetRXIQCalBand();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ResetRXIQCalBand();");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ResetTXIQCalBand();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "ResetTXIQCalBand();");
         } // end of behavior for STANDBY
     }
     
@@ -916,7 +916,7 @@ evaluateGuard = null;
             this.tracer?.exitState('STANDBY');
         } // end of behavior for STANDBY
         
-        this.stateId = ReceiveIQCalSm.StateId.ROOT;
+        this.stateId = TransmitIQCalSm.StateId.ROOT;
     }
     
     #STANDBY_auto()
@@ -945,13 +945,13 @@ evaluateGuard = null;
     {
         switch (id)
         {
-            case ReceiveIQCalSm.StateId.ROOT: return "ROOT";
-            case ReceiveIQCalSm.StateId.BAND_ADJUST: return "BAND_ADJUST";
-            case ReceiveIQCalSm.StateId.FIND_MINIMUM: return "FIND_MINIMUM";
-            case ReceiveIQCalSm.StateId.ADJUST: return "ADJUST";
-            case ReceiveIQCalSm.StateId.READ: return "READ";
-            case ReceiveIQCalSm.StateId.WAIT: return "WAIT";
-            case ReceiveIQCalSm.StateId.STANDBY: return "STANDBY";
+            case TransmitIQCalSm.StateId.ROOT: return "ROOT";
+            case TransmitIQCalSm.StateId.BAND_ADJUST: return "BAND_ADJUST";
+            case TransmitIQCalSm.StateId.FIND_MINIMUM: return "FIND_MINIMUM";
+            case TransmitIQCalSm.StateId.ADJUST: return "ADJUST";
+            case TransmitIQCalSm.StateId.READ: return "READ";
+            case TransmitIQCalSm.StateId.WAIT: return "WAIT";
+            case TransmitIQCalSm.StateId.STANDBY: return "STANDBY";
             default: return "?";
         }
     }
@@ -961,13 +961,13 @@ evaluateGuard = null;
     {
         switch (id)
         {
-            case ReceiveIQCalSm.EventId.AUTO: return "AUTO";
-            case ReceiveIQCalSm.EventId.AUTO_COMPLETE: return "AUTO_COMPLETE";
-            case ReceiveIQCalSm.EventId.DO: return "DO";
-            case ReceiveIQCalSm.EventId.FIND_MINIMUM: return "FIND_MINIMUM";
-            case ReceiveIQCalSm.EventId.MIN_EXIT: return "MIN_EXIT";
-            case ReceiveIQCalSm.EventId.NEXT_POINT: return "NEXT_POINT";
-            case ReceiveIQCalSm.EventId.READ_DELTA: return "READ_DELTA";
+            case TransmitIQCalSm.EventId.AUTO: return "AUTO";
+            case TransmitIQCalSm.EventId.AUTO_COMPLETE: return "AUTO_COMPLETE";
+            case TransmitIQCalSm.EventId.DO: return "DO";
+            case TransmitIQCalSm.EventId.FIND_MINIMUM: return "FIND_MINIMUM";
+            case TransmitIQCalSm.EventId.MIN_EXIT: return "MIN_EXIT";
+            case TransmitIQCalSm.EventId.NEXT_POINT: return "NEXT_POINT";
+            case TransmitIQCalSm.EventId.READ_DELTA: return "READ_DELTA";
             default: return "?";
         }
     }
@@ -1096,7 +1096,7 @@ evaluateGuard = null;
             document.querySelector('tbody').appendChild(row);
         }
 
-        var sm = new ReceiveIQCalSm();
+        var sm = new TransmitIQCalSm();
 
         // prompt the user to evaluate guards manually
         sm.evaluateGuard = (vertexName, behaviorUml) => {
@@ -1126,7 +1126,7 @@ evaluateGuard = null;
 
         // The simulator uses a tracer callback to perform operations such as 
         // state highlighting and logging. You do not need this functionality
-        // when using ReceiveIQCalSm.js in your own applications, although you may
+        // when using TransmitIQCalSm.js in your own applications, although you may
         // choose to implement a tracer for debugging purposes.
         sm.tracer = {
             enterState: (mermaidName) => {
@@ -1157,7 +1157,7 @@ evaluateGuard = null;
                 clearHighlightedEdges();
                 sm.tracer?.log('<span class="dispatched"><span class="trigger">' + diagramEventName + '</span> DISPATCHED</span>', true);
                 const fsmEventName = diagramEventName.toUpperCase();
-                sm.dispatchEvent(ReceiveIQCalSm.EventId[fsmEventName]); 
+                sm.dispatchEvent(TransmitIQCalSm.EventId[fsmEventName]); 
             });
             document.getElementById('buttons').appendChild(button);
         });

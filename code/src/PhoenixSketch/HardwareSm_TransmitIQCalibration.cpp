@@ -1,18 +1,18 @@
 /**
- * The receive IQ calibration routine uses a state machine to handle stepping through 
+ * The transmit IQ calibration routine uses a state machine to handle stepping through 
  * the process. The state machine itself is described by the StateSmith UML diagram
- * in ReceiveIQCalSm.drawio and the generated source code files ReceiveIQCalSm.cpp/h. 
+ * in TransmitIQCalSm.drawio and the generated source code files TransmitIQCalSm.cpp/h. 
  * This file contains the functions used by the state machine to ensure clean separation 
- * between the graphical code in MainBoard_DisplayCalibration_RXIQ.cpp and the rest of 
+ * between the graphical code in MainBoard_DisplayCalibration_TXIQ.cpp and the rest of 
  * the code
  */
 
 #include "SDT.h"
 
-ReceiveIQCalSm rxiqSM;
+TransmitIQCalSm txiqSM;
 
 /**
- * RX IQ Auto-Tune Algorithm
+ * TX IQ Auto-Tune Algorithm
  *
  * Systematically sweeps amplitude and phase parameters to maximize sideband separation.
  *
@@ -65,22 +65,26 @@ static float32_t GetNewVal(int8_t iter, int8_t stp){
 static void SetAmpPhase(int8_t iter, int8_t stp){
     float32_t newval = GetNewVal(iter, stp);
     if (iter%2 == 0){
-        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
+        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
     } else {
-        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
+        ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
     }
 }
 
 /**
- * @brief Initialize receive IQ calibration state machine
- * @note Starts ReceiveIQCalSm state machine with 150ms acquisition duration
+ * @brief Initialize transmit IQ calibration state machine
+ * @note Starts TransmitIQCalSm state machine with 150ms acquisition duration
  */
-void InitializeRXIQCalibration(void){
-    ReceiveIQCalSm_start(&rxiqSM);
-    rxiqSM.vars.acquisitionDuration_ms = 60;
+void InitializeTXIQCalibration(void){
+    TransmitIQCalSm_start(&txiqSM);
+    txiqSM.vars.acquisitionDuration_ms = 60;
 }
 
-void ResetRXIQCalBand(void){
+void SetTXIQCurrentBand(int32_t band){
+    currentBand = band;
+}
+
+void ResetTXIQCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
@@ -91,11 +95,11 @@ void ResetRXIQCalBand(void){
     maxSBS = 0;
 }
 
-void AdjustRXIQBand(void){
+void AdjustTXIQBand(void){
     if (bandCompleted[currentBand]){
         // Was this the last band? If so, exit.
         if (currentBand == LAST_BAND){
-            ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_AUTO_COMPLETE);
+            TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO_COMPLETE);
             return;
         }
         // Increment to the next band.
@@ -106,25 +110,25 @@ void AdjustRXIQBand(void){
     UpdateRFHardwareState();
 
     // Go to find minimum loop
-    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_FIND_MINIMUM);
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_FIND_MINIMUM);
 }
 
-void ResetRXIQCalSettings(void){
+void ResetTXIQCalSettings(void){
     step = 0;
     iteration = 0;
     maxSBS = 0;
 }
 
-float32_t maxSBS_save;
+static float32_t maxSBS_save;
 
-void AdjustRXIQCalSetting(void){
+void AdjustTXIQCalSetting(void){
     // Have we completed all the steps in this iteration?
     if (step >= NSteps[iteration]){
         // Set the parameter we were changing to the minimum value
         if (iteration%2 == 0){
-            ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+            ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
         } else {
-            ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+            ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
         }
         // The next time we step around the amplitude or phase, use this as our starting point
         int8_t nextIndex = iteration + 2;
@@ -141,20 +145,20 @@ void AdjustRXIQCalSetting(void){
     if (iteration > 5){
         // Set the parameter we were changing to the minimum value
         if ((iteration-1)%2 == 0){
-            ED.IQAmpCorrectionFactor[currentBand] = maxSBS_parameter;
+            ED.IQXAmpCorrectionFactor[currentBand] = maxSBS_parameter;
         } else {
-            ED.IQPhaseCorrectionFactor[currentBand] = maxSBS_parameter;
+            ED.IQXPhaseCorrectionFactor[currentBand] = maxSBS_parameter;
         }
         deltaVals[currentBand] = maxSBS_save;
         bandCompleted[currentBand] = true;
-        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_MIN_EXIT);
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_MIN_EXIT);
         return;
     }
     // Change the appropriate parameter
     SetAmpPhase(iteration,step); 
 
-    // Go to read data state after waiting for rxiqSM.vars.acquisitionDuration_ms
-    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_READ_DELTA);
+    // Go to read data state after waiting for txiqSM.vars.acquisitionDuration_ms
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_READ_DELTA);
 }
 
 static int32_t deltaCount = 0;
@@ -164,31 +168,43 @@ static int32_t deltaCount = 0;
  * is only updated every 10ms, so include a counter that runs the code
  * every 10th call
  */
-void UpdateRXDeltaVal(void){
+void UpdateTXDeltaVal(void){
     if (deltaCount++ == 10){
         // Because we set the CW tone to be 48 kHz above or below the LO, the upper
-        // and lower sideband products will be in very specific bins. Upper will be
-        // in bin 3/4*512 = 384, lower will be in bin 1/4*512 = 128
-        float32_t upper = psdnew[384]; 
-        float32_t lower = psdnew[128]; 
-        if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
+        // and lower sideband products will be in very specific bins.
+        // spectrum_zoom = 3 -> zoom factor = 1 << 3 = 2^3 = 8
+        // Center bin = 256
+        // Frequency of tone = 800 Hz
+        // Bandwidth of zoom = 192000 / 8 = 24000 Hz
+        // Bandwidth of each bin = 24000 / 512 = 46.875 Hz
+        // Bin offset = 800 / 46.875 = 17
+        // Therefor bins are 256 +/- 17
+
+        float32_t upper = psdnew[256+17];
+        float32_t lower = psdnew[256-17];
+        //char buff[100];
+        if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
             sideband_separation = (upper-lower)*10;
+            //sprintf(buff,"USB: Lower=%2.1f,upper=%2.1f,sbs=%2.1f",lower,upper,sideband_separation);
         } else {
             sideband_separation = (lower-upper)*10;
+            //sprintf(buff,"LSB: Lower=%2.1f,upper=%2.1f,sbs=%2.1f",lower,upper,sideband_separation);
         }
+        //Debug(buff);
         deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
         deltaCount = 0;
+        
     }
 }
 
-float32_t GetRXDeltaVals(int32_t band){
+float32_t GetTXDeltaVals(int32_t band){
     if ((band >= 0) && (band < NUMBER_OF_BANDS))
         return deltaVals[band];
     else
         return NAN;
 }
 
-void ReadRXIQDelta(void){
+void ReadTXIQDelta(void){
     if (deltaVals[ED.currentBand[ED.activeVFO]] > maxSBS){
         // The value of the sideband separation
         maxSBS = deltaVals[ED.currentBand[ED.activeVFO]];
@@ -199,5 +215,5 @@ void ReadRXIQDelta(void){
     step++;
     
     // Go to ADJUST state for next amp/phase step
-    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_NEXT_POINT);
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_NEXT_POINT);
 }

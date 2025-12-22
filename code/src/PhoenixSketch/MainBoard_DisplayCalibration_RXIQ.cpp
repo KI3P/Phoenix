@@ -144,14 +144,14 @@ static float32_t oldsep = 0.0;
  * @note Higher values indicate better IQ balance (target > 60 dB)
  */
 static void DrawDeltaPane(void){
-    if (oldsep != GetDeltaVals(ED.currentBand[ED.activeVFO]))
+    if (oldsep != GetRXDeltaVals(ED.currentBand[ED.activeVFO]))
         PaneDelta.stale = true;
-    oldsep = GetDeltaVals(ED.currentBand[ED.activeVFO]);
+    oldsep = GetRXDeltaVals(ED.currentBand[ED.activeVFO]);
 
     if (!PaneDelta.stale) return;
     tft.fillRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_BLACK);
     
-    sprintf(buff,"%2.1fdB",GetDeltaVals(ED.currentBand[ED.activeVFO]));
+    sprintf(buff,"%2.1fdB",GetRXDeltaVals(ED.currentBand[ED.activeVFO]));
     tft.setCursor(PaneDelta.x0, PaneDelta.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
@@ -327,9 +327,9 @@ static void DrawTablePane(void){
         sprintf(buff,"%4.3f",ED.IQPhaseCorrectionFactor[k]);
         tft.print(buff);        
 
-        if (GetDeltaVals(k) != 0.0){
+        if (GetRXDeltaVals(k) != 0.0){
             tft.setCursor(PaneTable.x0+160, y);
-            sprintf(buff,"%2.1f",GetDeltaVals(k));
+            sprintf(buff,"%2.1f",GetRXDeltaVals(k));
             tft.print(buff);
         }
     }

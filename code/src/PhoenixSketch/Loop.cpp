@@ -381,7 +381,6 @@ void HandleButtonPress(int32_t button){
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE) ||
         (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) || 
-        (modeSM.state_id == ModeSm_StateId_CALIBRATE_TX_IQ_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK))
         return;
@@ -746,12 +745,19 @@ void HandleButtonPress(int32_t button){
                     ChangeTXIQIncrement();
                     break;
                 }
+                case 16:{
+                    // Engage autocal process, which is handled by its own state machine
+                    Debug("Pressed button to engage autocal");
+                    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
+                    break;
+                }
                 case BAND_UP:{
                     if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
                         ED.currentBand[ED.activeVFO] = FIRST_BAND;
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    SetTXIQCurrentBand(ED.currentBand[ED.activeVFO]);
                     UpdateRFHardwareState();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
@@ -762,6 +768,7 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    SetTXIQCurrentBand(ED.currentBand[ED.activeVFO]);
                     UpdateRFHardwareState();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
@@ -1314,7 +1321,8 @@ void ConsumeInterrupt(void){
         case (iCALIBRATE_TX_IQ):{
             SaveArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_TX_IQ);
-            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);  
+            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);
+            InitializeTXIQCalibration();
             break;
         }
         case (iCALIBRATE_POWER):{

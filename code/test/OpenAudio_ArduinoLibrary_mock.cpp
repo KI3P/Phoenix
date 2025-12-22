@@ -136,9 +136,12 @@ public:
         }
 
         // Convert int16_t to float32_t for DataBlock
+        // Swap I and Q so that sideband is correct and apply imperfections too
         for (int i = 0; i < FEEDBACK_BLOCK_SIZE; i++) {
-            iFloat[i] = (float32_t)iBuffer[i];
-            qFloat[i] = (float32_t)samples[i];
+            //iFloat[i] = (float32_t)iBuffer[i];
+            //qFloat[i] = (float32_t)samples[i];
+            iFloat[i] = 1.1*(float32_t)samples[i];
+            qFloat[i] = (float32_t)iBuffer[i];
         }
 
         // Apply frequency shift (Fs/4 = 48kHz at 192kHz sample rate)
@@ -885,7 +888,7 @@ public:
         float amp = oscillatorSource->getAmplitude();
 
         // Convert amplitude - the oscillator amplitude is set as amp/500 in InitializeAudio
-        double amplitude = amp * 500.0 * 300.0;
+        double amplitude = amp * 500.0;
         // Convert frequency
         freq = freq*192000.0f/AUDIO_SAMPLE_RATE_EXACT;
 

@@ -30,8 +30,9 @@ const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
 float32_t attLevel = 0.0;
 
-static const int8_t NUMBER_OF_TXIQ_PANES = 7;
+static const int8_t NUMBER_OF_TXIQ_PANES = 8;
 // Forward declaration of the pane drawing functions
+static void DrawTXIQDeltaPane(void);
 static void DrawTXIQAtt(void);
 static void DrawTXIQStatus(void);
 static void DrawTXIQFrequency(void);
@@ -41,6 +42,7 @@ static void DrawTXIQInstructionsPane(void);
 static void DrawTXIQSpectrumPane(void);
 
 // Pane instances
+static Pane PaneTXIQDelta =    {250,45,160,40,DrawTXIQDeltaPane,1};
 static Pane PaneTXIQAtt =      {660,330,120,40,DrawTXIQAtt,1};
 static Pane PaneTXIQStatus =   {660,380,120,40,DrawTXIQStatus,1};
 static Pane PaneTXIQFrequency ={660,430,140,40,DrawTXIQFrequency,1};
@@ -51,11 +53,37 @@ static Pane PaneTXIQSpectrum = {3,95,517,150,DrawTXIQSpectrumPane,1};
 
 // Array of all panes for iteration
 static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,
-                                    &PaneTXIQInstructions, &PaneTXIQAtt,
+                                    &PaneTXIQInstructions, &PaneTXIQAtt, &PaneTXIQDelta,
                                     &PaneTXIQStatus,&PaneTXIQFrequency,&PaneTXIQSpectrum};
 
 
 extern struct dispSc displayScale[];
+
+
+static float32_t oldsep = 0.0;
+/**
+ * @brief Render the sideband separation (Delta) display pane
+ * @note Shows measured dB difference between desired and unwanted sideband
+ * @note Higher values indicate better IQ balance (target > 60 dB)
+ */
+static void DrawTXIQDeltaPane(void){
+    if (!HasDualVFOs())
+        return; // This only works if we have dual VFOs
+    if (oldsep != GetTXDeltaVals(ED.currentBand[ED.activeVFO]))
+        PaneTXIQDelta.stale = true;
+    oldsep = GetTXDeltaVals(ED.currentBand[ED.activeVFO]);
+
+    if (!PaneTXIQDelta.stale) return;
+    tft.fillRect(PaneTXIQDelta.x0, PaneTXIQDelta.y0, PaneTXIQDelta.width, PaneTXIQDelta.height, RA8875_BLACK);
+    
+    sprintf(buff,"%2.1fdB",GetTXDeltaVals(ED.currentBand[ED.activeVFO]));
+    tft.setCursor(PaneTXIQDelta.x0, PaneTXIQDelta.y0);
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.print(buff);
+
+    PaneTXIQDelta.stale = false;
+}
 
 /**
  * Calculate vertical pixel position for a spectrum FFT bin.
@@ -93,9 +121,9 @@ FASTRUN void PlotTXIQSpectrum(void){
     // Draw the lower sideband
     x1 = MAX_WATERFALL_WIDTH/2-WIN_WIDTH;
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
-    else
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
+    else
+        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);
@@ -110,9 +138,9 @@ FASTRUN void PlotTXIQSpectrum(void){
     // Draw the upper sideband
     x1 = MAX_WATERFALL_WIDTH/2;
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
-    else
         tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
+    else
+        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);
@@ -316,6 +344,7 @@ void DecrementTXIQAmp(void){
 }
 
 int8_t oldTXIQincind = 5;
+int8_t oldTXIQband = -1;
 float32_t oldTXIQamp = -5.0;
 float32_t oldTXIQphase = -5.0;
 /**
@@ -324,11 +353,13 @@ float32_t oldTXIQphase = -5.0;
  * @note Updates when user adjusts parameters or changes bands
  */
 static void DrawTXIQAdjustPane(void){
-    if ((oldTXIQincind != incindexTXIQ) || 
-        (oldTXIQamp != ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]) || 
+    if ((oldTXIQincind != incindexTXIQ) ||
+        (oldTXIQband != ED.currentBand[ED.activeVFO]) ||
+        (oldTXIQamp != ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]) ||
         (oldTXIQphase != ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]))
         PaneTXIQAdjust.stale = true;
     oldTXIQincind = incindexTXIQ;
+    oldTXIQband = ED.currentBand[ED.activeVFO];
     oldTXIQamp = ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]];
     oldTXIQphase = ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]];
 
