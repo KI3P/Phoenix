@@ -40,7 +40,6 @@ static float32_t maxSBS = 0.0;
 static float32_t maxSBS_parameter = 0.0;
 static int8_t iteration = 0;
 static int8_t step = 0;
-static bool initialEntry = false;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for each band
 static float32_t sideband_separation = 0.0;
@@ -100,6 +99,7 @@ void AdjustTXIQBand(void){
         // Was this the last band? If so, exit.
         if (currentBand == LAST_BAND){
             TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO_COMPLETE);
+            SetInterrupt(iPTT_RELEASED);
             return;
         }
         // Increment to the next band.

@@ -734,8 +734,6 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
-                    // Restore the equalizers from the save
-                    RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -747,6 +745,8 @@ void HandleButtonPress(int32_t button){
                 }
                 case 16:{
                     // Engage autocal process, which is handled by its own state machine
+                    // Engage PTT
+                    SetInterrupt(iPTT_PRESSED);
                     Debug("Pressed button to engage autocal");
                     TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
                     break;

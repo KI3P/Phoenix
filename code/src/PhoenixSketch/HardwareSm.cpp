@@ -308,7 +308,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             break;
         }
         case RFCalTransmitIQ:{
-            SetRXAttenuation( 10.0 );
+            SetRXAttenuation( 31.5 );
             SetTXAttenuation( 31.5 );
 
             // Get all the receive hardware out of the path

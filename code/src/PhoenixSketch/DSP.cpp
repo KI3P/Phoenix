@@ -1104,12 +1104,13 @@ DataBlock * TransmitProcessing(const char *fname){
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
         ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
     SidebandSelection(&data);
+    arm_scale_f32(data.I,-1,data.I,256);
     TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
     TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
 
     // Swap I and Q at this point to get correct USB and LSB formation on transmit
-    data.I = float_buffer_R;
-    data.Q = float_buffer_L;
+    //data.I = float_buffer_R;
+    //data.Q = float_buffer_L;
 
     // Play the data on the output buffer
     PlayIQData(&data);
