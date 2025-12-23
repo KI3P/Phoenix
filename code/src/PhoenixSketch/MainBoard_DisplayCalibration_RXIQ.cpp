@@ -24,7 +24,6 @@ extern RA8875 tft;
 // Optional auto-tune algorithm performs systematic parameter sweep
 //
 ///////////////////////////////////////////////////////////////////////////////
-static bool autotune = false;
 static const int8_t NUMBER_OF_PANES = 5;
 // Forward declaration of the pane drawing functions
 static void DrawDeltaPane(void);

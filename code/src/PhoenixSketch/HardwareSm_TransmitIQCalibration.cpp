@@ -113,6 +113,9 @@ void AdjustTXIQBand(void){
     ED.modulation[ED.activeVFO] = bands[currentBand].mode;
     UpdateRFHardwareState();
 
+    Debug(String("Calibrating band ") + String(bands[currentBand].name));
+    // Start by setting the phase to 0
+    ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0f;
     // Go to find minimum loop
     TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_FIND_MINIMUM);
 }
@@ -127,12 +130,19 @@ static float32_t maxSBS_save;
 
 void AdjustTXIQCalSetting(void){
     // Have we completed all the steps in this iteration?
+    char buff[100];
     if (step >= NSteps[iteration]){
         // Set the parameter we were changing to the minimum value
         if (iteration%2 == 0){
             ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+            sprintf(buff,"...Iteration %d found best amp = %4.3f, delta = %2.1f",
+                        iteration,maxSBS_parameter,maxSBS);
+            Debug(buff);
         } else {
             ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
+            sprintf(buff,"...Iteration %d found best phs = %4.3f, delta = %2.1f",
+                        iteration,maxSBS_parameter,maxSBS);
+            Debug(buff);
         }
         // The next time we step around the amplitude or phase, use this as our starting point
         int8_t nextIndex = iteration + 2;
@@ -155,6 +165,10 @@ void AdjustTXIQCalSetting(void){
         }
         deltaVals[currentBand] = maxSBS_save;
         bandCompleted[currentBand] = true;
+        sprintf(buff,"...Best fit amp =%4.3f, phs = %4.3f",
+                    ED.IQXAmpCorrectionFactor[currentBand],
+                    ED.IQXPhaseCorrectionFactor[currentBand]);
+        Debug(buff);
         TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_MIN_EXIT);
         return;
     }
@@ -173,6 +187,8 @@ static int32_t deltaCount = 0;
  * every 10th call
  */
 void UpdateTXDeltaVal(void){
+    if (!HasDualVFOs())
+        return;
     if (deltaCount++ == 10){
         // Because we set the CW tone to be 48 kHz above or below the LO, the upper
         // and lower sideband products will be in very specific bins.
@@ -215,6 +231,12 @@ void ReadTXIQDelta(void){
         // The amp/phase parameter that delivered this sideband separation
         maxSBS_parameter = GetNewVal(iteration, step);
     }
+    char buff[50];
+    sprintf(buff,"      %4.3f,%4.3f,%2.1f",
+                ED.IQXAmpCorrectionFactor[currentBand],
+                ED.IQXPhaseCorrectionFactor[currentBand],
+                deltaVals[ED.currentBand[ED.activeVFO]]);
+    Debug(buff);
     // Proceed to the next step in this iteration
     step++;
     

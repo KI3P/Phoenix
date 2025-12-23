@@ -323,13 +323,13 @@ void DecrementTXIQPhase(void){
 
 /**
  * @brief Increase TX IQ amplitude correction factor for current band
- * @note Increments by current increment value, clamped to [0.5, 2.0]
+ * @note Increments by current increment value, clamped to [0.5, 2.5]
  * @note Called when user rotates volume encoder clockwise
  */
 void IncrementTXIQAmp(void){
     ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] += increment;
-    if (ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] > 2.0)
-        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 2.0;
+    if (ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] > 2.5)
+        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 2.5;
 }
 
 /**
