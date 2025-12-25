@@ -35,7 +35,7 @@ TransmitIQCalSm txiqSM;
  */
 static float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0};
 static int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
-static float32_t Delta[] = {0.01,                 0.01,                 0.01,0.01,0.001,0.001};
+static float32_t Delta[] = {0.02,                 0.01,                 0.01,0.01,0.001,0.001};
 static float32_t maxSBS = 0.0;
 static float32_t maxSBS_parameter = 0.0;
 static int8_t iteration = 0;
@@ -113,7 +113,7 @@ void AdjustTXIQBand(void){
     ED.modulation[ED.activeVFO] = bands[currentBand].mode;
     UpdateRFHardwareState();
 
-    Debug(String("Calibrating band ") + String(bands[currentBand].name));
+    Debug(String("Calibrating TXIQ band ") + String(bands[currentBand].name));
     // Start by setting the phase to 0
     ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0f;
     // Go to find minimum loop
@@ -130,19 +130,12 @@ static float32_t maxSBS_save;
 
 void AdjustTXIQCalSetting(void){
     // Have we completed all the steps in this iteration?
-    char buff[100];
     if (step >= NSteps[iteration]){
         // Set the parameter we were changing to the minimum value
         if (iteration%2 == 0){
             ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-            sprintf(buff,"...Iteration %d found best amp = %4.3f, delta = %2.1f",
-                        iteration,maxSBS_parameter,maxSBS);
-            Debug(buff);
         } else {
             ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-            sprintf(buff,"...Iteration %d found best phs = %4.3f, delta = %2.1f",
-                        iteration,maxSBS_parameter,maxSBS);
-            Debug(buff);
         }
         // The next time we step around the amplitude or phase, use this as our starting point
         int8_t nextIndex = iteration + 2;
@@ -165,10 +158,6 @@ void AdjustTXIQCalSetting(void){
         }
         deltaVals[currentBand] = maxSBS_save;
         bandCompleted[currentBand] = true;
-        sprintf(buff,"...Best fit amp =%4.3f, phs = %4.3f",
-                    ED.IQXAmpCorrectionFactor[currentBand],
-                    ED.IQXPhaseCorrectionFactor[currentBand]);
-        Debug(buff);
         TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_MIN_EXIT);
         return;
     }
@@ -202,15 +191,11 @@ void UpdateTXDeltaVal(void){
 
         float32_t upper = psdnew[256+17];
         float32_t lower = psdnew[256-17];
-        //char buff[100];
         if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
             sideband_separation = (upper-lower)*10;
-            //sprintf(buff,"USB: Lower=%2.1f,upper=%2.1f,sbs=%2.1f",lower,upper,sideband_separation);
         } else {
             sideband_separation = (lower-upper)*10;
-            //sprintf(buff,"LSB: Lower=%2.1f,upper=%2.1f,sbs=%2.1f",lower,upper,sideband_separation);
         }
-        //Debug(buff);
         deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
         deltaCount = 0;
         
@@ -231,12 +216,6 @@ void ReadTXIQDelta(void){
         // The amp/phase parameter that delivered this sideband separation
         maxSBS_parameter = GetNewVal(iteration, step);
     }
-    char buff[50];
-    sprintf(buff,"      %4.3f,%4.3f,%2.1f",
-                ED.IQXAmpCorrectionFactor[currentBand],
-                ED.IQXPhaseCorrectionFactor[currentBand],
-                deltaVals[ED.currentBand[ED.activeVFO]]);
-    Debug(buff);
     // Proceed to the next step in this iteration
     step++;
     

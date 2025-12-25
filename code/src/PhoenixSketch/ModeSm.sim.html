@@ -263,6 +263,8 @@ state CALIBRATION_STATES {
 
         CALIBRATE_RX_IQ : enter / #123; UpdateHardwareState()#59; #125;
 
+        CALIBRATE_RX_IQ : do / #123; UpdateRXDeltaVal()#59; #125;
+
         CALIBRATE_TX_IQ_SPACE
 
         CALIBRATE_TX_IQ_SPACE : CALIBRATE_TX_IQ_SPACE
@@ -667,6 +669,7 @@ evaluateGuard = null;
             case ModeSm.StateId.CALIBRATE_RX_IQ:
                 switch (eventId)
                 {
+                    case ModeSm.EventId.DO: this.#CALIBRATE_RX_IQ_do(); break;
                     case ModeSm.EventId.CALIBRATE_EXIT: this.#CALIBRATE_RX_IQ_calibrate_exit(); break;
                 }
                 break;
@@ -1396,6 +1399,18 @@ evaluateGuard = null;
             // Finish transition by calling pseudo state transition function.
             this.#CALIBRATION_STATES_ExitPoint_done__transition();
             return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+        } // end of behavior for CALIBRATE_RX_IQ
+        
+        // No ancestor handles this event.
+    }
+    
+    #CALIBRATE_RX_IQ_do()
+    {
+        // CALIBRATE_RX_IQ behavior
+        // uml: do / { this.tracer?.log("⚡ FSM would execute action: " + "UpdateRXDeltaVal();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "UpdateRXDeltaVal();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "UpdateRXDeltaVal();");
         } // end of behavior for CALIBRATE_RX_IQ
         
         // No ancestor handles this event.
@@ -2521,7 +2536,8 @@ evaluateGuard = null;
     "CALIBRATE_EXIT"
   ],
   "CALIBRATE_RX_IQ": [
-    "CALIBRATE_EXIT"
+    "CALIBRATE_EXIT",
+    "do"
   ],
   "CALIBRATE_TX_IQ_SPACE": [
     "CALIBRATE_EXIT",

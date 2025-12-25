@@ -28,6 +28,7 @@
 
 // Mock control: which I2C address the simulated device responds to
 static uint8_t mock_device_address = SI5351_DUAL_VFO_ADDR;  // Default to dual VFO for backwards compatibility
+//static uint8_t mock_device_address = SI5351_BUS_BASE_ADDR;
 
 // Function to control mock behavior from tests
 void Si5351_Mock_SetDeviceAddress(uint8_t addr) {

@@ -334,7 +334,7 @@ void IncrementTXIQAmp(void){
 
 /**
  * @brief Decrease TX IQ amplitude correction factor for current band
- * @note Decrements by current increment value, clamped to [0.5, 2.0]
+ * @note Decrements by current increment value, clamped to [0.5, 2.5]
  * @note Called when user rotates volume encoder counter-clockwise
  */
 void DecrementTXIQAmp(void){

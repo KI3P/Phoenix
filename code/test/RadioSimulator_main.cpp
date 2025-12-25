@@ -450,28 +450,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Initializing display..." << std::endl;
 
-
     setup();
-
-    /*InitializeFrontPanel();
-    InitializeSignalProcessing();
-    InitializeAudio();
-    InitializeDisplay();
-    InitializeRFHardware(); // RF board, LPF board, and BPF board
-
-    std::cout << "Display initialized. Starting main loop..." << std::endl;
-
-    // Initialize state machines to a known state
-    UISm_ctor(&uiSM);
-    UISm_start(&uiSM);
-    UpdateAudioIOState();
-
-    ModeSm_ctor(&modeSM);
-    ModeSm_start(&modeSM);
-
-    PowerCalSm_ctor(&powerSM);
-    PowerCalSm_start(&powerSM);
-    */
 
     // Initialize key pins to released state (active low)
     digitalWrite(KEY1, 1); // KEY1 released
@@ -508,23 +487,6 @@ int main(int argc, char* argv[]) {
 
         // Update the SDL display once per frame (not on every draw call)
         tft.updateScreen();
-
-        // FPS counter
-        /*frameCount++;
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastFPSTime).count();
-        if (elapsed >= 5) {
-            float fps = frameCount / (float)elapsed;
-            std::cout << "FPS: " << fps
-                      << " | UI State: " << uiSM.state_id
-                      << " | Mode State: " << modeSM.state_id
-                      << std::endl;
-            frameCount = 0;
-            lastFPSTime = now;
-        }*/
-
-        // Small delay to prevent CPU spinning (target ~60 FPS)
-        //std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
     std::cout << "Cleaning up..." << std::endl;

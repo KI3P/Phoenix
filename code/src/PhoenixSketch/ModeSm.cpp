@@ -69,6 +69,8 @@ static void CALIBRATE_RX_IQ_exit(ModeSm* sm);
 
 static void CALIBRATE_RX_IQ_calibrate_exit(ModeSm* sm);
 
+static void CALIBRATE_RX_IQ_do(ModeSm* sm);
+
 static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm);
 
 static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm);
@@ -283,6 +285,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
         case ModeSm_StateId_CALIBRATE_RX_IQ:
             switch (event_id)
             {
+                case ModeSm_EventId_DO: CALIBRATE_RX_IQ_do(sm); break;
                 case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_RX_IQ_calibrate_exit(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
@@ -927,6 +930,18 @@ static void CALIBRATE_RX_IQ_calibrate_exit(ModeSm* sm)
         // Finish transition by calling pseudo state transition function.
         CALIBRATION_STATES_ExitPoint_done__transition(sm);
         return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+    } // end of behavior for CALIBRATE_RX_IQ
+    
+    // No ancestor handles this event.
+}
+
+static void CALIBRATE_RX_IQ_do(ModeSm* sm)
+{
+    // CALIBRATE_RX_IQ behavior
+    // uml: do / { UpdateRXDeltaVal(); }
+    {
+        // Step 1: execute action `UpdateRXDeltaVal();`
+        UpdateRXDeltaVal();
     } // end of behavior for CALIBRATE_RX_IQ
     
     // No ancestor handles this event.

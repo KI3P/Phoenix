@@ -1218,17 +1218,17 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTXIQAmp) {
     float32_t ampAfterMultipleDecrements = ED.IQXAmpCorrectionFactor[currentBand];
     EXPECT_NEAR(ampAfterMultipleDecrements, initialAmp, 0.00001);
 
-    // Test upper limit (max value is 2.0)
+    // Test upper limit (max value is 2.5)
     // Set to a value close to max
-    ED.IQXAmpCorrectionFactor[currentBand] = 1.999;
+    ED.IQXAmpCorrectionFactor[currentBand] = 2.499;
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.0, 0.00001);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.5, 0.00001);
 
-    // Try to increment beyond max - should be clamped at 2.0
+    // Try to increment beyond max - should be clamped at 2.5
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.0, 0.00001);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.5, 0.00001);
 
     // Test lower limit (min value is 0.5)
     // Set to a value close to min
@@ -1519,19 +1519,19 @@ TEST_F(OscillatorFeedbackTest, OscillatorProducesNonZeroSamples) {
 
 /**
  * Test that samples have reasonable amplitude
- * Note: The oscillator amplitude is multiplied by 500*32767 in the implementation,
+ * Note: The oscillator amplitude is multiplied by 500*30 in the implementation,
  * so we use a small value to avoid int16_t overflow/clipping
  */
 TEST_F(OscillatorFeedbackTest, OscillatorSampleAmplitude) {
     // Set up oscillator with amplitude that won't clip
-    // amplitude * 500 * 32767 should be < 32767
-    // So amplitude should be < 1/500 = 0.002
-    float amplitude_setting = 0.001f;  // Will give peak of ~16384
+    // amplitude * 500 * 30 should be < 32767
+    // So amplitude should be < 32767/(500*30) ≈ 2.18
+    float amplitude_setting = 0.001f;  // Will give peak of ~15
     transmitIQcal_oscillator.frequency(800.0f);
     transmitIQcal_oscillator.amplitude(amplitude_setting);
 
-    // Expected peak amplitude: amp * 500 * 32767 = 0.001 * 500 * 32767 ≈ 16384
-    double expectedAmplitude = amplitude_setting * 500.0 * 32767.0;
+    // Expected peak amplitude: amp * 500 * 30 = 0.001 * 500 * 30 = 15
+    double expectedAmplitude = amplitude_setting * 500.0 * 30.0;
 
     Q_in_L_Ex.begin();
     Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);

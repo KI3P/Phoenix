@@ -12,6 +12,7 @@
 #include "Mode.h"
 //#include "SDT.h"
 void UpdateTXDeltaVal(void);
+void UpdateRXDeltaVal(void);
 
 
 typedef enum ModeSm_EventId

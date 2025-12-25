@@ -734,6 +734,7 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);

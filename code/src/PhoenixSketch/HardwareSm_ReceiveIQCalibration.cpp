@@ -35,7 +35,7 @@ ReceiveIQCalSm rxiqSM;
  */
 static float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0};
 static int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
-static float32_t Delta[] = {0.01,                 0.01,                 0.01,0.01,0.001,0.001};
+static float32_t Delta[] = {0.02,                 0.01,                 0.01,0.01,0.001,0.001};
 static float32_t maxSBS = 0.0;
 static float32_t maxSBS_parameter = 0.0;
 static int8_t iteration = 0;
@@ -44,6 +44,7 @@ static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for each band
 static float32_t sideband_separation = 0.0;
 static int32_t currentBand = -1;
+static bool finalMeasurement = false;  // Flag to indicate final measurement at optimal point
 
 /**
  * @brief Calculate parameter value for given iteration and step
@@ -104,6 +105,10 @@ void AdjustRXIQBand(void){
     ED.currentBand[ED.activeVFO] = currentBand;
     UpdateRFHardwareState();
 
+    Debug(String("Calibrating RXIQ band ") + String(bands[currentBand].name));
+    // Start by setting the phase to 0
+    ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0f;
+
     // Go to find minimum loop
     ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_FIND_MINIMUM);
 }
@@ -144,11 +149,12 @@ void AdjustRXIQCalSetting(void){
         } else {
             ED.IQPhaseCorrectionFactor[currentBand] = maxSBS_parameter;
         }
-        deltaVals[currentBand] = maxSBS_save;
-        bandCompleted[currentBand] = true;
-        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_MIN_EXIT);
+        // Take a final measurement at the optimal point
+        finalMeasurement = true;
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_READ_DELTA);
         return;
     }
+    finalMeasurement = false;
     // Change the appropriate parameter
     SetAmpPhase(iteration,step); 
 
@@ -175,7 +181,13 @@ void UpdateRXDeltaVal(void){
         } else {
             sideband_separation = (lower-upper)*10;
         }
-        deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
+        if (finalMeasurement) {
+            // For final measurement, use direct value (no IIR filter smoothing)
+            deltaVals[ED.currentBand[ED.activeVFO]] = sideband_separation;
+        } else {
+            // During optimization, use IIR filter to smooth noisy measurements
+            deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
+        }
         deltaCount = 0;
     }
 }
@@ -188,6 +200,12 @@ float32_t GetRXDeltaVals(int32_t band){
 }
 
 void ReadRXIQDelta(void){
+    if (finalMeasurement){
+        // Final measurement at optimal point - complete the band
+        bandCompleted[currentBand] = true;
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_MIN_EXIT);
+        return;
+    }
     if (deltaVals[ED.currentBand[ED.activeVFO]] > maxSBS){
         // The value of the sideband separation
         maxSBS = deltaVals[ED.currentBand[ED.activeVFO]];
@@ -196,7 +214,7 @@ void ReadRXIQDelta(void){
     }
     // Proceed to the next step in this iteration
     step++;
-    
+
     // Go to ADJUST state for next amp/phase step
     ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_NEXT_POINT);
 }
