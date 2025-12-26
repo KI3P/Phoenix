@@ -113,18 +113,11 @@ static void updateAudioSourceForRFState() {
     oldband = ED.currentBand[ED.activeVFO];
     switch (currentState) {
         case RFCalReceiveIQ:
-            // For RX IQ calibration, use the opposite sideband tone source
-            // USB mode needs LSB tone, LSB mode needs USB tone
-            // Also disable oscillator mode for Q_in_L_Ex/Q_in_R_Ex
+            // For RX IQ calibration, use LSB tone for all bands
             Q_in_L_Ex.setOscillatorSource(nullptr);
             Q_in_R_Ex.setOscillatorSource(nullptr);
-            if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
-                setAudioInputSource(AUDIO_SOURCE_RXIQ_LSB);
-                std::cout << "Audio Source (auto): RX IQ tones (LSB) for USB calibration" << std::endl;
-            } else {
-                setAudioInputSource(AUDIO_SOURCE_RXIQ_USB);
-                std::cout << "Audio Source (auto): RX IQ tones (USB) for LSB calibration" << std::endl;
-            }
+            setAudioInputSource(AUDIO_SOURCE_RXIQ_LSB);
+            std::cout << "Audio Source (auto): RX IQ tones (LSB) for RX IQ calibration" << std::endl;
             break;
 
         case RFCalTransmitIQ:

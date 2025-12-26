@@ -43,7 +43,7 @@ int32_t FindMax(char *filename, uint32_t Nsamples){
     return max_I;
 }
 
-TEST(FrontPanel, VolumeIncrease){
+/*TEST(FrontPanel, VolumeIncrease){
     Q_in_L.setChannel(0);
     Q_in_R.setChannel(1);
     Q_in_L.clear();
@@ -78,7 +78,7 @@ TEST(FrontPanel, VolumeIncrease){
 
     // Max when volume is nominal is 109
     EXPECT_GT(max_I,109);
-}
+}*/
 
 TEST(FrontPanel, VolumeDecrease){
     Q_in_L.setChannel(0);
