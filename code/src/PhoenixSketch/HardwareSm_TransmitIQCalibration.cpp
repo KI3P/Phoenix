@@ -19,7 +19,7 @@ TransmitIQCalSm txiqSM;
  * Three-pass approach with progressively finer resolution:
  *
  * Pass 1 (Coarse):
- *   - Iteration 0: Amplitude 0.5 to 1.5 in 0.01 steps
+ *   - Iteration 0: Amplitude 0.5 to 1.5 in 0.02 steps
  *   - Iteration 1: Phase -0.2 to 0.2 in 0.01 steps
  *
  * Pass 2 (Medium):
@@ -30,12 +30,16 @@ TransmitIQCalSm txiqSM;
  *   - Iteration 4: Amplitude ±10 steps (0.001) around Pass 2 optimum
  *   - Iteration 5: Phase ±10 steps (0.001) around Pass 2 optimum
  *
+ * Pass 4 (Extra Fine):
+ *   - Iteration 6: Amplitude ±2 steps (0.001) around Pass 3 optimum
+ *   - Iteration 7: Phase ±2 steps (0.001) around Pass 3 optimum
+ *
  * For each iteration, measures sideband separation and records best-performing value.
  * Automatically advances through all bands.
  */
-static float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0};
-static int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
-static float32_t Delta[] = {0.02,                 0.01,                 0.01,0.01,0.001,0.001};
+static float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+static int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21,  5,   5  };
+static float32_t Delta[] = {0.02,                 0.01,                 0.01,0.01,0.001,0.001,0.001,0.001};
 static float32_t maxSBS = 0.0;
 static float32_t maxSBS_parameter = 0.0;
 static int8_t iteration = 0;
@@ -139,7 +143,7 @@ void AdjustTXIQCalSetting(void){
         }
         // The next time we step around the amplitude or phase, use this as our starting point
         int8_t nextIndex = iteration + 2;
-        if (nextIndex < 6)
+        if (nextIndex < 8)
             center[nextIndex] = maxSBS_parameter;
 
         // Go to the next iteration
@@ -149,7 +153,7 @@ void AdjustTXIQCalSetting(void){
         maxSBS = 0.0;
     }
     // Have we completed all the iterations and ready to go to the next band?
-    if (iteration > 5){
+    if (iteration > 7){
         // Set the parameter we were changing to the minimum value
         if ((iteration-1)%2 == 0){
             ED.IQXAmpCorrectionFactor[currentBand] = maxSBS_parameter;
