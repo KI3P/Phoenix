@@ -592,11 +592,7 @@ void TuneForReceiveIQCalibration(void){
     // Set the CW signal to be on the opposite side of the LO from the
     // nominal tune frequency and minimize the leakage of that signal
     // into the nominal tune frequency bins
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-        SetCWVFOFrequency( (band_center + SR[SampleRate].rate/4)*100 );
-    } else {
-        SetCWVFOFrequency( (band_center - SR[SampleRate].rate/4)*100 );
-    }
+    SetCWVFOFrequency( (band_center + SR[SampleRate].rate/4)*100 );
 }
 
 /**

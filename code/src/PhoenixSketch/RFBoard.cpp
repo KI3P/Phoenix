@@ -22,8 +22,8 @@ bool dualVFO = true; /** Set to true if we have separate RX and TX VFOs */
 #define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_8MA
 static int32_t rxmultiple, oldrxMultiple;
 static int64_t RXVFOFreq_dHz;
-#define CLK0RX   SI5351_CLK1 
-#define CLK90RX  SI5351_CLK0
+#define CLK0RX   SI5351_CLK0 
+#define CLK90RX  SI5351_CLK1
 
 #define SI5351_DRIVE_CURRENT_TX SI5351_DRIVE_2MA
 static int32_t txmultiple, oldtxMultiple;

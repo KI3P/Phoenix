@@ -176,11 +176,7 @@ void UpdateRXDeltaVal(void){
         // in bin 3/4*512 = 384, lower will be in bin 1/4*512 = 128
         float32_t upper = psdnew[384]; 
         float32_t lower = psdnew[128]; 
-        if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-            sideband_separation = (upper-lower)*10;
-        } else {
-            sideband_separation = (lower-upper)*10;
-        }
+        sideband_separation = (upper-lower)*10;
         if (finalMeasurement) {
             // For final measurement, use direct value (no IIR filter smoothing)
             deltaVals[ED.currentBand[ED.activeVFO]] = sideband_separation;

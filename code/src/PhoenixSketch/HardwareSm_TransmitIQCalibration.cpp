@@ -23,22 +23,22 @@ TransmitIQCalSm txiqSM;
  *   - Iteration 1: Phase -0.2 to 0.2 in 0.01 steps
  *
  * Pass 2 (Medium):
- *   - Iteration 2: Amplitude ±4 steps around Pass 1 optimum
- *   - Iteration 3: Phase ±4 steps around Pass 1 optimum
+ *   - Iteration 2: Amplitude ±5 steps around Pass 1 optimum
+ *   - Iteration 3: Phase ±5 steps around Pass 1 optimum
  *
  * Pass 3 (Fine):
  *   - Iteration 4: Amplitude ±10 steps (0.001) around Pass 2 optimum
  *   - Iteration 5: Phase ±10 steps (0.001) around Pass 2 optimum
  *
  * Pass 4 (Extra Fine):
- *   - Iteration 6: Amplitude ±2 steps (0.001) around Pass 3 optimum
- *   - Iteration 7: Phase ±2 steps (0.001) around Pass 3 optimum
+ *   - Iteration 6: Amplitude ±5 steps (0.001) around Pass 3 optimum
+ *   - Iteration 7: Phase ±5 steps (0.001) around Pass 3 optimum
  *
  * For each iteration, measures sideband separation and records best-performing value.
  * Automatically advances through all bands.
  */
 static float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-static int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21,  5,   5  };
+static int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),10,  10,  20,    20,  10,   10  };
 static float32_t Delta[] = {0.02,                 0.01,                 0.01,0.01,0.001,0.001,0.001,0.001};
 static float32_t maxSBS = 0.0;
 static float32_t maxSBS_parameter = 0.0;

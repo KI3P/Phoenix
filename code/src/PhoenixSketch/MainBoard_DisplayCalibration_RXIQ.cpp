@@ -82,10 +82,7 @@ FASTRUN void PlotSpectrum(void){
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
 
     x1 = MAX_WATERFALL_WIDTH/4-WIN_WIDTH/2;
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
-    else
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
+    tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);
@@ -99,10 +96,7 @@ FASTRUN void PlotSpectrum(void){
     }
 
     x1 = MAX_WATERFALL_WIDTH*3/4-WIN_WIDTH/2;
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
-    else
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
+    tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);

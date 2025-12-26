@@ -122,8 +122,8 @@ errno_t ReadIQInputBuffer(DataBlock *data){
             sp_R1 = Q_in_R.readBuffer();
             // Using arm_Math library, convert to float one buffer_size.
             // Float_buffer samples are now standardized from > -1.0 to < 1.0
-            arm_q15_to_float(sp_L1, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
-            arm_q15_to_float(sp_R1, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_R1, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_L1, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
             Q_in_L.freeBuffer();
             Q_in_R.freeBuffer();
         }
@@ -755,7 +755,13 @@ void TransmitReceiveProcessing(void){
     if (ReadIQInputBuffer(&data)){
         // There is no data available, skip the rest
         return;
-    }    
+    }
+    // Swap I and Q to get sidebands correct
+    float32_t *tmp;
+    tmp = data.I;
+    data.I = data.Q;
+    data.Q = tmp;
+
     // Scale data channels by the overall system RF gain and the band-specified gain adjustment
     ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
 
