@@ -9,6 +9,8 @@ enum RFHardwareState {
     RFReceive,
     RFTransmit,
     RFCalReceiveIQ,
+    RFCalTransmitIQ,
+    RFCalTransmitIQSingleVFO,
     RFInvalid
 };
 
@@ -17,6 +19,7 @@ enum TuneState {
     TuneSSBTX,
     TuneCWTX,
     TuneCalReceiveIQ,
+    TuneCalTransmitIQ,
     TuneInvalid
 };
 
@@ -39,6 +42,19 @@ void SetMeasuredPower(float32_t newPower);
 float32_t GetTargetPower(void);
 uint8_t GetPowerUnit(void);
 void InitializePowerCalibration(void);
+
+// Receive IQ calibration routines
+void InitializeRXIQCalibration(void);
+void ResetRXIQCalBand(void);
+void AdjustRXIQBand(void);
+void ResetRXIQCalSettings(void);
+void AdjustRXIQCalSetting(void);
+void ReadRXIQDelta(void);
+void UpdateRXDeltaVal(void);
+float32_t GetRXDeltaVals(int32_t band);
+void InitializeTXIQCalibration(void);
+float32_t GetTXDeltaVals(int32_t band);
+void SetTXIQCurrentBand(int32_t band);
 
 #endif //HARDWARESM_H
 

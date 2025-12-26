@@ -59,46 +59,87 @@ errno_t InitAttenuation(void);
  */
 uint16_t GetRFMCPRegisters(void);
 
-// SSB VFO Control Functions
+/**
+ * @brief Reset VFO state for testing purposes
+ * @note This function is intended for unit testing only
+ */
+void ResetVFOState(void);
+
+// VFO Control Functions
 
 void SetFrequencyCorrectionFactor(int32_t corr);
 
 /**
- * @brief Get the current SSB VFO frequency setting
+ * @brief Get the current RX VFO frequency setting
  * @return Frequency in decihertz (Hz × 10)
  */
-int64_t GetSSBVFOFrequency(void);
+int64_t GetRXVFOFrequency(void);
 
 /**
- * @brief Set the SSB VFO frequency
- * @param frequency_dHz Desired frequency in decihertz (Hz × 10)
- * @note Frequency is applied to Si5351 CLK0 output
+ * @brief Get the current TX VFO frequency setting
+ * @return Frequency in decihertz (Hz × 10)
  */
-void SetSSBVFOFrequency(int64_t frequency_dHz);
+int64_t GetTXVFOFrequency(void);
 
 /**
- * @brief Set the SSB VFO output power level
+ * @brief Set the RX VFO frequency
+ * @param frequency_dHz Desired frequency in decihertz (Hz × 10)
+ */
+void SetRXVFOFrequency(int64_t frequency_dHz);
+
+/**
+ * @brief Set the TX VFO frequency
+ * @param frequency_dHz Desired frequency in decihertz (Hz × 10)
+ */
+void SetTXVFOFrequency(int64_t frequency_dHz);
+
+/**
+ * @brief Set the RX VFO output power level
  * @param power Power level (0-3): SI5351_DRIVE_2MA, 4MA, 6MA, or 8MA
  */
-void SetSSBVFOPower(int32_t power);
+void SetRXVFOPower(int32_t power);
 
 /**
- * @brief Enable the SSB VFO output
- * @note Turns on Si5351 CLK0 output
+ * @brief Set the TX VFO output power level
+ * @param power Power level (0-3): SI5351_DRIVE_2MA, 4MA, 6MA, or 8MA
  */
-void EnableSSBVFOOutput(void);
+void SetTXVFOPower(int32_t power);
 
 /**
- * @brief Disable the SSB VFO output
- * @note Turns off Si5351 CLK0 output
+ * @brief Enable the RX VFO output
+ * @note Turns on Si5351 CLK outputs
  */
-void DisableSSBVFOOutput(void);
+void EnableRXVFOOutput(void);
 
 /**
- * @brief Initialize the SSB VFO hardware (Si5351 CLK0)
+ * @brief Enable the TX VFO output
+ * @note Turns on Si5351 CLK outputs
+ */
+void EnableTXVFOOutput(void);
+
+/**
+ * @brief Disable the RX VFO output
+ * @note Turns off Si5351 CLK outputs
+ */
+void DisableRXVFOOutput(void);
+
+/**
+ * @brief Disable the TX VFO output
+ * @note Turns off Si5351 CLK outputs
+ */
+void DisableTXVFOOutput(void);
+
+/**
+ * @brief Initialize the RX VFO hardware
  * @return ESUCCESS on success, error code on failure
  */
-errno_t InitSSBVFO(void);
+errno_t InitRXVFO(void);
+
+/**
+ * @brief Initialize the TX VFO hardware
+ * @return ESUCCESS on success, error code on failure
+ */
+errno_t InitTXVFO(void);
 
 // CW VFO Control Functions
 
@@ -156,6 +197,10 @@ void CWoff(void);
  * @return ESUCCESS on success, error code on failure
  */
 errno_t InitVFOs(void);
+
+bool HasDualVFOs(void);
+// Only used during unit tests!
+void SetDualVFOs(bool val);
 
 // Transmit Modulation Control
 

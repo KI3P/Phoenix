@@ -4,6 +4,8 @@
 
 #include "RA8875.h"
 #include "Arduino.h"
+#include "RFBoard.h"
+#include "OpenAudio_ArduinoLibrary.h"
 #include <iostream>
 #include <cstring>
 #include <cmath>
@@ -16,7 +18,7 @@ static const int DISPLAY_WIDTH = 800;
 static const int DISPLAY_HEIGHT = 480;
 static const int REGISTER_PANEL_HEIGHT = 60;
 static const int HELP_PANEL_HEIGHT = 200;
-static const int WINDOW_HEIGHT = DISPLAY_HEIGHT + REGISTER_PANEL_HEIGHT + HELP_PANEL_HEIGHT;
+static const int SDL_WINDOW_HEIGHT = DISPLAY_HEIGHT + REGISTER_PANEL_HEIGHT + HELP_PANEL_HEIGHT;
 
 // SDL globals
 static SDL_Window* g_window = nullptr;
@@ -36,6 +38,7 @@ static uint8_t g_layer_effect = 0;  // OR, AND, TRANSPARENT
 
 // Forward declaration
 static void update_register_panel();
+static void update_help_panel_audio_source();
 
 // Convert RGB565 to ARGB8888
 static uint32_t rgb565_to_argb8888(uint16_t color) {
@@ -88,6 +91,9 @@ static void update_display() {
 
     // Update register panel with current hardware state
     update_register_panel();
+
+    // Update audio source indicator in help panel
+    update_help_panel_audio_source();
 
     SDL_UpdateTexture(g_texture, nullptr, g_framebuffer, DISPLAY_WIDTH * sizeof(uint32_t));
     SDL_UpdateTexture(g_register_texture, nullptr, g_register_buffer, DISPLAY_WIDTH * sizeof(uint32_t));
@@ -489,6 +495,48 @@ static void init_help_panel() {
     draw_help_string(col4, y, "ESC", key_color); draw_help_string(col4 + 32, y, "Exit", desc_color);
 }
 
+// Update the audio source indicator in the help panel
+// This is called each frame to show the current audio source
+static void update_help_panel_audio_source() {
+    if (!g_help_buffer) return;
+
+    // Position for audio source indicator (prominent location)
+    int x_start = 350;  // 550 - 200 (moved left by 1/4 screen width)
+    int y_pos = 8;  // Same line as title
+    int box_width = 370;  // Wide enough for "Audio Source: Two-Tone (700/1900Hz @ 48kHz)"
+    int box_height = 20;
+
+    // Colors
+    uint32_t bg_color = 0xFF303030;       // Slightly lighter than panel bg
+    uint32_t border_color = 0xFF505050;   // Border
+    uint32_t label_color = 0xFFCCCCCC;    // Light gray for label
+    uint32_t source_color = 0xFF00FFFF;   // Cyan for source name (stands out)
+
+    // Clear the area with background
+    for (int py = y_pos; py < y_pos + box_height && py < HELP_PANEL_HEIGHT; py++) {
+        for (int px = x_start; px < x_start + box_width && px < DISPLAY_WIDTH; px++) {
+            g_help_buffer[py * DISPLAY_WIDTH + px] = bg_color;
+        }
+    }
+
+    // Draw border
+    for (int px = x_start; px < x_start + box_width && px < DISPLAY_WIDTH; px++) {
+        g_help_buffer[y_pos * DISPLAY_WIDTH + px] = border_color;
+        g_help_buffer[(y_pos + box_height - 1) * DISPLAY_WIDTH + px] = border_color;
+    }
+    for (int py = y_pos; py < y_pos + box_height && py < HELP_PANEL_HEIGHT; py++) {
+        g_help_buffer[py * DISPLAY_WIDTH + x_start] = border_color;
+        g_help_buffer[py * DISPLAY_WIDTH + x_start + box_width - 1] = border_color;
+    }
+
+    // Draw label and current source
+    draw_help_string(x_start + 5, y_pos + 2, "Audio Source:", label_color);
+
+    // Get current audio source name
+    const char* source_name = getAudioInputSourceName();
+    draw_help_string(x_start + 115, y_pos + 2, source_name, source_color);
+}
+
 // Initialize the hardware register panel (static layout)
 static void init_register_panel() {
     if (!g_register_buffer) return;
@@ -508,7 +556,7 @@ static void init_register_panel() {
 }
 
 // External reference to hardware register (defined in Globals.cpp)
-extern uint32_t hardwareRegister;
+extern uint64_t hardwareRegister;
 
 // Update the hardware register panel with current state
 static void update_register_panel() {
@@ -539,8 +587,8 @@ static void update_register_panel() {
 
     // Row 1: Title and hex value
     draw_register_string(10, y, "HARDWARE REGISTER:", title_color);
-    char hex_str[16];
-    snprintf(hex_str, sizeof(hex_str), "0x%08X", hardwareRegister);
+    char hex_str[20];
+    snprintf(hex_str, sizeof(hex_str), "0x%016lX", hardwareRegister);
     draw_register_string(170, y, hex_str, value_color);
 
     y += line_height;
@@ -549,10 +597,10 @@ static void update_register_panel() {
     draw_register_string(10, y, "BPF", label_color);
     draw_register_string(55, y, "RXATT", label_color);
     draw_register_string(115, y, "TXATT", label_color);
-    // RF bit labels: SSBVFO(15), CWVFO(14), CAL(13), MODE(12), CW(11), RXTX(10)
-    draw_register_string(192, y, "SV CV CA MO CW RT", label_color);
+    // RF bit labels: TXVFO(32) RXVFO(15), CWVFO(14), CAL(13), MODE(12), CW(11), RXTX(10)
+    draw_register_string(192, y, "TV RV CV CA MO CW RT", label_color);
     // LPF bit labels: RXBPF(9), TXBPF(8), PA100W(7), XVTR(6), ANT1(5), ANT0(4), LPFBAND[3:0]
-    draw_register_string(342, y, "RB TB PA XV A1 A0  LPF", label_color);
+    draw_register_string(366, y, "RB TB PA XV A1 A0  LPF", label_color);
 
     y += line_height;
 
@@ -583,7 +631,13 @@ static void update_register_panel() {
     }
     x_pos += 30;
 
-    // RF[15:10] - 6 bits (SSBVFO, CWVFO, CAL, MODE, CW, RXTX)
+    // TXVFO bit which is off on its own boo hoo
+    uint32_t color = (hardwareRegister & (1UL << 32)) ? on_color : off_color;
+    draw_register_char(x_pos, y, (hardwareRegister & (1UL << 32)) ? '1' : '0', color);
+    x_pos += 8;
+    x_pos += 16;
+
+    // RF[15:10] - 6 bits (RXVFO, CWVFO, CAL, MODE, CW, RXTX)
     for (int bit = 15; bit >= 10; bit--) {
         uint32_t color = (hardwareRegister & (1UL << bit)) ? on_color : off_color;
         draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
@@ -606,6 +660,36 @@ static void update_register_panel() {
         draw_register_char(x_pos, y, (hardwareRegister & (1UL << bit)) ? '1' : '0', color);
         x_pos += 8;
     }
+
+    // VFO Frequency Display (right side of panel)
+    int vfo_x = 560;  // Start position for VFO section
+    int vfo_y = 4;
+
+    // Row 1: VFO section title
+    draw_register_string(vfo_x, vfo_y, "VFO FREQUENCIES", title_color);
+    vfo_y += line_height;
+
+    // Get current VFO frequencies (in Hz)
+    int64_t rx_freq_hz = GetRXVFOFrequency();
+    int64_t tx_freq_hz = GetTXVFOFrequency();
+    int64_t cw_freq_hz = GetCWVFOFrequency();
+
+    // Row 2: RX VFO
+    draw_register_string(vfo_x, vfo_y, "RX:", label_color);
+    char freq_str[20];
+    // Format as MHz with 3 decimal places (kHz resolution)
+    snprintf(freq_str, sizeof(freq_str), "%8.6f MHz", rx_freq_hz / 1000000.0);
+    draw_register_string(vfo_x + 25, vfo_y, freq_str, value_color);
+    vfo_y += line_height;
+
+    // Row 3: TX and CW VFOs
+    draw_register_string(vfo_x, vfo_y, "TX:", label_color);
+    snprintf(freq_str, sizeof(freq_str), "%8.6f", tx_freq_hz / 1000000.0);
+    draw_register_string(vfo_x + 25, vfo_y, freq_str, value_color);
+
+    draw_register_string(vfo_x + 130, vfo_y, "CW:", label_color);
+    snprintf(freq_str, sizeof(freq_str), "%8.6f", cw_freq_hz / 1000000.0);
+    draw_register_string(vfo_x + 130+25, vfo_y, freq_str, value_color);
 }
 
 // Draw a single character using built-in font and return its width
@@ -706,7 +790,7 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         DISPLAY_WIDTH,
-        WINDOW_HEIGHT,
+        SDL_WINDOW_HEIGHT,
         SDL_WINDOW_SHOWN
     );
 

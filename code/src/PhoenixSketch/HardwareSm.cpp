@@ -186,6 +186,9 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             CWoff();                                            // <<1ms  | < 1ms
             // Set clockEnableCW to LO
             DisableCWVFOOutput();                               // ~ 1ms  | < 2ms
+            if (HasDualVFOs()){
+                DisableTXVFOOutput();
+            }
             SetTXAttenuation(31.5);                             // ~ 1ms  | < 3ms
             TXBypassBPF(); // BPF out of TX path                // ~ 1ms  | < 4ms
             SelectXVTR();  // Shunt the TX path to nothing      // ~ 1ms  | < 5ms
@@ -203,7 +206,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
-            EnableSSBVFOOutput();
+            EnableRXVFOOutput();
             SelectTXSSBModulation();
             // Make sure calFeedbackState is LO
             DisableCalFeedback();
@@ -220,13 +223,13 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
         case RFTransmit:{
             // We are in SSB mode. The DSP chain uses g to set gain, we can ignore it. Here we
             // just determine whether to switch in the 100W PA.
-            if (modeSM.state_id != ModeSm_StateId_CALIBRATE_OFFSET_MARK &&
-                modeSM.state_id != ModeSm_StateId_CALIBRATE_TX_IQ_MARK) {
-                // Normal SSB transmit: calculate gain and PA selection
+            if (modeSM.state_id != ModeSm_StateId_CALIBRATE_OFFSET_MARK) {
                 CalculateSSBTXGain(ED.powerOutSSB[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
             }
+
             // In calibration modes, ED.PA100Wactive is already set correctly
             // and we don't need to calculate gain
+            SetRXAttenuation( 31.5 );
 
             // Get all the receive hardware out of the path
             RXBypassBPF(); // BPF out of RX path
@@ -236,19 +239,17 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
 
             // Start configuring the transmit chain
             // Set GPB state to appropriate value
-            if (modeSM.state_id != ModeSm_StateId_CALIBRATE_TX_IQ_MARK)
-                SetTXAttenuation( 0 ); // Always 0 in SSB mode. Gain is set in DSP chain.
+            SetTXAttenuation( 0 ); // Always 0 in SSB mode. Gain is set in DSP chain.
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
             // Set cwState to LO
             CWoff();
-            // Set frequencySSB_Hz to the TXRX frequency
-            //SetSSBVFOFrequency( GetTXRXFreq_dHz() );
             UpdateTuneState();
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI
-            EnableSSBVFOOutput();
+            EnableRXVFOOutput();
+            EnableTXVFOOutput();
             // Set modulationState to HI (SSB)
             SelectTXSSBModulation();
             
@@ -259,6 +260,82 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             else
                 Bypass100WPA();
 
+            MyDelay(10);
+            // Set rxtxState to HI (TX)
+            SelectTXMode();
+            
+            break;
+        }
+        // This is the RF transmit IQ case where we have to use an external spectrum
+        // analyzer to measure the image rejection
+        case RFCalTransmitIQSingleVFO:{
+            SetRXAttenuation( 31.5 );
+
+            // Get all the receive hardware out of the path
+            RXBypassBPF(); // BPF out of RX path
+            // Set calFeedbackState to LO
+            DisableCalFeedback();
+            MyDelay(10);
+
+            // Start configuring the transmit chain
+            // Don't mess with the transmit attenuation, this is set by the 
+            // calibration loop
+
+            // Set clockEnableCW to LO
+            DisableCWVFOOutput();
+            // Set cwState to LO
+            CWoff();
+            UpdateTuneState();
+            // Set driveCurrentSSB_mA to appropriate value
+            // > This does not change after initialization, so do nothing
+            // Set clockEnableSSB to HI
+            EnableRXVFOOutput();
+            EnableTXVFOOutput();
+            // Set modulationState to HI (SSB)
+            SelectTXSSBModulation();
+            
+            TXSelectBPF(); // BPF in to TX path
+            BypassXVTR();  // Bypass XVTR
+            if (ED.PA100Wactive)
+                Select100WPA();
+            else
+                Bypass100WPA();
+
+            MyDelay(10);
+            // Set rxtxState to HI (TX)
+            SelectTXMode();
+            
+            break;
+        }
+        case RFCalTransmitIQ:{
+            SetRXAttenuation( 31.5 );
+            SetTXAttenuation( 31.5 );
+
+            // Get all the receive hardware out of the path
+            RXBypassBPF(); // BPF out of RX path
+            // Set calFeedbackState to LO
+            EnableCalFeedback();
+            MyDelay(10);
+
+            // Start configuring the transmit chain
+            // Set clockEnableCW to LO
+            DisableCWVFOOutput();
+            // Set cwState to LO
+            CWoff();
+            UpdateTuneState();
+            // Set driveCurrentSSB_mA to appropriate value
+            // > This does not change after initialization, so do nothing
+            // Set clockEnableSSB to HI
+            EnableRXVFOOutput();
+            EnableTXVFOOutput();
+            // Set modulationState to HI (SSB)
+            SelectTXSSBModulation();
+            
+            // Configure the signal routing on the LPF board to minimize the possiblity of 
+            // multiple receive paths
+            TXBypassBPF(); // BPF out of TX path
+            SelectXVTR(); // send the signal on a path away from the T/R switch
+            Bypass100WPA();
             MyDelay(10);
             // Set rxtxState to HI (TX)
             SelectTXMode();
@@ -287,9 +364,9 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 else
                     SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
                 // Set clockEnableSSB to LO
-                DisableSSBVFOOutput();
+                DisableRXVFOOutput();
+                DisableTXVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
-                //SetCWVFOFrequency( GetCWTXFreq_dHz() );
                 UpdateTuneState();
                 // Set driveCurrentCW_mA to appropriate value
                 // > This does not change after initialization, so do nothing
@@ -336,7 +413,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 else
                     SetTXAttenuation( ED.XAttenCW[ED.currentBand[ED.activeVFO]] );
                 // Set clockEnableSSB to LO
-                DisableSSBVFOOutput();
+                DisableRXVFOOutput();
+                DisableTXVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
                 //SetCWVFOFrequency( GetCWTXFreq_dHz() );
                 UpdateTuneState();
@@ -367,6 +445,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             CWoff();
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
+            if (HasDualVFOs())
+                DisableTXVFOOutput();
             SetTXAttenuation(31.5);
             TXBypassBPF(); // BPF out of TX path
             SelectXVTR();  // Shunt the TX path to nothing
@@ -382,7 +462,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             // Set driveCurrentSSB_mA to appropriate value
             // > This does not change after initialization, so do nothing
             // Set clockEnableSSB to HI (SSB)
-            EnableSSBVFOOutput();
+            EnableRXVFOOutput();
             SelectTXCWModulation();
             // Make sure calFeedbackState is HI
             EnableCalFeedback();
@@ -449,7 +529,6 @@ void UpdateRFHardwareState(void){
             break;
         }
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
-        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             rfHardwareState = RFTransmit;
             break;
@@ -468,18 +547,19 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFCWSpace;
             break;
         }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
+            // We can self-calibrate if we have dual VFOs. For single VFO
+            // we have to use an external spectrum analyzer.
+            if (HasDualVFOs())
+                rfHardwareState = RFCalTransmitIQ;
+            else
+                rfHardwareState = RFCalTransmitIQSingleVFO;
+            break;
+        }
         case (ModeSm_StateId_CALIBRATE_RX_IQ):{
             rfHardwareState = RFCalReceiveIQ;
             break;
         }
-        // Power calibration now uses CALIBRATE_TX_IQ_SPACE/MARK states
-        //case (ModeSm_StateId_CALIBRATE_CW_PA):{
-        //    Debug("Entered hardware cal power state");
-        //    break;
-        //}
-        //case (ModeSm_StateId_CALIBRATE_SSB_PA):{
-        //    break;
-        //}
         default:{
             Debug("Unhandled modeSM.state_id state in UpdateRFHardwareState!");
             char strbuf[10];
@@ -508,15 +588,11 @@ void TuneForReceiveIQCalibration(void){
     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
     int64_t band_center = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz + 
                             bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2;
-    SetSSBVFOFrequency( band_center*100 );
+    SetRXVFOFrequency( band_center*100 );
     // Set the CW signal to be on the opposite side of the LO from the
     // nominal tune frequency and minimize the leakage of that signal
     // into the nominal tune frequency bins
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-        SetCWVFOFrequency( (band_center + SR[SampleRate].rate/4)*100 );
-    } else {
-        SetCWVFOFrequency( (band_center - SR[SampleRate].rate/4)*100 );
-    }
+    SetCWVFOFrequency( (band_center + SR[SampleRate].rate/4)*100 );
 }
 
 /**
@@ -557,13 +633,19 @@ void HandleTuneState(TuneState tuneState){
         case TuneReceive:{
             // CW/SSB Receive:  RXfreq = centerFreq_Hz - fineTuneFreq_Hz - SampleRate/4
             int64_t newFreq = ED.centerFreq_Hz[ED.activeVFO]*100;
-            SetSSBVFOFrequency( newFreq );
+            SetRXVFOFrequency( newFreq );
             break;
         }
         case TuneSSBTX:{
             // SSB Transmit:    TXfreq = centerFreq_Hz
             int64_t newFreq = GetTXRXFreq_dHz();
-            SetSSBVFOFrequency( newFreq );
+            // Set transmit to the TXRX frequency
+            SetTXVFOFrequency( newFreq );
+            if (HasDualVFOs()){
+                // The signal power at the fundamental is too strong. Tune the receive VFO so we're
+                // sensitive to the third harmonic when displaying the transmit spectrum.
+                SetRXVFOFrequency( newFreq/3 );
+            }
             break;
         }
         case TuneCWTX:{
@@ -574,6 +656,18 @@ void HandleTuneState(TuneState tuneState){
         }
         case (TuneCalReceiveIQ):{
             TuneForReceiveIQCalibration();
+            break;
+        }
+        case (TuneCalTransmitIQ):{
+            if (HasDualVFOs()){
+                // Set frequencySSB_Hz to the TXRX frequency
+                SetRXVFOFrequency( ED.centerFreq_Hz[ED.activeVFO]*100 );
+                // Offset the transmit VFO from the receive VFO so that the signal appears far
+                // away from DC in the receive spectrum
+                SetTXVFOFrequency( (ED.centerFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4)*100 );
+            } else {
+                SetTXVFOFrequency( GetTXRXFreq_dHz() );
+            }
             break;
         }
         default:
@@ -611,7 +705,6 @@ void UpdateTuneState(void){
             break;
         }
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
-        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             tuneState = TuneSSBTX;
             break;
@@ -625,6 +718,10 @@ void UpdateTuneState(void){
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT):{
             tuneState = TuneCWTX;
+            break;
+        }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
+            tuneState = TuneCalTransmitIQ;
             break;
         }
         case (ModeSm_StateId_CALIBRATE_RX_IQ):{

@@ -45,6 +45,18 @@ void PerformSignalProcessing(void);
 DataBlock * ReceiveProcessing(const char *fname);
 
 /**
+ * @brief Special version of receive signal processing chain used during transmit
+ * @note Truncated version of RX chain that only computes the PSD for display purposes, no audio demod
+ */
+void TransmitReceiveProcessing(void);
+
+/**
+ * @brief Special version of receive signal processing chain used during transmit IQ calibration
+ * @note Truncated version of RX chain that only computes the PSD for display purposes, no audio demod
+ */
+void TransmitIQReceiveProcessing(void);
+
+/**
  * @brief Execute transmit signal processing chain
  * @param fname Optional filename for debugging (can be NULL)
  * @return Pointer to processed DataBlock ready for RF output

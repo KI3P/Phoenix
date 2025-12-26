@@ -9,7 +9,10 @@
 #include <SerialFlash.h>
 #include <OpenAudio_ArduinoLibrary.h>
 
-#define SIDETONE_FREQUENCY 100
+#define SIDETONE_FREQUENCY 400.0f // Hz
+
+// TX IQ calibration oscillator - used for transmit IQ calibration
+extern AudioSynthWaveformSine transmitIQcal_oscillator;
 
 /**
  * @brief Configure I2S sample rate via PLL clock calculations

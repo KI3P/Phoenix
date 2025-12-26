@@ -40,12 +40,18 @@ void CalcPSD256(float32_t *I, float32_t *Q);
 // Frequency Shifting
 
 /**
- * @brief Shift frequency by Fs/4 using efficient Hilbert transform method
+ * @brief Shift frequency by +Fs/4 using efficient Lyons method
  * @param data Pointer to DataBlock containing I/Q samples
  * @note Implements digital mixing by +/- 1/4 sample rate using sign changes
- * @note Very efficient for USB/LSB sideband selection
  */
 void FreqShiftFs4(DataBlock *data);
+
+/**
+ * @brief Shift frequency by -Fs/4 using efficient Lyons method
+ * @param data Pointer to DataBlock containing I/Q samples
+ * @note Implements digital mixing by +/- 1/4 sample rate using sign changes
+ */
+void FreqShiftMFs4(DataBlock *data);
 
 /**
  * @brief Shift frequency by arbitrary amount using NCO (Numerically Controlled Oscillator)

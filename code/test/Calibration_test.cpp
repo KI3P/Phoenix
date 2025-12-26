@@ -161,6 +161,10 @@ class CalibrationTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Initialize test environment before each test
+
+        // Initialize hardwareRegister to ensure clean starting state
+        hardwareRegister = 0;
+
         // Set up the queues so we get some simulated data through and start the "clock"
         Q_in_L.setChannel(0);
         Q_in_R.setChannel(1);
@@ -959,7 +963,8 @@ void CheckThatStateIsCalReceiveIQ(){
     EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT), 0);   // MODE should be LO (CW)
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 1);  // CW transmit VFO should be HI (on)
-    EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXVFOBIT), 0); // TX VFO should be LO (off)
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*31.5));  // RX attenuation
     EXPECT_EQ(GETHWRBITS(TXATTLSB,6), (uint8_t)round(2*31.5));  // TX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
@@ -972,18 +977,19 @@ void CheckThatStateIsCalTransmitIQ(){
     int32_t band = ED.currentBand[ED.activeVFO];
     EXPECT_EQ(GETHWRBITS(LPFBAND0BIT,4), BandToBCD(band)); // LPF filter
     EXPECT_EQ(GETHWRBITS(ANT0BIT,2), ED.antennaSelection[band]); // antenna
-    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 1);   // transverter should be HI (out of path) for receive
+    EXPECT_EQ(GET_BIT(hardwareRegister,XVTRBIT), 0);   // transverter should be LO (in path)
     EXPECT_EQ(GET_BIT(hardwareRegister,PA100WBIT), 0); // PA should always be LO (bypassed)
-    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 1);  // TX path should include BPF
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXBPFBIT), 0);  // TX path should bypass BPF
     EXPECT_EQ(GET_BIT(hardwareRegister,RXBPFBIT), 0);  // RX path should bypass BPF
     EXPECT_EQ(GET_BIT(hardwareRegister,RXTXBIT), 1);   // RXTX bit should be TX (1)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWBIT), 0);     // CW bit should be 0 (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT),1);   // MODE should be HI (SSB)
-    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
+    EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 1);    // Cal should be HI (on)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
-    EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
-    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[ED.currentBand[ED.activeVFO]]));  // RX attenuation
-    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 0);  // TX attenuation
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // RX VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXVFOBIT), 1); // TX VFO should be HI (on)
+    EXPECT_EQ(GETHWRBITS(RXATTLSB,6), 63);  // RX attenuation always 31.5 dB (63 = 2*31.5) during transmit
+    EXPECT_EQ(GETHWRBITS(TXATTLSB,6), 63);  // TX attenuation
     EXPECT_EQ(GETHWRBITS(BPFBAND0BIT,4), BandToBCD(band)); // BPF filter
     // Now check that the GPIO registers match the hardware register
     CheckThatHardwareRegisterMatchesActualHardware();
@@ -1003,7 +1009,8 @@ void CheckThatRegisterStateIsReceive(){
     EXPECT_EQ(GET_BIT(hardwareRegister,MODEBIT), 1);   // MODE doesn't matter for receive, should be HI(SSB)
     EXPECT_EQ(GET_BIT(hardwareRegister,CALBIT), 0);    // Cal should be LO (off)
     EXPECT_EQ(GET_BIT(hardwareRegister,CWVFOBIT), 0);  // CW transmit VFO should be LO (off)
-    EXPECT_EQ(GET_BIT(hardwareRegister,SSBVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,RXVFOBIT), 1); // SSB VFO should be HI (on)
+    EXPECT_EQ(GET_BIT(hardwareRegister,TXVFOBIT), 0); // TX VFO should be LO (off)
     // Note: TX attenuation is not checked in receive mode because it doesn't affect RX operation
     // and the timing of when it gets reset during state transitions is implementation-dependent
     EXPECT_EQ(GETHWRBITS(RXATTLSB,6), (uint8_t)round(2*ED.RAtten[band]));  // RX attenuation
@@ -1013,6 +1020,9 @@ void CheckThatRegisterStateIsReceive(){
 }
 
 TEST_F(CalibrationTest, CalibrateTransmitIQState) {
+    // TX IQ calibration requires dual VFO mode
+    SetDualVFOs(true);
+
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 
     // Reset PA selection to ensure test isolation
@@ -1208,17 +1218,17 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTXIQAmp) {
     float32_t ampAfterMultipleDecrements = ED.IQXAmpCorrectionFactor[currentBand];
     EXPECT_NEAR(ampAfterMultipleDecrements, initialAmp, 0.00001);
 
-    // Test upper limit (max value is 2.0)
+    // Test upper limit (max value is 2.5)
     // Set to a value close to max
-    ED.IQXAmpCorrectionFactor[currentBand] = 1.999;
+    ED.IQXAmpCorrectionFactor[currentBand] = 2.499;
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.0, 0.00001);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.5, 0.00001);
 
-    // Try to increment beyond max - should be clamped at 2.0
+    // Try to increment beyond max - should be clamped at 2.5
     SetInterrupt(iVOLUME_INCREASE);
     loop(); MyDelay(10);
-    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.0, 0.00001);
+    EXPECT_NEAR(ED.IQXAmpCorrectionFactor[currentBand], 2.5, 0.00001);
 
     // Test lower limit (min value is 0.5)
     // Set to a value close to min
@@ -1267,7 +1277,7 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     // Test incrementing the transmit attenuation by rotating finetune encoder clockwise
     SetInterrupt(iFINETUNE_INCREASE);
     loop(); MyDelay(10);
-
+    
     float32_t attenAfterIncrease = attLevel;
     EXPECT_NEAR(attenAfterIncrease, initialAtten + expectedIncrement, 0.00001);
     EXPECT_NEAR(attLevel,GetTXAttenuation(),0.51);
@@ -1350,3 +1360,471 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
         loop(); MyDelay(10);
     }
 }*/
+
+// ============================================================================
+// Oscillator Mode and Feedback Tests
+// ============================================================================
+// These tests verify that the oscillator-driven mode for Q_in_L_Ex and Q_in_R_Ex
+// works correctly for TX IQ calibration feedback.
+
+#include "MainBoard_AudioIO.h"
+#include <cmath>
+#include <vector>
+
+/**
+ * Test fixture for Oscillator/Feedback mode tests
+ */
+class OscillatorFeedbackTest : public ::testing::Test {
+protected:
+    static constexpr int BLOCK_SIZE = 128;
+    static constexpr double SAMPLE_RATE = 192000.0;
+    static constexpr double PI_TIMES_2 = 2.0 * M_PI;
+
+    void SetUp() override {
+        // Clear the queues
+        Q_in_L_Ex.setChannel(0);
+        Q_in_R_Ex.setChannel(1);
+        Q_in_L_Ex.clear();
+        Q_in_R_Ex.clear();
+
+        // Disable oscillator mode initially
+        Q_in_L_Ex.setOscillatorSource(nullptr);
+        Q_in_R_Ex.setOscillatorSource(nullptr);
+
+        // Start the millis timer
+        StartMillis();
+    }
+
+    void TearDown() override {
+        // Clean up oscillator mode
+        Q_in_L_Ex.setOscillatorSource(nullptr);
+        Q_in_R_Ex.setOscillatorSource(nullptr);
+    }
+
+    /**
+     * Calculate the expected phase at a given sample index for a sine wave
+     */
+    double expectedPhase(double frequency, uint32_t sampleIndex) {
+        return PI_TIMES_2 * frequency * sampleIndex / SAMPLE_RATE;
+    }
+
+    /**
+     * Estimate the phase of a sample given amplitude and expected amplitude
+     * Returns phase in radians
+     */
+    double estimatePhase(int16_t sample, double amplitude) {
+        double normalized = sample / amplitude;
+        // Clamp to [-1, 1] to handle any numerical errors
+        if (normalized > 1.0) normalized = 1.0;
+        if (normalized < -1.0) normalized = -1.0;
+        return acos(normalized);
+    }
+
+    /**
+     * Check if a block contains all zeros
+     */
+    bool isZeroBlock(int16_t* block, int size) {
+        for (int i = 0; i < size; i++) {
+            if (block[i] != 0) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Calculate RMS of a block
+     */
+    double calculateRMS(int16_t* block, int size) {
+        double sum = 0;
+        for (int i = 0; i < size; i++) {
+            sum += (double)block[i] * block[i];
+        }
+        return sqrt(sum / size);
+    }
+};
+
+/**
+ * Helper to wait for blocks to become available with timeout
+ * Returns the number of blocks available, or 0 if timeout
+ */
+static int waitForBlocks(AudioRecordQueue& queue, int timeoutMs = 50) {
+    int elapsed = 0;
+    while (elapsed < timeoutMs) {
+        int avail = queue.available();
+        if (avail > 0) return avail;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        elapsed += 2;
+    }
+    return queue.available();
+}
+
+/**
+ * Test that oscillator mode can be enabled and disabled
+ */
+TEST_F(OscillatorFeedbackTest, OscillatorModeEnableDisable) {
+    // Enable the queue
+    Q_in_L_Ex.begin();
+
+    // Set oscillator source
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Wait for blocks to be available (with retry to handle initialization)
+    int avail = waitForBlocks(Q_in_L_Ex);
+    EXPECT_GT(avail, 0) << "Expected blocks to be available after enabling oscillator mode";
+
+    // Disable oscillator mode
+    Q_in_L_Ex.setOscillatorSource(nullptr);
+    Q_in_L_Ex.clear();
+
+    // After clearing, available should reflect non-oscillator mode behavior
+    // (In this case, it falls back to other modes)
+}
+
+/**
+ * Test that oscillator produces non-zero samples
+ */
+TEST_F(OscillatorFeedbackTest, OscillatorProducesNonZeroSamples) {
+    // Set up oscillator with known frequency and amplitude
+    transmitIQcal_oscillator.frequency(800.0f);
+    transmitIQcal_oscillator.amplitude(0.08f);  // 40/500 as in InitializeAudio
+
+    Q_in_L_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Wait for samples to be generated
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    // Read several blocks
+    int blocksRead = 0;
+    int zeroBlocks = 0;
+
+    for (int i = 0; i < 10; i++) {
+        if (Q_in_L_Ex.available() > 0) {
+            int16_t* block = Q_in_L_Ex.readBuffer();
+            blocksRead++;
+
+            if (isZeroBlock(block, BLOCK_SIZE)) {
+                zeroBlocks++;
+            }
+
+            Q_in_L_Ex.freeBuffer();
+        } else {
+            // Wait for more samples
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+    }
+
+    EXPECT_GT(blocksRead, 0) << "Should have read at least one block";
+    EXPECT_EQ(zeroBlocks, 0) << "Should not have any zero-valued blocks";
+}
+
+/**
+ * Test that samples have reasonable amplitude
+ * Note: The oscillator amplitude is multiplied by 500*30 in the implementation,
+ * so we use a small value to avoid int16_t overflow/clipping
+ */
+TEST_F(OscillatorFeedbackTest, OscillatorSampleAmplitude) {
+    // Set up oscillator with amplitude that won't clip
+    // amplitude * 500 * 30 should be < 32767
+    // So amplitude should be < 32767/(500*30) ≈ 2.18
+    float amplitude_setting = 0.001f;  // Will give peak of ~15
+    transmitIQcal_oscillator.frequency(800.0f);
+    transmitIQcal_oscillator.amplitude(amplitude_setting);
+
+    // Expected peak amplitude: amp * 500 * 30 = 0.001 * 500 * 30 = 15
+    double expectedAmplitude = amplitude_setting * 500.0 * 30.0;
+
+    Q_in_L_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Wait for blocks to be available
+    int avail = waitForBlocks(Q_in_L_Ex);
+    ASSERT_GT(avail, 0) << "Should have blocks available";
+
+    int16_t* block = Q_in_L_Ex.readBuffer();
+
+    // Find max absolute value in block
+    int16_t maxVal = 0;
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        if (abs(block[i]) > maxVal) {
+            maxVal = abs(block[i]);
+        }
+    }
+
+    // Max value should be close to expected amplitude (within 20% - allows for phase)
+    EXPECT_NEAR(maxVal, expectedAmplitude, expectedAmplitude * 0.2)
+        << "Peak amplitude should match expected value";
+
+    Q_in_L_Ex.freeBuffer();
+}
+
+/**
+ * Test phase continuity across multiple blocks
+ * This is the key test - verifies no phase discontinuities
+ */
+TEST_F(OscillatorFeedbackTest, PhaseContinuityAcrossBlocks) {
+    // Use a frequency that gives a nice number of samples per cycle
+    // 800 Hz at 192 kHz = 240 samples per cycle
+    float frequency = 800.0f;
+    float amplitude_setting = 0.08f;
+
+    transmitIQcal_oscillator.frequency(frequency);
+    transmitIQcal_oscillator.amplitude(amplitude_setting);
+
+    double expectedAmplitude = amplitude_setting * 500.0 * 32767.0;
+    double phaseIncrement = PI_TIMES_2 * frequency / SAMPLE_RATE;
+
+    Q_in_L_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Wait for samples to accumulate
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    // Read multiple blocks and verify continuity
+    const int NUM_BLOCKS = 10;
+    int16_t allSamples[NUM_BLOCKS * BLOCK_SIZE];
+    int totalSamples = 0;
+
+    for (int b = 0; b < NUM_BLOCKS; b++) {
+        // Wait if needed
+        while (Q_in_L_Ex.available() == 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        int16_t* block = Q_in_L_Ex.readBuffer();
+        ASSERT_NE(block, nullptr) << "readBuffer should not return null";
+        ASSERT_FALSE(isZeroBlock(block, BLOCK_SIZE))
+            << "Block " << b << " should not be all zeros";
+
+        // Copy samples
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            allSamples[totalSamples++] = block[i];
+        }
+
+        Q_in_L_Ex.freeBuffer();
+    }
+
+    ASSERT_EQ(totalSamples, NUM_BLOCKS * BLOCK_SIZE);
+
+    // Now verify phase continuity by checking that the signal is a smooth cosine
+    // We do this by computing the "derivative" and checking it's smooth
+    // For a cosine, the derivative magnitude should be approximately constant
+
+    int discontinuities = 0;
+    double maxDerivative = 0;
+    double expectedMaxDerivative = expectedAmplitude * phaseIncrement;  // A * 2πf/fs
+
+    for (int i = 1; i < totalSamples; i++) {
+        double diff = allSamples[i] - allSamples[i-1];
+        double absDiff = fabs(diff);
+
+        if (absDiff > maxDerivative) {
+            maxDerivative = absDiff;
+        }
+
+        // A discontinuity would show up as a very large jump
+        // For a smooth sine at 800Hz, max derivative is about 2πf/fs * A ≈ 34.5
+        // A phase discontinuity would cause a jump of up to 2*A ≈ 2620
+        // We use a threshold of 3x expected max derivative to detect discontinuities
+        if (absDiff > 3 * expectedMaxDerivative) {
+            discontinuities++;
+            // Log the discontinuity location
+            ADD_FAILURE() << "Phase discontinuity detected at sample " << i
+                          << ": jump of " << diff
+                          << " (expected max ~" << expectedMaxDerivative << ")";
+        }
+    }
+
+    EXPECT_EQ(discontinuities, 0)
+        << "Should have no phase discontinuities across " << NUM_BLOCKS << " blocks";
+
+    // Also verify max derivative is in expected range
+    EXPECT_LT(maxDerivative, 2 * expectedMaxDerivative)
+        << "Maximum sample-to-sample difference should be within expected range";
+}
+
+/**
+ * Test that both I and Q channels produce valid samples
+ */
+TEST_F(OscillatorFeedbackTest, BothChannelsProduceSamples) {
+    transmitIQcal_oscillator.frequency(800.0f);
+    transmitIQcal_oscillator.amplitude(0.08f);
+
+    Q_in_L_Ex.begin();
+    Q_in_R_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+    Q_in_R_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Wait for blocks to be available on both channels
+    int availI = waitForBlocks(Q_in_L_Ex);
+    int availQ = waitForBlocks(Q_in_R_Ex);
+
+    EXPECT_GT(availI, 0) << "I channel should have blocks";
+    EXPECT_GT(availQ, 0) << "Q channel should have blocks";
+
+    // Read from both
+    int16_t* blockI = Q_in_L_Ex.readBuffer();
+    int16_t* blockQ = Q_in_R_Ex.readBuffer();
+
+    ASSERT_FALSE(isZeroBlock(blockI, BLOCK_SIZE)) << "I channel should not be zero";
+    ASSERT_FALSE(isZeroBlock(blockQ, BLOCK_SIZE)) << "Q channel should not be zero";
+
+    // Both should have similar RMS (since they're generated from same oscillator)
+    double rmsI = calculateRMS(blockI, BLOCK_SIZE);
+    double rmsQ = calculateRMS(blockQ, BLOCK_SIZE);
+
+    EXPECT_GT(rmsI, 100) << "I channel RMS should be significant";
+    EXPECT_GT(rmsQ, 100) << "Q channel RMS should be significant";
+
+    Q_in_L_Ex.freeBuffer();
+    Q_in_R_Ex.freeBuffer();
+}
+
+/**
+ * Test continuous reading over a longer period
+ * Verifies no zero blocks appear during sustained operation
+ */
+TEST_F(OscillatorFeedbackTest, SustainedOperationNoZeroBlocks) {
+    transmitIQcal_oscillator.frequency(800.0f);
+    transmitIQcal_oscillator.amplitude(0.08f);
+
+    Q_in_L_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Read blocks over 100ms of simulated time
+    // At 192kHz, 128 samples = 0.667ms, so ~150 blocks in 100ms
+    const int TARGET_BLOCKS = 100;
+    int blocksRead = 0;
+    int zeroBlocks = 0;
+    int iterations = 0;
+    const int MAX_ITERATIONS = 1000;
+
+    while (blocksRead < TARGET_BLOCKS && iterations < MAX_ITERATIONS) {
+        iterations++;
+
+        int avail = Q_in_L_Ex.available();
+        if (avail > 0) {
+            int16_t* block = Q_in_L_Ex.readBuffer();
+            blocksRead++;
+
+            if (isZeroBlock(block, BLOCK_SIZE)) {
+                zeroBlocks++;
+                ADD_FAILURE() << "Zero block detected at block " << blocksRead;
+            }
+
+            Q_in_L_Ex.freeBuffer();
+        } else {
+            // Wait for more samples to be generated
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+
+    EXPECT_GE(blocksRead, TARGET_BLOCKS)
+        << "Should have read at least " << TARGET_BLOCKS << " blocks";
+    EXPECT_EQ(zeroBlocks, 0)
+        << "Should not have any zero blocks during sustained operation";
+}
+
+/**
+ * Test that clearing the queue doesn't cause issues
+ */
+TEST_F(OscillatorFeedbackTest, ClearAndResume) {
+    transmitIQcal_oscillator.frequency(800.0f);
+    transmitIQcal_oscillator.amplitude(0.08f);
+
+    Q_in_L_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Wait for blocks to be available
+    int initialAvail = waitForBlocks(Q_in_L_Ex);
+    EXPECT_GT(initialAvail, 0) << "Should have initial samples";
+
+    // Clear the queue
+    Q_in_L_Ex.clear();
+
+    // Wait for new samples after clear
+    int afterClearAvail = waitForBlocks(Q_in_L_Ex);
+    EXPECT_GT(afterClearAvail, 0) << "Should have samples after clear";
+
+    // Read and verify not zero
+    int16_t* block = Q_in_L_Ex.readBuffer();
+    EXPECT_FALSE(isZeroBlock(block, BLOCK_SIZE)) << "Block after clear should not be zero";
+
+    Q_in_L_Ex.freeBuffer();
+}
+
+/**
+ * Test that signal is a valid periodic waveform (has regular zero crossings)
+ * Note: Exact frequency depends on the oscillator implementation and global state
+ */
+TEST_F(OscillatorFeedbackTest, SignalIsPeriodicWaveform) {
+    // Use lower amplitude to avoid clipping
+    transmitIQcal_oscillator.frequency(800.0f);
+    transmitIQcal_oscillator.amplitude(0.001f);
+
+    Q_in_L_Ex.begin();
+    Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+
+    // Collect samples from multiple blocks
+    const int NUM_SAMPLES = 2560;  // 20 blocks worth
+    int16_t samples[NUM_SAMPLES];
+    int samplesCollected = 0;
+
+    while (samplesCollected < NUM_SAMPLES) {
+        int avail = waitForBlocks(Q_in_L_Ex);
+        if (avail > 0) {
+            int16_t* block = Q_in_L_Ex.readBuffer();
+            int toCopy = std::min(BLOCK_SIZE, NUM_SAMPLES - samplesCollected);
+            for (int i = 0; i < toCopy; i++) {
+                samples[samplesCollected++] = block[i];
+            }
+            Q_in_L_Ex.freeBuffer();
+        }
+    }
+
+    // Count positive-going zero crossings
+    int zeroCrossings = 0;
+    for (int i = 1; i < NUM_SAMPLES; i++) {
+        if (samples[i-1] < 0 && samples[i] >= 0) {
+            zeroCrossings++;
+        }
+    }
+
+    // Should have some zero crossings indicating a periodic signal
+    EXPECT_GT(zeroCrossings, 0) << "Should have at least some zero crossings";
+
+    // Check that zero crossings are somewhat regular (not noise)
+    // For a periodic signal, the spacing between crossings should be similar
+    std::vector<int> crossingPositions;
+    for (int i = 1; i < NUM_SAMPLES; i++) {
+        if (samples[i-1] < 0 && samples[i] >= 0) {
+            crossingPositions.push_back(i);
+        }
+    }
+
+    if (crossingPositions.size() >= 3) {
+        // Calculate intervals between crossings
+        std::vector<int> intervals;
+        for (size_t i = 1; i < crossingPositions.size(); i++) {
+            intervals.push_back(crossingPositions[i] - crossingPositions[i-1]);
+        }
+
+        // Calculate mean and std dev of intervals
+        double sum = 0;
+        for (int interval : intervals) {
+            sum += interval;
+        }
+        double mean = sum / intervals.size();
+
+        double varSum = 0;
+        for (int interval : intervals) {
+            varSum += (interval - mean) * (interval - mean);
+        }
+        double stdDev = sqrt(varSum / intervals.size());
+
+        // For a clean sinusoid, std dev should be small compared to mean
+        // Allow 10% variation (accounts for integer sample positions)
+        EXPECT_LT(stdDev, mean * 0.1)
+            << "Zero crossing intervals should be consistent (mean=" << mean
+            << ", stdDev=" << stdDev << ")";
+    }
+}

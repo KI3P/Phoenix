@@ -37,12 +37,12 @@
  *   ;/'               - Fine tune encoder
  *
  *   ---- PTT and CW Keys ----
- *   p - PTT (hold to transmit SSB)
+ *   p - PTT (toggle to transmit SSB)
  *   . - CW Key 1 (straight key / dit)
  *   / - CW Key 2 (dah for iambic keyer)
  *
  *   ---- Audio Source ----
- *   a - Cycle audio input source (Computer/Two-Tone/Single-Tone)
+ *   a - Cycle audio input source (Computer/Two-Tone/Single-Tone/RXIQ/Feedback)
  */
 
 
@@ -61,6 +61,7 @@ static std::thread timer_thread;
 
 #include "SDT.h"
 #include "MainBoard_Display.h"
+#include "MainBoard_AudioIO.h"
 #include "RA8875.h"
 #include "Loop.h"
 #include "UISm.h"
@@ -70,6 +71,7 @@ static std::thread timer_thread;
 #include "Config.h"
 #include "OpenAudio_ArduinoLibrary.h"
 #include "LittleFS_mock.h"
+#include "HardwareSm.h"
 
 // External declarations
 extern RA8875 tft;
@@ -90,6 +92,60 @@ extern void RA8875_SDL_Cleanup();
 // Flag to signal shutdown was requested
 static bool shutdownRequested = false;
 
+// Track the previous RF hardware state to detect changes
+static RFHardwareState previousRFState = RFInvalid;
+static int32_t oldband = -1;
+
+/**
+ * Update audio input source based on RF hardware state.
+ * Automatically switches to appropriate audio sources for calibration modes:
+ * - RFCalReceiveIQ: Use RXIQ_LSB for USB mode, RXIQ_USB for LSB mode
+ * - RFCalTransmitIQ: Configure Q_in_L_Ex/Q_in_R_Ex to use transmitIQcal_oscillator,
+ *                    and use Feedback mode to loop TX IQ back to RX input
+ */
+static void updateAudioSourceForRFState() {
+    RFHardwareState currentState = GetRFHardwareState();
+
+    // Only update when state changes
+    if ((currentState == previousRFState) && (ED.currentBand[ED.activeVFO] == oldband)) {
+        return;
+    }
+    oldband = ED.currentBand[ED.activeVFO];
+    switch (currentState) {
+        case RFCalReceiveIQ:
+            // For RX IQ calibration, use LSB tone for all bands
+            Q_in_L_Ex.setOscillatorSource(nullptr);
+            Q_in_R_Ex.setOscillatorSource(nullptr);
+            setAudioInputSource(AUDIO_SOURCE_RXIQ_LSB);
+            std::cout << "Audio Source (auto): RX IQ tones (LSB) for RX IQ calibration" << std::endl;
+            break;
+
+        case RFCalTransmitIQ:
+            // For TX IQ calibration:
+            // 1. Configure Q_in_L_Ex and Q_in_R_Ex to use transmitIQcal_oscillator
+            //    This simulates the audio routing where the oscillator feeds the
+            //    input mixers in CALIBRATE_TX_IQ_MARK state
+            Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+            Q_in_R_Ex.setOscillatorSource(&transmitIQcal_oscillator);
+            std::cout << "TX IQ Cal: Q_in_L_Ex/Q_in_R_Ex using transmitIQcal_oscillator ("
+                      << transmitIQcal_oscillator.getFrequency() << " Hz, amp="
+                      << transmitIQcal_oscillator.getAmplitude() << ")" << std::endl;
+
+            // 2. Use feedback mode to loop TX IQ output back to RX input
+            setAudioInputSource(AUDIO_SOURCE_FEEDBACK);
+            std::cout << "Audio Source (auto): Feedback for TX IQ calibration" << std::endl;
+            break;
+
+        default:
+            // For other states, disable oscillator mode and don't change audio source
+            Q_in_L_Ex.setOscillatorSource(nullptr);
+            Q_in_R_Ex.setOscillatorSource(nullptr);
+            break;
+    }
+
+    previousRFState = currentState;
+}
+
 // Simulated time is handled by Arduino_mock.cpp
 
 // Simple keyboard event handler
@@ -100,6 +156,7 @@ enum SimulatorAction {
 
 // Track key states for PTT and CW keys (need to detect release)
 static bool pttKeyDown = false;
+static bool pttEngaged = false;  // Track latching PTT state
 static bool cwKey1Down = false;
 
 #ifdef USE_SDL_DISPLAY
@@ -190,12 +247,18 @@ SimulatorAction processEvents() {
                     case SDLK_LEFT: SetInterrupt(iFILTER_DECREASE); break;
                     case SDLK_RIGHT: SetInterrupt(iFILTER_INCREASE); break;
 
-                    // ---- PTT (Press to transmit SSB) ----
+                    // ---- PTT (Toggle to transmit SSB) ----
                     case SDLK_p:
                         if (!pttKeyDown) {
                             pttKeyDown = true;
-                            SetInterrupt(iPTT_PRESSED);
-                            std::cout << "PTT PRESSED" << std::endl;
+                            pttEngaged = !pttEngaged;
+                            if (pttEngaged) {
+                                SetInterrupt(iPTT_PRESSED);
+                                std::cout << "PTT ENGAGED" << std::endl;
+                            } else {
+                                SetInterrupt(iPTT_RELEASED);
+                                std::cout << "PTT DISENGAGED" << std::endl;
+                            }
                         }
                         break;
 
@@ -227,6 +290,15 @@ SimulatorAction processEvents() {
                                 next = AUDIO_SOURCE_SINGLE_TONE;
                                 break;
                             case AUDIO_SOURCE_SINGLE_TONE:
+                                next = AUDIO_SOURCE_RXIQ_LSB;
+                                break;
+                            case AUDIO_SOURCE_RXIQ_LSB:
+                                next = AUDIO_SOURCE_RXIQ_USB;
+                                break;
+                            case AUDIO_SOURCE_RXIQ_USB:
+                                next = AUDIO_SOURCE_FEEDBACK;
+                                break;
+                            case AUDIO_SOURCE_FEEDBACK:
                             default:
                                 next = AUDIO_SOURCE_COMPUTER;
                                 break;
@@ -240,13 +312,9 @@ SimulatorAction processEvents() {
 
             case SDL_KEYUP:
                 switch (event.key.keysym.sym) {
-                    // ---- PTT Release ----
+                    // ---- PTT Key Release (just clear key state, don't change PTT) ----
                     case SDLK_p:
-                        if (pttKeyDown) {
-                            pttKeyDown = false;
-                            SetInterrupt(iPTT_RELEASED);
-                            std::cout << "PTT RELEASED" << std::endl;
-                        }
+                        pttKeyDown = false;
                         break;
 
                     // ---- CW Key 1 Release ----
@@ -283,11 +351,11 @@ void printUsage() {
     std::cout << "  [ / ]         - Main tune encoder" << std::endl;
     std::cout << "  ; / '         - Fine tune encoder" << std::endl;
     std::cout << "\n  --- PTT and CW ---" << std::endl;
-    std::cout << "  p (hold)      - PTT (transmit SSB)" << std::endl;
+    std::cout << "  p (toggle)    - PTT (transmit SSB)" << std::endl;
     std::cout << "  . (hold)      - CW Key 1 (straight key / dit)" << std::endl;
     std::cout << "  /             - CW Key 2 (dah)" << std::endl;
     std::cout << "\n  --- Audio Source ---" << std::endl;
-    std::cout << "  a             - Cycle audio source (Computer/Two-Tone/Single-Tone)" << std::endl;
+    std::cout << "  a             - Cycle audio source (Computer/Two-Tone/Single-Tone/RXIQ/Feedback)" << std::endl;
     std::cout << "============================================\n" << std::endl;
 }
 
@@ -299,6 +367,8 @@ void timer1ms(void) {
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
     PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
 }
 
 /**
@@ -347,11 +417,13 @@ int main(int argc, char* argv[]) {
     Q_in_L_Ex.clear();
     Q_in_R_Ex.clear();
 
-    // Set up audio output queues with left/right channel assignment
-    Q_out_L.setAudioChannel(0);  // Left channel
-    Q_out_R.setAudioChannel(1);  // Right channel
-    Q_out_L_Ex.setAudioChannel(0);
-    Q_out_R_Ex.setAudioChannel(1);
+    // Set up audio output queues with channel assignment
+    // Channels 0/1: Audio output (speaker playback, downsampled to 48kHz)
+    // Channels 2/3: IQ output (for feedback loopback, full 192kHz)
+    Q_out_L.setAudioChannel(0);    // Left audio channel
+    Q_out_R.setAudioChannel(1);    // Right audio channel
+    Q_out_L_Ex.setAudioChannel(2); // I channel (IQ output)
+    Q_out_R_Ex.setAudioChannel(3); // Q channel (IQ output)
 
     // Initialize SDL audio for demodulated audio playback
     // Using 192kHz to match the DSP output sample rate (SR[SampleRate].rate)
@@ -371,28 +443,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Initializing display..." << std::endl;
 
-
     setup();
-
-    /*InitializeFrontPanel();
-    InitializeSignalProcessing();
-    InitializeAudio();
-    InitializeDisplay();
-    InitializeRFHardware(); // RF board, LPF board, and BPF board
-
-    std::cout << "Display initialized. Starting main loop..." << std::endl;
-
-    // Initialize state machines to a known state
-    UISm_ctor(&uiSM);
-    UISm_start(&uiSM);
-    UpdateAudioIOState();
-
-    ModeSm_ctor(&modeSM);
-    ModeSm_start(&modeSM);
-
-    PowerCalSm_ctor(&powerSM);
-    PowerCalSm_start(&powerSM);
-    */
 
     // Initialize key pins to released state (active low)
     digitalWrite(KEY1, 1); // KEY1 released
@@ -424,25 +475,11 @@ int main(int argc, char* argv[]) {
         // This processes interrupts, dispatches to state machines, and updates the display
         loop();
 
+        // Update audio source based on RF hardware state (for calibration modes)
+        updateAudioSourceForRFState();
+
         // Update the SDL display once per frame (not on every draw call)
         tft.updateScreen();
-
-        // FPS counter
-        /*frameCount++;
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastFPSTime).count();
-        if (elapsed >= 5) {
-            float fps = frameCount / (float)elapsed;
-            std::cout << "FPS: " << fps
-                      << " | UI State: " << uiSM.state_id
-                      << " | Mode State: " << modeSM.state_id
-                      << std::endl;
-            frameCount = 0;
-            lastFPSTime = now;
-        }*/
-
-        // Small delay to prevent CPU spinning (target ~60 FPS)
-        //std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
     std::cout << "Cleaning up..." << std::endl;

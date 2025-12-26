@@ -14,6 +14,9 @@ static char *filename = nullptr;
 void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
 static uint32_t swrTimer_ms = 0;
 
+#define RXTXZoom 3
+#define TXIQZOOM 3
+
 /**
  * Perform the appropriate IQ signal processing depending on the state we're in
  */
@@ -28,9 +31,16 @@ void PerformSignalProcessing(void){
             break;
         }
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
-        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
+            if (HasDualVFOs())
+                TransmitReceiveProcessing();
+            break;
+        }
+        case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):{
+            TransmitProcessing(nullptr);
+            if (HasDualVFOs())
+                TransmitIQReceiveProcessing();
             break;
         }
         default:{
@@ -112,8 +122,8 @@ errno_t ReadIQInputBuffer(DataBlock *data){
             sp_R1 = Q_in_R.readBuffer();
             // Using arm_Math library, convert to float one buffer_size.
             // Float_buffer samples are now standardized from > -1.0 to < 1.0
-            arm_q15_to_float(sp_L1, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
-            arm_q15_to_float(sp_R1, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_R1, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_L1, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
             Q_in_L.freeBuffer();
             Q_in_R.freeBuffer();
         }
@@ -716,6 +726,8 @@ void PlayBuffer(DataBlock *data){
  */
 void InitializeSignalProcessing(void){
     InitializeFilters(ED.spectrum_zoom,&RXfilters);
+    InitializeFilters(RXTXZoom,&RXTXfilters);
+    InitializeFilters(TXIQZOOM,&TXIQfilters);
     InitializeTransmitFilters(&TXfilters);
     InitializeAGC(&agc, SR[SampleRate].rate/RXfilters.DF);
     InitializeKim1NoiseReduction();
@@ -730,6 +742,65 @@ void InitializeSignalProcessing(void){
 void setfilename(char *fnm){
     filename = fnm;
 }
+
+/**
+ * Truncated version of the receive processing that runs during transmit if we have
+ * dual VFOs installed on the RF board
+ */
+void TransmitReceiveProcessing(void){
+    data.I = float_buffer_L;
+    data.Q = float_buffer_R;
+
+    // Read data from buffer
+    if (ReadIQInputBuffer(&data)){
+        // There is no data available, skip the rest
+        return;
+    }
+    // Swap I and Q to get sidebands correct
+    float32_t *tmp;
+    tmp = data.I;
+    data.I = data.Q;
+    data.Q = tmp;
+
+    // Scale data channels by the overall system RF gain and the band-specified gain adjustment
+    ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
+
+    // Perform IQ correction
+    ApplyIQCorrection(&data,
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+
+    // Perform FFT for spectral display
+    ZoomFFTExe(&data, RXTXZoom, &RXTXfilters);
+}
+
+/**
+ * Truncated version of the receive processing that runs during transmit IQ if 
+ * we have dual VFOs installed on the RF board
+ */
+void TransmitIQReceiveProcessing(void){
+    data.I = float_buffer_L;
+    data.Q = float_buffer_R;
+
+    // Read data from buffer
+    if (ReadIQInputBuffer(&data)){
+        // There is no data available, skip the rest
+        return;
+    }    
+    // Scale data channels by the overall system RF gain and the band-specified gain adjustment
+    ApplyRFGain(&data, ED.rfGainAllBands_dB, bands[ED.currentBand[ED.activeVFO]].RFgain_dB);
+
+    // Perform IQ correction
+    ApplyIQCorrection(&data,
+        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+
+    // Shift the frequency
+    FreqShiftFs4(&data);
+    // Perform FFT for spectral display
+    ZoomFFTExe(&data, TXIQZOOM, &TXIQfilters);
+}
+
 
 /**
  * Used by the unit tests. Saves data to a file for offline examination.
@@ -1025,7 +1096,7 @@ DataBlock * TransmitProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-
+    //Flag(2);
     TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
@@ -1039,10 +1110,16 @@ DataBlock * TransmitProcessing(const char *fname){
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
         ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
     SidebandSelection(&data);
+    arm_scale_f32(data.I,-1,data.I,256);
     TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
     TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
 
+    // Swap I and Q at this point to get correct USB and LSB formation on transmit
+    //data.I = float_buffer_R;
+    //data.Q = float_buffer_L;
+
     // Play the data on the output buffer
     PlayIQData(&data);
+    //Flag(0);
     return &data;
 }

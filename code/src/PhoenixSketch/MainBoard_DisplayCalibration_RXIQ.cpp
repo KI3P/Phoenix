@@ -24,7 +24,6 @@ extern RA8875 tft;
 // Optional auto-tune algorithm performs systematic parameter sweep
 //
 ///////////////////////////////////////////////////////////////////////////////
-static bool autotune = false;
 static const int8_t NUMBER_OF_PANES = 5;
 // Forward declaration of the pane drawing functions
 static void DrawDeltaPane(void);
@@ -49,7 +48,7 @@ extern struct dispSc displayScale[];
 /**
  * Calculate vertical pixel position for a spectrum FFT bin.
  */
-FASTRUN int16_t pixeln(uint32_t i){
+FASTRUN static int16_t pixeln(uint32_t i){
     int16_t zeroPoint = -1*(int16_t)((-124.0 - RECEIVE_POWER_OFFSET)/10.0*displayScale[ED.spectrumScale].dBScale);
     int16_t result = zeroPoint+(int16_t)(displayScale[0].dBScale * psdnew[i]); // 20dB scale
     return result;
@@ -68,11 +67,9 @@ static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-30);
 static int16_t y_current = offset;
 #define WIN_WIDTH 20
 #define DARK_RED tft.Color565(64, 0, 0)
-static float32_t sideband_separation = 0.0;
 static char buff[100];
-int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
-static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for each band
-static int32_t Nreadings = 0;                  // Reading counter for measurement averaging
+static int16_t centerLine = (MAX_WATERFALL_WIDTH + SPECTRUM_LEFT_X) / 2;
+//static int32_t Nreadings = 0;                  // Reading counter for measurement averaging
 
 /**
  * @brief Render RX IQ calibration spectrum display
@@ -85,10 +82,7 @@ FASTRUN void PlotSpectrum(void){
     offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
 
     x1 = MAX_WATERFALL_WIDTH/4-WIN_WIDTH/2;
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
-    else
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
+    tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);
@@ -102,10 +96,7 @@ FASTRUN void PlotSpectrum(void){
     }
 
     x1 = MAX_WATERFALL_WIDTH*3/4-WIN_WIDTH/2;
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB)
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
-    else
-        tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,DARK_RED);
+    tft.fillRect(SPECTRUM_LEFT_X+x1,SPECTRUM_TOP_Y,WIN_WIDTH,SPECTRUM_HEIGHT,RA8875_BLUE);
     for (int j = 0; j < WIN_WIDTH; j++){
         y_left = y_current;
         y_current = offset - pixeln(x1);
@@ -118,19 +109,6 @@ FASTRUN void PlotSpectrum(void){
         pixelold[x1] = y_current;
         x1++;
     }
-
-    // Because we set the CW tone to be 48 kHz above or below the LO, the upper
-    // and lower sideband products will be in very specific bins. Upper will be
-    // in bin 3/4*512 = 384, lower will be in bin 1/4*512 = 128
-    float32_t upper = psdnew[384]; 
-    float32_t lower = psdnew[128]; 
-    if (bands[ED.currentBand[ED.activeVFO]].mode == LSB){
-        sideband_separation = (upper-lower)*10;
-    } else {
-        sideband_separation = (lower-upper)*10;
-    }
-    deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
-    Nreadings++;
     psdupdated = false;
 }
 
@@ -159,14 +137,14 @@ static float32_t oldsep = 0.0;
  * @note Higher values indicate better IQ balance (target > 60 dB)
  */
 static void DrawDeltaPane(void){
-    if (oldsep != deltaVals[ED.currentBand[ED.activeVFO]])
+    if (oldsep != GetRXDeltaVals(ED.currentBand[ED.activeVFO]))
         PaneDelta.stale = true;
-    oldsep = deltaVals[ED.currentBand[ED.activeVFO]];
+    oldsep = GetRXDeltaVals(ED.currentBand[ED.activeVFO]);
 
     if (!PaneDelta.stale) return;
     tft.fillRect(PaneDelta.x0, PaneDelta.y0, PaneDelta.width, PaneDelta.height, RA8875_BLACK);
     
-    sprintf(buff,"%2.1fdB",deltaVals[ED.currentBand[ED.activeVFO]]);
+    sprintf(buff,"%2.1fdB",GetRXDeltaVals(ED.currentBand[ED.activeVFO]));
     tft.setCursor(PaneDelta.x0, PaneDelta.y0);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
@@ -342,9 +320,9 @@ static void DrawTablePane(void){
         sprintf(buff,"%4.3f",ED.IQPhaseCorrectionFactor[k]);
         tft.print(buff);        
 
-        if (deltaVals[k] != 0.0){
+        if (GetRXDeltaVals(k) != 0.0){
             tft.setCursor(PaneTable.x0+160, y);
-            sprintf(buff,"%2.1f",deltaVals[k]);
+            sprintf(buff,"%2.1f",GetRXDeltaVals(k));
             tft.print(buff);
         }
     }
@@ -418,165 +396,6 @@ static void DrawSpectrumPane(void){
 }
 
 /**
- * @brief Enable automatic RX IQ calibration algorithm
- * @note Initiates systematic parameter sweep to find optimal IQ settings
- * @note Called when user presses button 16
- */
-void EngageRXIQAutotune(void){
-    autotune = true;
-}
-
-/**
- * RX IQ Auto-Tune Algorithm
- *
- * Systematically sweeps amplitude and phase parameters to maximize sideband separation.
- *
- * Three-pass approach with progressively finer resolution:
- *
- * Pass 1 (Coarse):
- *   - Iteration 0: Amplitude 0.5 to 1.5 in 0.01 steps
- *   - Iteration 1: Phase -0.2 to 0.2 in 0.01 steps
- *
- * Pass 2 (Medium):
- *   - Iteration 2: Amplitude ±4 steps around Pass 1 optimum
- *   - Iteration 3: Phase ±4 steps around Pass 1 optimum
- *
- * Pass 3 (Fine):
- *   - Iteration 4: Amplitude ±10 steps (0.001) around Pass 2 optimum
- *   - Iteration 5: Phase ±10 steps (0.001) around Pass 2 optimum
- *
- * For each iteration, measures sideband separation and records best-performing value.
- * Automatically advances through all bands.
- */
-float32_t center[] ={1.0,                  0.0,                  0.0, 0.0, 0.0, 0.0};
-int8_t NSteps[]  =  {(int)((1.5-0.5)/0.01),(int)((0.2+0.2)/0.01),9,   21,  9,   21 }; 
-float32_t Delta[] = {0.01,                 0.01,                 0.01,0.01,0.001,0.001};
-float32_t maxSBS = 0.0;
-float32_t maxSBS_parameter = 0.0;
-static int8_t iteration = 0;
-static int8_t step = 0;
-static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
-static bool initialEntry = false;
-
-/**
- * @brief Calculate parameter value for given iteration and step
- * @param iter Iteration number (0-5)
- * @param stp Step number within iteration
- * @return Calculated amplitude or phase value
- */
-float32_t GetNewVal(int8_t iter, int8_t stp){
-    float32_t newval = center[iter]-(NSteps[iter]*Delta[iter])/2.0+stp*Delta[iter];
-    return newval;
-}
-
-/**
- * @brief Set amplitude or phase correction factor for auto-tune algorithm
- * @param iter Iteration number (even=amplitude, odd=phase)
- * @param stp Step number within iteration
- * @note Resets measurement counter to allow new reading to stabilize
- */
-void SetAmpPhase(int8_t iter, int8_t stp){
-    float32_t newval = GetNewVal(iter, stp);
-    Nreadings = 0;
-    if (iter%2 == 0){
-        ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
-    } else {
-        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = newval;
-    }
-}
-float32_t maxSBS_save;
-/**
- * @brief Execute one step of the RX IQ auto-tune algorithm
- * @note Called repeatedly from DrawCalibrateRXIQ() when autotune enabled
- * @note State machine advances through iterations and bands automatically
- * @note Completes when all bands calibrated or autotune disabled
- */
-void TuneIQValues(void){
-    // Catch the initial entry condition:
-    if (initialEntry){
-        Debug("Initial entry to tuning IQ. Setting initial point");
-        for (size_t k=0; k<NUMBER_OF_BANDS; k++){
-            bandCompleted[k] = false;
-        }
-        Nreadings = 0;
-        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0;
-        SetAmpPhase(iteration,step);
-        initialEntry = false;
-        return;
-    }
-    if (bandCompleted[ED.currentBand[ED.activeVFO]]){
-        ED.currentBand[ED.activeVFO]++;
-        if (ED.currentBand[ED.activeVFO] > LAST_BAND){
-            ED.currentBand[ED.activeVFO] = LAST_BAND;
-            autotune = false;
-            Debug("Autotune complete!");
-            return;
-        }
-        // Change the band
-        ED.centerFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][0];
-        ED.fineTuneFreq_Hz[ED.activeVFO] = ED.lastFrequencies[ED.currentBand[ED.activeVFO]][1];
-        ED.modulation[ED.activeVFO] = (ModulationType)ED.lastFrequencies[ED.currentBand[ED.activeVFO]][2];
-        UpdateRFHardwareState();
-
-        // Start the first iteration for this new band
-        iteration = 0;
-        step = 0;
-        Nreadings = 0;
-        maxSBS = 0.0;
-        ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0;
-        SetAmpPhase(iteration,step);
-    }
-
-    // Once Nreadings reaches 6 the new reading is ready
-    if (Nreadings > 6){
-        // Save this parameter if the sideband separation is the largest so far
-        if (deltaVals[ED.currentBand[ED.activeVFO]] > maxSBS){
-            // The value of the sideband separation
-            maxSBS = deltaVals[ED.currentBand[ED.activeVFO]];
-            // The amp/phase parameter that delivered this sideband separation
-            maxSBS_parameter = GetNewVal(iteration, step);
-        }
-
-        // Proceed to the next step in this iteration
-        step++;
-        if (step >= NSteps[iteration]){
-            // Set the parameter we were changing to the minimum value
-            if (iteration%2 == 0){
-                ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-            } else {
-                ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-            }
-            // The next time we step around the amplitude or phase, use this as our starting point
-            int8_t nextIndex = iteration + 2;
-            if (nextIndex < 6)
-                center[nextIndex] = maxSBS_parameter;
-
-            // Go to the next iteration
-            step = 0;
-            iteration++;
-            maxSBS_save = maxSBS;
-            maxSBS = 0.0;
-        }
-        if (iteration > 5){
-            // Go to next band
-            bandCompleted[ED.currentBand[ED.activeVFO]] = true;
-            // Set the parameter we were changing to the minimum value
-            if ((iteration-1)%2 == 0){
-                ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-            } else {
-                ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = maxSBS_parameter;
-            }
-            deltaVals[ED.currentBand[ED.activeVFO]] = maxSBS_save;
-            return;
-        } 
-        // Change the appropriate parameter
-        SetAmpPhase(iteration,step);
-        Nreadings = 0;
-    }
-
-}
-
-/**
  * @brief Main RX IQ calibration screen rendering function
  * @note Called from DrawDisplay() when in CALIBRATE_RX_IQ UI state
  * @note User manually adjusts amp/phase or runs auto-tune algorithm
@@ -601,12 +420,7 @@ void DrawCalibrateRXIQ(void){
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
             WindowPanes[i]->stale = true;
         }
-        initialEntry = true;
     }
-
-    // If we are in autotune mode, engage the algorithm!
-    if (autotune)
-        TuneIQValues();
 
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){
         WindowPanes[i]->DrawFunction();

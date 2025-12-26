@@ -84,6 +84,8 @@ const struct SR_Descriptor SR[18] = {
 };
 
 ReceiveFilterConfig RXfilters;
+ReceiveFilterConfig RXTXfilters;
+ReceiveFilterConfig TXIQfilters;
 TransmitFilterConfig TXfilters;
 AGCConfig agc;
 uint8_t SampleRate = SAMPLE_RATE_192K;
@@ -92,7 +94,7 @@ const float32_t CWToneOffsetsHz[] = {400, 562.5, 656.5, 750.0, 843.75 };
 
 ModeSm modeSM;
 UISm uiSM;
-uint32_t hardwareRegister;
+uint64_t hardwareRegister;
 
 /**
  * Simple blocking delay function.
@@ -264,8 +266,8 @@ void buffer_pretty_print(void) {
     }
 
     Debug("Entries (oldest to newest):");
-    Debug("| Index | Timestamp(μs) | Register Value | Binary                                  | Hex        |");
-    Debug("|-------|---------------|----------------|-----------------------------------------|------------|");
+    Debug("| Index | Timestamp(μs) | Register Value | Binary                                                                          | Hex                |");
+    Debug("|-------|---------------|----------------|---------------------------------------------------------------------------------|--------------------|");
 
     // Calculate starting index for oldest entry
     size_t start_idx;
@@ -282,7 +284,7 @@ void buffer_pretty_print(void) {
 
         // Convert register value to binary string
         String binary = "";
-        for (int bit = 31; bit >= 0; bit--) {
+        for (int bit = 63; bit >= 0; bit--) {
             binary += ((entry.register_value >> bit) & 1) ? "1" : "0";
             if (bit % 4 == 0 && bit > 0) binary += " ";  // Add space every 4 bits
         }
@@ -303,12 +305,24 @@ void buffer_pretty_print(void) {
         line += " | ";
 
         line += binary;
-        // Pad binary 
-        while (line.length() < 82) line += " ";
+        // Pad binary
+        while (line.length() < 114) line += " ";
         line += " | ";
 
-        line += "0x" + String((unsigned int)entry.register_value, HEX);
-        while (line.length() < 96) line += " ";
+        // Print 64-bit hex value (upper 32 bits then lower 32 bits)
+        line += "0x";
+        uint32_t upper = (uint32_t)(entry.register_value >> 32);
+        uint32_t lower = (uint32_t)(entry.register_value & 0xFFFFFFFF);
+        if (upper > 0) {
+            line += String(upper, HEX);
+            // Pad lower part to 8 hex digits
+            String lowerStr = String(lower, HEX);
+            while (lowerStr.length() < 8) lowerStr = "0" + lowerStr;
+            line += lowerStr;
+        } else {
+            line += String(lower, HEX);
+        }
+        while (line.length() < 136) line += " ";
         line += "|";
 
         Debug(line);
@@ -319,12 +333,12 @@ void buffer_pretty_print(void) {
 /**
  * Extract and convert a bit field from a register value to a binary string.
  *
- * @param register_value The 32-bit register value
+ * @param register_value The 64-bit register value
  * @param MSB Most significant bit position of the field
  * @param LSB Least significant bit position of the field
  * @return Binary string representation of the bit field (MSB first)
  */
-String regtostring(uint32_t register_value,uint8_t MSB, uint8_t LSB){
+String regtostring(uint64_t register_value,uint8_t MSB, uint8_t LSB){
   // Convert register value to binary string
   String binary = "";
   for (int bit = MSB; bit >= LSB; bit--) {
@@ -370,7 +384,9 @@ void pretty_print_line(BufferEntry entry){
   line += " ";
   line += regtostring(entry.register_value,CWVFOBIT,CWVFOBIT);
   line += " ";
-  line += regtostring(entry.register_value,SSBVFOBIT,SSBVFOBIT);
+  line += regtostring(entry.register_value,RXVFOBIT,RXVFOBIT);
+  line += " ";
+  line += regtostring(entry.register_value,TXVFOBIT,TXVFOBIT);
   line += " ";
   line += regtostring(entry.register_value,TXATTMSB,TXATTLSB);
   line += " ";
@@ -385,11 +401,11 @@ void pretty_print_line(BufferEntry entry){
  * Useful for quickly checking current hardware state.
  */
 void buffer_pretty_print_last_entry(void) {
-  Debug("|               |              X 1     R   M   C S               |");
-  Debug("|               |           A  V 0 T R X   O C A F F             |");
-  Debug("|               |           n  T 0 X X T C D L O O               |");
-  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
-  Debug("|---------------|------------------------------------------------|");
+  Debug("|               |              X 1     R   M   C R T               |");
+  Debug("|               |           A  V 0 T R X   O C V V V               |");
+  Debug("|               |           n  T 0 X X T C D A F F F               |");
+  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |");
+  Debug("|---------------|--------------------------------------------------|");
   BufferEntry entry;
   if (buffer.head > 0) entry = buffer.entries[buffer.head-1];
   else entry = buffer.entries[REGISTER_BUFFER_SIZE-1];
@@ -413,11 +429,11 @@ void buffer_pretty_buffer_array(void) {
     }
 
     Debug("Entries (oldest to newest):");
-    Debug("|               |              X 1     R   M   C S               |");
-    Debug("|               |           A  V 0 T R X   O C V V               |");
-    Debug("|               |           n  T 0 X X T C D A F F               |");
-    Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O TXATT  RXATT  |");
-    Debug("|---------------|------------------------------------------------|");
+    Debug("|               |              X 1     R   M   C R T               |");
+    Debug("|               |           A  V 0 T R X   O C V V V               |");
+    Debug("|               |           n  T 0 X X T C D A F F F               |");
+    Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |");
+    Debug("|---------------|--------------------------------------------------|");
 
     // Calculate starting index for oldest entry
     size_t start_idx;
@@ -460,6 +476,8 @@ void tick1ms(void){
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
     PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
 }
 
 time_t getTeensy3Time() {

@@ -26,6 +26,14 @@
 #include "Wire.h"
 #include "RFBoard_si5351.h"
 
+// Mock control: which I2C address the simulated device responds to
+static uint8_t mock_device_address = SI5351_DUAL_VFO_ADDR;  // Default to dual VFO for backwards compatibility
+//static uint8_t mock_device_address = SI5351_BUS_BASE_ADDR;
+
+// Function to control mock behavior from tests
+void Si5351_Mock_SetDeviceAddress(uint8_t addr) {
+    mock_device_address = addr;
+}
 
 /********************/
 /* Public functions */
@@ -40,6 +48,16 @@ Si5351::Si5351(uint8_t i2c_addr):
 	plla_ref_osc = SI5351_PLL_INPUT_XO;
 	pllb_ref_osc = SI5351_PLL_INPUT_XO;
 	clkin_div = SI5351_CLKIN_DIV_1;
+}
+
+/*
+ * set_address(uint8_t i2c_addr)
+ *
+ * Set the I2C address of the Si5351 device.
+ */
+void Si5351::set_address(uint8_t i2c_addr)
+{
+	i2c_bus_addr = i2c_addr;
 }
 
 /*
@@ -59,7 +77,8 @@ Si5351::Si5351(uint8_t i2c_addr):
  *
  */
 bool Si5351::init(uint8_t xtal_load_c, uint32_t xo_freq, int32_t corr){
-    return true;
+    // Only return true if our current address matches the mock device address
+    return (i2c_bus_addr == mock_device_address);
 }
 
 /*

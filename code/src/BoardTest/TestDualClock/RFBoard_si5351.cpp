@@ -50,17 +50,6 @@ Si5351::Si5351(uint8_t i2c_addr):
 }
 
 /*
- * set_address(uint8_t i2c_addr)
- *
- * Set the I2C address of the Si5351 device. This should be called before init()
- * if you need to use a non-default address.
- */
-void Si5351::set_address(uint8_t i2c_addr)
-{
-    i2c_bus_addr = i2c_addr;
-}
-
-/*
  * init(uint8_t xtal_load_c, uint32_t ref_osc_freq, int32_t corr)
  *
  * Setup communications to the Si5351 and set the crystal

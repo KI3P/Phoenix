@@ -763,3 +763,219 @@ TEST(TransmitChain, TwoTone){
     EXPECT_EQ(1,1);
 }
 
+/**
+ * Test that TransmitReceiveProcessing calculates the power spectrum during transmit.
+ * This test verifies that the PSD (Power Spectral Density) is being calculated
+ * when the TransmitReceiveProcessing function is called during SSB transmit mode.
+ */
+TEST(TransmitChain, TransmitReceiveProcessingCalculatesPSD){
+    // Initialize the signal processing filters
+    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 3 (RXTXZoom is defined as 3 in DSP.cpp)
+    InitializeFilters(3, &RXTXfilters);
+    ZoomFFTPrep(3, &RXTXfilters);
+
+    // Reset the PSD array to ensure we can detect when it's been updated
+    ResetPSD();
+    psdupdated = false;
+
+    // Verify that psdnew starts at zero
+    for (size_t i = 0; i < SPECTRUM_RES; i++){
+        EXPECT_FLOAT_EQ(psdnew[i], 0.0);
+    }
+
+    // Set up the mock audio input queues with IQ data containing a known tone
+    // Use the mock data channels (channel 0 = L_mock, channel 1 = R_mock)
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+
+    // Set the state machine to SSB_TRANSMIT state (TransmitReceiveProcessing is called in this state)
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+
+    // Call TransmitReceiveProcessing multiple times to fill the zoom FFT ring buffer
+    // With zoom=3, each call processes 2048/8=256 samples, and we need 512 samples total
+    // So we need at least 2 calls to fill the buffer and trigger PSD calculation
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
+
+    // Verify that psdupdated flag is set, indicating PSD was calculated
+    EXPECT_TRUE(psdupdated);
+
+    // Verify that psdnew contains non-zero data (some bins should have signal power)
+    // At minimum, we expect the array to have been written to
+    bool hasNonZeroValues = false;
+    for (size_t i = 0; i < SPECTRUM_RES; i++){
+        if (psdnew[i] != 0.0){
+            hasNonZeroValues = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(hasNonZeroValues);
+
+    // Write the PSD to a file for analysis
+    WriteFile(psdnew, "TransmitReceiveProcessing_psd.txt", SPECTRUM_RES);
+}
+
+/**
+ * Test that TransmitReceiveProcessing produces a PSD with a peak at the expected
+ * frequency bin when given a known tone input.
+ */
+TEST(TransmitChain, TransmitReceiveProcessingPSDContainsCorrectTone){
+    // Initialize the signal processing filters
+    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 3 (RXTXZoom is defined as 3 in DSP.cpp)
+    InitializeFilters(3, &RXTXfilters);
+    ZoomFFTPrep(3, &RXTXfilters);
+
+    // Create IQ test data with a known tone at 6 kHz
+    // With zoom=3, the FFT covers 24 kHz (decimated by 8), so we need a tone below Nyquist (12 kHz)
+    uint32_t Nsamples = 2048 * 4; // Need enough samples to fill the mock buffer
+    uint32_t sampleRate_Hz = 192000;
+    float32_t tone_Hz = 6000.0; // Within the zoomed spectrum range
+    static int16_t testI[2048*4];
+    static int16_t testQ[2048*4];
+
+    // Generate IQ tone and convert to int16 format for the mock queue
+    float oneoverfs = 1.0f / (float)sampleRate_Hz;
+    for (uint32_t i = 0; i < Nsamples; i++){
+        float I = 0.5f * cos(TWO_PI * tone_Hz * (float)i * oneoverfs);
+        float Q = 0.5f * sin(TWO_PI * tone_Hz * (float)i * oneoverfs);
+        // Convert from float (-1 to +1) to int16
+        testI[i] = (int16_t)(I * 32767.0f);
+        testQ[i] = (int16_t)(Q * 32767.0f);
+    }
+
+    // Set up the mock audio input queues with our test data
+    Q_in_L.setChannel(0, testI);
+    Q_in_R.setChannel(1, testQ);
+    Q_in_L.clear();
+    Q_in_R.clear();
+
+    // Reset the PSD array
+    ResetPSD();
+    psdupdated = false;
+
+    // Set the state machine to SSB_TRANSMIT state
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+
+    // Call TransmitReceiveProcessing multiple times to fill the zoom FFT ring buffer
+    // With zoom=3, we need multiple calls to accumulate enough samples
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
+
+    // Verify that psdupdated flag is set
+    EXPECT_TRUE(psdupdated);
+
+    // Calculate the expected bin for our tone
+    // For spectrum_zoom = 3, decimation by 8 gives effective sample rate of 24 kHz
+    // The FFT is 512 points covering 24 kHz
+    // Bin width = 24000 / 512 = 46.875 Hz
+    // For 6 kHz tone: bin = 512/2 + 512*6000/24000 = 256 + 128 = 384
+    int32_t expectedBin = frequency_to_bin(tone_Hz, 512, sampleRate_Hz / 8);
+
+    // Find the peak in the PSD
+    float32_t maxPsd = -1e10;
+    int32_t maxBin = 0;
+    for (int i = 0; i < SPECTRUM_RES; i++){
+        if (psdnew[i] > maxPsd){
+            maxPsd = psdnew[i];
+            maxBin = i;
+        }
+    }
+
+    // The peak should be at or very near the expected bin
+    EXPECT_NEAR(maxBin, expectedBin, 2); // Allow 2 bins of tolerance
+
+    // The peak should be significantly above the noise floor
+    // Check that the peak is at least 10 dB above a nearby noise bin
+    float32_t noiseLevel = psdnew[(expectedBin + 50) % SPECTRUM_RES];
+    EXPECT_GT(maxPsd - noiseLevel, 1.0); // At least 10 dB difference (in log10 units, 1.0 = 10 dB)
+
+    // Write the PSD to a file for analysis
+    WriteFile(psdnew, "TransmitReceiveProcessing_tone_psd.txt", SPECTRUM_RES);
+}
+
+/**
+ * Test that TransmitReceiveProcessing properly applies RF gain and IQ correction
+ * before calculating the PSD.
+ */
+TEST(TransmitChain, TransmitReceiveProcessingAppliesGainAndCorrection){
+    // Initialize the signal processing filters
+    // TransmitReceiveProcessing uses RXTXfilters with spectrum_zoom = 3 (RXTXZoom is defined as 3 in DSP.cpp)
+    InitializeFilters(3, &RXTXfilters);
+    ZoomFFTPrep(3, &RXTXfilters);
+
+    // Set up specific RF gain and IQ correction values
+    float32_t originalRfGain = ED.rfGainAllBands_dB;
+    float32_t originalBandGain = bands[ED.currentBand[ED.activeVFO]].RFgain_dB;
+    float32_t originalAmpCorr = ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]];
+    float32_t originalPhsCorr = ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]];
+
+    // Set test values - a moderate gain adjustment
+    ED.rfGainAllBands_dB = 10.0; // 10 dB gain
+    bands[ED.currentBand[ED.activeVFO]].RFgain_dB = 0.0;
+    ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = 1.0;
+    ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0;
+
+    // Set up mock data
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+
+    // Reset the PSD array
+    ResetPSD();
+    psdupdated = false;
+
+    // Set the state machine to SSB_TRANSMIT state
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+
+    // First measurement with +10 dB RF gain
+    // Call multiple times to fill the zoom FFT ring buffer
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
+    float32_t psdWithGain[SPECTRUM_RES];
+    for (size_t i = 0; i < SPECTRUM_RES; i++){
+        psdWithGain[i] = psdnew[i];
+    }
+
+    // Reset and measure again with 0 dB RF gain
+    Q_in_L.clear();
+    Q_in_R.clear();
+    ResetPSD();
+    psdupdated = false;
+
+    ED.rfGainAllBands_dB = 0.0; // 0 dB gain (no change)
+    // Call multiple times to fill the zoom FFT ring buffer
+    for (int i = 0; i < 3; i++) {
+        TransmitReceiveProcessing();
+    }
+
+    // Find the peak bin in both measurements
+    float32_t maxPsdWithGain = -1e10;
+    float32_t maxPsdNoGain = -1e10;
+    for (int i = 0; i < SPECTRUM_RES; i++){
+        if (psdWithGain[i] > maxPsdWithGain) maxPsdWithGain = psdWithGain[i];
+        if (psdnew[i] > maxPsdNoGain) maxPsdNoGain = psdnew[i];
+    }
+
+    // The measurement with +10 dB gain should have approximately 1.0 higher PSD
+    // (since PSD is in log10 scale, 10 dB = 1.0 in log10 of power)
+    // Note: This may not be exactly 1.0 due to the AGC-like behavior in CalcPSD512
+    // but it should be noticeably higher
+    EXPECT_GT(maxPsdWithGain, maxPsdNoGain);
+
+    // Write results for analysis
+    WriteFile(psdWithGain, "TransmitReceiveProcessing_withGain_psd.txt", SPECTRUM_RES);
+    WriteFile(psdnew, "TransmitReceiveProcessing_noGain_psd.txt", SPECTRUM_RES);
+
+    // Restore original values
+    ED.rfGainAllBands_dB = originalRfGain;
+    bands[ED.currentBand[ED.activeVFO]].RFgain_dB = originalBandGain;
+    ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]] = originalAmpCorr;
+    ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = originalPhsCorr;
+}
+

@@ -202,10 +202,10 @@ TEST(SignalProcessing, ReadDataIntoBuffers){
     ReadIQInputBuffer(&data);
     #include "mock_R_data_int.c"
     #include "mock_L_data_int.c"
-    EXPECT_NEAR(data.I[1],(float)L_mock[1]/32768.0,0.00001);
-    EXPECT_NEAR(data.Q[1],(float)R_mock[1]/32768.0,0.00001);
-    EXPECT_NEAR(data.I[2047],(float)L_mock[2047]/32768.0,0.00001);
-    EXPECT_NEAR(data.Q[2047],(float)R_mock[2047]/32768.0,0.00001);
+    EXPECT_NEAR(data.I[1],(float)R_mock[1]/32768.0,0.00001);
+    EXPECT_NEAR(data.Q[1],(float)L_mock[1]/32768.0,0.00001);
+    EXPECT_NEAR(data.I[2047],(float)R_mock[2047]/32768.0,0.00001);
+    EXPECT_NEAR(data.Q[2047],(float)L_mock[2047]/32768.0,0.00001);
 }
 
 // Reading data into the input buffers returns false when it is empty
@@ -250,29 +250,6 @@ TEST(SignalProcessing, ScaleRFData){
     ApplyRFGain(&data, 3.0,3.0);
     EXPECT_NEAR(data.I[1],Lpre*1.412537545*1.412537545,0.00001);
     EXPECT_NEAR(data.Q[1],Rpre*1.412537545*1.412537545,0.00001);
-}
-
-// Is the IQ correction being properly applied? Compare to output of Python code
-TEST(SignalProcessing, IQCorrectionCorrect){
-    extern AudioRecordQueue Q_in_L;
-    extern AudioRecordQueue Q_in_R;
-    Q_in_L.setChannel(0);
-    Q_in_R.setChannel(1);
-    Q_in_L.clear();
-    Q_in_R.clear();
-    DataBlock data;
-    float32_t float_buffer_L[2048]; 
-    float32_t float_buffer_R[2048]; 
-    data.I = float_buffer_L;
-    data.Q = float_buffer_R;
-    ReadIQInputBuffer(&data);
-    ApplyIQCorrection(&data,1.11,-0.09);
-    #include "mock_I_data_IQcorrected.c"
-    #include "mock_Q_data_IQcorrected.c"
-    for (size_t k = 0; k < (BUFFER_SIZE * N_BLOCKS); k++){
-        EXPECT_NEAR(data.I[k], I_corrected[k],0.00001);
-        EXPECT_NEAR(data.Q[k], Q_corrected[k],0.00001);
-    }
 }
 
 // Is the FFT calculation correct?

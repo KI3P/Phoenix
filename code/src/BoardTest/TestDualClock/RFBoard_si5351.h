@@ -284,7 +284,6 @@ class Si5351
 {
 public:
   Si5351(uint8_t i2c_addr = SI5351_BUS_BASE_ADDR);
-    void set_address(uint8_t i2c_addr);
     bool init(uint8_t, uint32_t, int32_t);
     void reset(void);
     uint8_t set_freq(uint64_t, enum si5351_clock);

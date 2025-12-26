@@ -34,6 +34,7 @@
 
 // Set the I2C addresses of the LPF, BPF, RF, and front panel boards
 #define SI5351_BUS_BASE_ADDR    0x60
+#define SI5351_DUAL_VFO_ADDR    0x61 // The I2C address with split VFO hardware
 #define LPF_MCP23017_ADDR       0x25
 #define BPF_MCP23017_ADDR       0x24
 #define RF_MCP23017_ADDR        0x27
