@@ -492,26 +492,12 @@ void StartPowerCal(void){
     SetInterrupt(iCALIBRATE_POWER);
 }
 
-VariableParameter offsetI = {
-    .variable = NULL, // will be set to &ED.DCOffsetI[ED.currentBand[ED.activeVFO]]
-    .type = TYPE_I16,
-    .limits = {.i16 = {.min = -1000, .max=1000, .step=1}}
-};
-
-VariableParameter offsetQ = {
-    .variable = NULL, // will be set to &ED.DCOffsetQ[ED.currentBand[ED.activeVFO]]
-    .type = TYPE_I16,
-    .limits = {.i16 = {.min = -1000, .max=1000, .step=1}}
-};
-
-struct SecondaryMenuOption CalOptions[7] = {
+struct SecondaryMenuOption CalOptions[5] = {
     "S meter level", variableOption, &rflevelcal, NULL, NULL,
     "Frequency", functionOption, NULL, (void *)StartFreqCal, NULL,
     "Receive IQ", functionOption, NULL, (void *)StartRXIQCal, NULL,
     "Transmit IQ", functionOption, NULL, (void *)StartTXIQCal, NULL,
     "Power", functionOption, NULL, (void *)StartPowerCal, NULL,
-    "Offset I", variableOption, &offsetI, NULL, NULL,
-    "Offset Q", variableOption, &offsetQ, NULL, NULL,
 };
 
 // Display menu
@@ -599,8 +585,6 @@ void UpdateArrayVariables(void){
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
-    offsetI.variable = &ED.DCOffsetI[ED.currentBand[ED.activeVFO]];
-    offsetQ.variable = &ED.DCOffsetQ[ED.currentBand[ED.activeVFO]];
 }
 
 ///////////////////////////////////////////////////////////////////////////////

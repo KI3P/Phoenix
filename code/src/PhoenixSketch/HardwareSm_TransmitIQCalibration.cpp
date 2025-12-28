@@ -14,7 +14,7 @@ TransmitIQCalSm txiqSM;
 /**
  * TX IQ Auto-Tune Algorithm
  *
- * Systematically sweeps amplitude and phase parameters to maximize sideband separation.
+ * Systematically sweeps amplitude and phase parameters to maximize sideband separation (IRR -- image rejection ratio).
  *
  * Three-pass approach with progressively finer resolution:
  *
@@ -46,7 +46,9 @@ static int8_t iteration = 0;
 static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for each band
+static float32_t dBcVals[NUMBER_OF_BANDS];  // Carrier suppression values for each band
 static float32_t sideband_separation = 0.0;
+static float32_t carrier_suppression = 0.0;
 static int32_t currentBand = -1;
 
 /**
@@ -194,13 +196,17 @@ void UpdateTXDeltaVal(void){
         // Therefor bins are 256 +/- 17
 
         float32_t upper = psdnew[256+17];
+        float32_t carrier = psdnew[256];
         float32_t lower = psdnew[256-17];
         if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
             sideband_separation = (upper-lower)*10;
+            carrier_suppression = (upper-carrier)*10;
         } else {
             sideband_separation = (lower-upper)*10;
+            carrier_suppression = (lower-carrier)*10;
         }
         deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
+        dBcVals[ED.currentBand[ED.activeVFO]] = 0.5*dBcVals[ED.currentBand[ED.activeVFO]] + 0.5*carrier_suppression;
         deltaCount = 0;
         
     }
@@ -212,6 +218,19 @@ float32_t GetTXDeltaVals(int32_t band){
     else
         return NAN;
 }
+
+float32_t GetTXCarrierVals(int32_t band){
+    if ((band >= 0) && (band < NUMBER_OF_BANDS))
+        return dBcVals[band];
+    else
+        return NAN;
+}
+
+void SetTXCarrierVals(int32_t band, float32_t value){
+    if ((band >= 0) && (band < NUMBER_OF_BANDS))
+        dBcVals[band] = value;
+}
+
 
 void ReadTXIQDelta(void){
     if (deltaVals[ED.currentBand[ED.activeVFO]] > maxSBS){

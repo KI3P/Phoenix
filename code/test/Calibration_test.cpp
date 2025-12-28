@@ -1252,6 +1252,7 @@ TEST_F(CalibrationTest, VolumeEncoderChangesTXIQAmp) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 }
 
+#ifndef DIRECT_COUPLED_TX
 TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     extern float32_t attLevel;
@@ -1342,6 +1343,7 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 }
+#endif
 
 /*TEST_F(CalibrationTest, CalibrateReceiveIQAutotuneSteps) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);

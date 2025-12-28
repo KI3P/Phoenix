@@ -53,7 +53,9 @@ void ReadRXIQDelta(void);
 void UpdateRXDeltaVal(void);
 float32_t GetRXDeltaVals(int32_t band);
 void InitializeTXIQCalibration(void);
+void InitializeTXCarrierCalibration(void);
 float32_t GetTXDeltaVals(int32_t band);
+float32_t GetTXCarrierVals(int32_t band);
 void SetTXIQCurrentBand(int32_t band);
 
 #endif //HARDWARESM_H

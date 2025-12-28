@@ -740,6 +740,13 @@ void HandleButtonPress(int32_t button){
                     SetInterrupt(iCALIBRATE_EXIT);
                     break;
                 }
+                case 14:{
+                    #ifdef DIRECT_COUPLED_TX
+                    SetInterrupt(iPTT_PRESSED);
+                    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+                    #endif
+                    break;
+                }
                 case 15:{
                     ChangeTXIQIncrement();
                     break;
@@ -1186,21 +1193,31 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iFINETUNE_INCREASE):{
+                    #ifdef DIRECT_COUPLED_TX
                     IncrementDCOffsetI();
-                    //IncrementTransmitAtt();
+                    #else
+                    IncrementTransmitAtt();
+                    #endif
                     break;
                 }
                 case (iFINETUNE_DECREASE):{
+                    #ifdef DIRECT_COUPLED_TX
                     DecrementDCOffsetI();
-                    //DecrementTransmitAtt();
+                    #else
+                    DecrementTransmitAtt();
+                    #endif
                     break;
                 }
                 case (iCENTERTUNE_INCREASE):{
+                    #ifdef DIRECT_COUPLED_TX
                     IncrementDCOffsetQ();
+                    #endif
                     break;
                 }
                 case (iCENTERTUNE_DECREASE):{
+                    #ifdef DIRECT_COUPLED_TX
                     DecrementDCOffsetQ();
+                    #endif
                     break;
                 }
 
@@ -1337,6 +1354,7 @@ void ConsumeInterrupt(void){
             UISm_dispatch_event(&uiSM,UISm_EventId_CALIBRATE_TX_IQ);
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_TX_IQ);
             InitializeTXIQCalibration();
+            InitializeTXCarrierCalibration();
             break;
         }
         case (iCALIBRATE_POWER):{

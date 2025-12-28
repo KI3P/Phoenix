@@ -478,6 +478,9 @@ void tick1ms(void){
     PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
     ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
     TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    #ifdef DIRECT_COUPLED_TX
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+    #endif
 }
 
 time_t getTeensy3Time() {

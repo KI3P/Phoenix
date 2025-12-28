@@ -25,14 +25,15 @@ extern RA8875 tft;
 #define TXIQ_SPECTRUM_REFRESH_MS 100
 static char buff[100];
 static bool redrawSpectrum;
-static uint8_t incindex = 0;
-const float32_t incvals[] = {0.01, 0.001};
+static uint8_t incindex = 1;
+const float32_t incvals[] = {0.1, 0.01, 0.001};
 static float32_t increment = incvals[incindex];
 float32_t attLevel = 0.0;
 
-static const int8_t NUMBER_OF_TXIQ_PANES = 9;
+static const int8_t NUMBER_OF_TXIQ_PANES = 10;
 // Forward declaration of the pane drawing functions
 static void DrawTXIQDeltaPane(void);
+static void DrawTXIQCarrierPane(void);
 static void DrawTXIQAtt(void);
 static void DrawTXIQOffsets(void);
 static void DrawTXIQStatus(void);
@@ -43,20 +44,24 @@ static void DrawTXIQInstructionsPane(void);
 static void DrawTXIQSpectrumPane(void);
 
 // Pane instances
-static Pane PaneTXIQDelta =    {250,45,160,40,DrawTXIQDeltaPane,1};
-static Pane PaneTXIQAtt =      {660,330,120,40,DrawTXIQAtt,1};
-static Pane PaneTXIQOffsets =  {660,355,120,25,DrawTXIQOffsets,1};
-static Pane PaneTXIQStatus =   {660,380,120,40,DrawTXIQStatus,1};
-static Pane PaneTXIQFrequency ={660,430,140,40,DrawTXIQFrequency,1};
-static Pane PaneTXIQAdjust =   {3,250,300,230,DrawTXIQAdjustPane,1};
-static Pane PaneTXIQTable =    {320,250,200,230,DrawTXIQTablePane,1};
+static Pane PaneTXIQDelta =    {115,45,135,40,DrawTXIQDeltaPane,1};
+static Pane PaneTXIQCarrier =  {390,45,135,40,DrawTXIQCarrierPane,1};
+
+static Pane PaneTXIQOffsets =  {540,330,240,30,DrawTXIQOffsets,1};
+static Pane PaneTXIQAtt =      {540,365,240,30,DrawTXIQAtt,1};
+static Pane PaneTXIQStatus =   {540,400,240,30,DrawTXIQStatus,1};
+static Pane PaneTXIQFrequency ={540,435,260,30,DrawTXIQFrequency,1};
+
+static Pane PaneTXIQAdjust =   {3,250,280,230,DrawTXIQAdjustPane,1};
+static Pane PaneTXIQTable =    {285,250,245,230,DrawTXIQTablePane,1};
 static Pane PaneTXIQInstructions = {537,7,260,320,DrawTXIQInstructionsPane,1};
 static Pane PaneTXIQSpectrum = {3,95,517,150,DrawTXIQSpectrumPane,1};
 
 // Array of all panes for iteration
 static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,&PaneTXIQOffsets,
                                     &PaneTXIQInstructions, &PaneTXIQAtt, &PaneTXIQDelta,
-                                    &PaneTXIQStatus,&PaneTXIQFrequency,&PaneTXIQSpectrum};
+                                    &PaneTXIQStatus,&PaneTXIQFrequency,&PaneTXIQSpectrum,
+                                    &PaneTXIQCarrier};
 
 
 extern struct dispSc displayScale[];
@@ -76,15 +81,51 @@ static void DrawTXIQDeltaPane(void){
     oldsep = GetTXDeltaVals(ED.currentBand[ED.activeVFO]);
 
     if (!PaneTXIQDelta.stale) return;
-    tft.fillRect(PaneTXIQDelta.x0, PaneTXIQDelta.y0, PaneTXIQDelta.width, PaneTXIQDelta.height, RA8875_BLACK);
-    
-    sprintf(buff,"%2.1fdB",GetTXDeltaVals(ED.currentBand[ED.activeVFO]));
-    tft.setCursor(PaneTXIQDelta.x0, PaneTXIQDelta.y0);
+
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
+
+    tft.fillRect(PaneTXIQDelta.x0-4*tft.getFontWidth(), PaneTXIQDelta.y0, PaneTXIQDelta.width+4*tft.getFontWidth(), PaneTXIQDelta.height, RA8875_BLACK);
+    
+    tft.setCursor(PaneTXIQDelta.x0-4*tft.getFontWidth(),  PaneTXIQDelta.y0);
+    tft.print("IRR:");
+
+    tft.setCursor(PaneTXIQDelta.x0, PaneTXIQDelta.y0);
+    sprintf(buff,"%2.1fdB",GetTXDeltaVals(ED.currentBand[ED.activeVFO]));
     tft.print(buff);
 
     PaneTXIQDelta.stale = false;
+}
+
+
+static float32_t oldcar = 0.0;
+/**
+ * @brief Render the carrier suppression display pane
+ * @note Shows measured dB difference between desired sideband and the carrier
+ * @note Higher values indicate better carrier suppression (target > 60 dB)
+ */
+static void DrawTXIQCarrierPane(void){
+    if (!HasDualVFOs())
+        return; // This only works if we have dual VFOs
+    if (oldcar != GetTXCarrierVals(ED.currentBand[ED.activeVFO]))
+        PaneTXIQCarrier.stale = true;
+    oldcar = GetTXCarrierVals(ED.currentBand[ED.activeVFO]);
+
+    if (!PaneTXIQCarrier.stale) return;
+
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+
+    tft.fillRect(PaneTXIQCarrier.x0-4*tft.getFontWidth(), PaneTXIQCarrier.y0, PaneTXIQCarrier.width+4*tft.getFontWidth(), PaneTXIQCarrier.height, RA8875_BLACK);
+    
+    tft.setCursor(PaneTXIQCarrier.x0-4*tft.getFontWidth(), PaneTXIQCarrier.y0);
+    tft.print("dBc:");
+
+    tft.setCursor(PaneTXIQCarrier.x0, PaneTXIQCarrier.y0);
+    sprintf(buff,"%2.1fdB",GetTXCarrierVals(ED.currentBand[ED.activeVFO]));
+    tft.print(buff);
+
+    PaneTXIQCarrier.stale = false;
 }
 
 /**
@@ -186,11 +227,13 @@ static void DrawTXIQAtt(void){
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
-    tft.fillRect(PaneTXIQAtt.x0-tft.getFontWidth()*15, PaneTXIQAtt.y0, PaneTXIQAtt.width+tft.getFontWidth()*15, PaneTXIQAtt.height, RA8875_BLACK);
+    tft.fillRect(PaneTXIQAtt.x0, PaneTXIQAtt.y0, PaneTXIQAtt.width, PaneTXIQAtt.height, RA8875_BLACK);
 
-    tft.setCursor(PaneTXIQAtt.x0,PaneTXIQAtt.y0);
+    tft.setCursor(PaneTXIQAtt.x0+120,PaneTXIQAtt.y0);
     tft.print(attLevel);
-    tft.setCursor(PaneTXIQAtt.x0-tft.getFontWidth()*15,PaneTXIQAtt.y0);
+    tft.print(" dB");
+
+    tft.setCursor(PaneTXIQAtt.x0+120-tft.getFontWidth()*15,PaneTXIQAtt.y0);
     tft.print("Transmit Att.:");
 
     PaneTXIQAtt.stale = false;
@@ -202,6 +245,7 @@ int16_t oldDCQ = 0;
  * @brief Render the I and Q DC offsets display pane
  */
 static void DrawTXIQOffsets(void){
+    #ifdef DIRECT_COUPLED_TX
     if ((oldDCI != ED.DCOffsetI[ED.currentBand[ED.activeVFO]]) ||
         (oldDCQ != ED.DCOffsetQ[ED.currentBand[ED.activeVFO]])) 
         PaneTXIQOffsets.stale = true;
@@ -213,17 +257,20 @@ static void DrawTXIQOffsets(void){
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
-    tft.fillRect(PaneTXIQOffsets.x0-tft.getFontWidth()*12, PaneTXIQOffsets.y0, PaneTXIQOffsets.width+tft.getFontWidth()*12, PaneTXIQOffsets.height, RA8875_BLACK);
+    tft.fillRect(PaneTXIQOffsets.x0, PaneTXIQOffsets.y0, PaneTXIQOffsets.width, PaneTXIQOffsets.height, RA8875_BLACK);
 
-    tft.setCursor(PaneTXIQOffsets.x0,PaneTXIQOffsets.y0);
+    tft.setCursor(PaneTXIQOffsets.x0+65,PaneTXIQOffsets.y0);
+    tft.print("I=");
     tft.print(ED.DCOffsetI[ED.currentBand[ED.activeVFO]]);
-    tft.print(",");
+    tft.setCursor(PaneTXIQOffsets.x0+150,PaneTXIQOffsets.y0);
+    tft.print("Q=");
     tft.print(ED.DCOffsetQ[ED.currentBand[ED.activeVFO]]);
 
-    tft.setCursor(PaneTXIQOffsets.x0-tft.getFontWidth()*12,PaneTXIQOffsets.y0);
-    tft.print("DC Offsets:");
+    tft.setCursor(PaneTXIQOffsets.x0+tft.getFontWidth(),PaneTXIQOffsets.y0);
+    tft.print("Offset:");
 
     PaneTXIQOffsets.stale = false;
+    #endif
 }
 
 
@@ -243,9 +290,9 @@ static void DrawTXIQStatus(void){
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
-    tft.fillRect(PaneTXIQStatus.x0-tft.getFontWidth()*10, PaneTXIQStatus.y0, PaneTXIQStatus.width+tft.getFontWidth()*10, PaneTXIQStatus.height, RA8875_BLACK);
+    tft.fillRect(PaneTXIQStatus.x0, PaneTXIQStatus.y0, PaneTXIQStatus.width, PaneTXIQStatus.height, RA8875_BLACK);
 
-    tft.setCursor(PaneTXIQStatus.x0,PaneTXIQStatus.y0);
+    tft.setCursor(PaneTXIQStatus.x0+120,PaneTXIQStatus.y0);
     switch(modeSM.state_id){
         case ModeSm_StateId_CALIBRATE_TX_IQ_SPACE:
             tft.setTextColor(RA8875_GREEN);
@@ -259,7 +306,7 @@ static void DrawTXIQStatus(void){
             break;
     }
     tft.setTextColor(RA8875_WHITE);
-    tft.setCursor(PaneTXIQStatus.x0-tft.getFontWidth()*10,PaneTXIQStatus.y0);
+    tft.setCursor(PaneTXIQStatus.x0+120-tft.getFontWidth()*10,PaneTXIQStatus.y0);
     tft.print("Transmit:");
 
     PaneTXIQStatus.stale = false;
@@ -282,12 +329,12 @@ static void DrawTXIQFrequency(void){
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
 
-    tft.fillRect(PaneTXIQFrequency.x0-tft.getFontWidth()*11, PaneTXIQFrequency.y0, PaneTXIQFrequency.width+tft.getFontWidth()*11, PaneTXIQFrequency.height, RA8875_BLACK);
+    tft.fillRect(PaneTXIQFrequency.x0, PaneTXIQFrequency.y0, PaneTXIQFrequency.width, PaneTXIQFrequency.height, RA8875_BLACK);
 
-    tft.setCursor(PaneTXIQFrequency.x0,PaneTXIQFrequency.y0);
+    tft.setCursor(PaneTXIQFrequency.x0+120,PaneTXIQFrequency.y0);
     tft.print(freq/1000);
-    tft.print("kHz");
-    tft.setCursor(PaneTXIQFrequency.x0-tft.getFontWidth()*11,PaneTXIQFrequency.y0);
+    tft.print(" kHz");
+    tft.setCursor(PaneTXIQFrequency.x0+120-tft.getFontWidth()*11,PaneTXIQFrequency.y0);
     tft.print("Frequency:");
 
     PaneTXIQFrequency.stale = false;
@@ -334,25 +381,25 @@ void DecrementTransmitAtt(void){
 }
 
 void IncrementDCOffsetI(void){
-    ED.DCOffsetI[ED.currentBand[ED.activeVFO]] += 100;
+    ED.DCOffsetI[ED.currentBand[ED.activeVFO]] += (int16_t)(1000*increment);
     if (ED.DCOffsetI[ED.currentBand[ED.activeVFO]] > 32000)
         ED.DCOffsetI[ED.currentBand[ED.activeVFO]] = 32000;
 }
 
 void DecrementDCOffsetI(void){
-    ED.DCOffsetI[ED.currentBand[ED.activeVFO]] -= 100;
+    ED.DCOffsetI[ED.currentBand[ED.activeVFO]] -= (int16_t)(1000*increment);
     if (ED.DCOffsetI[ED.currentBand[ED.activeVFO]] < -32000)
         ED.DCOffsetI[ED.currentBand[ED.activeVFO]] = -32000;
 }
 
 void IncrementDCOffsetQ(void){
-    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] += 100;
+    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] += (int16_t)(1000*increment);
     if (ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] > 32000)
         ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = 32000;
 }
 
 void DecrementDCOffsetQ(void){
-    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] -= 100;
+    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] -= (int16_t)(1000*increment);
     if (ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] < -32000)
         ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = -32000;
 }
@@ -422,7 +469,7 @@ static void DrawTXIQAdjustPane(void){
 
     if (!PaneTXIQAdjust.stale) return;
     tft.fillRect(PaneTXIQAdjust.x0, PaneTXIQAdjust.y0, PaneTXIQAdjust.width, PaneTXIQAdjust.height, RA8875_BLACK);
-    tft.drawRect(PaneTXIQAdjust.x0, PaneTXIQAdjust.y0, PaneTXIQAdjust.width, PaneTXIQAdjust.height, RA8875_YELLOW);
+    //tft.drawRect(PaneTXIQAdjust.x0, PaneTXIQAdjust.y0, PaneTXIQAdjust.width, PaneTXIQAdjust.height, RA8875_YELLOW);
     
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
@@ -483,6 +530,8 @@ float32_t GetTXIQPhsSum(void){
 
 static float32_t oldTXIQampsums = 0;
 static float32_t oldTXIQphssums = -10;
+static int16_t oldIoff = 0;
+static int16_t oldQoff = 0;
 /**
  * @brief Render the TX IQ all-bands calibration summary table
  * @note Shows amplitude and phase values for all bands
@@ -491,14 +540,18 @@ static float32_t oldTXIQphssums = -10;
 static void DrawTXIQTablePane(void){
     float32_t nas = GetTXIQAmpSum();
     float32_t nps = GetTXIQPhsSum();
-    if ((oldTXIQampsums != nas) || (oldTXIQphssums != nps))
+    if ((oldTXIQampsums != nas) || (oldTXIQphssums != nps) ||
+        (oldIoff != ED.DCOffsetI[ED.currentBand[ED.activeVFO]]) ||
+        (oldQoff != ED.DCOffsetQ[ED.currentBand[ED.activeVFO]]))
         PaneTXIQTable.stale = true;
     oldTXIQampsums = nas;
     oldTXIQphssums = nps;
+    oldIoff = ED.DCOffsetI[ED.currentBand[ED.activeVFO]];
+    oldQoff = ED.DCOffsetQ[ED.currentBand[ED.activeVFO]];
     if (!PaneTXIQTable.stale) return;
 
     tft.fillRect(PaneTXIQTable.x0, PaneTXIQTable.y0, PaneTXIQTable.width, PaneTXIQTable.height, RA8875_BLACK);
-    tft.drawRect(PaneTXIQTable.x0, PaneTXIQTable.y0, PaneTXIQTable.width, PaneTXIQTable.height, RA8875_YELLOW);
+    //tft.drawRect(PaneTXIQTable.x0, PaneTXIQTable.y0, PaneTXIQTable.width, PaneTXIQTable.height, RA8875_YELLOW);
     
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
@@ -511,7 +564,9 @@ static void DrawTXIQTablePane(void){
     tft.print("Phs");
     if (HasDualVFOs()){
         tft.setCursor(PaneTXIQTable.x0+160, PaneTXIQTable.y0+3);
-        tft.print("Val");
+        tft.print("IRR");
+        tft.setCursor(PaneTXIQTable.x0+205, PaneTXIQTable.y0+3);
+        tft.print("dBc");
     }
 
     for (size_t k=FIRST_BAND; k<=LAST_BAND; k++){
@@ -531,6 +586,11 @@ static void DrawTXIQTablePane(void){
             if (GetTXDeltaVals(k) != 0.0){
                 tft.setCursor(PaneTXIQTable.x0+160, y);
                 sprintf(buff,"%2.1f",GetTXDeltaVals(k));
+                tft.print(buff);
+            }
+            if (GetTXCarrierVals(k) != 0.0){
+                tft.setCursor(PaneTXIQTable.x0+205, y);
+                sprintf(buff,"%2.1f",GetTXCarrierVals(k));
                 tft.print(buff);
             }
         }
@@ -559,40 +619,54 @@ static void DrawTXIQInstructionsPane(void){
     int16_t delta = 40;
     int16_t lineD = 20;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Turn the volume knob to");
+    tft.print("* Volume knob adjusts amp");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    adjust amp");
+    tft.print("* Filter knob adjusts phase");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Turn the filter knob to");
+    tft.print("* Button 15 changes increment");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    adjust phase");
+    tft.print("* Adjust until Delta > 60 dB");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("* Press button 15 to change");
+    tft.print("* Press Band Up or Band Down");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    the increment");
+    tft.print("  to change to the next band.");
+
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print(" * Adjust until Delta > 60 dB");
+    tft.print("* Button 16 does IQ calibration.");
+
+    #ifndef DIRECT_COUPLED_TX
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print(" * Press Band Up or Band Down");
+    tft.print("* Finetune knob changes att.");
+    #else
+
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    to change to the next band.");
+    tft.print("* Button 14 does carrier null.");
+
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print(" * Turn finetune knob to change");
+    tft.print("* Finetune knob to change");
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print("    TX attenuation if needed.");
+    tft.print("  I channel DC offset.");
+
     delta += lineD;
     tft.setCursor(x0, y0+delta);
-    tft.print(" * Press Home to save and exit.");
+    tft.print("* Center tune knob to change");
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("  Q channel DC offset.");
+    #endif
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    tft.print("* Press Home to save and exit.");
 
     PaneTXIQInstructions.stale = false;
 }
@@ -617,10 +691,7 @@ void DrawCalibrateTXIQ(void){
         tft.setFontScale((enum RA8875tsize)1);
         tft.setCursor(10,10);
         tft.print("Transmit IQ calibration");
-        if (HasDualVFOs()){
-            tft.setCursor(120,  PaneTXIQDelta.y0);
-            tft.print("Delta:");
-        }
+        
         ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
         ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
         ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;

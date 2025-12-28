@@ -138,10 +138,8 @@ public:
         // Convert int16_t to float32_t for DataBlock
         // Swap I and Q so that sideband is correct and apply imperfections too
         for (int i = 0; i < FEEDBACK_BLOCK_SIZE; i++) {
-            //iFloat[i] = (float32_t)iBuffer[i];
-            //qFloat[i] = (float32_t)samples[i];
-            iFloat[i] = 1.1*(float32_t)samples[i];
-            qFloat[i] = (float32_t)iBuffer[i];
+            iFloat[i] = 1.1*(float32_t)samples[i] + 150.2;
+            qFloat[i] = (float32_t)iBuffer[i] + 67.8;
         }
 
         // Apply frequency shift (Fs/4 = 48kHz at 192kHz sample rate)
