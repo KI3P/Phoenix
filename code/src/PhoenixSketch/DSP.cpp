@@ -1044,6 +1044,9 @@ void PlayIQData(DataBlock *data){
         sp_R2 = Q_out_R_Ex.getBuffer();
         arm_float_to_q15(&data->I[BUFFER_SIZE * i], sp_L2, BUFFER_SIZE);
         arm_float_to_q15(&data->Q[BUFFER_SIZE * i], sp_R2, BUFFER_SIZE);
+        // Add offsets to perform carrier nulling
+        arm_offset_q15(sp_L2,ED.DCOffsetI[ED.currentBand[ED.activeVFO]],sp_L2,BUFFER_SIZE);
+        arm_offset_q15(sp_R2,ED.DCOffsetQ[ED.currentBand[ED.activeVFO]],sp_R2,BUFFER_SIZE);
         Q_out_L_Ex.playBuffer();  // play it !
         Q_out_R_Ex.playBuffer();  // play it !
     }

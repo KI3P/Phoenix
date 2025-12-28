@@ -86,6 +86,8 @@ void SaveDataToStorage(bool savetosd){
         doc["IQPhaseCorrectionFactor"][i] = ED.IQPhaseCorrectionFactor[i];
         doc["IQXAmpCorrectionFactor"][i] = ED.IQXAmpCorrectionFactor[i];
         doc["IQXPhaseCorrectionFactor"][i] = ED.IQXPhaseCorrectionFactor[i];
+        doc["DCOffsetI"][i] = ED.DCOffsetI[i];
+        doc["DCOffsetQ"][i] = ED.DCOffsetQ[i];
         doc["XAttenCW"][i] = ED.XAttenCW[i];
         doc["RAtten"][i] = ED.RAtten[i];
         doc["antennaSelection"][i] = ED.antennaSelection[i];
@@ -334,6 +336,16 @@ void RestoreDataFromStorage(void){
             ED.IQXPhaseCorrectionFactor[i] = doc["IQXPhaseCorrectionFactor"][i] | ED.IQXPhaseCorrectionFactor[i];
         }
     }
+    if (doc["DCOffsetI"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.DCOffsetI[i] = doc["DCOffsetI"][i] | ED.DCOffsetI[i];
+        }
+    }
+    if (doc["DCOffsetQ"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.DCOffsetQ[i] = doc["DCOffsetQ"][i] | ED.DCOffsetQ[i];
+        }
+    }
     if (doc["XAttenCW"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.XAttenCW[i] = doc["XAttenCW"][i] | ED.XAttenCW[i];
@@ -549,6 +561,16 @@ void RestoreDataFromSDCard(void){
             ED.IQXPhaseCorrectionFactor[i] = doc["IQXPhaseCorrectionFactor"][i] | ED.IQXPhaseCorrectionFactor[i];
         }
     }
+    if (doc["DCOffsetI"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.DCOffsetI[i] = doc["DCOffsetI"][i] | ED.DCOffsetI[i];
+        }
+    }
+    if (doc["DCOffsetQ"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.DCOffsetQ[i] = doc["DCOffsetQ"][i] | ED.DCOffsetQ[i];
+        }
+    }
     if (doc["XAttenCW"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.XAttenCW[i] = doc["XAttenCW"][i] | ED.XAttenCW[i];
@@ -753,6 +775,20 @@ void PrintEDToSerial(void){
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         sprintf(buff,"%4.3f",ED.IQXPhaseCorrectionFactor[i]);
         Serial.print(buff);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("DCOffsetI: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.DCOffsetI[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("DCOffsetQ: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.DCOffsetQ[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();

@@ -30,10 +30,11 @@ const float32_t incvals[] = {0.01, 0.001};
 static float32_t increment = incvals[incindex];
 float32_t attLevel = 0.0;
 
-static const int8_t NUMBER_OF_TXIQ_PANES = 8;
+static const int8_t NUMBER_OF_TXIQ_PANES = 9;
 // Forward declaration of the pane drawing functions
 static void DrawTXIQDeltaPane(void);
 static void DrawTXIQAtt(void);
+static void DrawTXIQOffsets(void);
 static void DrawTXIQStatus(void);
 static void DrawTXIQFrequency(void);
 static void DrawTXIQAdjustPane(void);
@@ -44,6 +45,7 @@ static void DrawTXIQSpectrumPane(void);
 // Pane instances
 static Pane PaneTXIQDelta =    {250,45,160,40,DrawTXIQDeltaPane,1};
 static Pane PaneTXIQAtt =      {660,330,120,40,DrawTXIQAtt,1};
+static Pane PaneTXIQOffsets =  {660,355,120,25,DrawTXIQOffsets,1};
 static Pane PaneTXIQStatus =   {660,380,120,40,DrawTXIQStatus,1};
 static Pane PaneTXIQFrequency ={660,430,140,40,DrawTXIQFrequency,1};
 static Pane PaneTXIQAdjust =   {3,250,300,230,DrawTXIQAdjustPane,1};
@@ -52,7 +54,7 @@ static Pane PaneTXIQInstructions = {537,7,260,320,DrawTXIQInstructionsPane,1};
 static Pane PaneTXIQSpectrum = {3,95,517,150,DrawTXIQSpectrumPane,1};
 
 // Array of all panes for iteration
-static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,
+static Pane* TXIQWindowPanes[NUMBER_OF_TXIQ_PANES] = {&PaneTXIQAdjust,&PaneTXIQTable,&PaneTXIQOffsets,
                                     &PaneTXIQInstructions, &PaneTXIQAtt, &PaneTXIQDelta,
                                     &PaneTXIQStatus,&PaneTXIQFrequency,&PaneTXIQSpectrum};
 
@@ -194,6 +196,37 @@ static void DrawTXIQAtt(void){
     PaneTXIQAtt.stale = false;
 }
 
+int16_t oldDCI = 0;
+int16_t oldDCQ = 0;
+/**
+ * @brief Render the I and Q DC offsets display pane
+ */
+static void DrawTXIQOffsets(void){
+    if ((oldDCI != ED.DCOffsetI[ED.currentBand[ED.activeVFO]]) ||
+        (oldDCQ != ED.DCOffsetQ[ED.currentBand[ED.activeVFO]])) 
+        PaneTXIQOffsets.stale = true;
+    oldDCI = ED.DCOffsetI[ED.currentBand[ED.activeVFO]];
+    oldDCQ = ED.DCOffsetQ[ED.currentBand[ED.activeVFO]];
+    if (!PaneTXIQOffsets.stale) return;
+    
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(RA8875_WHITE);
+
+    tft.fillRect(PaneTXIQOffsets.x0-tft.getFontWidth()*12, PaneTXIQOffsets.y0, PaneTXIQOffsets.width+tft.getFontWidth()*12, PaneTXIQOffsets.height, RA8875_BLACK);
+
+    tft.setCursor(PaneTXIQOffsets.x0,PaneTXIQOffsets.y0);
+    tft.print(ED.DCOffsetI[ED.currentBand[ED.activeVFO]]);
+    tft.print(",");
+    tft.print(ED.DCOffsetQ[ED.currentBand[ED.activeVFO]]);
+
+    tft.setCursor(PaneTXIQOffsets.x0-tft.getFontWidth()*12,PaneTXIQOffsets.y0);
+    tft.print("DC Offsets:");
+
+    PaneTXIQOffsets.stale = false;
+}
+
+
 static ModeSm_StateId oldstate = ModeSm_StateId_ROOT;
 /**
  * @brief Render the transmit on/off status display pane
@@ -298,6 +331,30 @@ void DecrementTransmitAtt(void){
         attLevel = 0.0;
     SetTXAttenuation(attLevel);
     ForceUpdateRFHardwareState();
+}
+
+void IncrementDCOffsetI(void){
+    ED.DCOffsetI[ED.currentBand[ED.activeVFO]] += 100;
+    if (ED.DCOffsetI[ED.currentBand[ED.activeVFO]] > 32000)
+        ED.DCOffsetI[ED.currentBand[ED.activeVFO]] = 32000;
+}
+
+void DecrementDCOffsetI(void){
+    ED.DCOffsetI[ED.currentBand[ED.activeVFO]] -= 100;
+    if (ED.DCOffsetI[ED.currentBand[ED.activeVFO]] < -32000)
+        ED.DCOffsetI[ED.currentBand[ED.activeVFO]] = -32000;
+}
+
+void IncrementDCOffsetQ(void){
+    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] += 100;
+    if (ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] > 32000)
+        ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = 32000;
+}
+
+void DecrementDCOffsetQ(void){
+    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] -= 100;
+    if (ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] < -32000)
+        ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = -32000;
 }
 
 /**

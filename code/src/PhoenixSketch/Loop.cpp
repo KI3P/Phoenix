@@ -958,6 +958,10 @@ void IncrementCalibrationPower(void);
 void DecrementCalibrationPower(void);
 void IncrementCalibrationTransmitAtt(void);
 void DecrementCalibrationTransmitAtt(void);
+void IncrementDCOffsetI(void);
+void DecrementDCOffsetI(void);
+void IncrementDCOffsetQ(void);
+void DecrementDCOffsetQ(void);
 
 /**
  * Considers the next interrupt from the FIFO buffer and acts accordingly by either 
@@ -1182,11 +1186,21 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iFINETUNE_INCREASE):{
-                    IncrementTransmitAtt();
+                    IncrementDCOffsetI();
+                    //IncrementTransmitAtt();
                     break;
                 }
                 case (iFINETUNE_DECREASE):{
-                    DecrementTransmitAtt();
+                    DecrementDCOffsetI();
+                    //DecrementTransmitAtt();
+                    break;
+                }
+                case (iCENTERTUNE_INCREASE):{
+                    IncrementDCOffsetQ();
+                    break;
+                }
+                case (iCENTERTUNE_DECREASE):{
+                    DecrementDCOffsetQ();
                     break;
                 }
 

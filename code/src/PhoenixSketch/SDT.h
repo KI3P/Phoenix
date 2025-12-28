@@ -283,6 +283,8 @@ extern struct config_t {
     float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
     float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1}; /** Transmit IQ calibration amplitude correction */
     float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit IQ calibration phase correction */
+    int16_t DCOffsetI[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, I */
+    int16_t DCOffsetQ[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, Q */
     float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
     // XAtten is only used in CW mode
     //float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
