@@ -752,10 +752,12 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case 16:{
-                    // Engage autocal process, which is handled by its own state machine
-                    // Engage PTT
-                    SetInterrupt(iPTT_PRESSED);
-                    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
+                    if (HasDualVFOs()){
+                        // Engage autocal process, which is handled by its own state machine
+                        // Engage PTT
+                        SetInterrupt(iPTT_PRESSED);
+                        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
+                    }
                     break;
                 }
                 case BAND_UP:{
