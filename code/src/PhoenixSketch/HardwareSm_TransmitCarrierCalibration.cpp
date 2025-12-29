@@ -37,7 +37,7 @@ static int16_t center[] =  {0,                  0,                         0,  0
 static int8_t NSteps[]  =  {(int)((5000+5000)/100),(int)((5000+5000)/100),24, 24, 24, 24 };
 static int16_t Delta[] =   {100,               100,                       10, 10,  1,  1 };
 static float32_t maxDBC = 0.0;
-static float32_t maxDBC_parameter = 0.0;
+static int16_t maxDBC_parameter = 0.0;
 static int8_t iteration = 0;
 static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
@@ -162,13 +162,13 @@ void AdjustTXCarrierCalSetting(void){
     }
     // Change the appropriate parameter
     SetOffset(iteration,step); 
-
     // Go to read data state after waiting for txcarrSM.vars.acquisitionDuration_ms
     TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_READ_DELTA);
 }
 
 void ReadTXCarrierDelta(void){
-    if (GetTXCarrierVals(ED.currentBand[ED.activeVFO]) > maxDBC){
+    bool ignore = (iteration == 0) && (step == 0);
+    if ((GetTXCarrierVals(ED.currentBand[ED.activeVFO]) > maxDBC) && !ignore){
         // The value of the carrier suppression
         maxDBC = GetTXCarrierVals(ED.currentBand[ED.activeVFO]);
         // The amp/phase parameter that delivered this carrier suppression
