@@ -57,6 +57,40 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 ![](images/Home_screen_button_map.png)
 
+# Version History
+
+## V1.1 Release Notes
+
+### Major New Features
+
+**Dual VFO Architecture**
+The radio now supports separate RX and TX VFOs using independent Si5351 clock outputs. This enables monitoring the transmit signal on the receiver during SSB transmission - you can now see your own transmitted spectrum on the display in real-time. The system auto-detects whether dual VFO hardware is present and adjusts operation accordingly.
+
+**Automatic Calibration System**
+Three new state machine-driven auto-calibration routines have been added:
+- **RX IQ Calibration** - Automatically optimizes receive IQ balance to minimize opposite sideband leakage
+- **TX IQ Calibration** - Auto-tunes transmit IQ parameters for optimal sideband suppression
+- **TX Carrier Nulling** - Automatically minimizes carrier leakthrough using DC offset correction
+
+All three use a gradient-based optimization algorithm that searches for optimal settings without requiring external test equipment. The calibration values are stored per-band.
+
+**Desktop Radio Simulator**
+A new SDL-based simulator (`radio_simulator`) allows testing the complete radio firmware on a desktop PC. Features include:
+- Full 800x480 display emulation
+- Keyboard mappings for all front panel buttons and encoders
+- Selectable audio sources: computer input, two-tone test, single-tone, or RX IQ test signals
+- Real-time DSP processing with audio output to computer speakers
+- Configuration file read/write to persistent storage
+
+### Under-the-Hood Changes
+
+- Hardware register expanded from 32 to 64 bits to accommodate dual VFO state tracking
+- VFO API renamed from `SetSSBVFOFrequency()` to `SetRXVFOFrequency()`/`SetTXVFOFrequency()`
+- New hardware states added: `RFCalTransmitIQSingleVFO`, `RFCalTransmitIQDualVFO`, `RFCalTransmitCarrier`
+- Improved test infrastructure with expanded mocks for OpenAudio, LittleFS, and ArduinoJson
+- Added transmit chain unit tests
+- Buffer print diagnostic added for debugging hardware register state
+
 # File Organization
 
 ## Source Code Locations
