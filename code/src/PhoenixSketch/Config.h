@@ -26,7 +26,7 @@
                                 // for other encoders or libs we use 1.0f
 
 // Direct coupled transmit
-#define DIRECT_COUPLED_TX
+//#define DIRECT_COUPLED_TX
 
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state
