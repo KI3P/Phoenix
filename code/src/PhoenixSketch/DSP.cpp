@@ -122,8 +122,8 @@ errno_t ReadIQInputBuffer(DataBlock *data){
             sp_R1 = Q_in_R.readBuffer();
             // Using arm_Math library, convert to float one buffer_size.
             // Float_buffer samples are now standardized from > -1.0 to < 1.0
-            arm_q15_to_float(sp_R1, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
-            arm_q15_to_float(sp_L1, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_L1, &data->I[BUFFER_SIZE * i], BUFFER_SIZE);
+            arm_q15_to_float(sp_R1, &data->Q[BUFFER_SIZE * i], BUFFER_SIZE);
             Q_in_L.freeBuffer();
             Q_in_R.freeBuffer();
         }
@@ -1113,13 +1113,8 @@ DataBlock * TransmitProcessing(const char *fname){
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
         ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
     SidebandSelection(&data);
-    arm_scale_f32(data.I,-1,data.I,256);
     TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
     TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
-
-    // Swap I and Q at this point to get correct USB and LSB formation on transmit
-    //data.I = float_buffer_R;
-    //data.Q = float_buffer_L;
 
     // Play the data on the output buffer
     PlayIQData(&data);

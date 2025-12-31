@@ -22,18 +22,18 @@ bool dualVFO = true; /** Set to true if we have separate RX and TX VFOs */
 #define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_8MA
 static int32_t rxmultiple, oldrxMultiple;
 static int64_t RXVFOFreq_dHz;
-#define CLK0RX   SI5351_CLK0 
-#define CLK90RX  SI5351_CLK1
+si5351_clock CLK0RX   = SI5351_CLK0;
+si5351_clock CLK90RX  = SI5351_CLK1;
 
 #define SI5351_DRIVE_CURRENT_TX SI5351_DRIVE_2MA
 static int32_t txmultiple, oldtxMultiple;
 static int64_t TXVFOFreq_dHz;
-#define CLK0TX   SI5351_CLK5 
-#define CLK90TX  SI5351_CLK4
+si5351_clock CLK0TX   = SI5351_CLK4;
+si5351_clock CLK90TX  = SI5351_CLK5;
 
 #define SI5351_DRIVE_CURRENT_CW SI5351_DRIVE_2MA
 static int64_t CWVFOFreq_dHz;
-#define CLKCW  SI5351_CLK6
+si5351_clock CLKCW  = SI5351_CLK6;
 #define CLKCWSINGLEVFO SI5351_CLK2
 
 #define XMIT_SSB 1
@@ -773,6 +773,8 @@ errno_t InitVFOs(void){
         if (si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, ED.freqCorrectionFactor)) {
             dualVFO = true;
             foundDevice = true;
+            CLK0RX   = SI5351_CLK1;
+            CLK90RX  = SI5351_CLK0;
             Debug("Found Si5351 at dual VFO address (0x61)");
         }
     }
