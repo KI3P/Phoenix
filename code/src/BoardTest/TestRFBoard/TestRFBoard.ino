@@ -12,8 +12,8 @@
 
 #define TXSTATE 1
 #define RXSTATE 0
-#define XIQSTATE 0
-#define XCWSTATE 1
+#define XIQSTATE 1
+#define XCWSTATE 0
 #define CWONSTATE 1
 #define CWOFFSTATE 0
 #define CALONSTATE 1
