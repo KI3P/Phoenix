@@ -2,7 +2,7 @@
 #define SDT_H
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.1"
+#define VERSION "Phx V1.0"
 
 #include "BuildInfo.h"
 
@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <TimeLib.h>
 #include "Config.h"
 
 #ifndef __STDC_LIB_EXT1__
@@ -45,8 +44,8 @@ typedef int errno_t;
 #define REV         27
 #define CAL         38  // RX board calibration control (H=CAL,L=normal)
 
-// The 64 bit register that records the state of the radio hardware
-extern uint64_t hardwareRegister;
+// The 32 bit register that records the state of the radio hardware
+extern uint32_t hardwareRegister;
 
 // The bit map for hardwareRegister
 #define LPFBAND0BIT  0
@@ -64,7 +63,7 @@ extern uint64_t hardwareRegister;
 #define MODEBIT      12
 #define CALBIT       13
 #define CWVFOBIT     14
-#define RXVFOBIT     15
+#define SSBVFOBIT    15
 #define TXATTLSB     16
 #define TXATTMSB     21
 #define RXATTLSB     22
@@ -73,7 +72,6 @@ extern uint64_t hardwareRegister;
 #define BPFBAND1BIT  29
 #define BPFBAND2BIT  30
 #define BPFBAND3BIT  31
-#define TXVFOBIT     32
 
 #define BAND_NF_BCD   0b1111
 #define BAND_6M_BCD   0b1010
@@ -89,10 +87,10 @@ extern uint64_t hardwareRegister;
 #define BAND_160M_BCD 0b0001
 
 // Macros used to manipulate the hardware register
-#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1ULL)
-#define SET_BIT(byte, bit) ((byte) |= (1ULL << (bit)));buffer_add()
-#define CLEAR_BIT(byte, bit) ((byte) &= ~(1ULL << (bit)));buffer_add()
-#define TOGGLE_BIT(byte, bit) ((byte) ^= (1ULL << (bit)));buffer_add()
+#define GET_BIT(byte, bit) (((byte) >> (bit)) & 1)
+#define SET_BIT(byte, bit) ((byte) |= (1 << (bit)));buffer_add()
+#define CLEAR_BIT(byte, bit) ((byte) &= ~(1 << (bit)));buffer_add()
+#define TOGGLE_BIT(byte, bit) ((byte) ^= (1 << (bit)));buffer_add()
 #define GET_LPF_BAND (uint8_t)(hardwareRegister & 0x0000000F)
 
 // Every time the value of hardwareRegister is updated, store this in a rolling buffer
@@ -177,16 +175,16 @@ float32_t AudioToDBM(float32_t audioVal);
 
 enum KeyTypeId {
     KeyTypeId_Straight = 0,
-    KeyTypeId_Keyer =    1,
-    KeyTypeId_Invalid =  8
+    KeyTypeId_Keyer = 1,
+    KeyTypeId_Invalid = 8
 };
 
 enum FilterType {
-    Lowpass =  0,
+    Lowpass = 0,
     Highpass = 1,
     Bandpass = 2,
-    Hilbert =  4,
-    Notch =    5
+    Hilbert = 4,
+    Notch = 5
 };
 
 enum TXRXType {
@@ -283,8 +281,6 @@ extern struct config_t {
     float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
     float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1}; /** Transmit IQ calibration amplitude correction */
     float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit IQ calibration phase correction */
-    int16_t DCOffsetI[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, I */
-    int16_t DCOffsetQ[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, Q */
     float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
     // XAtten is only used in CW mode
     //float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
@@ -389,7 +385,6 @@ struct ReceiveFilterConfig {
     arm_biquad_casd_df1_inst_f32 biquadZoomI;
     arm_biquad_casd_df1_inst_f32 biquadZoomQ;
     uint8_t zoom_M;
-    uint32_t zoom_sample_ptr = 0;  /** Tracks current position in FFT ring buffers for this filter config */
     const uint32_t IIR_biquad_Zoom_FFT_N_stages = 4;
 
     // Convolution FIR filter
@@ -633,9 +628,6 @@ struct AGCConfig {
 #include "UISm.h"
 #include "HardwareSm.h"
 #include "PowerCalSm.h"
-#include "ReceiveIQCalSm.h"
-#include "TransmitIQCalSm.h"
-#include "TransmitCarrierCalSm.h"
 // Others
 #include "ParamSave.h"
 #include "Loop.h"
@@ -659,16 +651,12 @@ extern struct BIT bit_results;
 extern struct band bands[];
 extern const struct SR_Descriptor SR[];
 extern ReceiveFilterConfig RXfilters;
-extern ReceiveFilterConfig RXTXfilters;
-extern ReceiveFilterConfig TXIQfilters;
 extern TransmitFilterConfig TXfilters;
 extern AGCConfig agc;
 extern UISm uiSM;
 extern ModeSm modeSM;
 extern PowerCalSm powerSM;
-extern ReceiveIQCalSm rxiqSM;
-extern TransmitIQCalSm txiqSM;
-extern TransmitCarrierCalSm txcarrSM;
+extern bool displayFFTUpdated; /** Set true when psdnew is updated */
 extern bool psdupdated;
 extern float32_t psdnew[]; /** Holds the current PSD data for the power spectrum display */
 extern float32_t audioYPixel[];
@@ -696,7 +684,7 @@ extern elapsedMicros usec;
 /** Structure of a hardware register buffer entry */
 typedef struct {
     uint32_t timestamp;
-    uint64_t register_value;
+    uint32_t register_value;
 } BufferEntry;
 
 /** Rolling buffer to store hardware register changes */
