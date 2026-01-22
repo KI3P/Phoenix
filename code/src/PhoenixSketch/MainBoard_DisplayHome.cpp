@@ -645,30 +645,41 @@ FASTRUN void ShowSpectrum(void){
         y_prev = pixelold[x1];
         pixelold[x1] = y_current;
         x1++;
-        if (x1 < 128) {
-            tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
-            if (audioYPixel[x1] != 0) {
-                if (audioYPixel[x1] > CLIP_AUDIO_PEAK)
-                    audioYPixel[x1] = CLIP_AUDIO_PEAK;
-                if (x1 == middleSlice) {
-                    smeterLength = y_current;
+        if (modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT){
+            if (x1 < 128) {
+                tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
+                if (audioYPixel[x1] > 2) {
+                    if (audioYPixel[x1] > CLIP_AUDIO_PEAK)
+                        audioYPixel[x1] = CLIP_AUDIO_PEAK;
+                    if (x1 == middleSlice) {
+                        smeterLength = y_current;
+                    }
+                    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
                 }
-                tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
             }
+            if (x1 == 128){
+                audioMaxSquaredAve = .5 * GetAudioPowerMax() + .5 * audioMaxSquaredAve;
+                DisplaydbM();
+            }
+            int test1 = -y_current + 230;
+            if (test1 < 0)
+                test1 = 0;
+            if (test1 > 117)
+                test1 = 117;
+            waterfall[x1] = gradient[test1];
         }
-        if (x1 == 128){
-            audioMaxSquaredAve = .5 * GetAudioPowerMax() + .5 * audioMaxSquaredAve;
-            DisplaydbM();
-        }
-        int test1 = -y_current + 230;
-        if (test1 < 0)
-            test1 = 0;
-        if (test1 > 117)
-            test1 = 117;
-        waterfall[x1] = gradient[test1];
     }
     
-    if (x1 >= MAX_WATERFALL_WIDTH){
+    if (x1 >= MAX_WATERFALL_WIDTH){        
+        x1 = 0;
+        y_prev = pixelold[0];
+        y_current = offset;
+        psdupdated = false;
+        redrawSpectrum = false;
+
+        if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)
+            return; // don't do the rest of these steps in transmit mode
+
         // if we're shifting the spectrum automatically, update the adjustment
         if (ED.spectrumFloorAuto){
             // our adjustment puts pixelmax (which is minimum power) at the bottom
@@ -680,12 +691,6 @@ FASTRUN void ShowSpectrum(void){
         }
         // In case spectrumNoiseFloor was changed
         offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
-        
-        x1 = 0;
-        y_prev = pixelold[0];
-        y_current = offset;
-        psdupdated = false;
-        redrawSpectrum = false;
 
         tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
         while (tft.readStatus()) ;
@@ -928,12 +933,46 @@ void DrawTimePane(void) {
 // SWR PANE
 ///////////////////////////////////////////////////////////////////////////////
 
-/**
- * Render the SWR (Standing Wave Ratio) pane (currently disabled/placeholder).
- */
 void DrawSWRPane(void) {
-    // Currently disabled
+
+    // Refresh rate
+    static uint32_t last = 0;
+    if (millis() - last < 250) return;   // 4 Hz
+    last = millis();
+
+    // TX is considered "active" if SWR was updated recently
+    const uint32_t age_ms = millis() - ReadSWRLastUpdateMs();
+    const bool txActive = (age_ms < 600);   // adjust 400..1000 as desired
+
+    float32_t s  = txActive ? ReadSWR() : 1.0f;
+    float32_t pf = txActive ? ReadForwardPower() : 0.0f;
+
+    // Guard rails
+    if (s < 1.0f) s = 1.0f;
+    if (s > 10.0f) s = 10.0f;
+    if (pf < 0.0f) pf = 0.0f;
+
+    tft.setFontDefault();
+    tft.fillRect(PaneSWR.x0, PaneSWR.y0, PaneSWR.width, PaneSWR.height, RA8875_BLACK);
+
+    // Smaller font: if 0 doesn't work in your build, change to 1.
+    tft.setFontScale((enum RA8875tsize)0);
+
+    // White on RX, Red on TX
+    tft.setTextColor(txActive ? RA8875_RED : RA8875_WHITE);
+
+    // Line 1: SWR
+    tft.setCursor(PaneSWR.x0, PaneSWR.y0);
+    tft.print("SWR ");
+    tft.print(s, 1);
+
+    // Line 2: Forward power (1 decimal)
+    tft.setCursor(PaneSWR.x0, PaneSWR.y0 + 12);
+    tft.print("PWR ");
+    tft.print(pf, 1);
+    tft.print("W");
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // TX/RX STATUS PANE
@@ -998,6 +1037,7 @@ void DrawTXRXStatusPane(void) {
     }
     PaneTXRXStatus.stale = false;
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // S-METER PANE

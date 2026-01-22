@@ -60,10 +60,10 @@ static AD7991 swrADC;
 #define LPF_GPA_STATE (uint8_t)((hardwareRegister >> 8) & 0x00000003)   // Bits 8 & 9
 #define LPF_GPB_STATE (uint8_t)(hardwareRegister & 0x000000FF)          // Lowest byte
 
-#define SET_LPF_GPA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFCFF) | (((uint32_t)val & 0x00000003) << 8));buffer_add()
-#define SET_LPF_GPB(val) (hardwareRegister = (hardwareRegister & 0xFFFFFF00) | ((uint32_t)val  & 0x000000FF));buffer_add()
-#define SET_LPF_BAND(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFF0) | ((uint32_t)val & 0x0000000F));buffer_add()
-#define SET_ANTENNA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFCF) | (((uint32_t)val & 0x00000003) << 4));buffer_add()
+#define SET_LPF_GPA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFCFF) | (((uint64_t)val & 0x00000003) << 8));buffer_add()
+#define SET_LPF_GPB(val) (hardwareRegister = (hardwareRegister & 0xFFFFFF00) | ((uint64_t)val  & 0x000000FF));buffer_add()
+#define SET_LPF_BAND(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFF0) | ((uint64_t)val & 0x0000000F));buffer_add()
+#define SET_ANTENNA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFCF) | (((uint64_t)val & 0x00000003) << 4));buffer_add()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Unit Testing Helper Functions
@@ -510,26 +510,47 @@ errno_t InitAntennaControl(void){
     return InitLPFBoardMCP();
 }
 
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // SWR (Standing Wave Ratio) Measurement
 ///////////////////////////////////////////////////////////////////////////////
 
+// ---------- SWR shared results (used by both modes) ----------
+static float32_t Pf_W;
+static float32_t Pr_W;
+static float32_t swr;
+static uint32_t swr_last_update_ms = 0;
+
+#ifdef USE_ANALOG_SWR
+// ---------- Analog SWR pins ----------
+static const int SWR_FWD_PIN = 26;   // A12 forward
+static const int SWR_REV_PIN = 27;   // A13 reverse
+static float32_t rawFwdOld = 0.0f;
+static float32_t rawRevOld = 0.0f;
+static const float32_t ADC_COUNTS = 1024.0f;   // 10-bit counts
+static const float32_t ADC_VREF   = 3.3f;      // volts
+#endif
+
+#ifndef USE_ANALOG_SWR
+// ---------- Digital (AD7991) SWR variables ----------
 static float32_t adcF_sRawOld;
 static float32_t adcR_sRawOld;
 static float32_t adcF_sRaw;
 static float32_t adcR_sRaw;
 static float32_t Pf_dBm;
 static float32_t Pr_dBm;
-static float32_t Pf_W;
-static float32_t Pr_W;
-static float32_t swr;
+#endif
 
 #define VREF_MV 4096     // the reference voltage on your board
 #define PAD_ATTENUATION_DB 26 // attenuation of the pad
 #define COUPLER_ATTENUATION_DB 20 // attenuation of the binocular toroid coupler
 
 /**
- * Read and calculate SWR, forward power, and reflected power.
+ * Read and calculate SWR, forward power, and reflected power.             WANT TO IMPLEMENT AN ANALOG FUNCTION OF THIS  DLS 21JA26
  *
  * Measurement Process:
  * 1. Read forward and reflected voltage from AD7991 ADC (channels 0 and 1)
@@ -550,7 +571,44 @@ static float32_t swr;
  *
  * @note Call this function periodically during transmit to update measurements
  */
+
 void PerformSWRBridgeReading(void) {
+
+#ifdef USE_ANALOG_SWR
+    // ===== ANALOG SWR (Teensy pins 26/27) =====
+    float32_t rawFwd = (float32_t)analogRead(SWR_FWD_PIN);
+    float32_t rawRev = (float32_t)analogRead(SWR_REV_PIN);
+
+
+    // simple smoothing (match your old behavior; tweak if desired)
+    float32_t avgFwd = 0.01f * rawFwd + 0.99f * rawFwdOld;
+    float32_t avgRev = 0.10f * rawRev + 0.90f * rawRevOld;
+    rawFwdOld = rawFwd;
+    rawRevOld = rawRev;
+
+    // counts -> volts
+    float32_t Vfwd = (avgFwd / ADC_COUNTS) * ADC_VREF;
+    float32_t Vrev = (avgRev / ADC_COUNTS) * ADC_VREF;
+
+    // 20 dB coupler assumed => x10 voltage
+    Pf_W = powf(Vfwd * 10.0f, 2.0f) / 50.0f;
+    Pr_W = powf(Vrev * 10.0f, 2.0f) / 50.0f;
+
+    // guard rails
+    if (Pf_W <= 0.001f) {   // essentially no forward power
+        swr = 1.0f;
+        return;
+    }
+    float32_t A = sqrtf(Pr_W / Pf_W);   // |Gamma|
+    if (A >= 0.999f) A = 0.999f;        // avoid divide-by-zero / infinity
+    if (A < 0.0f)    A = 0.0f;
+
+    swr = (1.0f + A) / (1.0f - A);
+    swr_last_update_ms = millis();
+
+#else
+
+    // ===== DIGITAL SWR (AD7991) - developer code unchanged =====
     // Step 1. Measure the peak forward and Reverse voltages
     adcF_sRaw = (float32_t)swrADC.readADCsingle(0);
     adcR_sRaw = (float32_t)swrADC.readADCsingle(1);
@@ -573,15 +631,27 @@ void PerformSWRBridgeReading(void) {
     // Finally, calculate the standing wave ratio
     float32_t A = pow(Pr_W / Pf_W, 0.5);
     swr = (1.0 + A) / (1.0 - A);
+    swr_last_update_ms = millis();   
+#endif
 }
 
+#ifndef USE_ANALOG_SWR
 float32_t ReadADCFwdRaw(void){
     return adcF_sRaw;
 }
-
 float32_t ReadADCRefRaw(void){
     return adcR_sRaw;
 }
+#else
+// Analog mode: AD7991 raw values don't exist
+float32_t ReadADCFwdRaw(void){
+    return 0.0f;
+}
+float32_t ReadADCRefRaw(void){
+    return 0.0f;
+}
+#endif
+
 
 
 /**
@@ -620,6 +690,11 @@ float32_t ReadReflectedPower(void){
     return Pr_W;
 }
 
+uint32_t ReadSWRLastUpdateMs(void){
+    return swr_last_update_ms;
+}
+
+
 /**
  * Initialize the SWR measurement hardware (AD7991 ADC).
  *
@@ -633,7 +708,28 @@ float32_t ReadReflectedPower(void){
  *
  * @return ESUCCESS if ADC initialized at either address, ENOI2C if not found
  */
-errno_t InitSWRControl(void){
+errno_t InitSWRControl(void){                                     //                         DLS  21JA26
+
+#ifdef USE_ANALOG_SWR
+    // Analog mode: no AD7991 required
+    pinMode(SWR_FWD_PIN, INPUT);
+    pinMode(SWR_REV_PIN, INPUT);
+
+    // Force the resolution to match ADC_COUNTS=1024
+    analogReadResolution(10);
+
+    bit_results.V12_LPF_AD7991_present = false;
+
+    Pf_W = 0.0f;
+    Pr_W = 0.0f;
+    swr  = 1.0f;
+    rawFwdOld = 0.0f;
+    rawRevOld = 0.0f;
+  
+    return ESUCCESS;
+
+#else
+    // Digital mode: developer AD7991 init unchanged
     bit_results.V12_LPF_AD7991_present = false;
     if (swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
         bit_results.V12_LPF_AD7991_present = true;
@@ -650,5 +746,7 @@ errno_t InitSWRControl(void){
     }
     Debug("AD7991 not found at 0x"+String(AD7991_I2C_ADDR2,HEX));
     return ENOI2C;
+#endif
 }
+
 

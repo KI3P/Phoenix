@@ -1,4 +1,4 @@
-#define MY_CALL                                 "n3ds" // Default max is 10 chars
+#define MY_CALL                                 "ABCDE" // Default max is 10 chars
 #define MY_TIMEZONE                             "EST: "  // Default max is 10 chars
 //#define ITU_REGION                            1  // Europe
 #define ITU_REGION                              2  // USA
@@ -14,16 +14,22 @@
 #define STARTUP_BAND BAND_40M   // This is the 40M band
 
 // Timing for startup screens
-#define SPLASH_DURATION_MS 1000 // How long to show Splash screen
+#define SPLASH_DURATION_MS 2000 // How long to show Splash screen
 
 // Control encoder direction and speed
 #define FAST_TUNE // comment this out to disable the FAST_TUNE algorithm
-#define VOLUME_REVERSED true
-#define FILTER_REVERSED true
-#define MAIN_TUNE_REVERSED true
-#define FINE_TUNE_REVERSED false
+#define VOLUME_REVERSED false              //   MY ENCODERS ARE REVERSED FROM OLIVER'S, DEFAULT IS TRUE
+#define FILTER_REVERSED false             //   MY ENCODERS ARE REVERSED FROM OLIVER'S, DEFAULT IS TRUE
+#define MAIN_TUNE_REVERSED false             //   MY ENCODERS ARE REVERSED FROM OLIVER'S, DEFAULT IS TRUE
+#define FINE_TUNE_REVERSED true             //   MY ENCODERS ARE REVERSED FROM OLIVER'S, DEFAULT IS FALSE
 #define ENCODER_FACTOR 0.25F    // use 0.25f with cheap encoders that have 4 detents per step,
                                 // for other encoders or libs we use 1.0f
+
+// Direct coupled transmit
+#define DIRECT_COUPLED_TX
+
+// Uncomment to use the Analog SWR instead of the Digital SWR on the display                            DLS 22JA26
+#define USE_ANALOG_SWR   // uncomment to use analog SWR on pins 26/27
 
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state
@@ -33,7 +39,8 @@
 #define KEYER_FLIP                              false // or true
 
 // Set the I2C addresses of the LPF, BPF, RF, and front panel boards
-#define SI5351_BUS_BASE_ADDR    0x60
+#define SI5351_BUS_BASE_ADDR    0x6F     //  MY ADDRESS WAS 0X6F, DEFAULT IS 0X60, NOW RUNNING DUAL OSC    DLS 15JA26
+#define SI5351_DUAL_VFO_ADDR    0x61     // The I2C address with split VFO hardware
 #define LPF_MCP23017_ADDR       0x25
 #define BPF_MCP23017_ADDR       0x24
 #define RF_MCP23017_ADDR        0x27
@@ -61,6 +68,7 @@
 #define DECODER_TOGGLE      13
 #define DFE                 14
 #define BEARING             15
+#define SPARE               16
 #define HOME_SCREEN         17
 #define VOLUME_BUTTON       18
 #define FILTER_BUTTON       19
