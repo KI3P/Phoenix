@@ -510,11 +510,6 @@ errno_t InitAntennaControl(void){
     return InitLPFBoardMCP();
 }
 
-
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // SWR (Standing Wave Ratio) Measurement
 ///////////////////////////////////////////////////////////////////////////////
@@ -550,7 +545,7 @@ static float32_t Pr_dBm;
 #define COUPLER_ATTENUATION_DB 20 // attenuation of the binocular toroid coupler
 
 /**
- * Read and calculate SWR, forward power, and reflected power.             WANT TO IMPLEMENT AN ANALOG FUNCTION OF THIS  DLS 21JA26
+ * Read and calculate SWR, forward power, and reflected power.  
  *
  * Measurement Process:
  * 1. Read forward and reflected voltage from AD7991 ADC (channels 0 and 1)
@@ -653,7 +648,6 @@ float32_t ReadADCRefRaw(void){
 #endif
 
 
-
 /**
  * Get the most recently calculated SWR value.
  *
@@ -708,7 +702,7 @@ uint32_t ReadSWRLastUpdateMs(void){
  *
  * @return ESUCCESS if ADC initialized at either address, ENOI2C if not found
  */
-errno_t InitSWRControl(void){                                     //                         DLS  21JA26
+errno_t InitSWRControl(void){  
 
 #ifdef USE_ANALOG_SWR
     // Analog mode: no AD7991 required

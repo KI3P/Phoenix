@@ -4,9 +4,9 @@
 #include <stdint.h>  
 #include <Arduino.h>
 #include "Config.h"
-uint32_t ReadSWRLastUpdateMs(void);
+
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.1DS1"                          //                     TO INDICATE MY MODS                             DLS  21JA26
+#define VERSION "Phx V1.2" 
 
 #include "BuildInfo.h"
 

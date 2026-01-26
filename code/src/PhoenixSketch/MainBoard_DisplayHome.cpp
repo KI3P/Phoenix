@@ -15,6 +15,7 @@
  */
 
 #include "SDT.h"
+#include "LPFBoard.h"
 #include "MainBoard_Display.h"
 #include <RA8875.h>
 #include <TimeLib.h>

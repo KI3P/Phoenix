@@ -122,6 +122,9 @@ float32_t ReadForwardPower(void);
  */
 float32_t ReadReflectedPower(void);
 
+// Timestamp (ms) of the most recent SWR update (used by display to detect TX activity)
+uint32_t ReadSWRLastUpdateMs(void);
+
 /**
  * @brief Initialize the SWR measurement hardware (AD7991 ADC)
  * @return ESUCCESS on success, ENOI2C if I2C communication fails
