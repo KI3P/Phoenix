@@ -59,6 +59,29 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 # Version History
 
+## V1.2 Release Notes
+
+### New Features
+
+**Optional Analog SWR Measurement**
+A new compile-time option `USE_ANALOG_SWR` enables SWR measurement using Teensy ADC pins 26 (forward) and 27 (reverse) instead of the AD7991 digital ADC. This provides an alternative for builders who prefer analog measurement or don't have the AD7991 chip. Enable this option by uncommenting `#define USE_ANALOG_SWR` in `Config.h`.
+
+**SWR/Power Display Pane**
+A new home screen pane displays real-time SWR and forward power during transmit:
+- Shows SWR value (1.0-10.0) and forward power in watts
+- Updates at 4 Hz during transmit
+- Text displays in red during active transmit, white during receive
+- Automatically detects transmit activity based on SWR measurement timing
+
+### Under-the-Hood Changes
+
+- Hardware register expanded from 32 to 64 bits to support TXVFOBIT for dual VFO tracking
+- Display code optimized to skip spectrum/waterfall updates during SSB transmit mode
+- Added `SI5351_DUAL_VFO_ADDR` constant (0x61) for dual VFO hardware configuration
+- New `ReadSWRLastUpdateMs()` API function for tracking SWR measurement timing
+- Added `DIRECT_COUPLED_TX` compile-time option (disabled by default)
+- Added spare button mapping slot in Config.h
+
 ## V1.1 Release Notes
 
 ### Major New Features
