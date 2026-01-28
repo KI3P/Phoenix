@@ -28,6 +28,11 @@
 // Direct coupled transmit
 //#define DIRECT_COUPLED_TX
 
+// Optional: use analog SWR on Teensy ADC pins 26 (FWD) / 27 (REV).
+// Default uses AD7991 digital SWR.
+//#define USE_ANALOG_SWR
+
+
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state
 #define DEFAULT_KEYER_WPM                       20 // Startup value for keyer wpm

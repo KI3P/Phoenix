@@ -15,6 +15,7 @@
  */
 
 #include "SDT.h"
+#include "LPFBoard.h"
 #include "MainBoard_Display.h"
 #include <RA8875.h>
 #include <TimeLib.h>
@@ -933,12 +934,46 @@ void DrawTimePane(void) {
 // SWR PANE
 ///////////////////////////////////////////////////////////////////////////////
 
-/**
- * Render the SWR (Standing Wave Ratio) pane (currently disabled/placeholder).
- */
 void DrawSWRPane(void) {
-    // Currently disabled
+
+    // Refresh rate
+    static uint32_t last = 0;
+    if (millis() - last < 250) return;   // 4 Hz
+    last = millis();
+
+    // TX is considered "active" if SWR was updated recently
+    const uint32_t age_ms = millis() - ReadSWRLastUpdateMs();
+    const bool txActive = (age_ms < 600);   // adjust 400..1000 as desired
+
+    float32_t s  = txActive ? ReadSWR() : 1.0f;
+    float32_t pf = txActive ? ReadForwardPower() : 0.0f;
+
+    // Guard rails
+    if (s < 1.0f) s = 1.0f;
+    if (s > 10.0f) s = 10.0f;
+    if (pf < 0.0f) pf = 0.0f;
+
+    tft.setFontDefault();
+    tft.fillRect(PaneSWR.x0, PaneSWR.y0, PaneSWR.width, PaneSWR.height, RA8875_BLACK);
+
+    // Smaller font: if 0 doesn't work in your build, change to 1.
+    tft.setFontScale((enum RA8875tsize)0);
+
+    // White on RX, Red on TX
+    tft.setTextColor(txActive ? RA8875_RED : RA8875_WHITE);
+
+    // Line 1: SWR
+    tft.setCursor(PaneSWR.x0, PaneSWR.y0);
+    tft.print("SWR ");
+    tft.print(s, 1);
+
+    // Line 2: Forward power (1 decimal)
+    tft.setCursor(PaneSWR.x0, PaneSWR.y0 + 12);
+    tft.print("PWR ");
+    tft.print(pf, 1);
+    tft.print("W");
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // TX/RX STATUS PANE
@@ -1003,6 +1038,7 @@ void DrawTXRXStatusPane(void) {
     }
     PaneTXRXStatus.stale = false;
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // S-METER PANE

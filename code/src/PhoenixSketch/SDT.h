@@ -1,14 +1,17 @@
 #ifndef SDT_H
 #define SDT_H
 
+#include <stdint.h>  
+#include <Arduino.h>
+#include "Config.h"
+
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.1"
+#define VERSION "Phx V1.2" 
 
 #include "BuildInfo.h"
 
 #define Debug(x) Serial.println(x)
 
-#include <Arduino.h>
 #include <Adafruit_MCP23X17.h>         // Installed via Arduino library manager
 #include <OpenAudio_ArduinoLibrary.h>  // https://github.com/chipaudette/OpenAudio_ArduinoLibrary
 #include <utility/imxrt_hw.h>
@@ -16,12 +19,10 @@
 #include <arm_const_structs.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <TimeLib.h>
-#include "Config.h"
 
 #ifndef __STDC_LIB_EXT1__
 typedef int errno_t;
