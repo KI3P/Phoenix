@@ -24,6 +24,10 @@ extern AudioSynthWaveformSine transmitIQcal_oscillator;
  */
 int SetI2SFreq(int freq);
 
+// FT8 / USB TX audio select                           
+void SetFt8Mode(bool enabled);
+bool GetFt8Mode(void);
+
 /**
  * @brief Initialize dual-codec audio subsystem for Phoenix SDR
  * @note Configures SGTL5000 codecs for transmit path (Teensy Audio Board) and receive path (main board)

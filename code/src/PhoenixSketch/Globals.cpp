@@ -489,7 +489,7 @@ time_t getTeensy3Time() {
 
 void setup(void){
     Serial.begin(115200);
-    SerialUSB1.begin(38400); // For CAT control
+    Serial.begin(38400); // For CAT control
     Serial.println("T41 SDT Setup");
 
     // get TIME from real time clock with 3V backup battery

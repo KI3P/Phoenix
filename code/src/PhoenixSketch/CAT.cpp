@@ -1,4 +1,5 @@
 #include "CAT.h"
+#include "MainBoard_AudioIO.h"   // GetFt8Mode()
 
 // Kenwood TS-480 CAT Interface (partial)
 //
@@ -693,10 +694,22 @@ char *RX_write( char* cmd ){
 char *TX_write( char* cmd ){
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_RECEIVE):{
+#ifdef T41_USB_AUDIO
+            // Only allow CAT PTT (WSJT-X TX) when FT8 mode is enabled
+            if (GetFt8Mode()) {
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+            } else {
+                // Ignore TX request if not in FT8 mode
+                // (optional) Serial.println("CAT TX ignored: FT8 mode is OFF");
+            }
+#else
+            // No USB audio build: allow normal CAT PTT behavior
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+#endif
             break;
         } 
         case (ModeSm_StateId_CW_RECEIVE):{
+            // CW keying via CAT still allowed
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
             break;
         }
@@ -705,6 +718,7 @@ char *TX_write( char* cmd ){
     }
     return empty_string_p;
 }
+
 
 char *VX_write( char* cmd ){
     Debug("Got VX write");
@@ -751,8 +765,8 @@ char *PR_read(  char* cmd  ){
 void CheckForCATSerialEvents(void){
     int i;
     char c;
-    while( ( i = SerialUSB1.available() ) > 0 ){
-        c = ( char )SerialUSB1.read();
+    while( ( i = Serial.available() ) > 0 ){
+        c = ( char )Serial.read();
         i--;
         catCommand[ catCommandIndex ] = c;
         #ifdef DEBUG_CAT
@@ -777,17 +791,17 @@ void CheckForCATSerialEvents(void){
                 #endif // DEBUG_CAT
                 int i = 0;
                 while( parser_output[i] != '\0' ){
-                    if( SerialUSB1.availableForWrite() > 0 ){
-                        SerialUSB1.print( parser_output[i] );
+                    if( Serial.availableForWrite() > 0 ){
+                        Serial.print( parser_output[i] );
                         #ifdef DEBUG_CAT
                         Serial.print( parser_output[i] );
                         #endif
                         i++;
                     }else{
-                        SerialUSB1.flush();
+                        Serial.flush();
                     }
                 }
-                SerialUSB1.flush();
+                Serial.flush();
                 #ifdef DEBUG_CAT
                 Serial.println();
                 #endif // DEBUG_CAT

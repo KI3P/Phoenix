@@ -6,11 +6,17 @@
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.2" 
+#define VERSION "Phx V1.3"                  //  WSJT VERSION 
 
 #include "BuildInfo.h"
 
-#define Debug(x) Serial.println(x)
+// Debug logging: enable only when you are NOT using USB Serial for CAT (e.g., FT8)
+#ifdef ENABLE_DEBUG_SERIAL
+  #define Debug(x) Serial.println(x)
+#else
+  #define Debug(x) do {} while(0)
+#endif
+
 
 #include <Adafruit_MCP23X17.h>         // Installed via Arduino library manager
 #include <OpenAudio_ArduinoLibrary.h>  // https://github.com/chipaudette/OpenAudio_ArduinoLibrary

@@ -52,6 +52,7 @@
  */
 
 #include "MainBoard_AudioIO.h"
+#include "Ft8UsbBridge.h"
 
 /**
  * The transition from analog to digital and digital to analog are handled using a fork
@@ -98,6 +99,7 @@
  * to see what it is what you're trying to transmit. Probably don't need this anymore.
  */
 
+
 // Generated using this tool: https://www.pjrc.com/teensy/gui/index.html
 // GUItool: begin automatically generated code
 AudioInputI2SQuad        i2s_quadIn;     //xy=576.75,225
@@ -120,6 +122,16 @@ AudioMixer4              modeSelectOutL; //xy=1725.75,184
 AudioMixer4              modeSelectOutExR; //xy=1727.75,103
 AudioMixer4              modeSelectOutR; //xy=1732.75,291
 AudioOutputI2SQuad       i2s_quadOut;    //xy=1969.75,138
+
+#ifdef T41_USB_AUDIO
+AudioPlayQueue Q_usbOut_L;
+AudioPlayQueue Q_usbOut_R;
+AudioOutputUSB usbOut;
+// stereo gain blocks for the PC feed
+AudioAmplifier usbRxGainL;
+AudioAmplifier usbRxGainR;
+#endif
+
 AudioConnection          patchCord1(i2s_quadIn, 0, modeSelectInExL, 0);
 AudioConnection          patchCord2(i2s_quadIn, 1, modeSelectInExR, 0);
 AudioConnection          patchCord3(i2s_quadIn, 2, modeSelectInL, 0);
@@ -141,7 +153,17 @@ AudioConnection          patchCord18(Q_out_L, 0, modeSelectOutL, 0);
 AudioConnection          patchCord19(modeSelectOutExL, 0, i2s_quadOut, 0);
 AudioConnection          patchCord20(modeSelectOutL, 0, i2s_quadOut, 2);
 AudioConnection          patchCord21(modeSelectOutExR, 0, i2s_quadOut, 1);
-AudioConnection          patchCord22(modeSelectOutR, 0, i2s_quadOut, 3);
+AudioConnection          patchCord22(modeSelectOutR,   0, i2s_quadOut, 3);
+
+#ifdef T41_USB_AUDIO
+AudioConnection patchUsbGainL(Q_usbOut_L, 0, usbRxGainL, 0);
+AudioConnection patchUsbGainR(Q_usbOut_R, 0, usbRxGainR, 0);
+
+AudioConnection patchUsbL(usbRxGainL, 0, usbOut, 0);
+AudioConnection patchUsbR(usbRxGainR, 0, usbOut, 1);
+#endif
+
+
 AudioControlSGTL5000     pcm5102_mainBoard; //xy=874.75,449
 // GUItool: end automatically generated code
 
@@ -151,18 +173,20 @@ AudioControlSGTL5000_Extended sgtl5000_teensy;
 
 static ModeSm_StateId previousAudioIOState = ModeSm_StateId_ROOT;
 
-/**
- * Get the previous audio I/O state.
- *
- * Returns the ModeSm state that the audio routing was last configured for.
- * Used to detect state changes and avoid unnecessary reconfiguration of the
- * audio graph when the mode hasn't changed.
- *
- * @return The previous ModeSm_StateId that audio routing was configured for
- */
-ModeSm_StateId GetAudioPreviousState(void){
-    return previousAudioIOState;
-}
+// Always exist so other modules can link
+static bool g_ft8Mode = false;
+
+#ifdef T41_USB_AUDIO
+enum class TxAudioSource : uint8_t { MIC = 0, USB = 2 };
+static void SelectTxInputSource(void);
+
+// remember the user’s modulation so FT8 can restore it
+static ModulationType g_savedModulation = USB;
+static bool g_haveSavedModulation = false;
+
+static TxAudioSource g_prevTxAudioSource = TxAudioSource::MIC;
+static TxAudioSource g_txAudioSource     = TxAudioSource::MIC;  // <-- IMPORTANT: MIC at boot
+#endif
 
 /**
  * Select a single active channel on a 4-channel audio mixer.
@@ -177,12 +201,65 @@ ModeSm_StateId GetAudioPreviousState(void){
  * @param mixer Pointer to the AudioMixer4 object to configure
  * @param channel Channel number to enable (0-3), all others will be muted
  */
+
 void SelectMixerChannel(AudioMixer4 *mixer, uint8_t channel){
     for (uint8_t k = 0; k < 4; k++){
         if (k == channel) mixer->gain(k,1);
         else mixer->gain(k,0);
     }
 }
+
+#ifdef T41_USB_AUDIO
+static void SelectTxInputSource(void)
+{
+    const uint8_t ch = static_cast<uint8_t>(g_txAudioSource);
+    SelectMixerChannel(&modeSelectInExL, ch);
+    SelectMixerChannel(&modeSelectInExR, ch);
+}
+#endif
+
+void SetFt8Mode(bool enabled)
+{
+    g_ft8Mode = enabled;
+
+#ifdef T41_USB_AUDIO
+    // Select TX audio source
+    g_txAudioSource = enabled ? TxAudioSource::USB : TxAudioSource::MIC;
+
+    if (enabled) {
+        // Save current modulation once, then force USB
+        if (!g_haveSavedModulation) {
+            g_savedModulation = ED.modulation[ED.activeVFO];
+            g_haveSavedModulation = true;
+        }
+        ED.modulation[ED.activeVFO] = USB;
+        UpdateRFHardwareState();
+    } else {
+        // Restore modulation when leaving FT8
+        if (g_haveSavedModulation) {
+            ED.modulation[ED.activeVFO] = g_savedModulation;
+            g_haveSavedModulation = false;
+            UpdateRFHardwareState();
+        }
+    }
+
+    // If we're already in TX, apply immediately
+    if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) {
+        SelectTxInputSource();
+        g_prevTxAudioSource = g_txAudioSource;
+    }
+#else
+    (void)enabled;
+#endif
+}
+
+
+
+bool GetFt8Mode(void)
+{
+    return g_ft8Mode;
+}
+
 
 /**
  * Mute all channels on a 4-channel audio mixer.
@@ -259,11 +336,21 @@ void UpdateTransmitAudioGain(void){
  * @see ModeSm state machine for state transition logic
  * @see UpdateRFHardwareState() in RFBoard.cpp
  */
+
 void UpdateAudioIOState(void){
-    if (modeSM.state_id == previousAudioIOState){
-        // Already in this state, no need to change
-        return;
+if (modeSM.state_id == previousAudioIOState){
+
+#ifdef T41_USB_AUDIO
+    // If still in TX and the selected TX source changed, re-apply it.
+    if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT && g_txAudioSource != g_prevTxAudioSource) {
+        SelectTxInputSource();
+        g_prevTxAudioSource = g_txAudioSource;
     }
+#endif
+
+    return;
+}
+
     switch (modeSM.state_id){
         case (ModeSm_StateId_CALIBRATE_OFFSET_SPACE):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_SPACE):
@@ -297,13 +384,36 @@ void UpdateAudioIOState(void){
             Q_in_L.begin(); 
             Q_in_R.begin();
             // Microphone input starts
-            Q_in_L_Ex.begin(); 
+        #ifdef T41_USB_AUDIO
+            if (GetFt8Mode()) {
+                // FT8 TX uses Ft8UsbBridge (not the mic record queues)
+                Q_in_L_Ex.end();
+                Q_in_R_Ex.end();
+            } else {
+                // Normal voice SSB TX uses microphone queues
+                Q_in_L_Ex.begin();
+                Q_in_R_Ex.begin();
+            }
+        #else
+            Q_in_L_Ex.begin();
             Q_in_R_Ex.begin();
+        #endif
+
             sgtl5000_teensy.micGain(ED.currentMicGain);
 
             // Input is microphone
-            SelectMixerChannel(&modeSelectInExL,0);
+            #ifdef T41_USB_AUDIO
+            SelectTxInputSource();   // chooses MIC(0) or USB(2)
+            #else
+            SelectMixerChannel(&modeSelectInExL,0); // mic
             SelectMixerChannel(&modeSelectInExR,0);
+            #endif
+
+            #ifdef T41_USB_AUDIO
+            g_prevTxAudioSource = g_txAudioSource;
+            #endif
+
+
             // Output is samples to RF transmit
             SelectMixerChannel(&modeSelectOutExL,0);
             SelectMixerChannel(&modeSelectOutExR,0);
@@ -425,7 +535,10 @@ void UpdateAudioIOState(void){
  * @see SR[] array in Config.h for supported sample rates
  */
 void InitializeAudio(void){
+    
     SetI2SFreq(SR[SampleRate].rate);
+
+
     // The sgtl5000_teensy is the controller for the Teensy Audio board. We use it to get 
     // the microphone input for SSB, and the I/Q output for the exciter board. In other
     // words, it is used for the transmit path.
@@ -433,6 +546,15 @@ void InitializeAudio(void){
     sgtl5000_teensy.enable();
     AudioMemory(500);
     AudioMemory_F32(10);
+
+
+#ifdef T41_USB_AUDIO
+Ft8UsbBridge_Init((float)SR[SampleRate].rate);
+usbRxGainL.gain(2.0f);   // try 1.0 to 6.0          FOR FT8 GAIN TO WINDOWS
+usbRxGainR.gain(2.0f);
+SetFt8Mode(false);
+#endif
+
     sgtl5000_teensy.inputSelect(AUDIO_INPUT_MIC); // set mic pre-amp gain to 40dB & audio gain to 12dB
     sgtl5000_teensy.micGain(10); // sets pre-amp and input gain to achieve 10dB of total gain
     sgtl5000_teensy.lineInLevel(0); // set ADC right and left channel volumes to 0dB
