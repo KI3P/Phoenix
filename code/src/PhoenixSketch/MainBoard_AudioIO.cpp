@@ -548,12 +548,12 @@ void InitializeAudio(void){
     AudioMemory_F32(10);
 
 
-#ifdef T41_USB_AUDIO
-Ft8UsbBridge_Init((float)SR[SampleRate].rate);
-usbRxGainL.gain(2.0f);   // try 1.0 to 6.0          FOR FT8 GAIN TO WINDOWS
-usbRxGainR.gain(2.0f);
-SetFt8Mode(false);
-#endif
+    #ifdef T41_USB_AUDIO
+    Ft8UsbBridge_Init((float)SR[SampleRate].rate);
+    usbRxGainL.gain(2.0f);   // try 1.0 to 6.0          FOR FT8 GAIN TO WINDOWS
+    usbRxGainR.gain(2.0f);
+    SetFt8Mode(false);
+    #endif
 
     sgtl5000_teensy.inputSelect(AUDIO_INPUT_MIC); // set mic pre-amp gain to 40dB & audio gain to 12dB
     sgtl5000_teensy.micGain(10); // sets pre-amp and input gain to achieve 10dB of total gain

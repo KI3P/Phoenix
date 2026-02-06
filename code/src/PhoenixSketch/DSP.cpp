@@ -958,21 +958,25 @@ DataBlock * ReceiveProcessing(const char *fname){
         CWAudioFilter(&data, &RXfilters);
     }
 
-// Interpolate
-InterpolateReceiveData(&data, &RXfilters);
-// Volume knob only affects the speaker path
-PlayUsbBufferPreVol(&data);
-// Volume knob only affects the speaker path
-AdjustVolume(&data, &RXfilters);
-SaveData(&data, 6); // used by the unit tests
-// Play sound on the speaker (post-volume)
-PlayBuffer(&data);
+    // Interpolate
+    InterpolateReceiveData(&data, &RXfilters);
 
-elapsed_micros_sum = elapsed_micros_sum + usec;
-elapsed_micros_idx_t++;
-//Flag(0);
+    #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
+        // Send audio to PC *before* volume knob affects it
+        PlayUsbBufferPreVol(&data);
+    #endif
 
-return &data;
+    // Speaker path volume knob
+    AdjustVolume(&data, &RXfilters);
+
+    SaveData(&data, 6); // used by the unit tests
+
+    // Always feed the speaker output (works in both builds)
+    PlayBuffer(&data);
+
+    elapsed_micros_sum = elapsed_micros_sum + usec;
+    elapsed_micros_idx_t++;
+    return &data;
 }
 
 

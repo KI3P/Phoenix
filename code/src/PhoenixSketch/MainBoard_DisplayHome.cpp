@@ -298,13 +298,13 @@ void DrawFreqBandModPane(void) {
     ft8 = GetFt8Mode();
     #endif
 
-if ((oldCenterFreq != ED.centerFreq_Hz[ED.activeVFO]) ||
-    (oldBand != ED.currentBand[ED.activeVFO]) ||
-    (oldState != modeSM.state_id) ||
-    (oldModulation != ED.modulation[ED.activeVFO]) ||
-    (oldFt8Mode != ft8)){
-    PaneFreqBandMod.stale = true;
-}
+    if ((oldCenterFreq != ED.centerFreq_Hz[ED.activeVFO]) ||
+        (oldBand != ED.currentBand[ED.activeVFO]) ||
+        (oldState != modeSM.state_id) ||
+        (oldModulation != ED.modulation[ED.activeVFO]) ||
+        (oldFt8Mode != ft8)){
+        PaneFreqBandMod.stale = true;
+    }
 
     if (!PaneFreqBandMod.stale) return;
 
@@ -347,10 +347,10 @@ if ((oldCenterFreq != ED.centerFreq_Hz[ED.activeVFO]) ||
             tft.print("(LSB)");
             break;
         case USB:
-        // Only label FT8 when FT8 mode is enabled
-        if (ft8) tft.print("(FT8)");
-        else     tft.print("(USB)");
-        break;
+            // Only label FT8 when FT8 mode is enabled
+            if (ft8) tft.print("(FT8)");
+            else     tft.print("(USB)");
+            break;
         case AM:
             tft.print("(AM)");
             break;

@@ -754,7 +754,6 @@ char *PR_read(  char* cmd  ){
     return obuf;
 }
 
-
 /**
  * Poll SerialUSB1 for incoming CAT commands and process them
  *
@@ -765,55 +764,56 @@ char *PR_read(  char* cmd  ){
 void CheckForCATSerialEvents(void){
     int i;
     char c;
-    while( ( i = Serial.available() ) > 0 ){
-        c = ( char )Serial.read();
+
+#ifdef T41_USB_AUDIO
+    while ( (i = Serial.available()) > 0 ) {
+        c = (char)Serial.read();
+#else
+    while ( (i = SerialUSB1.available()) > 0 ) {
+        c = (char)SerialUSB1.read();
+#endif
         i--;
         catCommand[ catCommandIndex ] = c;
-        #ifdef DEBUG_CAT
-        Serial.print( catCommand[ catCommandIndex ] );
-        #endif
-        if( c == ';' ){
-            // Finished reading CAT command
-            #ifdef DEBUG_CAT
-            Serial.println();
-            #endif // DEBUG_CAT
 
-            // Check to see if the command is a good one BEFORE sending it
-            // to the command executor
-            //Serial.println( String("catCommand is ")+String(catCommand)+String(" catCommandIndex is ")+String(catCommandIndex));
+#ifdef DEBUG_CAT
+        Serial.print( catCommand[ catCommandIndex ] );
+#endif
+
+        if( c == ';' ){
+#ifdef DEBUG_CAT
+            Serial.println();
+#endif
             char *parser_output = command_parser( catCommand );
             catCommandIndex = 0;
-            // We executed it, now erase it
             memset( catCommand, 0, sizeof( catCommand ));
+
             if( parser_output[0] != '\0' ){
-                #ifdef DEBUG_CAT1
-                Serial.println( parser_output );
-                #endif // DEBUG_CAT
                 int i = 0;
                 while( parser_output[i] != '\0' ){
+#ifdef T41_USB_AUDIO
                     if( Serial.availableForWrite() > 0 ){
                         Serial.print( parser_output[i] );
-                        #ifdef DEBUG_CAT
-                        Serial.print( parser_output[i] );
-                        #endif
+#else
+                    if( SerialUSB1.availableForWrite() > 0 ){
+                        SerialUSB1.print( parser_output[i] );
+#endif
                         i++;
-                    }else{
-                        Serial.flush();
                     }
                 }
+#ifdef T41_USB_AUDIO
                 Serial.flush();
-                #ifdef DEBUG_CAT
-                Serial.println();
-                #endif // DEBUG_CAT
+#else
+                SerialUSB1.flush();
+#endif
             }
-        }else{
+        } else {
             catCommandIndex++;
             if( catCommandIndex >= 128 ){
                 catCommandIndex = 0;
-                memset( catCommand, 0, sizeof( catCommand ));   //clear out that overflowed buffer!
-                #ifdef DEBUG_CAT
+                memset( catCommand, 0, sizeof( catCommand ));
+#ifdef DEBUG_CAT
                 Serial.println( "CAT command buffer overflow" );
-                #endif
+#endif
             }
         }
     }

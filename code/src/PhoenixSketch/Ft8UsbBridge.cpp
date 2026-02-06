@@ -12,6 +12,9 @@
 #include <Audio.h>
 #include <string.h>
 #include "Ft8UsbBridge.h"
+#include "Config.h"
+
+#if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
 
 // -----------------------------------------------------------------------------
 // USB audio objects
@@ -219,3 +222,5 @@ bool Ft8UsbBridge_GetSamples(float *out, uint32_t outCount)
     g_blocksSinceInit++;
     return true;
 }
+
+#endif
