@@ -1,0 +1,37 @@
+name: Compile Production Sketch
+
+on:
+  pull_request:
+    paths:
+      - 'code/src/PhoenixSketch/**'
+      - '.github/workflows/compile.yml'
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Configure board support
+        run: |
+          arduino-cli config init
+          arduino-cli config set library.enable_unsafe_install true
+          arduino-cli config add board_manager.additional_urls \
+            https://www.pjrc.com/teensy/package_teensy_index.json
+          arduino-cli core update-index
+          arduino-cli core install teensy:avr
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib install ArduinoJson "Adafruit MCP23017 Arduino Library"
+          arduino-cli lib install --git-url \
+            https://github.com/chipaudette/OpenAudio_ArduinoLibrary.git
+
+      - name: Compile sketch
+        run: |
+          arduino-cli compile \
+            --fqbn teensy:avr:teensy41:usb=serial2,speed=600,opt=fastlto \
+            code/src/PhoenixSketch/PhoenixSketch.ino
