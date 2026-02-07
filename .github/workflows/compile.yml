@@ -33,5 +33,5 @@ jobs:
       - name: Compile sketch
         run: |
           arduino-cli compile \
-            --fqbn teensy:avr:teensy41:usb=serial2,speed=600,opt=fastlto \
+            --fqbn teensy:avr:teensy41:usb=serial2,speed=600,opt=o1lto \
             code/src/PhoenixSketch/PhoenixSketch.ino
