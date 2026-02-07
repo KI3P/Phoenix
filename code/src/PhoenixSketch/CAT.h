@@ -2,6 +2,7 @@
 #define CAT_H
 #include "SDT.h"
 
+
 /**
  * @brief Poll and process CAT (Computer Aided Transceiver) serial commands
  * @note Called from main loop to handle Kenwood TS-2000 protocol commands
