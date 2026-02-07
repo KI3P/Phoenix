@@ -32,7 +32,6 @@ typedef int errno_t;
 
 #define BEGIN_TEENSY_SHUTDOWN   0
 #define SHUTDOWN_COMPLETE       1
-
 #define EQUALIZER_CELL_COUNT    14
 
 // Teensy pins used for particular functions
