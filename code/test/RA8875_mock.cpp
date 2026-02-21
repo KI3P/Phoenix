@@ -84,6 +84,10 @@ void RA8875::print(float value) {
     // Mock implementation - could log the value if needed for testing
 }
 
+void RA8875::print(float value, int digits) {
+    // Mock implementation - could log the value if needed for testing
+}
+
 void RA8875::setFontDefault() {
     // Mock implementation - reset to default font
     _font_scale = 1;
