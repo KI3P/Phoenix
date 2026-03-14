@@ -15,9 +15,6 @@ float32_t audioYPixel[SPECTRUM_RES/4];
 
 VolumeFunction volumeFunction = AudioVolume;
 
-//#define BROADCAST_BAND 0
-#define HAM_BAND 1
-//#define MISC_BAND 2
 struct band bands[NUMBER_OF_BANDS] = 
   {
   //freqVFO1 freqVFO2 band low   band hi   name    mode      Hi    Low  Gain_dB  type  AGC

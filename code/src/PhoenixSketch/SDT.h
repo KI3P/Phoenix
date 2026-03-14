@@ -320,6 +320,12 @@ struct BIT {
     uint8_t AD7991_I2C_ADDR;
 };
 
+enum BandType {
+    BROADCAST_BAND,
+    HAM_BAND,
+    MISC_BAND
+};
+
 /** Contains the parameters that define a band */
 struct band {
     int64_t freqVFO1_Hz;    /** Frequency of VFO1 in Hz (hardware mixer) */
@@ -330,7 +336,7 @@ struct band {
     int32_t FHiCut_Hz;      /** Audio bandpass filter edge */
     int32_t FLoCut_Hz;      /** Audio bandpass filter edge */
     float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
-    uint8_t band_type;      /** UNUSED */
+    BandType band_type;     /** type of band */
     int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
 };
 
