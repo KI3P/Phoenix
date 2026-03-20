@@ -111,9 +111,10 @@ extern uint64_t hardwareRegister;
 #define BAND_10M                                9
 #define BAND_6M                                 10
 #define BAND_4M                                 11
+#define BAND_GENERAL                            12
 #define FIRST_BAND                              BAND_160M
-#define LAST_BAND                               BAND_6M
-#define NUMBER_OF_BANDS                         12
+#define LAST_BAND                               BAND_GENERAL
+#define NUMBER_OF_BANDS                         13
 #define MAX_FAVORITES                           13
 
 // Zoom
@@ -251,7 +252,7 @@ extern struct config_t {
     NoiseReductionType nrOptionSelect = NROff; /** Noise reduction mode */
     uint8_t ANR_notchOn = 0;        /** Automatic notch filter on/off */
     int32_t spectrumScale = 1;      /** dB/pixel selection for spectrum display */
-    int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50}; /** Shift spectrum up/down on display */
+    int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50,50 }; /** Shift spectrum up/down on display */
     int8_t spectrumFloorAuto = 1;   /** Automatically adjust the spectrum floor */
     uint32_t spectrum_zoom = 1;     /** Zoom level for spectrum */
     int32_t CWFilterIndex = 5;      /** Selects the receive CW audio filter */
@@ -270,43 +271,46 @@ extern struct config_t {
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
     int32_t currentMicGain = 20;   /** Gain of the mic used for SSB */
-    float32_t dbm_calibration[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Calibrates the S-meter scale on the display */
+    float32_t dbm_calibration[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Calibrates the S-meter scale on the display */
     float32_t powerOutCW[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL}; /** Set output power in Watts in CW mode */
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            0}; /** Set output power in Watts in CW mode */
     float32_t powerOutSSB[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL}; /** Set output power in Watts in SSB mode */
-    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1}; /** Receive IQ calibration amplitude correction */
-    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
-    float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1}; /** Transmit IQ calibration amplitude correction */
-    float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit IQ calibration phase correction */
-    int16_t DCOffsetI[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, I */
-    int16_t DCOffsetQ[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, Q */
-    float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
+                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
+                                            0}; /** Set output power in Watts in SSB mode */
+    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Receive IQ calibration amplitude correction */
+    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
+    float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Transmit IQ calibration amplitude correction */
+    float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit IQ calibration phase correction */
+    int16_t DCOffsetI[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, I */
+    int16_t DCOffsetQ[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, Q */
+    float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
     // XAtten is only used in CW mode
-    //float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
-    float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board receive attenuation */
+    //float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
+    float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board receive attenuation */
     int64_t lastFrequencies[NUMBER_OF_BANDS][3] = {{1850000,0,1},{3700000,0,1},{5351500,0,0},
                     {7150000,0,1},{10125000,0,0},{14200000,0,0},{18100000,0,0},
-                    {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0}}; /** center tune, fine tune, modulation */
-    int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
+                    {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0},
+                    {10000000,0,1}}; /** center tune, fine tune, modulation */
+    int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
     bool keyerFlip = KEYER_FLIP; /**false = right paddle = DAH, true = DIT */
     bool PA100Wactive = false;
-    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680}; /** The saturation power output level when 20W PA is used */
-    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2}; /** k index parameterizes the knee location in the Pout vs attenuation */
-    float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = {86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000};  /** The saturation power output level when 100W PA is used */
+    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,0}; /** The saturation power output level when 20W PA is used */
+    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
+    float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = {86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,0};  /** The saturation power output level when 100W PA is used */
     float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = {10,10,10,10,10,10,10,10,10,10,10,10}; /** k index parameterizes the knee location in the Pout vs attenuation */
     float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** The power threshold that switches in the 100W amplifier */
-    float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
-    float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
+    float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
+    float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
 
-    float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
+    float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
+    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
+    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
+    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine
