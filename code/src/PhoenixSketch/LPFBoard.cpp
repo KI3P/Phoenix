@@ -433,9 +433,6 @@ errno_t Init100WPAControl(void){
  * This ensures transmit harmonics are always filtered appropriately, even
  * when operating outside ham bands (e.g., general coverage receiver mode).
  *
- * For non-ham bands it selects the filter for the first ham band 
- * that ends above the current center frequency.
- * 
  * @param band Band identifier (BAND_160M, BAND_80M, etc.) or -1 for auto-selection
  */
 void SelectLPFBand(int32_t band){
@@ -457,15 +454,6 @@ void SelectLPFBand(int32_t band){
         if (band == -1){
             // This is the case where the frequency is higher than the highest band
             band = LAST_BAND + 10; // force it to pick no filter. You're on your own now
-        }
-    } else if (band <= LAST_BAND && bands[band].band_type != HAM_BAND) {
-        // For a non-ham band select the filter for the first ham band 
-        // that is above or contains the current frequency 
-        for (uint8_t i = FIRST_BAND; i <= LAST_BAND; i++) {
-            if (bands[i].band_type == HAM_BAND && ED.centerFreq_Hz[ED.activeVFO] <= bands[i].fBandHigh_Hz) {
-                band = i;
-                break;
-            }
         }
     }
 

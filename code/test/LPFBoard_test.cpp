@@ -1578,35 +1578,3 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandSequentialTest) {
             << "Failed for frequency " << testCases[i].freq << " Hz";
     }
 }
-
-TEST_F(LPFBoardTest, SelectLPFBandForNonHamBand) {
-    // Test multiple out-of-band frequencies in sequence
-    SetLPFRegister(0x0000);
-
-    // Test frequencies going from low to high, between different bands
-    struct {
-        uint32_t freq;
-        uint8_t expectedFilterBand;
-    } testCases[] = {
-        {1000000, BAND_160M_BCD},   // Below 160M -> 160M
-        {2000000, BAND_160M_BCD},   // End of 160M -> 160M
-        {2000001, BAND_80M_BCD},    // Just above end of 160M -> 80M
-        {26000000, BAND_10M_BCD},   // Above 12M and below 10M -> 10M
-        {26000000, BAND_10M_BCD},   // End of 10M -> 10M
-        {29700000, BAND_10M_BCD},   // End of 10M -> 10M
-        {29700001, BAND_6M_BCD},    // Just above 10M -> 6M
-        {54000000, BAND_6M_BCD},    // End of 6M -> 6M
-        {54000001, BAND_NF_BCD},    // Just above 6M -> No filter
-    };
-
-    for (size_t i = 0; i < sizeof(testCases) / sizeof(testCases[0]); i++) {
-        ED.centerFreq_Hz[ED.activeVFO] = testCases[i].freq;
-        SelectLPFBand(BAND_GENERAL);
-
-        uint16_t result = GetLPFRegister();
-        uint16_t bandBits = result & 0x0F;
-
-        EXPECT_EQ(bandBits, testCases[i].expectedFilterBand)
-            << "Failed for frequency " << testCases[i].freq << " Hz";
-    }
-}
