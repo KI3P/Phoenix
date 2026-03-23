@@ -16,4 +16,10 @@ void UpdateHardwareState(void);
  */
 void ModeCWTransmitSpaceEnter(void);
 
+/**
+ * @brief Checks if transmit is allowed for the current band 
+ * @note Used as guard for transitions to transmit states
+ */
+bool IsTxAllowed(void);
+
 #endif // MODE_H

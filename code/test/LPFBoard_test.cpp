@@ -1491,6 +1491,12 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandBoundaryConditions) {
     ED.centerFreq_Hz[ED.activeVFO] = 54000001; // Just above 6M
     SelectLPFBand(-1);
     result = GetLPFRegister();
+    EXPECT_EQ(result & 0x0F, BAND_6M_BCD); // Should select 5M
+
+    // Test frequency just above 4M band (72.0 MHz)
+    ED.centerFreq_Hz[ED.activeVFO] = 72000001; // Just above 4M
+    SelectLPFBand(-1);
+    result = GetLPFRegister();
     EXPECT_EQ(result & 0x0F, BAND_NF_BCD); // Should select no filter
 }
 
@@ -1557,7 +1563,8 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandSequentialTest) {
         {8500000, BAND_40M_BCD},    // Between 40M and 30M -> 40M
         {16000000, BAND_20M_BCD},   // Between 20M and 17M -> 20M
         {35000000, BAND_10M_BCD},   // Between 10M and 6M -> 10M
-        {70000000, BAND_NF_BCD},    // Above 6M -> No filter
+        {60000000, BAND_6M_BCD},    // Between 6M and 4M -> 6M
+        {75000000, BAND_NF_BCD},    // Above 4M -> No filter
     };
 
     for (size_t i = 0; i < sizeof(testCases)/sizeof(testCases[0]); i++) {

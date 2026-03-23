@@ -15,9 +15,6 @@ float32_t audioYPixel[SPECTRUM_RES/4];
 
 VolumeFunction volumeFunction = AudioVolume;
 
-//#define BROADCAST_BAND 0
-#define HAM_BAND 1
-//#define MISC_BAND 2
 struct band bands[NUMBER_OF_BANDS] = 
   {
   //freqVFO1 freqVFO2 band low   band hi   name    mode      Hi    Low  Gain_dB  type  AGC
@@ -49,6 +46,7 @@ struct band bands[NUMBER_OF_BANDS] =
     //435000000, 420000000, 450000000, "70CM",  USB, 3000, 200, 0, HAM_BAND, 20,    // 70CM
     //915000000, 902000000, 928000000, "33CM",  USB, 3000, 200, 0, HAM_BAND, 20,    // 33CM
     //1270000000, 1240000000, 1300000000, "23CM", USB, 3000, 200, 0, HAM_BAND, 20,  // 23CM
+    200000, 200000, 80800000, "GEN", USB, 3000, 200, 0, MISC_BAND, 20,      // General coverage
 };
 
 struct BIT bit_results = {

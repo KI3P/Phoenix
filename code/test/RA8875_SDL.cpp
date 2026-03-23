@@ -1062,6 +1062,12 @@ void RA8875::print(float value) {
     print(buf);
 }
 
+void RA8875::print(float value, int digits) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.1f", value);
+    print(buf);
+}
+
 void RA8875::setFontDefault() {
     _font_scale = 1;
     _custom_font = nullptr;

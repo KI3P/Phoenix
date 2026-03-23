@@ -456,6 +456,7 @@ void SelectLPFBand(int32_t band){
             band = LAST_BAND + 10; // force it to pick no filter. You're on your own now
         }
     }
+
     SET_LPF_BAND(BandToBCD(band));
     // And now actually change the hardware...
     UpdateMCPRegisters();

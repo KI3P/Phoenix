@@ -342,11 +342,32 @@ TEST(CAT, FAWriteOutOfBandFrequency){
     int64_t expectedCenterFreq = 500000L + SR[SampleRate].rate/4;
     EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
 
+    // Band should change to general band
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_GENERAL);
+
+    // Response should still be formatted correctly
+    EXPECT_STREQ(result, "FA00000500000;");
+}
+
+// Test FA_write out-of-all-bands frequency handling
+TEST(CAT, FAWriteOutOfAllBandsFrequency) {
+    // Set initial band to a known value
+    ED.currentBand[VFO_A] = BAND_20M;
+
+    // Test frequency that doesn't fall within any defined ham band
+    char command[] = "FA00081000000;";     // 81 MHz (beyond general band)
+
+    char* result = FA_write(command);
+
+    // Should still set the frequency
+    int64_t expectedCenterFreq = 81000000L + SR[SampleRate].rate / 4;
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
+
     // Band should remain unchanged for out-of-band frequency (avoids -1 index)
     EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
 
     // Response should still be formatted correctly
-    EXPECT_STREQ(result, "FA00000500000;");
+    EXPECT_STREQ(result, "FA00081000000;");
 }
 
 // Test FA_write with frequency at band edges
@@ -364,7 +385,7 @@ TEST(CAT, FAWriteBandEdgeFrequencies){
     // Test frequency just outside 20m band (13.999 MHz)
     char commandOutside[] = "FA00013999000;";
     FA_write(commandOutside);
-    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);  // Band remains unchanged for out-of-band
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_GENERAL);  // Band falls back to general
 }
 
 // Test FB_write function for valid frequency parsing
@@ -460,11 +481,32 @@ TEST(CAT, FBWriteOutOfBandFrequency){
     int64_t expectedCenterFreq = 500000L + SR[SampleRate].rate/4;
     EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
 
+    // Band should fallback to general band
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_GENERAL);
+
+    // Response should still be formatted correctly
+    EXPECT_STREQ(result, "FB00000500000;");
+}
+
+// Test FB_write out-of-all-bands frequency handling
+TEST(CAT, FBWriteOutOfAllBandFrequency) {
+    // Set initial band to a known value
+    ED.currentBand[VFO_A] = BAND_20M;
+
+    // Test frequency that doesn't fall within any defined ham band
+    char command[] = "FB00081000000;";     // 81 MHz (out of general band)
+
+    char* result = FB_write(command);
+
+    // Should still set the frequency
+    int64_t expectedCenterFreq = 81000000L + SR[SampleRate].rate / 4;
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], expectedCenterFreq);
+
     // Band should remain unchanged for out-of-band frequency (avoids -1 index)
     EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);
 
     // Response should still be formatted correctly
-    EXPECT_STREQ(result, "FB00000500000;");
+    EXPECT_STREQ(result, "FB00081000000;");
 }
 
 // Test FB_write with frequency at band edges
@@ -482,7 +524,7 @@ TEST(CAT, FBWriteBandEdgeFrequencies){
     // Test frequency just outside 20m band (13.999 MHz)
     char commandOutside[] = "FB00013999000;";
     FB_write(commandOutside);
-    EXPECT_EQ(ED.currentBand[VFO_A], BAND_20M);  // Band remains unchanged for out-of-band
+    EXPECT_EQ(ED.currentBand[VFO_A], BAND_GENERAL);  // Band falls back to general
 }
 
 // Test FB_write sets VFO A (same as FA_write)
