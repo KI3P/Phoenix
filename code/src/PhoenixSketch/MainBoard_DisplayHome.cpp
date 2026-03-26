@@ -699,11 +699,14 @@ FASTRUN void ShowSpectrum(void){
         if(ping == 1) {
           ping = 2;
           pong = 1;
+          tft.writeTo(L2);
         } else {
           ping = 1;
           pong = 2;
+          tft.writeTo(L1);
         }
         tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
+        tft.writeTo(L1);
     }
 }
 
