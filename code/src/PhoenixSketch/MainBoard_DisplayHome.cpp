@@ -574,7 +574,7 @@ void DisplaydbM() {
     float32_t dbm;
 
     tft.fillRect(SMETER_X + 1, SMETER_Y + 1, SMETER_BAR_LENGTH, SMETER_BAR_HEIGHT, RA8875_BLACK);
-    //dbm = 10.0 * log10f_fast(audioMaxSquaredAve) 
+    //dbm = 10.0 * log10f_fast(audioMaxSquaredAve)
     //        + ED.RAtten[ED.currentBand[ED.activeVFO]]
     //        - ED.rfGainAllBands_dB
     //        + RECEIVE_POWER_OFFSET     // the notional scaling factor for the receive chain
@@ -610,14 +610,14 @@ static float32_t newadjust = 0.0f; // used by ED.spectrumFloorAuto
 static int16_t pixelmax = 0; // used by ED.spectrumFloorAuto
 
 /**
- * Calculate vertical pixel position for a spectrum FFT bin. This is an 
+ * Calculate vertical pixel position for a spectrum FFT bin. This is an
  * amplitude in pixels such that -124 dBm is at 0 and higher powers are
- * positive. 
- * 
+ * positive.
+ *
  * Power to zero point pixel location is calculated as follows:
  *   zeroPoint = (Power [dBm] - RECEIVE_POWER_OFFSET)/10 * dBScale
  *             = (-124 + 93.15)/10 * 20 = -61.74
- * 
+ *
  * PSD value at a power of -124 dBm should be roughly:
  *  (-124+RECEIVE_POWER_OFFSET)/10 = -3.087
  */
@@ -670,8 +670,8 @@ FASTRUN void ShowSpectrum(void){
             waterfall[x1] = gradient[test1];
         }
     }
-    
-    if (x1 >= MAX_WATERFALL_WIDTH){        
+
+    if (x1 >= MAX_WATERFALL_WIDTH){
         x1 = 0;
         y_prev = pixelold[0];
         y_current = offset;
@@ -693,10 +693,16 @@ FASTRUN void ShowSpectrum(void){
         // In case spectrumNoiseFloor was changed
         offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
 
-        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 1, 2);
+        static int ping = 1, pong = 2;
+        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, ping, pong);
         while (tft.readStatus()) ;
-        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, 2, 1);
-        while (tft.readStatus()) ;
+        if(ping == 1) {
+          ping = 2;
+          pong = 1;
+        } else {
+          ping = 1;
+          pong = 2;
+        }
         tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
     }
 }
@@ -804,7 +810,7 @@ void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
 void DrawStateOfHealthPane(void) {
     if ((modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) && PaneStateOfHealth.stale){
 
-        // Draw some color bars to warn when the audio power is getting too large for 
+        // Draw some color bars to warn when the audio power is getting too large for
         // the transmit IQ chain. The RF board starts to clip when RMS values exceed 0.6.
         // The audio hat starts to clip when they exceed 0.7
         //    __________     __________
@@ -830,7 +836,7 @@ void DrawStateOfHealthPane(void) {
 
     // State of health data is something you might want to display, but most won't
     // Remove the return statement below to enable the state of health information
-    return; 
+    return;
 
     if (!PaneStateOfHealth.stale) return;
     if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) && (ED.decoderFlag))
@@ -1604,7 +1610,7 @@ void DrawHome(){
         for (size_t i = 0; i < NUMBER_OF_PANES; i++){
             WindowPanes[i]->stale = true;
         }
-        // For the purposes of displaying the correct values, set the TX CW 
+        // For the purposes of displaying the correct values, set the TX CW
         // attenuation values to be based on the desired power
         bool tmp;
         for (size_t k = FIRST_BAND; k <= LAST_BAND; k++)
