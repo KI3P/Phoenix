@@ -487,7 +487,13 @@ time_t getTeensy3Time() {
 
 void setup(void){
     Serial.begin(115200);
-    SerialUSB1.begin(38400); // For CAT control
+
+#ifndef T41_USB_AUDIO
+    // Non-USB-audio build:
+    // CAT on SerialUSB1
+    SerialUSB1.begin(38400);
+#endif
+
     Serial.println("T41 SDT Setup");
 
     // get TIME from real time clock with 3V backup battery

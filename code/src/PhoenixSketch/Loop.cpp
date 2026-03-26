@@ -85,6 +85,9 @@
  */
 
 #include "SDT.h"
+#include "MainBoard_AudioIO.h"
+#include "FrontPanel.h"
+
 
 // FIFO buffer for interrupt events
 #define INTERRUPT_BUFFER_SIZE 16
@@ -1275,11 +1278,21 @@ void ConsumeInterrupt(void){
 
     // Handle all the other non-encoder interrupts
     switch (interrupt){
+
         case (iBUTTON_PRESSED):{
             int32_t button = GetButton();
+            SetButton(-1);   // clear latched button
+
+            if (button == 16) {                           //                          SET FT8 MODE
+                bool newState = !GetFt8Mode();
+                SetFt8Mode(newState);
+                break; 
+            }
+
             HandleButtonPress(button);
             break;
         }
+
         case (iVFO_CHANGE):{
             // The VFO has been updated. We might have selected a different active VFO,
             // we might have changed frequency.

@@ -1,4 +1,6 @@
 #include "SDT.h"
+#include "Ft8UsbBridge.h"
+#include "MainBoard_AudioIO.h"   // for GetFt8Mode()
 
 float32_t DMAMEM float_buffer_L[READ_BUFFER_SIZE];
 float32_t DMAMEM float_buffer_R[READ_BUFFER_SIZE];
@@ -13,6 +15,11 @@ static uint32_t n_clear;
 static char *filename = nullptr;
 void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
 static uint32_t swrTimer_ms = 0;
+
+#ifdef T41_USB_AUDIO
+extern AudioPlayQueue Q_usbOut_L;
+extern AudioPlayQueue Q_usbOut_R;
+#endif
 
 #define RXTXZoom 3
 #define TXIQZOOM 3
@@ -718,6 +725,36 @@ void PlayBuffer(DataBlock *data){
     }
 }
 
+#ifdef T41_USB_AUDIO
+static float32_t usbTmp[BUFFER_SIZE];
+static float32_t g_usbRxGain = 1.5f;   //      GAIN SET FOR WJST, DEFAULT IS 2
+
+void PlayUsbBufferPreVol(DataBlock *data){
+    for (unsigned i = 0; i < N_BLOCKS; i++) {
+        int16_t *pL = Q_usbOut_L.getBuffer();
+        int16_t *pR = Q_usbOut_R.getBuffer();
+
+        // Copy one block then apply gain
+        arm_copy_f32(&data->I[BUFFER_SIZE * i], usbTmp, BUFFER_SIZE);
+        arm_scale_f32(usbTmp, g_usbRxGain, usbTmp, BUFFER_SIZE);
+
+        // Optional: clip to [-1, +1] to avoid wrap distortion
+        for (size_t k = 0; k < BUFFER_SIZE; k++) {
+            if (usbTmp[k] > 1.0f) usbTmp[k] = 1.0f;
+            else if (usbTmp[k] < -1.0f) usbTmp[k] = -1.0f;
+        }
+
+        arm_float_to_q15(usbTmp, pL, BUFFER_SIZE);
+        arm_float_to_q15(usbTmp, pR, BUFFER_SIZE);
+
+        Q_usbOut_L.playBuffer();
+        Q_usbOut_R.playBuffer();
+    }
+}
+#endif
+
+
+
 /**
  * Initialize the global variables to their default startup values
  * 1) Configure the RXfilters
@@ -924,19 +961,21 @@ DataBlock * ReceiveProcessing(const char *fname){
     // Interpolate
     InterpolateReceiveData(&data, &RXfilters);
 
-    // Volume adjust for audio volume setting. I and Q contain duplicate data, don't 
-    // need to scale both
+    #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
+        // Send audio to PC *before* volume knob affects it
+        PlayUsbBufferPreVol(&data);
+    #endif
+
+    // Speaker path volume knob
     AdjustVolume(&data, &RXfilters);
 
     SaveData(&data, 6); // used by the unit tests
 
-    // Play sound on the speaker
+    // Always feed the speaker output (works in both builds)
     PlayBuffer(&data);
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
-    //Flag(0);
-
     return &data;
 }
 
@@ -965,7 +1004,34 @@ float32_t GetMicRRMS(void){
  * @param data The data block to put the samples in
  * @return ESUCCESS if samples were read, EFAIL if insufficient samples are available
  */ 
-errno_t ReadMicrophoneBuffer(DataBlock *data){
+errno_t ReadMicrophoneBuffer(DataBlock *data)
+{
+    if (!data) return EFAIL;
+
+#ifdef T41_USB_AUDIO
+if (GetFt8Mode()) {
+    const uint32_t outCount = N_BLOCKS_EX * BUFFER_SIZE;
+
+    bool ok = Ft8UsbBridge_GetSamples(data->I, outCount);
+    if (!ok) {
+        memset(data->I, 0, outCount * sizeof(float32_t));
+    }
+
+    // Dual-mono + attenuation (prevents harshness/clipping/pulsing)
+    for (uint32_t i = 0; i < outCount; i++) {
+        float s = data->I[i] * 0.20f;  // try 0.10–0.30
+        data->I[i] = s;
+        data->Q[i] = s;
+    }
+
+    data->N = outCount;
+    data->sampleRate_Hz = SR[SampleRate].rate;
+    return ESUCCESS;
+}
+#endif
+
+    // ----- existing microphone code continues below -----
+
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
         //counter++;

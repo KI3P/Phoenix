@@ -1,4 +1,5 @@
 #include "CAT.h"
+#include "MainBoard_AudioIO.h"   // GetFt8Mode()
 
 // Kenwood TS-480 CAT Interface (partial)
 //
@@ -693,10 +694,22 @@ char *RX_write( char* cmd ){
 char *TX_write( char* cmd ){
     switch (modeSM.state_id){
         case (ModeSm_StateId_SSB_RECEIVE):{
+#ifdef T41_USB_AUDIO
+            // Only allow CAT PTT (WSJT-X TX) when FT8 mode is enabled
+            if (GetFt8Mode()) {
+                ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+            } else {
+                // Ignore TX request if not in FT8 mode
+                // (optional) Serial.println("CAT TX ignored: FT8 mode is OFF");
+            }
+#else
+            // No USB audio build: allow normal CAT PTT behavior
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+#endif
             break;
         } 
         case (ModeSm_StateId_CW_RECEIVE):{
+            // CW keying via CAT still allowed
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
             break;
         }
@@ -705,6 +718,7 @@ char *TX_write( char* cmd ){
     }
     return empty_string_p;
 }
+
 
 char *VX_write( char* cmd ){
     Debug("Got VX write");
@@ -740,7 +754,6 @@ char *PR_read(  char* cmd  ){
     return obuf;
 }
 
-
 /**
  * Poll SerialUSB1 for incoming CAT commands and process them
  *
@@ -751,55 +764,56 @@ char *PR_read(  char* cmd  ){
 void CheckForCATSerialEvents(void){
     int i;
     char c;
-    while( ( i = SerialUSB1.available() ) > 0 ){
-        c = ( char )SerialUSB1.read();
+
+#ifdef T41_USB_AUDIO
+    while ( (i = Serial.available()) > 0 ) {
+        c = (char)Serial.read();
+#else
+    while ( (i = SerialUSB1.available()) > 0 ) {
+        c = (char)SerialUSB1.read();
+#endif
         i--;
         catCommand[ catCommandIndex ] = c;
-        #ifdef DEBUG_CAT
-        Serial.print( catCommand[ catCommandIndex ] );
-        #endif
-        if( c == ';' ){
-            // Finished reading CAT command
-            #ifdef DEBUG_CAT
-            Serial.println();
-            #endif // DEBUG_CAT
 
-            // Check to see if the command is a good one BEFORE sending it
-            // to the command executor
-            //Serial.println( String("catCommand is ")+String(catCommand)+String(" catCommandIndex is ")+String(catCommandIndex));
+#ifdef DEBUG_CAT
+        Serial.print( catCommand[ catCommandIndex ] );
+#endif
+
+        if( c == ';' ){
+#ifdef DEBUG_CAT
+            Serial.println();
+#endif
             char *parser_output = command_parser( catCommand );
             catCommandIndex = 0;
-            // We executed it, now erase it
             memset( catCommand, 0, sizeof( catCommand ));
+
             if( parser_output[0] != '\0' ){
-                #ifdef DEBUG_CAT1
-                Serial.println( parser_output );
-                #endif // DEBUG_CAT
                 int i = 0;
                 while( parser_output[i] != '\0' ){
+#ifdef T41_USB_AUDIO
+                    if( Serial.availableForWrite() > 0 ){
+                        Serial.print( parser_output[i] );
+#else
                     if( SerialUSB1.availableForWrite() > 0 ){
                         SerialUSB1.print( parser_output[i] );
-                        #ifdef DEBUG_CAT
-                        Serial.print( parser_output[i] );
-                        #endif
+#endif
                         i++;
-                    }else{
-                        SerialUSB1.flush();
                     }
                 }
+#ifdef T41_USB_AUDIO
+                Serial.flush();
+#else
                 SerialUSB1.flush();
-                #ifdef DEBUG_CAT
-                Serial.println();
-                #endif // DEBUG_CAT
+#endif
             }
-        }else{
+        } else {
             catCommandIndex++;
             if( catCommandIndex >= 128 ){
                 catCommandIndex = 0;
-                memset( catCommand, 0, sizeof( catCommand ));   //clear out that overflowed buffer!
-                #ifdef DEBUG_CAT
+                memset( catCommand, 0, sizeof( catCommand ));
+#ifdef DEBUG_CAT
                 Serial.println( "CAT command buffer overflow" );
-                #endif
+#endif
             }
         }
     }

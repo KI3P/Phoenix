@@ -21,6 +21,8 @@
 #include <TimeLib.h>
 #include "FreeSansBold24pt7b.h"
 #include "FreeSansBold18pt7b.h"
+#include "MainBoard_AudioIO.h"
+
 
 // External references to objects and variables defined in MainBoard_Display.cpp
 extern RA8875 tft;
@@ -285,23 +287,32 @@ static int64_t oldCenterFreq = 0;
 static int32_t oldBand = -1;
 static ModeSm_StateId oldState = ModeSm_StateId_ROOT;
 static ModulationType oldModulation = DCF77;
+static bool oldFt8Mode = false;
 
 /**
  * Render the frequency, band name, and modulation mode pane.
  */
 void DrawFreqBandModPane(void) {
+    bool ft8 = false;
+    #ifdef T41_USB_AUDIO
+    ft8 = GetFt8Mode();
+    #endif
+
     if ((oldCenterFreq != ED.centerFreq_Hz[ED.activeVFO]) ||
         (oldBand != ED.currentBand[ED.activeVFO]) ||
         (oldState != modeSM.state_id) ||
-        (oldModulation != ED.modulation[ED.activeVFO])){
+        (oldModulation != ED.modulation[ED.activeVFO]) ||
+        (oldFt8Mode != ft8)){
         PaneFreqBandMod.stale = true;
     }
+
     if (!PaneFreqBandMod.stale) return;
 
     oldCenterFreq = ED.centerFreq_Hz[ED.activeVFO];
     oldBand = ED.currentBand[ED.activeVFO];
     oldState = modeSM.state_id;
     oldModulation = ED.modulation[ED.activeVFO];
+    oldFt8Mode = ft8;
 
     tft.setFontDefault();
     tft.fillRect(PaneFreqBandMod.x0, PaneFreqBandMod.y0, PaneFreqBandMod.width, PaneFreqBandMod.height, RA8875_BLACK);
@@ -336,7 +347,9 @@ void DrawFreqBandModPane(void) {
             tft.print("(LSB)");
             break;
         case USB:
-            tft.print("(USB)");
+            // Only label FT8 when FT8 mode is enabled
+            if (ft8) tft.print("(FT8)");
+            else     tft.print("(USB)");
             break;
         case AM:
             tft.print("(AM)");

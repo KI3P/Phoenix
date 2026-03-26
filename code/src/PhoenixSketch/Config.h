@@ -18,7 +18,7 @@
 
 // Control encoder direction and speed
 #define FAST_TUNE // comment this out to disable the FAST_TUNE algorithm
-#define VOLUME_REVERSED true
+#define VOLUME_REVERSED true                             
 #define FILTER_REVERSED true
 #define MAIN_TUNE_REVERSED true
 #define FINE_TUNE_REVERSED false
@@ -32,6 +32,8 @@
 // Default uses AD7991 digital SWR.
 //#define USE_ANALOG_SWR
 
+//#define ENABLE_DEBUG_SERIAL     //  TO ENABLE DEBUG UNCOMMENT THIS LINE AND SWITCH OFF FT8/DIGITAL   NEED TO PROGRAM TEENSY AS DUAL SERIAL
+//#define T41_USB_AUDIO 1         //  TO ENABLE FT8 UNCOMMENT THIS LINE AND SWITCH ON FT8/DIGITAL   NEED TO PROGRAM TEENSY AS SERIAL + MIDI + AUDIO.
 
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state
