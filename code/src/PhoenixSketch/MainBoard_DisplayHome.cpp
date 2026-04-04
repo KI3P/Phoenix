@@ -24,7 +24,7 @@
 
 // External references to objects and variables defined in MainBoard_Display.cpp
 extern RA8875 tft;
-#define SPECTRUM_REFRESH_MS 200
+#define SPECTRUM_REFRESH_MS 120
 
 // Shared display state variables
 bool redrawParameter = true;
@@ -409,7 +409,7 @@ uint16_t FILTER_PARAMETERS_Y = PaneSpectrum.y0+1;
 // Spectrum data buffers
 uint16_t pixelold[MAX_WATERFALL_WIDTH];
 uint16_t waterfall[MAX_WATERFALL_WIDTH];
-#define NCHUNKS 4
+#define NCHUNKS 8
 
 // S-meter constants (used by DisplaydbM function within spectrum rendering)
 #define SMETER_X PaneSMeter.x0+20
