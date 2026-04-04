@@ -134,12 +134,15 @@ void DrawBIT(void){
         tft.setCursor(5 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
         if (!bit_results.RF_Si5351_present) {
             tft.setTextColor(RA8875_RED);
-            sprintf(tmpbuf, "RF SI5351 I2C not found at 0x%02X", SI5351_BUS_BASE_ADDR);
+            sprintf(tmpbuf, "RF SI5351 I2C not found at 0x%02X or 0x%02X", SI5351_BUS_BASE_ADDR, SI5351_DUAL_VFO_ADDR);
             tft.print(tmpbuf);
         } else {
             tft.setTextColor(RA8875_GREEN);
             tft.setCursor(10 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
-            sprintf(tmpbuf, "0x%02X", SI5351_BUS_BASE_ADDR);
+            if (HasDualVFOs())
+                sprintf(tmpbuf, "0x%02X", SI5351_DUAL_VFO_ADDR);
+            else
+                sprintf(tmpbuf, "0x%02X", SI5351_BUS_BASE_ADDR);
             tft.print("RF SI5351 I2C:");
             tft.setCursor(col1, WINDOW_HEIGHT/10 + yoff);
             tft.print(tmpbuf);

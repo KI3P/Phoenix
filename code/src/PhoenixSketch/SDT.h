@@ -6,7 +6,7 @@
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.2" 
+#define VERSION "Phx V1.2.1" 
 
 #include "BuildInfo.h"
 
