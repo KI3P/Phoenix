@@ -199,6 +199,7 @@ This code has been tested with the Arduino IDE version 2.3.6. Configure your Ard
 Install the following libraries via the Arduino Library Manager:
 
 * Adafruit MCP23017 Arduino Library, by Adafruit (v2.3.2) (note: install with dependencies)
+* ArduinoJson, by Benoit Blanchon (v7.4.3)
 
 Some libraries need to be installed manually. The manual process is:
 
