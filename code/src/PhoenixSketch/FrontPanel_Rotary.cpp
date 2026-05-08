@@ -4,7 +4,7 @@
  * Contact: bb@cactii.net
  *
  * Modified by John Melton (G0ORX) to allow feeding A/B pin states
- * to allow working with MCP23017.
+ * to allow working with MCP23017 and Tom Metty (AJ8X).
  *
  */
 
