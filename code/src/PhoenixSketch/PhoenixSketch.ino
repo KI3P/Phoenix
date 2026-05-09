@@ -187,5 +187,7 @@ If not, see <https://www.gnu.org/licenses/>.
  * - code/test/: Unit tests demonstrating module usage
  */
 
+#include "CompilerOptionsCheck.h"
+
  // The setup() function is in Globals.cpp
  // The loop() function is in Loop.cpp
