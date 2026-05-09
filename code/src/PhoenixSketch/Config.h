@@ -58,11 +58,27 @@ If not, see <https://www.gnu.org/licenses/>.
 // FrontPanel_USBMouse.* compile to no-ops and pull no extra dependencies.
 //#define USB_HOST_INPUT_ENABLED
 
+// DMR voice codec via a DVSI ThumbDV (AMBE3000) USB dongle on the Teensy 4.1
+// USBHOST port. Uncomment to enable. When enabled the build requires the
+// PJRC USBHost_t36 library (same as USB_HOST_INPUT_ENABLED) and pulls in
+// AmbeDvsi.cpp. When disabled (default) AmbeDvsi.cpp compiles to no-ops.
+//
+// Note: this PR adds only the *codec stage* (PCM <-> AMBE+2 49-bit frames).
+// DMR's RF layer is 4FSK (4800 sym/s, ~9600 bps) carried inside a narrow FM
+// channel (12.5 kHz) -- it is *not* a peer modulation of NFM or FM_WIDE,
+// it sits on top of one of them. The 4FSK mod/demod and DMR framing/FEC
+// stages are a future Phoenix DSP module.
+//
+// Wiring: ThumbDV plugged into the Teensy 4.1 USBHOST receptacle, enumerating
+// as USB CDC-ACM at 460800 8N1. The driver runs the AMBE3000 in DMR mode
+// (rate index 33, AMBE+2, 49 bits / 20 ms). The PCM side is 8 kHz, 16-bit
+// linear, 160 samples (20 ms) per call.
+//#define DMR_THUMBDV_ENABLED
+
 // Convenience: any feature that needs the USBHost_t36 stack must trigger
 // InitializeUSBHost/TickUSBHost. Defining either USB_HOST_INPUT_ENABLED
-// (HID keyboard/mouse) or DMR_THUMBDV_ENABLED (added in a later PR for
-// the DVSI ThumbDV/AMBE3000 codec) enables the stack via this combined
-// guard.
+// (HID keyboard/mouse) or DMR_THUMBDV_ENABLED (DVSI ThumbDV/AMBE3000 codec)
+// enables the stack via this combined guard.
 #if defined(USB_HOST_INPUT_ENABLED) || defined(DMR_THUMBDV_ENABLED)
 #define USB_HOST_STACK_ENABLED
 #endif
