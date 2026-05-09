@@ -1,3 +1,8 @@
+#ifndef BEENHERE
+#include "SDT.h"
+#endif
+
+
 /*
  * si5351.h - Si5351 library for Arduino
  *
@@ -25,9 +30,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef BEENHERE
-#include "SDT.h"
-#endif
 
 #ifndef SI5351_H_
 #define SI5351_H_

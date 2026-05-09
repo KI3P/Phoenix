@@ -35,6 +35,10 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "SDT.h"
 #include "LPFBoard.h"
 #include "MainBoard_Display.h"
+#include "MainBoard_DisplayFT8.h"
+#include "MainBoard_DisplayPSK31.h"
+#include "DmrFraming.h"   // DmrLastCallSeen for the home-screen DMR pane
+#include "DmrModem.h"     // DmrModemRxLevel / DmrModemRxIsLocked / GetState
 #include <RA8875.h>
 #include <TimeLib.h>
 #include "FreeSansBold24pt7b.h"
@@ -60,7 +64,7 @@ int64_t GetUpperFreq_Hz();
 // PANE DEFINITIONS (HOME SCREEN SPECIFIC)
 ///////////////////////////////////////////////////////////////////////////////
 
-static const int8_t NUMBER_OF_PANES = 13;
+static const int8_t NUMBER_OF_PANES = 14;
 
 // Forward declarations for pane drawing functions (implemented below in this file)
 static void DrawVFOPanes(void);
@@ -75,6 +79,7 @@ static void DrawAudioSpectrumPane(void);
 static void DrawSettingsPane(void);
 static void DrawNameBadgePane(void);
 static void DrawSAMOffsetPane(void);
+static void DrawDmrStatusPane(void);
 
 // Pane instances
 static Pane PaneVFOA =        {5,5,280,50,DrawVFOPanes,1};
@@ -90,13 +95,19 @@ static Pane PaneAudioSpectrum={535,115,260,150,DrawAudioSpectrumPane,1};
 static Pane PaneSettings =    {535,270,260,170,DrawSettingsPane,1};
 static Pane PaneNameBadge =   {535,445,260,30,DrawNameBadgePane,1};
 static Pane PaneSAMOffset =   {320,60,180,30,DrawSAMOffsetPane,1};
+/* DMR status occupies the same screen real estate as PaneSAMOffset --
+ * the two modes are mutually exclusive (SAM is its own modulation type;
+ * DMR overlays NFM/FM_WIDE), so only one will ever render content here
+ * at a time. Slightly wider than SAMOffset to fit "TG / src ID / age". */
+static Pane PaneDmrStatus =   {310,60,210,30,DrawDmrStatusPane,1};
 
 // Array of all panes for iteration
 static Pane* WindowPanes[NUMBER_OF_PANES] = {&PaneVFOA,&PaneVFOB,&PaneFreqBandMod,
                                     &PaneSpectrum,&PaneStateOfHealth,
                                     &PaneTime,&PaneSWR,&PaneTXRXStatus,
                                     &PaneSMeter,&PaneAudioSpectrum,&PaneSettings,
-                                    &PaneNameBadge, &PaneSAMOffset};
+                                    &PaneNameBadge, &PaneSAMOffset,
+                                    &PaneDmrStatus};
 
 ///////////////////////////////////////////////////////////////////////////////
 // DISPLAY SCALE AND COLOR STRUCTURES (HOME SCREEN SPECIFIC)
@@ -365,6 +376,18 @@ void DrawFreqBandModPane(void) {
         case IQ:
             tft.print("(IQ)");
             break;
+        case NFM:
+            tft.print("(NFM)");
+            break;
+        case FM_WIDE:
+            tft.print("(FM-W)");
+            break;
+        case FT8_INTERNAL:
+            tft.print("(FT8)");
+            break;
+        case PSK31:
+            tft.print("(PSK)");
+            break;
         case DCF77:
             tft.print("(DCF77)");
             break;
@@ -401,6 +424,120 @@ void DrawSAMOffsetPane(void){
     tft.print(SAMoff);
 
     PaneSAMOffset.stale = false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DMR STATUS PANE
+///////////////////////////////////////////////////////////////////////////////
+//
+// Renders a one-line DMR status indicator. Visible whenever the DMR
+// overlay (dmrConfig.enabled) is on; content adapts to runtime state:
+//
+//   - Active call (LC/EMB seen within DMR_PANE_TIMEOUT_MS):
+//       "DMR Group TG:9 From:1234567 3s"
+//   - Modem locked, no fresh LC:
+//       "DMR Lock:✓  Sig:78"
+//   - Searching (no lock):
+//       "DMR Search   Sig:42"
+//
+// Hides itself (and clears its area) when dmrConfig.enabled is false.
+//
+// Shares screen coordinates with PaneSAMOffset; SAM and DMR are mutually
+// exclusive (SAM is its own modulation, DMR overlays NFM/FM_WIDE) so only
+// one of them ever renders content there at any given time.
+//
+static const uint32_t DMR_PANE_TIMEOUT_MS = 5000;  /* call assumed ended after 5 s */
+
+void DrawDmrStatusPane(void){
+    /* Cached state of the previous successful render so we can detect
+     * "anything changed" without redrawing every iteration. */
+    static bool        lastDrawnVisible = false;
+    static int         lastViewMode     = -1;   /* 0 = call, 1 = locked, 2 = searching */
+    static DmrCallType lastType         = DmrCallGroup;
+    static uint32_t    lastSrc          = 0;
+    static uint32_t    lastDst          = 0;
+    static uint32_t    lastShownAgeSec  = 0xFFFFFFFFu;
+    static int         lastSigPct       = -1;
+
+    auto hidePane = [&](void){
+        if (lastDrawnVisible) {
+            tft.fillRect(PaneDmrStatus.x0, PaneDmrStatus.y0,
+                         PaneDmrStatus.width, PaneDmrStatus.height, RA8875_BLACK);
+            lastDrawnVisible = false;
+        }
+        lastViewMode = -1;
+        PaneDmrStatus.stale = false;
+    };
+
+    if (!dmrConfig.enabled) { hidePane(); return; }
+
+    /* Sample current modem state. */
+    DmrCallType type    = DmrCallGroup;
+    uint32_t    src     = 0, dst = 0, ageMs = 0xFFFFFFFFu;
+    const bool  haveCall = DmrLastCallSeen(&type, &src, &dst, &ageMs);
+    const bool  callActive = haveCall && ageMs <= DMR_PANE_TIMEOUT_MS;
+    const bool  locked     = DmrModemRxIsLocked();
+
+    /* Map RxLevel (0..~1.5) to a 0..100 "signal" indicator, clamped. */
+    float sigF = DmrModemRxLevel() * 100.0f;
+    if (sigF < 0.0f) sigF = 0.0f;
+    if (sigF > 999.0f) sigF = 999.0f;
+    const int sigPct = (int)(sigF + 0.5f);
+
+    const int viewMode = callActive ? 0 : (locked ? 1 : 2);
+    const uint32_t ageSec = ageMs / 1000;
+
+    /* Decide whether anything visible has changed since the last redraw. */
+    const bool stateChanged =
+        !lastDrawnVisible
+        || (viewMode != lastViewMode)
+        || (callActive && (type   != lastType
+                          || src   != lastSrc
+                          || dst   != lastDst
+                          || ageSec != lastShownAgeSec))
+        || (!callActive && (sigPct != lastSigPct));
+    if (!PaneDmrStatus.stale && !stateChanged) return;
+
+    /* Render. Green border whenever the modem has any kind of lock,
+     * yellow while searching, to give a quick at-a-glance status. */
+    const uint16_t borderColor = (viewMode == 2) ? RA8875_YELLOW : RA8875_GREEN;
+    const uint16_t textColor   = (viewMode == 2) ? RA8875_YELLOW : RA8875_GREEN;
+
+    tft.fillRect(PaneDmrStatus.x0, PaneDmrStatus.y0,
+                 PaneDmrStatus.width, PaneDmrStatus.height, RA8875_BLACK);
+    tft.drawRect(PaneDmrStatus.x0, PaneDmrStatus.y0,
+                 PaneDmrStatus.width, PaneDmrStatus.height, borderColor);
+
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(textColor);
+    tft.setCursor(PaneDmrStatus.x0 + 6, PaneDmrStatus.y0 + 7);
+
+    char buf[64];
+    if (viewMode == 0) {
+        const char *typeStr  = (type == DmrCallGroup) ? "Group" : "Priv";
+        const char *dstLabel = (type == DmrCallGroup) ? "TG"    : "ID";
+        snprintf(buf, sizeof(buf),
+                 "DMR %s %s:%lu From:%lu %lus",
+                 typeStr, dstLabel,
+                 (unsigned long)dst, (unsigned long)src,
+                 (unsigned long)ageSec);
+    } else if (viewMode == 1) {
+        snprintf(buf, sizeof(buf), "DMR Lock  Sig:%d  BER:%d",
+                 sigPct, DmrLastBurstCorrections());
+    } else {
+        snprintf(buf, sizeof(buf), "DMR Search  Sig:%d", sigPct);
+    }
+    tft.print(buf);
+
+    lastDrawnVisible = true;
+    lastViewMode     = viewMode;
+    lastType         = type;
+    lastSrc          = src;
+    lastDst          = dst;
+    lastShownAgeSec  = ageSec;
+    lastSigPct       = sigPct;
+    PaneDmrStatus.stale = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -743,6 +880,46 @@ void DrawSpectrumPane(void) {
         (oft != ED.fineTuneFreq_Hz[ED.activeVFO]) ||
         (omd != ED.modulation[ED.activeVFO])){
         PaneSpectrum.stale = true;
+    }
+
+    /* FT8 dispatch: when in FT8_INTERNAL mode, render the FT8 message list
+     * over the spectrum pane area instead of the spectrum/waterfall.
+     * MainBoard_DisplayFT8.cpp owns the rendering. */
+    if (ED.modulation[ED.activeVFO] == FT8_INTERNAL) {
+        if (PaneSpectrum.stale) {
+            DrawFT8MessageList(PaneSpectrum.x0, PaneSpectrum.y0,
+                               PaneSpectrum.width, PaneSpectrum.height);
+            omd = ED.modulation[ED.activeVFO];
+            PaneSpectrum.stale = false;
+        }
+        return;
+    }
+
+    /* PSK31 dispatch: same pattern. Decoded-text pane lives in
+     * MainBoard_DisplayPSK31.cpp. */
+    if (ED.modulation[ED.activeVFO] == PSK31) {
+        if (PaneSpectrum.stale) {
+            DrawPSK31Pane(PaneSpectrum.x0, PaneSpectrum.y0,
+                          PaneSpectrum.width, PaneSpectrum.height);
+            omd = ED.modulation[ED.activeVFO];
+            PaneSpectrum.stale = false;
+        }
+        return;
+    }
+
+    /* Transition OUT of FT8 or PSK31: clear the entire pane area on both
+     * layers so the digital-mode text doesn't persist in the waterfall
+     * region while the waterfall slowly scrolls fresh data over it. The
+     * normal draw paths below repaint the spectrum trace top + frequency-bar
+     * overlay, but never blank-clear the pane themselves. */
+    if (omd == FT8_INTERNAL || omd == PSK31) {
+        tft.writeTo(L2);
+        tft.fillRect(PaneSpectrum.x0, PaneSpectrum.y0,
+                     PaneSpectrum.width, PaneSpectrum.height, RA8875_BLACK);
+        tft.writeTo(L1);
+        tft.fillRect(PaneSpectrum.x0, PaneSpectrum.y0,
+                     PaneSpectrum.width, PaneSpectrum.height, RA8875_BLACK);
+        /* omd will be updated to the current modulation further down. */
     }
 
     if (psdupdated && redrawSpectrum){
@@ -1641,6 +1818,10 @@ void DrawHome(){
         timer_ms = millis();
         PaneStateOfHealth.stale = true;
         PaneTime.stale = true;
+        /* Tick the DMR pane's "age in seconds" counter once per second
+         * while a call is active. The pane self-decides whether to
+         * actually redraw based on visibility + state change. */
+        PaneDmrStatus.stale = true;
     }
 
     if (millis()-timerDisplay_ms > SPECTRUM_REFRESH_MS) {

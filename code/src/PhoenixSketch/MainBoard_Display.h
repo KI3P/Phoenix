@@ -368,6 +368,6 @@ void ChangeFrequencyCorrectionFactorIncrement(void);
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;
-extern struct PrimaryMenuOption primaryMenu[8];
+extern struct PrimaryMenuOption primaryMenu[11];
 
 #endif

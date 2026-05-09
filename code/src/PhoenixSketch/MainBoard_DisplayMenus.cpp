@@ -15,6 +15,7 @@ PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with Phoenix. 
 If not, see <https://www.gnu.org/licenses/>.
 */
+
 /**
  * @file MainBoard_DisplayMenus.cpp
  * @brief Menu system for Phoenix SDR radio configuration
@@ -577,9 +578,242 @@ struct SecondaryMenuOption DiagnosticOptions[3] = {
     "Buffer print", functionOption, NULL, (void *)buffer_pretty_print_last_entry, NULL,
 };
 
+///////////////////////////////////////////////////////////////////////////////
+// FT8 menu page
+///////////////////////////////////////////////////////////////////////////////
+//
+// Runtime knobs and a one-click message-queue interface for FT8 operating.
+// Callsign and grid are read from ED (set via Config.h MY_CALL or programmatic
+// assignment); on-radio text editing without a USB keyboard is impractical
+// so this menu intentionally skips a callsign/grid editor. The preset queue
+// templates substitute <CALL>/<GRID> at queue time so changes take effect
+// immediately without restart.
+//
+#include "DSP_FT8.h"
+
+VariableParameter ft8TxFreqVar = {
+    .variable = &ft8TxFreq,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 200, .max = 2700, .step = 5}}
+};
+VariableParameter ft8RxFreqVar = {
+    .variable = &ft8RxFreq,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 200, .max = 2700, .step = 5}}
+};
+VariableParameter ft8TxEqRxVar = {
+    .variable = &txEqualsRx,
+    .type = TYPE_BOOL,
+    .limits = {.b = {.min = false, .max = true, .step = 1}}
+};
+VariableParameter ft8TxStateVar = {
+    .variable = &ft8TxState,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = 1, .step = 1}}
+};
+VariableParameter ft8IntStateVar = {
+    .variable = &ft8IntState,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = 1, .step = 1}}
+};
+VariableParameter ft8CqStateVar = {
+    .variable = &ft8CqState,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = 1, .step = 1}}
+};
+
+/* functionOption requires a void(*)(void); wrap each preset slot. */
+static void FT8MenuQueueSlot0(void){ FT8QueueMessageSlot(0); }
+static void FT8MenuQueueSlot1(void){ FT8QueueMessageSlot(1); }
+static void FT8MenuQueueSlot2(void){ FT8QueueMessageSlot(2); }
+static void FT8MenuQueueSlot3(void){ FT8QueueMessageSlot(3); }
+static void FT8MenuQueueSlot4(void){ FT8QueueMessageSlot(4); }
+/* Cancel any pending or in-flight TX. Useful if the operator queues by
+ * accident or wants to reconfigure mid-cycle. */
+static void FT8MenuCancelTx(void){ FT8CancelTx(); }
+/* Retune the active VFO to the current band's standard FT8 calling
+ * frequency (e.g., 14.074 MHz on 20 m). Modulation isn't changed. */
+static void FT8MenuTuneToBandFreq(void){ FT8TuneToBandFreq(); }
+/* One-click "Go to FT8": switches modulation to FT8_INTERNAL AND retunes
+ * to the current band's FT8 calling freq. Quickest way to get on the air. */
+static void FT8MenuGoToModeAndTune(void){ FT8GoToModeAndTune(); }
+
+/* USB-keyboard text editor entry points. Each spawns the editor with the
+ * appropriate target string + label + on-commit save callback. The save
+ * callback fires only on successful commit (MENU_OPTION_SELECT button);
+ * cancel via HOME_SCREEN does not save. */
+#include "MainBoard_TextEditor.h"
+#include "Storage.h"
+
+static void FT8MenuSaveAfterCommit(void){
+    /* Commit callback shared by callsign + grid editors. Auto-save to
+     * LittleFS so the change persists immediately. ~tens of ms; acceptable
+     * for an interactive edit. */
+    SaveDataToStorage(false);
+}
+
+static void FT8MenuEditCallsign(void){
+    TextEditorBegin(ED.callsign, sizeof(ED.callsign),
+                    "Edit Callsign:", FT8MenuSaveAfterCommit);
+}
+
+static void FT8MenuEditGrid(void){
+    TextEditorBegin(ED.grid, sizeof(ED.grid),
+                    "Edit Grid:", FT8MenuSaveAfterCommit);
+}
+
+/* Target-callsign tracking: capture the latest received CQ as the QSO
+ * target so reply templates fill in correctly. The auto-update in
+ * AddDecodedMessage only fires when target is empty, so this menu entry
+ * lets the operator force-pull the latest CQ (e.g. when changing QSO
+ * partner mid-session). */
+static void FT8MenuTargetLatestCQ(void){ FT8TargetLatestCQ(); }
+static void FT8MenuClearTarget(void){    FT8ClearTarget();    }
+/* Edit the target string directly with the USB-keyboard editor. Useful
+ * for typing a callsign without waiting for a CQ. */
+static void FT8MenuEditTarget(void){
+    TextEditorBegin(ft8TargetCall, sizeof(ft8TargetCall),
+                    "Edit Target:", NULL);  /* not persisted to ED */
+}
+
+struct SecondaryMenuOption FT8Options[] = {
+    /* Runtime knobs. The preset labels for slots use the same labels as
+     * FT8GetPresetLabel returns; we hardcode them here to avoid a runtime
+     * lookup since the menu label expects a stable const char *. */
+    "TX Freq Hz",     variableOption, &ft8TxFreqVar,    NULL, NULL,
+    "RX Freq Hz",     variableOption, &ft8RxFreqVar,    NULL, NULL,
+    "TX = RX",        variableOption, &ft8TxEqRxVar,    NULL, NULL,
+    "TX Mode (0/1)",  variableOption, &ft8TxStateVar,   NULL, NULL,
+    "Interval (0=ev)",variableOption, &ft8IntStateVar,  NULL, NULL,
+    "CQ Mode (0=man)",variableOption, &ft8CqStateVar,   NULL, NULL,
+    /* One-click message queue. Each entry copies the corresponding template
+     * (with <CALL>/<GRID> expanded) into txBuf[0] and marks it WAITING --
+     * the slot-aligned TX gate in DSP_FT8.cpp will pick it up at the next
+     * matching slot boundary. */
+    "Queue: CQ",      functionOption, NULL, (void *)FT8MenuQueueSlot0, NULL,
+    "Queue: 73",      functionOption, NULL, (void *)FT8MenuQueueSlot1, NULL,
+    "Queue: RR73",    functionOption, NULL, (void *)FT8MenuQueueSlot2, NULL,
+    "Queue: 599",     functionOption, NULL, (void *)FT8MenuQueueSlot3, NULL,
+    "Queue: ID",      functionOption, NULL, (void *)FT8MenuQueueSlot4, NULL,
+    "Cancel TX",      functionOption, NULL, (void *)FT8MenuCancelTx,   NULL,
+    "Tune to FT8 freq", functionOption, NULL, (void *)FT8MenuTuneToBandFreq, NULL,
+    "Go to FT8 + tune", functionOption, NULL, (void *)FT8MenuGoToModeAndTune, NULL,
+    "Edit Callsign",  functionOption, NULL, (void *)FT8MenuEditCallsign,    NULL,
+    "Edit Grid",      functionOption, NULL, (void *)FT8MenuEditGrid,        NULL,
+    "Target latest CQ", functionOption, NULL, (void *)FT8MenuTargetLatestCQ, NULL,
+    "Edit Target",    functionOption, NULL, (void *)FT8MenuEditTarget,      NULL,
+    "Clear Target",   functionOption, NULL, (void *)FT8MenuClearTarget,     NULL,
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// PSK31 menu page
+///////////////////////////////////////////////////////////////////////////////
+//
+// PSK31's settings surface is small: the audio receive frequency (also
+// adjustable via the fine-tune encoder when in PSK31 mode), and a couple
+// of one-shot reset functions for the decoder pipeline + text buffer.
+//
+#include "DSP_PSK31.h"
+
+VariableParameter psk31RxFreqVar = {
+    .variable = &psk31RxFreq,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 200, .max = 2700, .step = 5}}
+};
+
+/* functionOption requires void(*)(void); wrap each PSK31 action. */
+static void PSK31MenuClearText(void)     { PSK31ClearText(); }
+static void PSK31MenuResetDecoder(void)  { ResetPSK31Pipeline(); }
+
+struct SecondaryMenuOption PSK31Options[] = {
+    "RX Freq Hz",     variableOption, &psk31RxFreqVar, NULL, NULL,
+    "Clear text",     functionOption, NULL, (void *)PSK31MenuClearText,    NULL,
+    "Reset decoder",  functionOption, NULL, (void *)PSK31MenuResetDecoder, NULL,
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// DMR menu page
+///////////////////////////////////////////////////////////////////////////////
+//
+// Operator-facing knobs for the DMR digital coding overlay (4FSK over
+// NFM / FM_WIDE). The values are persisted in ED by Storage; each edit
+// also calls SyncDmrConfigFromED() so the live runtime config (which
+// the DSP, modem, and framing layers consult) stays current.
+//
+// Private-call dialing, RX TG whitelist, and per-VFO assignment are
+// future enhancements -- this surface covers the minimum needed to take
+// a Phoenix radio onto a Talk Group.
+//
+#include "DmrFraming.h"   // SyncDmrConfigFromED()
+
+VariableParameter dmrEnableVar = {
+    .variable = &ED.dmrEnabled,
+    .type = TYPE_BOOL,
+    .limits = {.b = {.min = false, .max = true, .step = 1}}
+};
+VariableParameter dmrTalkGroupVar = {
+    .variable = &ED.dmrTalkGroup,
+    .type = TYPE_I32,
+    /* 24-bit DMR Group Address space; 0..16777215. Step 1; the operator
+     * can wind through quickly with the encoder, and most popular TGs
+     * (e.g. 9, 91, 310) sit in the low integers. */
+    .limits = {.i32 = {.min = 0, .max = 16777215, .step = 1}}
+};
+VariableParameter dmrSrcIdVar = {
+    .variable = &ED.dmrSrcId,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = 16777215, .step = 1}}
+};
+VariableParameter dmrTimeSlotVar = {
+    .variable = &ED.dmrTimeSlot,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 1, .max = 2, .step = 1}}
+};
+VariableParameter dmrColorCodeVar = {
+    .variable = &ED.dmrColorCode,
+    .type = TYPE_I8,
+    .limits = {.i8 = {.min = 0, .max = 15, .step = 1}}
+};
+
+/* Post-update callback shared by every DMR menu entry. After the
+ * encoder has incremented/decremented the underlying ED field, push the
+ * value into the live `dmrConfig` global and persist to LittleFS so the
+ * setting survives reboot. */
+static void DmrMenuApplyAndSave(void){
+    SyncDmrConfigFromED();
+    SaveDataToStorage(false);
+}
+
+/* Save Now: explicit save trigger, useful after a sequence of edits. */
+static void DmrMenuSaveNow(void){
+    SaveDataToStorage(false);
+}
+
+/* Reset Defaults: restore the DMR config fields to the compile-time
+ * defaults declared in SDT.h. Live runtime + persistent storage are
+ * both updated in one shot. */
+static void DmrMenuResetDefaults(void){
+    ED.dmrEnabled    = false;
+    ED.dmrTalkGroup  = 9;
+    ED.dmrSrcId      = 0;
+    ED.dmrTimeSlot   = 1;
+    ED.dmrColorCode  = 1;
+    SyncDmrConfigFromED();
+    SaveDataToStorage(false);
+}
+
+struct SecondaryMenuOption DMROptions[] = {
+    "Enable",         variableOption, &dmrEnableVar,    NULL, (void *)DmrMenuApplyAndSave,
+    "Talk Group",     variableOption, &dmrTalkGroupVar, NULL, (void *)DmrMenuApplyAndSave,
+    "My DMR ID",      variableOption, &dmrSrcIdVar,     NULL, (void *)DmrMenuApplyAndSave,
+    "Time Slot",      variableOption, &dmrTimeSlotVar,  NULL, (void *)DmrMenuApplyAndSave,
+    "Color Code",     variableOption, &dmrColorCodeVar, NULL, (void *)DmrMenuApplyAndSave,
+    "Save Now",       functionOption, NULL, (void *)DmrMenuSaveNow,        NULL,
+    "Reset Defaults", functionOption, NULL, (void *)DmrMenuResetDefaults,  NULL,
+};
 
 // Primary menu structure
-struct PrimaryMenuOption primaryMenu[8] = {
+struct PrimaryMenuOption primaryMenu[11] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
@@ -588,6 +822,9 @@ struct PrimaryMenuOption primaryMenu[8] = {
     "EEPROM", EEPROMOptions, sizeof(EEPROMOptions)/sizeof(EEPROMOptions[0]),
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
     "Diagnostics", DiagnosticOptions, sizeof(DiagnosticOptions)/sizeof(DiagnosticOptions[0]),
+    "FT8", FT8Options, sizeof(FT8Options)/sizeof(FT8Options[0]),
+    "PSK31", PSK31Options, sizeof(PSK31Options)/sizeof(PSK31Options[0]),
+    "DMR", DMROptions, sizeof(DMROptions)/sizeof(DMROptions[0]),
 };
 
 /**
@@ -709,6 +946,25 @@ void PrintMainMenuOptions(bool foreground){
     tft.setFontScale(1);
 
     for (size_t k=0; k<sizeof(primaryMenu)/sizeof(primaryMenu[0]); k++){
+        /* When HAS_PSRAM is undefined (no PSRAM installed), the FT8
+         * subsystem is hard-disabled because its 720 KB EXTMEM slot
+         * buffer can't be allocated. Paint that menu row red and skip
+         * the normal highlight bookkeeping so it's visually obvious. */
+        bool ft8Disabled = false;
+#ifndef HAS_PSRAM
+        if (strcmp(primaryMenu[k].label, "FT8") == 0) ft8Disabled = true;
+#endif
+        if (ft8Disabled) {
+            tft.setTextColor(RA8875_RED);
+            tft.setCursor(x, y);
+            tft.print(primaryMenu[k].label);
+            /* Restore the page-default colour for whatever entries follow. */
+            if (foreground) tft.setTextColor(RA8875_WHITE);
+            else            tft.setTextColor(DARKGREY, RA8875_BLACK);
+            y += delta;
+            continue;
+        }
+
         if (k == primaryMenuIndex){
             if (foreground)
                 tft.setTextColor(RA8875_GREEN);

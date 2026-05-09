@@ -15,6 +15,7 @@ PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with Phoenix. 
 If not, see <https://www.gnu.org/licenses/>.
 */
+
 #include "SDT.h"
 #include <LittleFS.h> // comes bundled with Teensyduino
 #include <SD.h>
@@ -133,6 +134,17 @@ void SaveDataToStorage(bool savetosd){
     }
 
     doc["PowerCal_20W_to_100W_threshold_W"] = ED.PowerCal_20W_to_100W_threshold_W;
+
+    // Operator identity (FT8 + future digital modes)
+    doc["callsign"] = ED.callsign;
+    doc["grid"]     = ED.grid;
+
+    // DMR overlay configuration (mirrored to live dmrConfig at runtime)
+    doc["dmrEnabled"]   = ED.dmrEnabled;
+    doc["dmrTalkGroup"] = ED.dmrTalkGroup;
+    doc["dmrSrcId"]     = ED.dmrSrcId;
+    doc["dmrTimeSlot"]  = ED.dmrTimeSlot;
+    doc["dmrColorCode"] = ED.dmrColorCode;
 
     // Write this JSON object to filename on the LittleFS
     // Delete existing file, otherwise data is appended to the file
@@ -447,6 +459,25 @@ void RestoreDataFromStorage(void){
 
     ED.PowerCal_20W_to_100W_threshold_W = doc["PowerCal_20W_to_100W_threshold_W"] | ED.PowerCal_20W_to_100W_threshold_W;
 
+    // Operator identity (FT8 + future digital modes). String fields use ArduinoJson's
+    // default-fallback pattern: read as const char*, copy if present, else keep current.
+    {
+        const char *cs = doc["callsign"] | (const char*)nullptr;
+        if (cs != nullptr) { strncpy(ED.callsign, cs, sizeof(ED.callsign) - 1); ED.callsign[sizeof(ED.callsign) - 1] = '\0'; }
+        const char *gr = doc["grid"] | (const char*)nullptr;
+        if (gr != nullptr) { strncpy(ED.grid, gr, sizeof(ED.grid) - 1); ED.grid[sizeof(ED.grid) - 1] = '\0'; }
+    }
+
+    // DMR overlay configuration. Falls back to the in-memory default
+    // (set by SDT.h's in-class initializers) if the saved file pre-dates
+    // the DMR fields, so radios upgrading from an older firmware load
+    // cleanly without needing a forced reset.
+    ED.dmrEnabled   = doc["dmrEnabled"]   | ED.dmrEnabled;
+    ED.dmrTalkGroup = doc["dmrTalkGroup"] | ED.dmrTalkGroup;
+    ED.dmrSrcId     = doc["dmrSrcId"]     | ED.dmrSrcId;
+    ED.dmrTimeSlot  = doc["dmrTimeSlot"]  | ED.dmrTimeSlot;
+    ED.dmrColorCode = doc["dmrColorCode"] | ED.dmrColorCode;
+
     Serial.println("Config data restored successfully");
 }
 
@@ -671,6 +702,22 @@ void RestoreDataFromSDCard(void){
     }
 
     ED.PowerCal_20W_to_100W_threshold_W = doc["PowerCal_20W_to_100W_threshold_W"] | ED.PowerCal_20W_to_100W_threshold_W;
+
+    // Operator identity (FT8 + future digital modes).
+    {
+        const char *cs = doc["callsign"] | (const char*)nullptr;
+        if (cs != nullptr) { strncpy(ED.callsign, cs, sizeof(ED.callsign) - 1); ED.callsign[sizeof(ED.callsign) - 1] = '\0'; }
+        const char *gr = doc["grid"] | (const char*)nullptr;
+        if (gr != nullptr) { strncpy(ED.grid, gr, sizeof(ED.grid) - 1); ED.grid[sizeof(ED.grid) - 1] = '\0'; }
+    }
+
+    // DMR overlay configuration (fallbacks defined in SDT.h's in-class
+    // initializers, so older saved files upgrade cleanly).
+    ED.dmrEnabled   = doc["dmrEnabled"]   | ED.dmrEnabled;
+    ED.dmrTalkGroup = doc["dmrTalkGroup"] | ED.dmrTalkGroup;
+    ED.dmrSrcId     = doc["dmrSrcId"]     | ED.dmrSrcId;
+    ED.dmrTimeSlot  = doc["dmrTimeSlot"]  | ED.dmrTimeSlot;
+    ED.dmrColorCode = doc["dmrColorCode"] | ED.dmrColorCode;
 
     // Save the data to the EEPROM so that it matches
     SaveDataToStorage(false);

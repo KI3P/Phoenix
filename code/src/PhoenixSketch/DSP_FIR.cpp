@@ -1345,12 +1345,52 @@ void InitFilterMask(float32_t *FIR_filter_mask, ReceiveFilterConfig *RXfilters) 
             case SAM:
             case AM:
             case IQ:
-            case DCF77:
+            case DCF77: {
+                /* Block-scope the local so subsequent case labels can't
+                 * "jump over the initialization" -- C++ requires this when a
+                 * local with a non-trivial initializer is in case scope and
+                 * later cases would otherwise skip past it. */
                 #define MAXABS(a, b) ((abs(a)) > (abs(b)) ? (abs(a)) : (abs(b)))
                 int32_t edge_Hz = MAXABS(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz,
-                                         bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz); 
+                                         bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz);
                 low_Hz = -edge_Hz;
                 high_Hz = edge_Hz;
+                break;
+            }
+            case NFM:
+                // Narrow-band FM voice. Spec: +-2.5 kHz peak deviation,
+                // ~12.5 kHz occupied bandwidth (Carson's rule), modulation
+                // index m ~= 0.83 at 3 kHz max audio. The FIR here is the
+                // post-discriminator audio LPF, sized to ~3 kHz (symmetric
+                // +-3000 Hz) — wider would just admit hiss past the audio
+                // band, narrower would chop voice intelligibility.
+                low_Hz  = -3000;
+                high_Hz =  3000;
+                break;
+            case FT8_INTERNAL:
+                // FT8 audio (200-3000 Hz typical FT8 audio offsets).
+                // ft8_lib's monitor does its own STFT-based fine selection so
+                // a wide audio passband is preferred to a narrow one.
+                low_Hz  =   200;
+                high_Hz =  3000;
+                break;
+            case PSK31:
+                // PSK31 audio: wide passband matches FT8's reasoning. The
+                // PSK31 decoder pipeline does its own narrow filtering after
+                // NCO down-mix to baseband (~50 Hz wide), so the front-end
+                // FIR can stay wide enough to let the operator move the audio
+                // carrier within the SSB passband.
+                low_Hz  =   200;
+                high_Hz =  3000;
+                break;
+            case FM_WIDE:
+                // Wide-band FM. Carson's rule for +-5 kHz peak deviation +
+                // ~3 kHz max audio gives 2*(5000+3000) = 16 kHz minimum
+                // occupied bandwidth; round up to symmetric +-10 kHz so the
+                // discriminator captures the full ~16-20 kHz BW with margin
+                // and still fits cleanly inside a 25 kHz channel.
+                low_Hz  = -10000;
+                high_Hz =  10000;
                 break;
         }
     }

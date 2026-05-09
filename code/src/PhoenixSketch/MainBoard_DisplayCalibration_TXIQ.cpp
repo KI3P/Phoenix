@@ -496,8 +496,12 @@ static void DrawTXIQTablePane(void){
     const int16_t col3x = 100;
     const int16_t col4x = 160;
     const int16_t col5x = 205;
+    #ifdef DIRECT_COUPLED_TX
+    /* Only used inside DIRECT_COUPLED_TX blocks below; wrapped in the same
+     * guard so non-DIRECT_COUPLED_TX builds don't emit -Wunused-variable. */
     const int16_t col6x = 255;
     const int16_t col7x = 305;
+    #endif
     
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);

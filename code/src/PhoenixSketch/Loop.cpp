@@ -103,7 +103,12 @@ If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "SDT.h"
+#include "DSP_FT8.h"  // for RunFT8DecoderLoop() called each loop iteration
+#include "DSP_PSK31.h"  // for ChangePSK31RxFreq encoder binding
+#include "MainBoard_TextEditor.h"  // for TextEditorTick / IsActive / Commit / Cancel
 #include "FrontPanel_USBHost.h"  // for TickUSBHost() (drives HID + ThumbDV/AMBE)
+#include "MainBoard_Display.h"  // for primaryMenu[] / primaryMenuIndex (HAS_PSRAM gate)
+#include <string.h>             // for strcmp() (HAS_PSRAM gate)
 
 // FIFO buffer for interrupt events
 #define INTERRUPT_BUFFER_SIZE 16
@@ -392,6 +397,25 @@ void StartPowerAutoCal(void);
  * @param button Button ID from the front panel (defined in button constants)
  */
 void HandleButtonPress(int32_t button){
+    /* Text-editor modal: when active, MENU_OPTION_SELECT commits and
+     * HOME_SCREEN cancels. All other buttons are swallowed so the operator
+     * can't accidentally navigate away mid-edit. The editor is a soft modal
+     * (no UISm state) so we intercept here at the very top of dispatch. */
+    if (TextEditorIsActive()) {
+        switch (button) {
+            case MENU_OPTION_SELECT:
+                TextEditorCommit();
+                break;
+            case HOME_SCREEN:
+                TextEditorCancel();
+                break;
+            default:
+                /* swallow */
+                break;
+        }
+        return;
+    }
+
     // Disable all buttons when in an active transmit mode
     if ((modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK) ||
@@ -495,11 +519,17 @@ void HandleButtonPress(int32_t button){
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
                 case DEMODULATION:{
-                    // Rotate through the modulation types USB(0), LSB(1), AM(2), and SAM(3)
-                    int8_t newmod = (int8_t)ED.modulation[ED.activeVFO] + 1;
-                    if (newmod > (int8_t)SAM)
-                        newmod = (int8_t)USB;
-                    ED.modulation[ED.activeVFO] = (ModulationType)newmod;
+                    // Rotate through the modulation types: USB, LSB, AM, SAM, NFM, FM_WIDE, FT8_INTERNAL, PSK31.
+                    // FM_WIDE sits immediately after NFM so the operator steps narrow->wide naturally.
+                    // IQ and DCF77 are intentionally skipped (not normal RX modes for the operator).
+                    static const ModulationType cycle[] = {USB, LSB, AM, SAM, NFM, FM_WIDE, FT8_INTERNAL, PSK31};
+                    const size_t cycleLen = sizeof(cycle) / sizeof(cycle[0]);
+                    size_t i = 0;
+                    for (i = 0; i < cycleLen; i++) {
+                        if (cycle[i] == ED.modulation[ED.activeVFO]) break;
+                    }
+                    i = (i >= cycleLen) ? 0 : (i + 1) % cycleLen;
+                    ED.modulation[ED.activeVFO] = cycle[i];
                     UpdateFIRFilterMask(&RXfilters);
                     Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
                     break;
@@ -595,6 +625,15 @@ void HandleButtonPress(int32_t button){
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
                 case FINETUNE_BUTTON:{
+                    /* In PSK31 mode the fine-tune encoder push toggles the
+                     * decoder-status sub-page on the PSK31 pane (live Gardner
+                     * mu, dphase, |timing err|). The fine-tune *rotation* is
+                     * still bound to ChangePSK31RxFreq, so the user can flip
+                     * to the diagnostic view without losing tuning. In other
+                     * modes this button is currently unbound. */
+                    if (ED.modulation[ED.activeVFO] == PSK31) {
+                        PSK31ToggleStatusPage();
+                    }
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
@@ -616,6 +655,18 @@ void HandleButtonPress(int32_t button){
             switch(button){
                 // You are in UISm_StateId_[MAIN,SECONDARY]_MENU states
                 case MENU_OPTION_SELECT:{
+#ifndef HAS_PSRAM
+                    /* Hard-disable the FT8 menu page when no PSRAM is
+                     * installed -- the 720 KB EXTMEM slot buffer FT8
+                     * needs has nowhere to live. Swallow SELECT events
+                     * targeting the FT8 row of the main menu so the
+                     * radio cannot navigate into the FT8 submenu. */
+                    if (uiSM.state_id == UISm_StateId_MAIN_MENU
+                        && primaryMenuIndex < sizeof(primaryMenu)/sizeof(primaryMenu[0])
+                        && strcmp(primaryMenu[primaryMenuIndex].label, "FT8") == 0) {
+                        break;
+                    }
+#endif
                     // Issue SELECT interrupt to UI
                     UISm_dispatch_event(&uiSM,UISm_EventId_SELECT);
                     break;
@@ -690,11 +741,15 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case DEMODULATION:{
-                    // Rotate through the modulation types USB(0), LSB(1), AM(2), and SAM(3)
-                    int8_t newmod = (int8_t)ED.modulation[ED.activeVFO] + 1;
-                    if (newmod > (int8_t)SAM)
-                        newmod = (int8_t)USB;
-                    ED.modulation[ED.activeVFO] = (ModulationType)newmod;
+                    // Same cycle as the HOME/UPDATE handler above.
+                    static const ModulationType cycle[] = {USB, LSB, AM, SAM, NFM, FT8_INTERNAL, PSK31};
+                    const size_t cycleLen = sizeof(cycle) / sizeof(cycle[0]);
+                    size_t i = 0;
+                    for (i = 0; i < cycleLen; i++) {
+                        if (cycle[i] == ED.modulation[ED.activeVFO]) break;
+                    }
+                    i = (i >= cycleLen) ? 0 : (i + 1) % cycleLen;
+                    ED.modulation[ED.activeVFO] = cycle[i];
                     UpdateFIRFilterMask(&RXfilters);
                     Debug("Modulation is " + String(ED.modulation[ED.activeVFO]));
                     break;
@@ -1091,11 +1146,26 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iFINETUNE_INCREASE):{
-                    AdjustFineTune(+1);
+                    /* In FT8 / PSK31 modes the fine-tune encoder repurposes to
+                     * adjust the digital-mode RX audio frequency (SSB VFO is
+                     * left alone). 5 Hz step per click. */
+                    if (ED.modulation[ED.activeVFO] == FT8_INTERNAL) {
+                        ChangeFT8RxFreq(+1);
+                    } else if (ED.modulation[ED.activeVFO] == PSK31) {
+                        ChangePSK31RxFreq(+1);
+                    } else {
+                        AdjustFineTune(+1);
+                    }
                     break;
                 }
                 case (iFINETUNE_DECREASE):{
-                    AdjustFineTune(-1);
+                    if (ED.modulation[ED.activeVFO] == FT8_INTERNAL) {
+                        ChangeFT8RxFreq(-1);
+                    } else if (ED.modulation[ED.activeVFO] == PSK31) {
+                        ChangePSK31RxFreq(-1);
+                    } else {
+                        AdjustFineTune(-1);
+                    }
                     break;
                 }
                 default: // do nothing and handle these below
@@ -1458,15 +1528,23 @@ FASTRUN void loop(void){
     ProcessPTTDebounce();
     CheckForFrontPanelInterrupts();
     CheckForCATSerialEvents();
-    /* Run the USB host stack (HID keyboard/mouse + future ThumbDV/AMBE codec).
+    /* Run the USB host stack (HID keyboard/mouse + ThumbDV/AMBE codec).
      * No-op unless USB_HOST_INPUT_ENABLED or DMR_THUMBDV_ENABLED is set
-     * in Config.h. Must run before ConsumeInterrupt so keystrokes from a
-     * USB keyboard are visible this same iteration. */
+     * in Config.h. Must run before TextEditorTick / ConsumeInterrupt so
+     * keystrokes from a USB keyboard are visible this same iteration. */
     TickUSBHost();
+    /* Drain USB-keyboard chars into the text editor when active. No-op
+     * otherwise. Must run before ConsumeInterrupt so chars typed in the
+     * same loop iteration as a button press are processed first. */
+    TextEditorTick();
     ConsumeInterrupt();
-    
+
     // Step 2: Perform signal processing
     PerformSignalProcessing();
+
+    // Step 2.5: FT8 decoder tick. No-op when modulation != FT8_INTERNAL
+    // (the FSM stays in BUFFERING with no samples flowing in).
+    RunFT8DecoderLoop();
 
     // Step 3: Draw the display
     DrawDisplay();

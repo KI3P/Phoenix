@@ -51,6 +51,23 @@ If not, see <https://www.gnu.org/licenses/>.
 //#define USE_ANALOG_SWR
 
 
+// PSRAM presence on the Teensy 4.1 underside (8 MB or 16 MB QSPI chip).
+// Required by FT8 (which uses a 720 KB EXTMEM slot buffer) and any
+// other PSRAM-resident features.
+//
+// When DEFINED:  the EXTMEM slot buffer is allocated and FT8 works
+//                normally. The FT8 menu page and FT8_INTERNAL modulation
+//                are fully functional.
+// When UNDEFINED (no PSRAM): the EXTMEM slot buffer is replaced by a
+//                1-element stub that consumes no memory; the FT8 menu
+//                page renders in red and ignores selection; selecting
+//                FT8_INTERNAL as a modulation is blocked at the dispatch
+//                level so the FT8 demod / TX paths never run.
+//
+// Default is undefined to match a stock Teensy 4.1 with no PSRAM
+// installed. Uncomment if you have soldered the PSRAM chip(s).
+//#define HAS_PSRAM
+
 // USB host input (mouse + keyboard) -- ported from T41_SDR (plumbing only).
 // Uncomment to enable. When enabled the build requires the PJRC USBHost_t36
 // library (https://github.com/PaulStoffregen/USBHost_t36) to be installed.
@@ -63,11 +80,13 @@ If not, see <https://www.gnu.org/licenses/>.
 // PJRC USBHost_t36 library (same as USB_HOST_INPUT_ENABLED) and pulls in
 // AmbeDvsi.cpp. When disabled (default) AmbeDvsi.cpp compiles to no-ops.
 //
-// Note: this PR adds only the *codec stage* (PCM <-> AMBE+2 49-bit frames).
-// DMR's RF layer is 4FSK (4800 sym/s, ~9600 bps) carried inside a narrow FM
-// channel (12.5 kHz) -- it is *not* a peer modulation of NFM or FM_WIDE,
-// it sits on top of one of them. The 4FSK mod/demod and DMR framing/FEC
-// stages are a future Phoenix DSP module.
+// Note: DMR's RF layer is 4FSK (4800 sym/s, ~9600 bps) carried inside a
+// narrow FM channel (12.5 kHz) -- it is *not* a peer modulation of NFM or
+// FM_WIDE, it sits on top of one of them. AmbeDvsi.cpp is therefore only
+// the codec stage (PCM <-> AMBE+2 49-bit frames). The 4FSK mod/demod and
+// DMR framing/FEC stages are a future Phoenix DSP module; until they
+// land the DigitalCoding flag in SDT.h is plumbed but not yet wired into
+// the audio chain.
 //
 // Wiring: ThumbDV plugged into the Teensy 4.1 USBHOST receptacle, enumerating
 // as USB CDC-ACM at 460800 8N1. The driver runs the AMBE3000 in DMR mode
@@ -76,13 +95,11 @@ If not, see <https://www.gnu.org/licenses/>.
 //#define DMR_THUMBDV_ENABLED
 
 // Convenience: any feature that needs the USBHost_t36 stack must trigger
-// InitializeUSBHost/TickUSBHost. Defining either USB_HOST_INPUT_ENABLED
-// (HID keyboard/mouse) or DMR_THUMBDV_ENABLED (DVSI ThumbDV/AMBE3000 codec)
+// InitializeUSBHost/TickUSBHost. Defining either of the two flags above
 // enables the stack via this combined guard.
 #if defined(USB_HOST_INPUT_ENABLED) || defined(DMR_THUMBDV_ENABLED)
 #define USB_HOST_STACK_ENABLED
 #endif
-
 
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state

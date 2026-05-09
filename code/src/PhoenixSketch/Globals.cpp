@@ -25,7 +25,9 @@ If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "SDT.h"
-#include "FrontPanel_USBHost.h"  // for InitializeUSBHost() (HID + future ThumbDV/AMBE)
+#include "DSP_FT8.h"  // for InitializeFT8() called from setup()
+#include "FrontPanel_USBHost.h"  // for InitializeUSBHost() (HID + ThumbDV/AMBE)
+#include "DmrFraming.h"          // for SyncDmrConfigFromED() (DMR menu persistence)
 
 struct config_t ED;
 bool psdupdated = false;
@@ -112,6 +114,13 @@ const float32_t CWToneOffsetsHz[] = {400, 562.5, 656.5, 750.0, 843.75 };
 ModeSm modeSM;
 UISm uiSM;
 uint64_t hardwareRegister;
+
+/* Live DMR runtime configuration (Talk Group / time slot / color code /
+ * radio IDs). Default-initialized via the in-class member initializers
+ * declared in SDT.h::DmrConfig. The DmrFraming/DmrModem layers and the
+ * future menu UI mutate this at runtime; once the UI is in place the
+ * config should be persisted via ED + Storage. */
+struct DmrConfig dmrConfig;
 
 /**
  * Simple blocking delay function.
@@ -527,14 +536,20 @@ void setup(void){
     Serial.println("...Initializing storage");
     InitializeStorage();
 
+    /* Push the persisted DMR settings (ED.dmr*) into the live runtime
+     * config now that Storage has loaded ED. Done before the DSP layer
+     * inits so the modem sees the right slot / TG / IDs from the start. */
+    SyncDmrConfigFromED();
+
     Serial.println("...Initializing hardware");
     InitializeFrontPanel();
     InitializeSignalProcessing();  // Initialize DSP before starting audio
+    InitializeFT8();               // Allocate FT8 slot buffer + prime ft8_lib (idempotent)
     InitializeAudio();
     InitializeDisplay();
     InitializeRFHardware(); // RF board, LPF board, and BPF board
     InitializeUSBHost();    // No-op unless USB_HOST_INPUT_ENABLED or DMR_THUMBDV_ENABLED is defined in Config.h. Brings up HID keyboard/mouse and/or the ThumbDV (AMBE3000) DMR codec.
-
+    
     // Initialize temperature monitoring
     uint16_t temp_check_frequency = 0x03U;  //updates the temp value at a RTC/3 clock rate
     //0xFFFF determines a 2 second sample rate period

@@ -152,6 +152,43 @@ void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters);
 float32_t GetSAMCarrierOffset(void);
 
 /**
+ * @brief Fast atan2 approximation in radians.
+ * @param y Numerator (imaginary / sin component)
+ * @param x Denominator (real / cos component)
+ * @return Angle in radians, range approximately [-2PI, 2PI] (matches AMDecodeSAM convention).
+ * @note Used internally by AMDecodeSAM and by the PSK31 DBPSK demod. Faster than
+ *       atan2f() at the cost of accuracy and a non-standard output range.
+ */
+float ApproxAtan2(float y, float x);
+
+/**
+ * @brief Demodulate I/Q signal as narrow-band FM
+ * @param data Pointer to DataBlock containing filtered I/Q samples; on return data->I[] holds mono audio
+ * @note Quadrature FM demod (time derivative of phase angle), Lyons "Understanding DSP" §13.22
+ * @note Ported from T41_SDR/Demod.cpp (nfmdemod). De-emphasis filter is NOT included in this port.
+ */
+void nfmdemod(DataBlock *data);
+
+/**
+ * @brief FT8 dispatcher entry point called from Demodulate() when modulation == FT8_INTERNAL.
+ * @param data Pointer to DataBlock containing filtered I/Q samples.
+ * @note Forwards samples to the FT8 buffering pipeline (DSP_FT8.cpp). Decimates to ~12 kHz
+ *       and accumulates a 15-second slot, then triggers the ft8_lib decoder at slot
+ *       boundaries. See DSP_FT8.h for the full FT8 receive/transmit API.
+ */
+void ft8InternalDemod(DataBlock *data);
+
+/**
+ * @brief PSK31 dispatcher entry point called from Demodulate() when modulation == PSK31.
+ * @param data Pointer to DataBlock with audio-rate I/Q output of the IFFT.
+ * @note Implemented in DSP_PSK31.cpp. Performs NCO mix to baseband at psk31RxFreq,
+ *       low-pass filter, decimate to 250 sps, Gardner symbol-clock recovery, DBPSK
+ *       decode, varicode decode, and pushes decoded chars to a ring buffer for
+ *       MainBoard_DisplayPSK31 to render.
+ */
+void psk31Demod(DataBlock *data);
+
+/**
  * @brief Apply noise reduction to received audio
  * @param data Pointer to DataBlock containing demodulated audio
  * @note Implements spectral subtraction or adaptive filtering for noise suppression

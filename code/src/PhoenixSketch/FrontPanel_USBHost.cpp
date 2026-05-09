@@ -2,9 +2,7 @@
 #include "FrontPanel_USBHost.h"
 #include "FrontPanel_USBKeyboard.h"
 #include "FrontPanel_USBMouse.h"
-#ifdef DMR_THUMBDV_ENABLED
 #include "AmbeDvsi.h"
-#endif
 
 /*
  * USB host driver -- ported from T41_SDR/t41USBHost.cpp. Plumbing only:

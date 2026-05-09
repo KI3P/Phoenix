@@ -35,6 +35,7 @@ If not, see <https://www.gnu.org/licenses/>.
 
 #include "SDT.h"
 #include "MainBoard_Display.h"
+#include "MainBoard_TextEditor.h"
 #include <RA8875.h>
 #include "FreeSansBold24pt7b.h"
 #include "FreeSansBold18pt7b.h"
@@ -242,6 +243,14 @@ UISm_StateId oldstate = UISm_StateId_ROOT;
  * - DrawParameter() in MainBoard_DisplayHome.cpp
  */
 void DrawDisplay(void){
+    /* Text-editor modal takes over the screen when active. Render and
+     * skip the normal UISm-based dispatch -- the editor is a soft modal
+     * (no UISm state) so it sits ahead of the normal flow. */
+    if (TextEditorIsActive()) {
+        TextEditorRender();
+        return;
+    }
+
     switch (uiSM.state_id){
         case (UISm_StateId_SPLASH):{
             DrawSplash();

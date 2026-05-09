@@ -17,6 +17,12 @@ If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "SDT.h"
+#include "DSP_FT8.h"  // for FT8IsTxInProgress() / FT8GetNextTxAudioChunk()
+#include "DmrModem.h"     // 4FSK mod/demod that overlays NFM / FM_WIDE
+#include "DmrFraming.h"   // Talk Group + LC header / voice burst FEC
+#include "AmbeDvsi.h"     // PCM <-> AMBE+2 codec via ThumbDV USB
+#include "DmrAudioOut.h"  // 8 kHz AMBE PCM → DSP-rate speaker audio (RX side)
+#include "DmrTxAudio.h"   // mic → AMBE → voice burst → modem queue (TX side)
 
 float32_t DMAMEM float_buffer_L[READ_BUFFER_SIZE];
 float32_t DMAMEM float_buffer_R[READ_BUFFER_SIZE];
@@ -620,9 +626,166 @@ float32_t GetSAMCarrierOffset(void){
     return SAM_carrier_freq_offset;
 }
 
+// Scaling constant for the quadrature FM demodulator (qa_fmemod testcase scaling).
+// Ported from T41_SDR/Demod.h.
+static const float32_t fmdemod_quadri_K = 0.340447550238101026565118445432744920253753662109375f;
+
+/**
+ * Narrow-band FM demodulation.
+ *
+ * Quadrature FM demod that computes the time derivative of the phase angle
+ * directly from the I/Q stream without an arctangent (Lyons, "Understanding
+ * Digital Signal Processing", §13.22 Frequency Demodulation Algorithms;
+ * see also https://www.embedded.com/dsp-tricks-frequency-demodulation-algorithms/).
+ *
+ * Ported from T41_SDR/Demod.cpp::nfmdemod, adapted from interleaved I/Q to
+ * Phoenix's separate I[]/Q[] arrays. Mono audio is written back to data->I[].
+ * De-emphasis filtering is intentionally not included in this port.
+ *
+ * @param data Pointer to the DataBlock to act upon
+ */
+/**
+ * @brief Phase-integrating FM modulator: audio-rate baseband → I/Q.
+ * @param data                    Input/output block. data->I[] enters with
+ *                                real audio in the range ~[-1, +1] (or
+ *                                ±3 for DMR 4FSK baseband). On return
+ *                                data->I[]/data->Q[] hold cos/sin of the
+ *                                accumulated phase.
+ * @param deviationPerUnitInputHz Hz of frequency deviation per unit of
+ *                                input amplitude. Typical:
+ *                                  NFM voice  : 2500 Hz   (±2.5 kHz peak)
+ *                                  FM_WIDE    : 5000 Hz   (±5 kHz peak)
+ *                                  DMR (4FSK) :  648 Hz   (±3 ⇒ ±1944 Hz)
+ *
+ * Phase is accumulated across blocks via a function-local static so the
+ * carrier is continuous between calls. The audio-rate I/Q is then fed
+ * into TXInterpolateBy2 + TXInterpolateBy4 to reach the 192 kHz output
+ * rate -- the same up-sampling tail the SSB path uses.
+ *
+ * Bandwidth note: at the 24 kHz audio I/Q rate (default Phoenix
+ * post-decimation), the I/Q Nyquist is ±12 kHz. NFM (Carson ~11 kHz),
+ * DMR (~6 kHz) sit comfortably; FM_WIDE (~20 kHz Carson, ±5 kHz dev +
+ * ~5 kHz audio) is right at the edge -- a future commit may upsample
+ * before modulating to give it more headroom.
+ */
+static void FmModulate(DataBlock *data, float deviationPerUnitInputHz) {
+    static float phase = 0.0f;            /* persists across blocks */
+    if (data == nullptr || data->N == 0)            return;
+    if (data->sampleRate_Hz == 0)                   return;
+
+    constexpr float pi    = 3.14159265358979f;
+    constexpr float twoPi = 2.0f * pi;
+    const float k = twoPi * deviationPerUnitInputHz / (float)data->sampleRate_Hz;
+
+    for (uint32_t i = 0; i < data->N; ++i) {
+        const float audio = data->I[i];
+        phase += k * audio;
+        /* keep phase in (-pi, +pi] so cosf/sinf retain precision */
+        if (phase >  pi) phase -= twoPi;
+        else if (phase < -pi) phase += twoPi;
+        data->I[i] = cosf(phase);
+        data->Q[i] = sinf(phase);
+    }
+}
+
+/**
+ * @brief Bridge FM-discriminator audio into the DMR 4FSK demodulator.
+ *
+ * Called immediately after nfmdemod() when modulation == NFM or FM_WIDE
+ * AND dmrConfig.enabled is true. The FM discriminator's output already
+ * sits in data->I[] at data->sampleRate_Hz (typically 24 kHz post-
+ * DecimateBy8). We:
+ *
+ *   1. Push those audio samples into DmrModem's matched-filter +
+ *      symbol-timing chain.
+ *   2. Drain any complete bursts the modem has produced.
+ *   3. For each burst, try DmrRxParseLcHeaderBurst() first (announces
+ *      the call: caches src / dst / TG addressing). If that fails, try
+ *      DmrRxParseFrame() as a 3-frame voice burst; on success, push the
+ *      three 49-bit AMBE+2 frames into AmbeDecodeFrame for PCM playback.
+ *   4. Replace the FM-discriminator audio in data->I[] with decoded
+ *      AMBE voice from DmrAudioOut. The raw 4FSK never reaches the
+ *      speaker; the user hears the upsampled vocoder output instead.
+ */
+static void DmrRxBridgeFmAudio(DataBlock *data) {
+    if (data == nullptr || data->N == 0)        return;
+    if (!dmrConfig.enabled)                     return;
+
+    /* Feed FM-discriminator output to the 4FSK demod. */
+    DmrModemRxFeed(data->I, (size_t)data->N);
+
+    /* Drain any complete bursts. */
+    uint8_t burst[DMR_BURST_BYTES_MAX];
+    size_t  blen = 0;
+    while (DmrModemRxPopBurst(burst, &blen)) {
+        DmrCallType callType;
+        uint32_t    srcId, dstId;
+        if (DmrRxParseLcHeaderBurst(burst, blen, &callType, &srcId, &dstId)) {
+            /* New call: addressing now cached for upcoming voice bursts. */
+            continue;
+        }
+        /* Try the embedded-LC pipeline. If we tuned in mid-call (no
+         * Voice LC Header was heard), this is how the addressing is
+         * recovered: 4 × 32 bits across voice frames A..D, BPTC(128,77)
+         * decoded on the last fragment. Returns true only when the
+         * accumulator finishes; intermediate fragments and FEC failures
+         * silently return false. */
+        (void)DmrRxParseEmbeddedLc(burst, &callType, &srcId, &dstId);
+
+        uint8_t ambeFrames[DMR_AMBE_FRAMES_PER_BURST][AMBE_DMR_BYTES_PER_FRAME];
+        if (DmrRxParseFrame(burst, blen, ambeFrames,
+                            &callType, &srcId, &dstId)) {
+            /* Hand the 3 AMBE+2 frames to the codec for PCM playback.
+             * Decoded PCM lands in AmbeDvsi's output queue and is
+             * pulled by DmrAudioPumpAndFill() below. */
+            for (int f = 0; f < DMR_AMBE_FRAMES_PER_BURST; ++f) {
+                AmbeDecodeFrame(ambeFrames[f]);
+            }
+        }
+        /* Bursts that don't validate as either are dropped silently;
+         * the modem will reacquire on the next SYNC. */
+    }
+
+    /* Replace the raw 4FSK audio with decoded AMBE voice (or silence
+     * before the first burst arrives). The remainder of the audio
+     * pipeline (BandEQ, NoiseReduction, InterpolateReceiveData,
+     * AdjustVolume, PlayBuffer) treats this as ordinary RX audio. */
+    DmrAudioPumpAndFill(data->I, (size_t)data->N);
+}
+
+void nfmdemod(DataBlock *data){
+    static float32_t last_sample_i = 0.0f;
+    static float32_t last_sample_q = 0.0f;
+
+    if (data->N == 0) return;
+
+    // We overwrite data->I[i] in place with audio, so we cannot read the
+    // original I[i-1] back on the next iteration. Shadow the previous I in a
+    // local. Q is never written, so we read it directly from data->Q[].
+    float32_t prev_i = last_sample_i;
+    float32_t prev_q = last_sample_q;
+
+    for (unsigned i = 0; i < data->N; i++) {
+        float32_t inow = data->I[i];
+        float32_t qnow = data->Q[i];
+        float32_t denom = inow * inow + qnow * qnow;
+        // d(phase)/dt ~= (q[n]*i[n-1] - i[n]*q[n-1]) / (i[n]^2 + q[n]^2)
+        // Lyons §13.22; equivalent to T41's nfmdemod (interleaved layout).
+        data->I[i] = (denom != 0.0f)
+            ? fmdemod_quadri_K * (qnow * prev_i - inow * prev_q) / denom
+            : 0.0f;
+        prev_i = inow;
+        prev_q = qnow;
+    }
+
+    // Save the last raw I/Q for continuity with the next block.
+    last_sample_i = prev_i;
+    last_sample_q = prev_q;
+}
+
 /**
  * Demodulate the audio.
- * 
+ *
  * @param data Pointer to the DataBlock to act upon
  */
 static float32_t wold = 0;
@@ -660,6 +823,45 @@ void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters){
         break;
       case SAM:
         AMDecodeSAM(data);
+        break;
+      case NFM:
+        // Narrow-band FM voice (ported from T41_SDR). Spec: +-2.5 kHz peak
+        // deviation, ~12.5 kHz occupied bandwidth per Carson's rule
+        // (2*(2500+3000) = 11 kHz, rounded to a 12.5 kHz channel), ~3 kHz
+        // audio LPF, modulation index m ~= 0.83 at 3 kHz max audio. Audio
+        // lands in data->I[]; data->Q[] is left untouched (matches SAM
+        // convention).
+        nfmdemod(data);
+        // When DigitalCoding == DigitalCodingDMR (dmrConfig.enabled), the
+        // FM-discriminator audio is the 4FSK baseband; route it through
+        // the DMR demod chain and mute the analog audio.
+        DmrRxBridgeFmAudio(data);
+        break;
+      case FT8_INTERNAL:
+#ifdef HAS_PSRAM
+        // FT8 internal decode (ported from T41_SDR + ft8_lib). The dispatcher
+        // forwards samples to the FT8 buffering pipeline; the actual decoder
+        // runs at 15-second slot boundaries from RunFT8DecoderLoop().
+        ft8InternalDemod(data);
+#else
+        // PSRAM not present -- ft8SlotBuf is a 1-element stub; do not write to it.
+        // The FT8 menu page is also disabled at the UI level.
+#endif
+        break;
+      case PSK31:
+        // Phoenix-native PSK31 decoder. NCO mix -> low-pass -> decimate ->
+        // Gardner clock recovery -> DBPSK -> varicode -> text ring buffer.
+        psk31Demod(data);
+        break;
+      case FM_WIDE:
+        // Wide-band FM voice. Same FM-discriminator core as NFM (nfmdemod);
+        // the wide-vs-narrow distinction is purely a passband / channelization
+        // difference enforced upstream by InitFilterMask (~16-20 kHz BW per
+        // Carson's rule for +-5 kHz peak deviation in a 25 kHz channel).
+        nfmdemod(data);
+        // Same DMR overlay as NFM; the wider FM channel just gives more
+        // headroom for the 4FSK ±1.944 kHz deviation.
+        DmrRxBridgeFmAudio(data);
         break;
       default:
         break;
@@ -752,6 +954,18 @@ void InitializeSignalProcessing(void){
     InitializeXanrNoiseReduction();
     InitializeSpectralNoiseReduction();
     InitializeCWProcessing(ED.currentWPM, &RXfilters);
+
+    /* Initialize the DMR 4FSK modem and the audio output bridge at the
+     * post-DecimateBy8 audio rate. That's the rate at which Demodulate()
+     * / nfmdemod() emit samples, which is what we feed into
+     * DmrModemRxFeed and what DmrAudioPumpAndFill writes back into
+     * data->I. Both modules are no-ops at runtime unless
+     * dmrConfig.enabled is set. */
+    const float dmrAudioRate = (float)SR[SampleRate].rate / 8.0f;
+    DmrModemInit(dmrAudioRate);
+    DmrAudioInit(dmrAudioRate);    /* RX: 8 kHz AMBE PCM → DSP audio  */
+    DmrTxAudioInit(dmrAudioRate);  /* TX: mic audio → AMBE → bursts   */
+    DmrConfigure(&dmrConfig);
 }
 
 /**
@@ -1112,25 +1326,134 @@ DataBlock * TransmitProcessing(const char *fname){
     data.I = float_buffer_L;
     data.Q = float_buffer_R;
 
-    // Read data from microphone input buffer
+    // Per-VFO modulation type drives the TX path branch:
+    //   - SSB (USB / LSB / AM / SAM / IQ) -> Hilbert + sideband selection
+    //   - NFM / FM_WIDE                   -> phase-integrating FM modulator
+    //   - DMR overlay (DigitalCodingDMR over NFM / FM_WIDE) replaces mic
+    //     audio with DmrModemRender's 4FSK baseband.
+    //   - FT8 (FT8_INTERNAL during TX) substitutes synthesized FT8 audio
+    //     into the SSB path (no Hilbert change; works over the SSB pipeline).
+    const ModulationType m     = ED.modulation[ED.activeVFO];
+    const bool isFM            = (m == NFM) || (m == FM_WIDE);
+    const bool dmrTx           = isFM && dmrConfig.enabled;
+#ifdef HAS_PSRAM
+    const bool ft8tx           = (m == FT8_INTERNAL) && FT8IsTxInProgress();
+#else
+    const bool ft8tx           = false;   /* FT8 hard-disabled when no PSRAM */
+#endif
+
+    // Read data from microphone input buffer.
     if (ReadMicrophoneBuffer(&data)){
-        // There is no data available, skip the rest
-        return NULL;
+        // No mic data available. For SSB voice this means there's nothing
+        // to do; for FT8 TX, FM voice TX, and DMR TX we still want the
+        // pipeline to run, so fill with silence at the input rate
+        // (192 kHz, 2048 samples) so decimation behaves.
+        if (!ft8tx && !isFM) return NULL;
+        arm_fill_f32(0.0f, data.I, 2048);
+        arm_fill_f32(0.0f, data.Q, 2048);
     }
     //Flag(2);
     TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
-    BandEQ(&data, &RXfilters, TX);
-    TXGain(&data); // apply the DSP gain factor
-    arm_copy_f32(data.I,data.Q,256);
-    TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
-    HilbertTransform(&data,&TXfilters); // 128
-    TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
-    // Perform IQ correction
-    ApplyIQCorrection(&data,
-        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
-        ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
-    SidebandSelection(&data);
+
+    // FT8 audio substitution after decimation. We're at 24 kHz / 256 samples
+    // here, which matches FT8GetNextTxAudioChunk's expected output rate
+    // (12 kHz internal -> 2x nearest-neighbor upsample -> 24 kHz).
+    if (ft8tx) {
+        int got = FT8GetNextTxAudioChunk(data.I, 256);
+        if (got < 256) {
+            // End-of-message reached partway through the chunk; pad with
+            // silence so the rest of the SSB pipeline keys cleanly off.
+            for (int i = (got > 0 ? got : 0); i < 256; i++) data.I[i] = 0.0f;
+        }
+    }
+
+    if (isFM) {
+        // ---------- FM transmit path (NFM / FM_WIDE; analog or DMR) ----------
+        if (dmrTx) {
+            // Producer side: capture mic audio (still in data.I[] from
+            // ReadMicrophoneBuffer + decimation) for the AMBE encode →
+            // burst → modem queue chain. Must happen BEFORE we overwrite
+            // data.I with the modem's 4FSK baseband below.
+            DmrTxAudioFeed(data.I, 256);
+            // Consumer side: replace mic audio with the 4FSK baseband.
+            // DmrModemRender writes zeros outside our TS and zeros when
+            // no bursts are pending, so the carrier sits at zero
+            // deviation between bursts -- proper PA on/off slot gating
+            // is a hardware-level refinement for a future commit.
+            DmrModemRender(data.I, 256);
+            // Skip BandEQ + TXGain: 4FSK is already at the right amplitude
+            // and shouldn't be voice-EQ-shaped.
+        } else {
+            // Analog FM voice: standard per-band audio EQ + operator gain.
+            BandEQ(&data, &RXfilters, TX);
+            TXGain(&data);
+        }
+        // Phase-integrating FM modulator. Deviation per unit audio:
+        //   DMR    :  648 Hz   (±3 symbol → ±1944 Hz peak per ETSI)
+        //   NFM    : 2500 Hz   (±2.5 kHz peak deviation, 12.5 kHz channel)
+        //   FM_WIDE: 5000 Hz   (±5 kHz peak deviation, 25 kHz channel)
+        const float deviationHz = dmrTx
+                                    ? 648.0f
+                                    : (m == NFM ? 2500.0f : 5000.0f);
+        FmModulate(&data, deviationHz);
+        // I/Q now sits in data.I[]/data.Q[] at 24 kHz / 256 samples; the
+        // existing TXInterpolateBy2 + TXInterpolateBy4 tail upsamples to
+        // 192 kHz, same as SSB.
+
+        // TDMA slot gating for DMR. Outside our configured time slot we
+        // zero the I/Q so the mixer puts no signal at the antenna --
+        // effectively "PA off" without round-tripping a hardware enable
+        // line at every 30 ms boundary. Without this, the FM modulator
+        // emits a continuous carrier between bursts (because audio = 0
+        // means constant phase, which still produces a non-zero
+        // cos/sin), which would step on the other party's TS in a
+        // Tier-II repeater scenario.
+        //
+        // Per-sample µs-resolution gating: we walk the 256 samples of
+        // this block (~10.7 ms at 24 kHz) at the audio rate, computing
+        // each sample's absolute time via micros() + sample offset, and
+        // zero only those samples whose timestamp falls outside our
+        // configured slot. A slot transition mid-block is therefore
+        // honored to within 1 sample (~42 µs), instead of being
+        // rounded to the 10.7 ms block boundary.
+        if (dmrTx) {
+            const uint32_t baseUs = micros();
+            /* 24 kHz audio rate → 1e6/24000 ≈ 41.67 µs per sample.
+             * Use integer division which gives 41 µs per sample, with
+             * cumulative drift << 1 ms across 256 samples -- well below
+             * the 30 ms slot precision target. */
+            for (uint32_t i = 0; i < 256; ++i) {
+                const uint32_t sUs = baseUs + (i * 1000000u) / 24000u;
+                if (!DmrSlotIsOursUs(sUs)) {
+                    data.I[i] = 0.0f;
+                    data.Q[i] = 0.0f;
+                }
+            }
+        }
+    } else {
+        // ---------- SSB transmit path (USB / LSB / AM / SAM / IQ; FT8 too) -
+        // Per-band audio EQ is intended for SSB voice shaping. FT8 wants a
+        // flat audio response in the 200-3000 Hz region so the GFSK tones
+        // aren't skewed in amplitude across the audio passband; bypass
+        // when substituting FT8 audio. TXGain still runs so the operator's
+        // power setting applies the same way it does for SSB.
+        if (!ft8tx) {
+            BandEQ(&data, &RXfilters, TX);
+        }
+        TXGain(&data); // apply the DSP gain factor
+        arm_copy_f32(data.I,data.Q,256);
+        TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
+        HilbertTransform(&data,&TXfilters); // 128
+        TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+        // Perform IQ correction
+        ApplyIQCorrection(&data,
+            ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+            ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+        SidebandSelection(&data);
+    }
+
+    // Common upsample-to-192k tail (shared by SSB and FM paths)
     TXInterpolateBy2(&data,&TXfilters); // 256 in, 512 out
     TXInterpolateBy4(&data,&TXfilters); // 512 in, 2048 out
 

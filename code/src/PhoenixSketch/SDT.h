@@ -15,15 +15,16 @@ PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with Phoenix. 
 If not, see <https://www.gnu.org/licenses/>.
 */
-#ifndef SDT_H
+
+c#ifndef SDT_H
 #define SDT_H
 
-#include <stdint.h>  
+#include <stdint.h>
 #include <Arduino.h>
 #include "Config.h"
 
-#define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.2.1" 
+#define RIGNAME "T41-Vxx-V04"
+#define VERSION "PhxVxx04 V1.2.1"
 
 #include "BuildInfo.h"
 
@@ -47,115 +48,121 @@ typedef int errno_t;
 
 #define CLEAR_VAR(x) memset(x, 0, sizeof(x))
 
-#define BEGIN_TEENSY_SHUTDOWN   0
-#define SHUTDOWN_COMPLETE       1
-#define EQUALIZER_CELL_COUNT    14
+#define BEGIN_TEENSY_SHUTDOWN 0
+#define SHUTDOWN_COMPLETE 1
+#define EQUALIZER_CELL_COUNT 14
 
 // Teensy pins used for particular functions
-#define RXTX        22 // Transmit/Receive (H=TX,L=RX)
-#define CW_ON_OFF   33 // CW on / off (H=ON,L=OFF) (V12 hardware)
-#define XMIT_MODE   34 // Transmit mode (H=SSB,L=CW) (V12 hardware)
-#define KEY1        36 // Tip for Straight key
-#define KEY2        35 // Ring
-#define PTT         37
-#define FOR         26
-#define REV         27
-#define CAL         38  // RX board calibration control (H=CAL,L=normal)
+#define RXTX 22       // Transmit/Receive (H=TX,L=RX)
+#define CW_ON_OFF 33  // CW on / off (H=ON,L=OFF) (V12 hardware)
+#define XMIT_MODE 34  // Transmit mode (H=SSB,L=CW) (V12 hardware)
+#define KEY1 36       // Tip for Straight key
+#define KEY2 35       // Ring
+#define PTT 37
+#define FOR 26
+#define REV 27
+#define CAL 38  // RX board calibration control (H=CAL,L=normal)
 
 // The 64 bit register that records the state of the radio hardware
 extern uint64_t hardwareRegister;
 
 // The bit map for hardwareRegister
-#define LPFBAND0BIT  0
-#define LPFBAND1BIT  1
-#define LPFBAND2BIT  2
-#define LPFBAND3BIT  3
-#define ANT0BIT      4
-#define ANT1BIT      5
-#define XVTRBIT      6
-#define PA100WBIT    7
-#define TXBPFBIT     8
-#define RXBPFBIT     9
-#define RXTXBIT      10
-#define CWBIT        11
-#define MODEBIT      12
-#define CALBIT       13
-#define CWVFOBIT     14
-#define RXVFOBIT     15
-#define TXATTLSB     16
-#define TXATTMSB     21
-#define RXATTLSB     22
-#define RXATTMSB     27
-#define BPFBAND0BIT  28
-#define BPFBAND1BIT  29
-#define BPFBAND2BIT  30
-#define BPFBAND3BIT  31
-#define TXVFOBIT     32
+#define LPFBAND0BIT 0
+#define LPFBAND1BIT 1
+#define LPFBAND2BIT 2
+#define LPFBAND3BIT 3
+#define ANT0BIT 4
+#define ANT1BIT 5
+#define XVTRBIT 6
+#define PA100WBIT 7
+#define TXBPFBIT 8
+#define RXBPFBIT 9
+#define RXTXBIT 10
+#define CWBIT 11
+#define MODEBIT 12
+#define CALBIT 13
+#define CWVFOBIT 14
+#define RXVFOBIT 15
+#define TXATTLSB 16
+#define TXATTMSB 21
+#define RXATTLSB 22
+#define RXATTMSB 27
+#define BPFBAND0BIT 28
+#define BPFBAND1BIT 29
+#define BPFBAND2BIT 30
+#define BPFBAND3BIT 31
+#define TXVFOBIT 32
 
-#define BAND_NF_BCD   0b1111
-#define BAND_6M_BCD   0b1010
-#define BAND_10M_BCD  0b1001
-#define BAND_12M_BCD  0b1000
-#define BAND_15M_BCD  0b0111
-#define BAND_17M_BCD  0b0110
-#define BAND_20M_BCD  0b0101
-#define BAND_30M_BCD  0b0100
-#define BAND_40M_BCD  0b0011
-#define BAND_60M_BCD  0b0000
-#define BAND_80M_BCD  0b0010
+#define BAND_NF_BCD 0b1111
+#define BAND_6M_BCD 0b1010
+#define BAND_10M_BCD 0b1001
+#define BAND_12M_BCD 0b1000
+#define BAND_15M_BCD 0b0111
+#define BAND_17M_BCD 0b0110
+#define BAND_20M_BCD 0b0101
+#define BAND_30M_BCD 0b0100
+#define BAND_40M_BCD 0b0011
+#define BAND_60M_BCD 0b0000
+#define BAND_80M_BCD 0b0010
 #define BAND_160M_BCD 0b0001
 
 // Macros used to manipulate the hardware register
 #define GET_BIT(byte, bit) (((byte) >> (bit)) & 1ULL)
-#define SET_BIT(byte, bit) ((byte) |= (1ULL << (bit)));buffer_add()
-#define CLEAR_BIT(byte, bit) ((byte) &= ~(1ULL << (bit)));buffer_add()
-#define TOGGLE_BIT(byte, bit) ((byte) ^= (1ULL << (bit)));buffer_add()
+#define SET_BIT(byte, bit) \
+  ((byte) |= (1ULL << (bit))); \
+  buffer_add()
+#define CLEAR_BIT(byte, bit) \
+  ((byte) &= ~(1ULL << (bit))); \
+  buffer_add()
+#define TOGGLE_BIT(byte, bit) \
+  ((byte) ^= (1ULL << (bit))); \
+  buffer_add()
 #define GET_LPF_BAND (uint8_t)(hardwareRegister & 0x0000000F)
 
 // Every time the value of hardwareRegister is updated, store this in a rolling buffer
 #define REGISTER_BUFFER_SIZE 100
 
 // Band configuration
-#define BAND_160M                               0
-#define BAND_80M                                1
-#define BAND_60M                                2
-#define BAND_40M                                3
-#define BAND_30M                                4
-#define BAND_20M                                5
-#define BAND_17M                                6
-#define BAND_15M                                7
-#define BAND_12M                                8
-#define BAND_10M                                9
-#define BAND_6M                                 10
-#define BAND_4M                                 11
-#define BAND_GENERAL                            12
-#define FIRST_BAND                              BAND_160M
-#define LAST_BAND                               BAND_GENERAL
-#define NUMBER_OF_BANDS                         13
-#define MAX_FAVORITES                           13
+#define BAND_160M 0
+#define BAND_80M 1
+#define BAND_60M 2
+#define BAND_40M 3
+#define BAND_30M 4
+#define BAND_20M 5
+#define BAND_17M 6
+#define BAND_15M 7
+#define BAND_12M 8
+#define BAND_10M 9
+#define BAND_6M 10
+#define BAND_4M 11
+#define BAND_GENERAL 12
+#define FIRST_BAND BAND_160M
+#define LAST_BAND BAND_GENERAL
+#define NUMBER_OF_BANDS 13
+#define MAX_FAVORITES 13
 
 // Zoom
-#define SPECTRUM_ZOOM_MIN  0
-#define SPECTRUM_ZOOM_1    0
-#define SPECTRUM_ZOOM_2    1
-#define SPECTRUM_ZOOM_4    2
-#define SPECTRUM_ZOOM_8    3
-#define SPECTRUM_ZOOM_16   4
-#define SPECTRUM_ZOOM_MAX  4
-#define SPECTRUM_RES       512
-#define FFT_LENGTH         SPECTRUM_RES
+#define SPECTRUM_ZOOM_MIN 0
+#define SPECTRUM_ZOOM_1 0
+#define SPECTRUM_ZOOM_2 1
+#define SPECTRUM_ZOOM_4 2
+#define SPECTRUM_ZOOM_8 3
+#define SPECTRUM_ZOOM_16 4
+#define SPECTRUM_ZOOM_MAX 4
+#define SPECTRUM_RES 512
+#define FFT_LENGTH SPECTRUM_RES
 
-#define SAMPLE_RATE_MIN  6
-#define SAMPLE_RATE_8K   0
-#define SAMPLE_RATE_11K  1
-#define SAMPLE_RATE_16K  2
-#define SAMPLE_RATE_22K  3
-#define SAMPLE_RATE_32K  4
-#define SAMPLE_RATE_44K  5
-#define SAMPLE_RATE_48K  6
-#define SAMPLE_RATE_50K  7
-#define SAMPLE_RATE_88K  8
-#define SAMPLE_RATE_96K  9
+#define SAMPLE_RATE_MIN 6
+#define SAMPLE_RATE_8K 0
+#define SAMPLE_RATE_11K 1
+#define SAMPLE_RATE_16K 2
+#define SAMPLE_RATE_22K 3
+#define SAMPLE_RATE_32K 4
+#define SAMPLE_RATE_44K 5
+#define SAMPLE_RATE_48K 6
+#define SAMPLE_RATE_50K 7
+#define SAMPLE_RATE_88K 8
+#define SAMPLE_RATE_96K 9
 #define SAMPLE_RATE_100K 10
 #define SAMPLE_RATE_101K 11
 #define SAMPLE_RATE_176K 12
@@ -164,18 +171,18 @@ extern uint64_t hardwareRegister;
 #define SAMPLE_RATE_256K 15
 #define SAMPLE_RATE_281K 16
 #define SAMPLE_RATE_353K 17
-#define SAMPLE_RATE_MAX  15
+#define SAMPLE_RATE_MAX 15
 
 // These constants are used to calibrate the S-meter and receive PSD to dBm
-#define RECEIVE_POWER_OFFSET    -93.15
+#define RECEIVE_POWER_OFFSET -93.15
 #define RECEIVE_SMETER_PSD_DELTA -8.35
 float32_t PSDToDBM(float32_t psdval);
 float32_t AudioToDBM(float32_t audioVal);
 
-#define BUFFER_SIZE                             128
-#define N_BLOCKS                                16 // receive: IQ input
-#define N_BLOCKS_EX                             16 // transmit: mic input
-#define READ_BUFFER_SIZE                        (BUFFER_SIZE * N_BLOCKS)
+#define BUFFER_SIZE 128
+#define N_BLOCKS 16     // receive: IQ input
+#define N_BLOCKS_EX 16  // transmit: mic input
+#define READ_BUFFER_SIZE (BUFFER_SIZE * N_BLOCKS)
 
 #ifndef PI
 #define PI 3.1415926535897932384626433832795f
@@ -194,202 +201,306 @@ float32_t AudioToDBM(float32_t audioVal);
 #define VFO_B 1
 
 enum KeyTypeId {
-    KeyTypeId_Straight = 0,
-    KeyTypeId_Keyer =    1,
-    KeyTypeId_Invalid =  8
+  KeyTypeId_Straight = 0,
+  KeyTypeId_Keyer = 1,
+  KeyTypeId_Invalid = 8
 };
 
 enum FilterType {
-    Lowpass =  0,
-    Highpass = 1,
-    Bandpass = 2,
-    Hilbert =  4,
-    Notch =    5
+  Lowpass = 0,
+  Highpass = 1,
+  Bandpass = 2,
+  Hilbert = 4,
+  Notch = 5
 };
 
 enum TXRXType {
-    TX = 1,
-    RX = 0
+  TX = 1,
+  RX = 0
 };
 
 enum AGCMode {
-    AGCOff = 0,
-    AGCLong = 1,
-    AGCSlow = 2,
-    AGCMed = 3,
-    AGCFast = 5,
-    AGCInvalid = 8
+  AGCOff = 0,
+  AGCLong = 1,
+  AGCSlow = 2,
+  AGCMed = 3,
+  AGCFast = 5,
+  AGCInvalid = 8
 };
 
 enum ModulationType {
-    USB = 0,
-    LSB = 1,
-    AM = 2,
-    SAM = 3,
-    IQ = 4,
-    DCF77 = 29  // set the clock with the time signal station DCF77
+  USB = 0,
+  LSB = 1,
+  AM = 2,
+  SAM = 3,
+  IQ = 4,
+  NFM = 5,           // Narrow-band FM voice (+-2.5 kHz peak dev., ~12.5 kHz occupied BW per Carson's rule, ~3 kHz audio LPF, modulation index m ~= 0.83 at 3 kHz max audio; ported from T41_SDR Demod.cpp). Also the RF carrier for DMR (12.5 kHz channel, 4FSK at 4800 sym/s) when DigitalCoding == DigitalCodingDMR.
+  FT8_INTERNAL = 6,  // FT8 internal decode (ported from T41_SDR ft8.cpp + ft8_lib)
+  PSK31 = 7,         // PSK31 BPSK 31.25 baud (full Phoenix implementation)
+  FM_WIDE = 8,       // Wide-band FM voice (+-5 kHz dev., ~16-20 kHz BW per Carson's rule, 25 kHz channel). May also carry DMR (4FSK at 4800 sym/s) when DigitalCoding == DigitalCodingDMR.
+  DCF77 = 29         // set the clock with the time signal station DCF77
 };
 
+/**
+ * Digital coding overlay applied on top of an FM modulation (NFM or FM_WIDE).
+ *
+ * DMR is not a peer of NFM/FM_WIDE -- it is a 4FSK digital baseband (4800
+ * sym/s, ~9600 bps) that rides inside an FM channel. When DigitalCoding ==
+ * DigitalCodingDMR and modulation == NFM or FM_WIDE, the audio chain is
+ * replaced by the digital pipeline:
+ *
+ *   TX:  mic PCM -> AmbeEncodePcm20ms -> AMBE+2 49-bit frames ->
+ *        DMR framing/FEC (DmrFraming) -> 4FSK modulator (DmrModem)
+ *        -> FM TX (NFM or FM_WIDE)
+ *   RX:  FM RX -> 4FSK demodulator (DmrModem) -> DMR deframing/FEC
+ *        (DmrFraming) -> AMBE+2 frames -> AmbeDecodeFrame -> speaker PCM
+ *
+ * Layering:
+ *   - AmbeDvsi.{h,cpp}      codec stage (PCM <-> AMBE+2 49-bit)        [done]
+ *   - DmrFraming.{h,cpp}    voice header / FEC / Talk Group addressing  [stub]
+ *   - DmrModem.{h,cpp}      4FSK mod/demod, TS1/TS2 burst gating        [stub]
+ *
+ * The DigitalCoding enum is plumbed today; the framing and modem layers
+ * land later. When they are missing, AmbeDvsi exposes its codec endpoints
+ * directly so the chip can be exercised in isolation.
+ */
+enum DigitalCoding {
+  DigitalCodingNone = 0,  /**< Plain analog audio over the selected modulation. */
+  DigitalCodingDMR  = 1   /**< DMR (4FSK / AMBE+2 49-bit) over NFM or FM_WIDE. */
+};
+
+/**
+ * DMR is TDMA: a 60 ms frame is split into two 30 ms timeslots. A radio
+ * transmits and receives only during its assigned slot; the modem layer
+ * (DmrModem) is responsible for gating the 4FSK burst to the right slot.
+ */
+enum DmrTimeSlot {
+  DmrTimeSlot1 = 1,   /**< First half of the TDMA frame. */
+  DmrTimeSlot2 = 2    /**< Second half of the TDMA frame. */
+};
+
+/**
+ * DMR addresses every voice/data burst as either a group call (broadcast
+ * to a Talk Group) or a private call (point-to-point to a single radio
+ * ID). This is encoded in the LC (Link Control) header on TX and parsed
+ * on RX.
+ */
+enum DmrCallType {
+  DmrCallGroup   = 0, /**< Talk Group call: dstId is a 24-bit TG number. */
+  DmrCallPrivate = 1  /**< Private call: dstId is a 24-bit DMR radio ID. */
+};
+
+/** Maximum number of Talk Group IDs the RX-side filter will hold. */
+#define DMR_RX_TG_FILTER_MAX 16
+
+/* AMBE+2 frame geometry shared between AmbeDvsi and DmrFraming. The DMR
+ * vocoder rate (33 / MotoTRBO) packs 49 bits / 20 ms into 7 bytes (top 49
+ * bits MSB-first; bottom 7 bits of byte 6 unused). Number of AMBE frames
+ * carried per voice-burst is fixed at 3 by ETSI TS 102 361-2. */
+#define AMBE_DMR_BITS_PER_FRAME      49
+#define AMBE_DMR_BYTES_PER_FRAME     7
+#define DMR_AMBE_FRAMES_PER_BURST    3
+
+/**
+ * Runtime configuration for the DMR digital coding overlay. Owned by
+ * DmrFraming/DmrModem at runtime; the user-facing menu eventually drives
+ * these values, and they should be persisted to ED via Storage once the
+ * UI is wired up.
+ *
+ * - colorCode    DMR Color Code (0-15). Acts as a network ID; RX
+ *                discards bursts whose CC does not match.
+ * - timeSlot     Our assigned TDMA slot for TX bursts (TS1 or TS2).
+ * - srcId        Our 24-bit DMR Radio ID, written into LC on TX.
+ * - dstId        Default destination ID for outbound calls (Talk Group
+ *                number for Group calls, radio ID for Private calls).
+ * - callType     Whether outbound calls are Group (default) or Private.
+ * - rxTgFilter   Optional whitelist of Talk Group IDs to accept on RX.
+ *                rxTgCount == 0 means "monitor all groups".
+ */
+struct DmrConfig {
+  bool         enabled    = false;  /**< Master DigitalCodingDMR on/off; checked by DSP.cpp. */
+  uint8_t      colorCode  = 1;
+  DmrTimeSlot  timeSlot   = DmrTimeSlot1;
+  uint32_t     srcId      = 0;
+  uint32_t     dstId      = 0;
+  DmrCallType  callType   = DmrCallGroup;
+  uint8_t      rxTgCount  = 0;
+  uint32_t     rxTgFilter[DMR_RX_TG_FILTER_MAX] = {0};
+};
+
+/** Live runtime DMR configuration (defined in Globals.cpp). */
+extern struct DmrConfig dmrConfig;
+
 enum NoiseReductionType {
-    NROff = 0,
-    NRKim = 1,
-    NRSpectral = 2,
-    NRLMS = 3,
-    NRInvalid = 8
+  NROff = 0,
+  NRKim = 1,
+  NRSpectral = 2,
+  NRLMS = 3,
+  NRInvalid = 8
 };
 
 enum VolumeFunction {
-    AudioVolume = 0,
-    AGCGain = 1,
-    MicGain = 2,
-    SidetoneVolume = 3,
-    InvalidVolumeFunction = 100
+  AudioVolume = 0,
+  AGCGain = 1,
+  MicGain = 2,
+  SidetoneVolume = 3,
+  InvalidVolumeFunction = 100
 };
 
 enum MorseStates { state0,
-              state1,
-              state2,
-              state3,
-              state4,
-              state5,
-              state6 };
+                   state1,
+                   state2,
+                   state3,
+                   state4,
+                   state5,
+                   state6 };
 
-#define SSB_20W_CAL_POWER_POINT_W  3.0f
+#define SSB_20W_CAL_POWER_POINT_W 3.0f
 #define SSB_100W_CAL_POWER_POINT_W 15.0f
-#define CW_20W_CAL_POWER_POINT_W  10.0f
+#define CW_20W_CAL_POWER_POINT_W 10.0f
 #define CW_100W_CAL_POWER_POINT_W 75.0f
 
 
 /** Radio configuration parameters that are kept in persistent storage */
 extern struct config_t {
-    AGCMode agc = AGCOff;           /** AGC mode */
-    int32_t audioVolume = 30;       /** Output audio amplitude */
-    float32_t rfGainAllBands_dB = 0;/** Gain applied to the received IQ samples in DSP chain */
-    int64_t stepFineTune = FAST_TUNE_INCREMENT; /** Increment value for fine tune */
-    NoiseReductionType nrOptionSelect = NROff; /** Noise reduction mode */
-    uint8_t ANR_notchOn = 0;        /** Automatic notch filter on/off */
-    int32_t spectrumScale = 1;      /** dB/pixel selection for spectrum display */
-    int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50,50 }; /** Shift spectrum up/down on display */
-    int8_t spectrumFloorAuto = 1;   /** Automatically adjust the spectrum floor */
-    uint32_t spectrum_zoom = 1;     /** Zoom level for spectrum */
-    int32_t CWFilterIndex = 5;      /** Selects the receive CW audio filter */
-    int32_t CWToneIndex = 3;        /** Selects the transmitted CW tone frequency */
-    int32_t decoderFlag = 0;        /** CW decoder on/off */
-    KeyTypeId keyType = KEYER_TYPE; /** CW key type: straight or keyer */
-    int32_t currentWPM = DEFAULT_KEYER_WPM; /** CW words per minute for keyer + decoder */
-    float32_t sidetoneVolume = 20.0;/** CW transmit sidetone volume */
-    int32_t freqIncrement = DEFAULTFREQINCREMENT; /** Increment value for center tune */
-    int32_t freqCorrectionFactor = 0; /** Correction value for Si5351 VFO */
-    uint8_t activeVFO = 0;          /** Which VFO is currently active (0 or 1) */
-    ModulationType modulation[2] = {LSB, LSB}; /** Modulation type for each VFO */
-    int32_t currentBand[2] = {STARTUP_BAND, STARTUP_BAND}; /** Band for each VFO */
-    int64_t centerFreq_Hz[2] = {CURRENT_FREQ_A,CURRENT_FREQ_B}; /** VFO center frequency for each VFO */
-    int64_t fineTuneFreq_Hz[2] = {0, 0}; /** Fine tune frequency for each VFO */
-    int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
-    int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
-    int32_t currentMicGain = 20;   /** Gain of the mic used for SSB */
-    float32_t dbm_calibration[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Calibrates the S-meter scale on the display */
-    float32_t powerOutCW[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            0}; /** Set output power in Watts in CW mode */
-    float32_t powerOutSSB[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
-                                            0}; /** Set output power in Watts in SSB mode */
-    float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Receive IQ calibration amplitude correction */
-    float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Receive IQ calibration phase correction */
-    float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS] =   {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Transmit IQ calibration amplitude correction */
-    float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit IQ calibration phase correction */
-    int16_t DCOffsetI[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, I */
-    int16_t DCOffsetQ[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Transmit carrier nulling correction, Q */
-    float32_t XAttenCW[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in CW mode */
-    // XAtten is only used in CW mode
-    //float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
-    float32_t RAtten[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board receive attenuation */
-    int64_t lastFrequencies[NUMBER_OF_BANDS][3] = {{1850000,0,1},{3700000,0,1},{5351500,0,0},
-                    {7150000,0,1},{10125000,0,0},{14200000,0,0},{18100000,0,0},
-                    {21200000,0,0},{24920000,0,0},{28350000,0,0},{50100000,0,0},{70300000,0,0},
-                    {10000000,0,1}}; /** center tune, fine tune, modulation */
-    int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
-    bool keyerFlip = KEYER_FLIP; /**false = right paddle = DAH, true = DIT */
-    bool PA100Wactive = false;
-    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,0}; /** The saturation power output level when 20W PA is used */
-    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
-    float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = {86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,0};  /** The saturation power output level when 100W PA is used */
-    float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = {10,10,10,10,10,10,10,10,10,10,10,10}; /** k index parameterizes the knee location in the Pout vs attenuation */
-    float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** The power threshold that switches in the 100W amplifier */
-    float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
-    float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
+  AGCMode agc = AGCOff;                                                                                                  /** AGC mode */
+  int32_t audioVolume = 30;                                                                                              /** Output audio amplitude */
+  float32_t rfGainAllBands_dB = 0;                                                                                       /** Gain applied to the received IQ samples in DSP chain */
+  int64_t stepFineTune = FAST_TUNE_INCREMENT;                                                                            /** Increment value for fine tune */
+  NoiseReductionType nrOptionSelect = NROff;                                                                             /** Noise reduction mode */
+  uint8_t ANR_notchOn = 0;                                                                                               /** Automatic notch filter on/off */
+  int32_t spectrumScale = 1;                                                                                             /** dB/pixel selection for spectrum display */
+  int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = { 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50 };                  /** Shift spectrum up/down on display */
+  int8_t spectrumFloorAuto = 1;                                                                                          /** Automatically adjust the spectrum floor */
+  uint32_t spectrum_zoom = 1;                                                                                            /** Zoom level for spectrum */
+  int32_t CWFilterIndex = 5;                                                                                             /** Selects the receive CW audio filter */
+  int32_t CWToneIndex = 3;                                                                                               /** Selects the transmitted CW tone frequency */
+  int32_t decoderFlag = 0;                                                                                               /** CW decoder on/off */
+  KeyTypeId keyType = KEYER_TYPE;                                                                                        /** CW key type: straight or keyer */
+  int32_t currentWPM = DEFAULT_KEYER_WPM;                                                                                /** CW words per minute for keyer + decoder */
+  float32_t sidetoneVolume = 20.0;                                                                                       /** CW transmit sidetone volume */
+  int32_t freqIncrement = DEFAULTFREQINCREMENT;                                                                          /** Increment value for center tune */
+  int32_t freqCorrectionFactor = 0;                                                                                      /** Correction value for Si5351 VFO */
+  uint8_t activeVFO = 0;                                                                                                 /** Which VFO is currently active (0 or 1) */
+  ModulationType modulation[2] = { LSB, LSB };                                                                           /** Modulation type for each VFO */
+  int32_t currentBand[2] = { STARTUP_BAND, STARTUP_BAND };                                                               /** Band for each VFO */
+  int64_t centerFreq_Hz[2] = { CURRENT_FREQ_A, CURRENT_FREQ_B };                                                         /** VFO center frequency for each VFO */
+  int64_t fineTuneFreq_Hz[2] = { 0, 0 };                                                                                 /** Fine tune frequency for each VFO */
+  int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
+  int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
+  int32_t currentMicGain = 20;                                                                                           /** Gain of the mic used for SSB */
+  float32_t dbm_calibration[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                                /** Calibrates the S-meter scale on the display */
+  float32_t powerOutCW[NUMBER_OF_BANDS] = { DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                            DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                            0 }; /** Set output power in Watts in CW mode */
+  float32_t powerOutSSB[NUMBER_OF_BANDS] = { DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                             DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                             DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                             DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL, DEFAULT_POWER_LEVEL,
+                                             0 };                                                  /** Set output power in Watts in SSB mode */
+  float32_t IQAmpCorrectionFactor[NUMBER_OF_BANDS] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };    /** Receive IQ calibration amplitude correction */
+  float32_t IQPhaseCorrectionFactor[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  /** Receive IQ calibration phase correction */
+  float32_t IQXAmpCorrectionFactor[NUMBER_OF_BANDS] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };   /** Transmit IQ calibration amplitude correction */
+  float32_t IQXPhaseCorrectionFactor[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; /** Transmit IQ calibration phase correction */
+  int16_t DCOffsetI[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                  /** Transmit carrier nulling correction, I */
+  int16_t DCOffsetQ[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                  /** Transmit carrier nulling correction, Q */
+  float32_t XAttenCW[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                 /** RF board transmit attenuation in CW mode */
+  // XAtten is only used in CW mode
+  //float32_t XAttenSSB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** RF board transmit attenuation in SSB mode */
+  float32_t RAtten[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                                                                                                                                                                                                                                    /** RF board receive attenuation */
+  int64_t lastFrequencies[NUMBER_OF_BANDS][3] = { { 1850000, 0, 1 }, { 3700000, 0, 1 }, { 5351500, 0, 0 }, { 7150000, 0, 1 }, { 10125000, 0, 0 }, { 14200000, 0, 0 }, { 18100000, 0, 0 }, { 21200000, 0, 0 }, { 24920000, 0, 0 }, { 28350000, 0, 0 }, { 50100000, 0, 0 }, { 70300000, 0, 0 }, { 10000000, 0, 1 } }; /** center tune, fine tune, modulation */
+  int32_t antennaSelection[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                                                                                                                                                                                                                            /** Antenna selection per band */
+  bool keyerFlip = KEYER_FLIP;                                                                                                                                                                                                                                                                                      /**false = right paddle = DAH, true = DIT */
+  bool PA100Wactive = false;
+  float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = { 14680, 14680, 14680, 14680, 14680, 14680, 14680, 14680, 14680, 14680, 14680, 14680, 0 };  /** The saturation power output level when 20W PA is used */
+  float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = { 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 16.2, 0 };               /** k index parameterizes the knee location in the Pout vs attenuation */
+  float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = { 86000, 86000, 86000, 86000, 86000, 86000, 86000, 86000, 86000, 86000, 86000, 86000, 0 }; /** The saturation power output level when 100W PA is used */
+  float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = { 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };                                         /** k index parameterizes the knee location in the Pout vs attenuation */
+  float32_t PowerCal_20W_to_100W_threshold_W = 20.0;                                                                                            /** The power threshold that switches in the 100W amplifier */
+  float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                                   /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
+  float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };                                  /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
 
-    float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
-    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
+  float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; /** SWR calibration */
+  float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; /** SWR calibration */
+  float32_t SWR_R_Offset[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0 };    /** SWR calibration */
+  float32_t SWR_F_Offset[NUMBER_OF_BANDS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0 };    /** SWR calibration */
+
+  char callsign[14] = MY_CALL; /** Operator callsign for FT8 + future digital modes; default from Config.h MY_CALL */
+  char grid[7] = "AA00";       /** Maidenhead grid square (4 or 6 chars + nul); placeholder default */
+
+  /* DMR persistent config. Mirrored into the live `dmrConfig` struct on
+   * boot (and on every menu edit) by SyncDmrConfigFromED(). The DMR DSP
+   * layers read from `dmrConfig`; this is the saved-on-disk source of
+   * truth that survives power cycles via Storage. */
+  bool      dmrEnabled    = false;        /** Master DigitalCodingDMR overlay on/off  */
+  int32_t   dmrTalkGroup  = 9;            /** 24-bit DMR Talk Group (group call dst)  */
+  int32_t   dmrSrcId      = 0;            /** 24-bit DMR Radio ID (us)                */
+  int32_t   dmrTimeSlot   = 1;            /** 1 or 2 -- our TDMA slot                 */
+  int8_t    dmrColorCode  = 1;            /** DMR Color Code 0..15 (network ID)       */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine
 struct BIT {
-    bool RF_I2C_present;
-    bool RF_Si5351_present;
-    bool BPF_I2C_present;
-    bool V12_LPF_I2C_present;
-    bool V12_LPF_AD7991_present;
-    bool FRONT_PANEL_I2C_present;
-    uint8_t AD7991_I2C_ADDR;
+  bool RF_I2C_present;
+  bool RF_Si5351_present;
+  bool BPF_I2C_present;
+  bool V12_LPF_I2C_present;
+  bool V12_LPF_AD7991_present;
+  bool FRONT_PANEL_I2C_present;
+  uint8_t AD7991_I2C_ADDR;
 };
 
 enum BandType {
-    BROADCAST_BAND,
-    HAM_BAND,
-    MISC_BAND
+  BROADCAST_BAND,
+  HAM_BAND,
+  MISC_BAND
 };
 
 /** Contains the parameters that define a band */
 struct band {
-    int64_t freqVFO1_Hz;    /** Frequency of VFO1 in Hz (hardware mixer) */
-    int64_t fBandLow_Hz;    /** Lower band edge */
-    int64_t fBandHigh_Hz;   /** Upper band edge */
-    const char *name;       /** Name of band */
-    ModulationType mode;    /** Modulation type (USB, LSB) */
-    int32_t FHiCut_Hz;      /** Audio bandpass filter edge */
-    int32_t FLoCut_Hz;      /** Audio bandpass filter edge */
-    float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
-    BandType band_type;     /** type of band */
-    int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
+  int64_t freqVFO1_Hz;  /** Frequency of VFO1 in Hz (hardware mixer) */
+  int64_t fBandLow_Hz;  /** Lower band edge */
+  int64_t fBandHigh_Hz; /** Upper band edge */
+  const char *name;     /** Name of band */
+  ModulationType mode;  /** Modulation type (USB, LSB) */
+  int32_t FHiCut_Hz;    /** Audio bandpass filter edge */
+  int32_t FLoCut_Hz;    /** Audio bandpass filter edge */
+  float32_t RFgain_dB;  /** Gain applied in the DSP receive chain */
+  BandType band_type;   /** type of band */
+  int32_t AGC_thresh;   /** AGC threshold value used by DSP receive code */
 };
 
 /** Contains the block of audio time samples being processed */
 struct DataBlock {
-    uint32_t N;             /** Number of samples */
-    uint32_t sampleRate_Hz; /** Sample rate */
-    float32_t *I;           /** Buffer of I samples */
-    float32_t *Q;           /** Buffer of Q samples */
-}; 
+  uint32_t N;             /** Number of samples */
+  uint32_t sampleRate_Hz; /** Sample rate */
+  float32_t *I;           /** Buffer of I samples */
+  float32_t *Q;           /** Buffer of Q samples */
+};
 
 /** Contains the sample rate details */
 typedef struct SR_Descriptor {
-    const uint8_t SR_n;
-    const uint32_t rate;
-    const char *const text;
+  const uint8_t SR_n;
+  const uint32_t rate;
+  const char *const text;
 } SR_Desc;
 
 /** Contains the structs and parameters for a decimation filter*/
-struct DecimationFilter{
-    float32_t M;                /** Decimation factor */
-    float32_t n_samplerate_Hz;  /** Samplerate before decimation, Hz */
-    float32_t n_att_dB;         /** Attenuation of the stopband, dB */
-    float32_t n_desired_BW_Hz;  /** Desired max BW of the filters, Hz */
-    float32_t *FIR_dec_I_state; /** Pointer to the state vector for I decimator FIR filter*/
-    float32_t *FIR_dec_Q_state; /** Pointer to the state vector for Q decimator FIR filter */
-    float32_t *FIR_dec_coeffs;  /** Pointer to the decimator FIR filter coefficients */
-    float32_t n_fpass;          /** FIR filter passband edge */
-    float32_t n_fstop;          /** FIR filter stopband edge */
-    uint16_t n_dec_taps;        /** Number of taps in FIR filter*/
-    arm_fir_decimate_instance_f32 FIR_dec_I; /** Decimating FIR filter instance for I */
-    arm_fir_decimate_instance_f32 FIR_dec_Q; /** Decimating FIR filter instance for Q */
+struct DecimationFilter {
+  float32_t M;                             /** Decimation factor */
+  float32_t n_samplerate_Hz;               /** Samplerate before decimation, Hz */
+  float32_t n_att_dB;                      /** Attenuation of the stopband, dB */
+  float32_t n_desired_BW_Hz;               /** Desired max BW of the filters, Hz */
+  float32_t *FIR_dec_I_state;              /** Pointer to the state vector for I decimator FIR filter*/
+  float32_t *FIR_dec_Q_state;              /** Pointer to the state vector for Q decimator FIR filter */
+  float32_t *FIR_dec_coeffs;               /** Pointer to the decimator FIR filter coefficients */
+  float32_t n_fpass;                       /** FIR filter passband edge */
+  float32_t n_fstop;                       /** FIR filter stopband edge */
+  uint16_t n_dec_taps;                     /** Number of taps in FIR filter*/
+  arm_fir_decimate_instance_f32 FIR_dec_I; /** Decimating FIR filter instance for I */
+  arm_fir_decimate_instance_f32 FIR_dec_Q; /** Decimating FIR filter instance for Q */
 };
 
 // These coefficients are defined in DSP_FIR.cpp and used by the filters
@@ -403,182 +514,182 @@ extern float32_t CW_AudioFilterCoeffs5[30];
 
 /** Contains the filter structs and parameters */
 struct ReceiveFilterConfig {
+  // Receive decimation filters
+  struct DecimationFilter DecimateRxStage1;
+  struct DecimationFilter DecimateRxStage2;
+  const uint32_t DF1 = 4; /** decimation factor stage 1 */
+  const uint32_t DF2 = 2; /** decimation factor stage 2 */
+  uint32_t DF;            /** combined decimation factor */
+  const float32_t n_att_dB = 90.0;
+  const float32_t n_desired_BW_Hz = 9000.0;
+
+  // Zoom FFT filters
+  arm_biquad_casd_df1_inst_f32 biquadZoomI;
+  arm_biquad_casd_df1_inst_f32 biquadZoomQ;
+  uint8_t zoom_M;
+  uint32_t zoom_sample_ptr = 0; /** Tracks current position in FFT ring buffers for this filter config */
+  const uint32_t IIR_biquad_Zoom_FFT_N_stages = 4;
+
+  // Convolution FIR filter
+  const uint32_t m_NumTaps = (FFT_LENGTH / 2) + 1;  // taps for the convolution FIR filter
+
+  // Audio lowpass filter
+  arm_biquad_casd_df1_inst_f32 biquadAudioLowPass;
+  const uint32_t N_stages_biquad_lowpass1 = 1;
+  float32_t biquad_lowpass1_coeffs[5] = { 0, 0, 0, 0, 0 };
+
+  // Audio equalization filters
+  const uint32_t eqNumStages = 4;
+  arm_biquad_cascade_df2T_instance_f32 S_Rec[EQUALIZER_CELL_COUNT];
+  arm_biquad_cascade_df2T_instance_f32 S_Xmt[EQUALIZER_CELL_COUNT];
+  float32_t *eqFiltBuffer;
+  float32_t *eqSumBuffer;
+
+  // CW decode filter
+  arm_fir_instance_f32 FIR_CW_Decode;
+  float32_t FIR_CW_Decode_state[64 + 256 - 1];
+
+  // CW audio bandpass filters
+  float32_t CW_AudioFilter1_state[12] = { 0 };
+  float32_t CW_AudioFilter2_state[12] = { 0 };
+  float32_t CW_AudioFilter3_state[12] = { 0 };
+  float32_t CW_AudioFilter4_state[12] = { 0 };
+  float32_t CW_AudioFilter5_state[12] = { 0 };
+  arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter1 = { 6, CW_AudioFilter1_state, CW_AudioFilterCoeffs1 };
+  arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter2 = { 6, CW_AudioFilter2_state, CW_AudioFilterCoeffs2 };
+  arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter3 = { 6, CW_AudioFilter3_state, CW_AudioFilterCoeffs3 };
+  arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter4 = { 6, CW_AudioFilter4_state, CW_AudioFilterCoeffs4 };
+  arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter5 = { 6, CW_AudioFilter5_state, CW_AudioFilterCoeffs5 };
+
+  // Interpolation filters
+  arm_fir_interpolate_instance_f32 FIR_int1;
+  arm_fir_interpolate_instance_f32 FIR_int2;
+  float32_t FIR_int1_coeffs[48];
+  float32_t *FIR_int1_state;
+  float32_t FIR_int2_coeffs[32];
+  float32_t *FIR_int2_state;
+
+  // Steps that are peformed when a ReceiveFilterConfig object is created
+  ReceiveFilterConfig() {
     // Receive decimation filters
-    struct DecimationFilter DecimateRxStage1;
-    struct DecimationFilter DecimateRxStage2;
-    const uint32_t DF1 = 4;  /** decimation factor stage 1 */
-    const uint32_t DF2 = 2;  /** decimation factor stage 2 */
-    uint32_t DF;             /** combined decimation factor */
-    const float32_t n_att_dB = 90.0;  
-    const float32_t n_desired_BW_Hz = 9000.0;
-    
+    DF = DF1 * DF2;  // decimation factor
+
     // Zoom FFT filters
-    arm_biquad_casd_df1_inst_f32 biquadZoomI;
-    arm_biquad_casd_df1_inst_f32 biquadZoomQ;
-    uint8_t zoom_M;
-    uint32_t zoom_sample_ptr = 0;  /** Tracks current position in FFT ring buffers for this filter config */
-    const uint32_t IIR_biquad_Zoom_FFT_N_stages = 4;
+    biquadZoomI.numStages = IIR_biquad_Zoom_FFT_N_stages;
+    biquadZoomQ.numStages = IIR_biquad_Zoom_FFT_N_stages;
+    biquadZoomI.pState = (float32_t *)calloc(IIR_biquad_Zoom_FFT_N_stages * 4, sizeof(float32_t));
+    biquadZoomQ.pState = (float32_t *)calloc(IIR_biquad_Zoom_FFT_N_stages * 4, sizeof(float32_t));
 
-    // Convolution FIR filter
-    const uint32_t m_NumTaps = (FFT_LENGTH / 2) + 1; // taps for the convolution FIR filter
-
-    // Audio lowpass filter
-    arm_biquad_casd_df1_inst_f32 biquadAudioLowPass;
-    const uint32_t N_stages_biquad_lowpass1 = 1;
-    float32_t biquad_lowpass1_coeffs[5] = { 0, 0, 0, 0, 0 };
+    // Audio lowpass filters
+    biquadAudioLowPass.numStages = N_stages_biquad_lowpass1;
+    biquadAudioLowPass.pState = (float32_t *)calloc(N_stages_biquad_lowpass1 * 4, sizeof(float32_t));
+    biquadAudioLowPass.pCoeffs = biquad_lowpass1_coeffs;
 
     // Audio equalization filters
-    const uint32_t eqNumStages = 4;
-    arm_biquad_cascade_df2T_instance_f32 S_Rec[EQUALIZER_CELL_COUNT];
-    arm_biquad_cascade_df2T_instance_f32 S_Xmt[EQUALIZER_CELL_COUNT];
-    float32_t *eqFiltBuffer;
-    float32_t *eqSumBuffer;
+    eqFiltBuffer = (float32_t *)calloc(READ_BUFFER_SIZE / DF, sizeof(float32_t));
+    eqSumBuffer = (float32_t *)calloc(READ_BUFFER_SIZE / DF, sizeof(float32_t));
+    for (size_t i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+      S_Rec[i].numStages = eqNumStages;
+      S_Rec[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
+      S_Rec[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
+
+      S_Xmt[i].numStages = eqNumStages;
+      S_Xmt[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
+      S_Xmt[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
+    }
 
     // CW decode filter
-    arm_fir_instance_f32 FIR_CW_Decode;
-    float32_t FIR_CW_Decode_state[64 + 256 - 1];
-
-    // CW audio bandpass filters
-    float32_t CW_AudioFilter1_state[12] = {0};
-    float32_t CW_AudioFilter2_state[12] = {0};
-    float32_t CW_AudioFilter3_state[12] = {0};
-    float32_t CW_AudioFilter4_state[12] = {0};
-    float32_t CW_AudioFilter5_state[12] = {0};
-    arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter1 = { 6, CW_AudioFilter1_state, CW_AudioFilterCoeffs1 };
-    arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter2 = { 6, CW_AudioFilter2_state, CW_AudioFilterCoeffs2 };
-    arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter3 = { 6, CW_AudioFilter3_state, CW_AudioFilterCoeffs3 };
-    arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter4 = { 6, CW_AudioFilter4_state, CW_AudioFilterCoeffs4 };
-    arm_biquad_cascade_df2T_instance_f32 S1_CW_AudioFilter5 = { 6, CW_AudioFilter5_state, CW_AudioFilterCoeffs5 };
+    arm_fir_init_f32(&FIR_CW_Decode, 64, CW_Filter_Coeffs2, FIR_CW_Decode_state, 256);
 
     // Interpolation filters
-    arm_fir_interpolate_instance_f32 FIR_int1;
-    arm_fir_interpolate_instance_f32 FIR_int2;
-    float32_t FIR_int1_coeffs[48];
-    float32_t *FIR_int1_state;
-    float32_t FIR_int2_coeffs[32];
-    float32_t *FIR_int2_state;
+    // First stage undoes the decimation factor DF2 (2).
+    // Block size is READ_BUFFER_SIZE / (DF1*DF2) = 2048 / 8 = 256
+    // Number of taps is 48
+    // So state array size is: Num Taps + Block Size - 1
+    uint16_t INT1_STATE_SIZE = 48 + READ_BUFFER_SIZE / (DF1 * DF2) - 1;
+    FIR_int1_state = (float32_t *)calloc(INT1_STATE_SIZE, sizeof(float32_t));
+    arm_fir_interpolate_init_f32(&FIR_int1, DF2, 48, FIR_int1_coeffs, FIR_int1_state, READ_BUFFER_SIZE / DF);
 
-    // Steps that are peformed when a ReceiveFilterConfig object is created
-    ReceiveFilterConfig() {
-        // Receive decimation filters
-        DF = DF1 * DF2;        // decimation factor
-        
-        // Zoom FFT filters
-        biquadZoomI.numStages = IIR_biquad_Zoom_FFT_N_stages;
-        biquadZoomQ.numStages = IIR_biquad_Zoom_FFT_N_stages;
-        biquadZoomI.pState = (float32_t *)calloc(IIR_biquad_Zoom_FFT_N_stages * 4, sizeof(float32_t));
-        biquadZoomQ.pState = (float32_t *)calloc(IIR_biquad_Zoom_FFT_N_stages * 4, sizeof(float32_t));
-        
-        // Audio lowpass filters
-        biquadAudioLowPass.numStages = N_stages_biquad_lowpass1;
-        biquadAudioLowPass.pState = (float32_t *)calloc(N_stages_biquad_lowpass1 * 4, sizeof(float32_t));
-        biquadAudioLowPass.pCoeffs = biquad_lowpass1_coeffs;
-
-        // Audio equalization filters
-        eqFiltBuffer = (float32_t *)calloc(READ_BUFFER_SIZE/DF, sizeof(float32_t));
-        eqSumBuffer = (float32_t *)calloc(READ_BUFFER_SIZE/DF, sizeof(float32_t));
-        for (size_t i = 0; i<EQUALIZER_CELL_COUNT; i++){
-            S_Rec[i].numStages = eqNumStages;
-            S_Rec[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
-            S_Rec[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
-
-            S_Xmt[i].numStages = eqNumStages;
-            S_Xmt[i].pState = (float32_t *)calloc(eqNumStages * 2, sizeof(float32_t));
-            S_Xmt[i].pCoeffs = NULL;  // Will be set in InitializeFilters()
-        }
-
-        // CW decode filter
-        arm_fir_init_f32(&FIR_CW_Decode, 64, CW_Filter_Coeffs2, FIR_CW_Decode_state, 256);
-
-        // Interpolation filters
-        // First stage undoes the decimation factor DF2 (2).
-        // Block size is READ_BUFFER_SIZE / (DF1*DF2) = 2048 / 8 = 256
-        // Number of taps is 48
-        // So state array size is: Num Taps + Block Size - 1
-        uint16_t INT1_STATE_SIZE = 48 +  READ_BUFFER_SIZE / (DF1*DF2)  - 1;
-        FIR_int1_state = (float32_t *)calloc(INT1_STATE_SIZE, sizeof(float32_t));
-        arm_fir_interpolate_init_f32(&FIR_int1, DF2, 48, FIR_int1_coeffs, FIR_int1_state, READ_BUFFER_SIZE/DF);
-
-        // Second stage undoes DF1 (4)
-        // operates on a block size of READ_BUFFER_SIZE / (DF1*DF2) * DF2 = 2048/4 = 512
-        // Number of taps is 32
-        // So state array size is:
-        uint16_t INT2_STATE_SIZE = 32 + READ_BUFFER_SIZE / DF1 - 1;
-        FIR_int2_state = (float32_t *)calloc(INT2_STATE_SIZE, sizeof(float32_t));
-        arm_fir_interpolate_init_f32(&FIR_int2, DF1, 32, FIR_int2_coeffs, FIR_int2_state, READ_BUFFER_SIZE/DF1);
+    // Second stage undoes DF1 (4)
+    // operates on a block size of READ_BUFFER_SIZE / (DF1*DF2) * DF2 = 2048/4 = 512
+    // Number of taps is 32
+    // So state array size is:
+    uint16_t INT2_STATE_SIZE = 32 + READ_BUFFER_SIZE / DF1 - 1;
+    FIR_int2_state = (float32_t *)calloc(INT2_STATE_SIZE, sizeof(float32_t));
+    arm_fir_interpolate_init_f32(&FIR_int2, DF1, 32, FIR_int2_coeffs, FIR_int2_state, READ_BUFFER_SIZE / DF1);
+  }
+  // Steps that are performed when ReceiveFilterConfig object is destroyed. This only happens
+  // when radio is turned off, so isn't really necessary.
+  ~ReceiveFilterConfig() {
+    free(biquadZoomI.pState);
+    free(biquadZoomQ.pState);
+    free(biquadAudioLowPass.pState);
+    free(eqFiltBuffer);
+    free(eqSumBuffer);
+    for (size_t i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+      free(S_Rec[i].pState);
+      free(S_Xmt[i].pState);
     }
-    // Steps that are performed when ReceiveFilterConfig object is destroyed. This only happens
-    // when radio is turned off, so isn't really necessary.
-    ~ReceiveFilterConfig() {
-        free(biquadZoomI.pState);
-        free(biquadZoomQ.pState);
-        free(biquadAudioLowPass.pState);
-        free(eqFiltBuffer);
-        free(eqSumBuffer);
-        for (size_t i = 0; i<EQUALIZER_CELL_COUNT; i++){
-            free(S_Rec[i].pState);
-            free(S_Xmt[i].pState);
-        }
-        free(FIR_int1_state);
-        free(FIR_int2_state);
-    }
+    free(FIR_int1_state);
+    free(FIR_int2_state);
+  }
 };
 
 // Definitions of these arrays are in DSP_FIR.cpp
-extern float32_t coeffs192K_10K_LPF_FIR[48]; // transmit decimate-by-4 and interpolate-by-4
-extern float32_t coeffs48K_8K_LPF_FIR[48];   // transmit decimate-by-2 and interpolate-by-2
-extern float32_t coeffs12K_8K_LPF_FIR[48];   // transmit decimate-by-2, again
+extern float32_t coeffs192K_10K_LPF_FIR[48];  // transmit decimate-by-4 and interpolate-by-4
+extern float32_t coeffs48K_8K_LPF_FIR[48];    // transmit decimate-by-2 and interpolate-by-2
+extern float32_t coeffs12K_8K_LPF_FIR[48];    // transmit decimate-by-2, again
 extern float32_t FIR_Hilbert_coeffs_45[100];
 extern float32_t FIR_Hilbert_coeffs_neg_45[100];
-extern float32_t FIR_int3_12ksps_48tap_2k7[48]; // transmit interpolate-by-2, again
+extern float32_t FIR_int3_12ksps_48tap_2k7[48];  // transmit interpolate-by-2, again
 
 struct TransmitFilterConfig {
-    // Decimation filters
-    // Decimate by 4
-    arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
-    arm_fir_decimate_instance_f32 FIR_dec1_EX_Q;
-    float32_t FIR_dec1_EX_I_state[2095];
-    float32_t FIR_dec1_EX_Q_state[2095];
+  // Decimation filters
+  // Decimate by 4
+  arm_fir_decimate_instance_f32 FIR_dec1_EX_I;
+  arm_fir_decimate_instance_f32 FIR_dec1_EX_Q;
+  float32_t FIR_dec1_EX_I_state[2095];
+  float32_t FIR_dec1_EX_Q_state[2095];
 
-    // Decimate by 2
-    arm_fir_decimate_instance_f32 FIR_dec2_EX_I;
-    arm_fir_decimate_instance_f32 FIR_dec2_EX_Q;
-    float32_t FIR_dec2_EX_I_state[559]; // was 535 before being fixed
-    float32_t FIR_dec2_EX_Q_state[559];
+  // Decimate by 2
+  arm_fir_decimate_instance_f32 FIR_dec2_EX_I;
+  arm_fir_decimate_instance_f32 FIR_dec2_EX_Q;
+  float32_t FIR_dec2_EX_I_state[559];  // was 535 before being fixed
+  float32_t FIR_dec2_EX_Q_state[559];
 
-    // Decimate by 2, again
-    arm_fir_decimate_instance_f32 FIR_dec3_EX_I;
-    arm_fir_decimate_instance_f32 FIR_dec3_EX_Q;
-    float32_t FIR_dec3_EX_I_state[303];// State vector size should be numtaps+blocksize-1 = 48+256-1 = 303
-    float32_t FIR_dec3_EX_Q_state[303];
+  // Decimate by 2, again
+  arm_fir_decimate_instance_f32 FIR_dec3_EX_I;
+  arm_fir_decimate_instance_f32 FIR_dec3_EX_Q;
+  float32_t FIR_dec3_EX_I_state[303];  // State vector size should be numtaps+blocksize-1 = 48+256-1 = 303
+  float32_t FIR_dec3_EX_Q_state[303];
 
-    // Hilbert transform
-    arm_fir_instance_f32 FIR_Hilbert_L;
-    arm_fir_instance_f32 FIR_Hilbert_R;
-    float32_t FIR_Hilbert_state_L[100 + 256 - 1];
-    float32_t FIR_Hilbert_state_R[100 + 256 - 1];
+  // Hilbert transform
+  arm_fir_instance_f32 FIR_Hilbert_L;
+  arm_fir_instance_f32 FIR_Hilbert_R;
+  float32_t FIR_Hilbert_state_L[100 + 256 - 1];
+  float32_t FIR_Hilbert_state_R[100 + 256 - 1];
 
-    // Interpolate by 2 again
-    arm_fir_interpolate_instance_f32 FIR_int3_EX_I;
-    arm_fir_interpolate_instance_f32 FIR_int3_EX_Q;
-    float32_t FIR_int3_EX_I_state[175]; // was 151 before being fixed
-    float32_t FIR_int3_EX_Q_state[175]; // 48+128-1 = 175
+  // Interpolate by 2 again
+  arm_fir_interpolate_instance_f32 FIR_int3_EX_I;
+  arm_fir_interpolate_instance_f32 FIR_int3_EX_Q;
+  float32_t FIR_int3_EX_I_state[175];  // was 151 before being fixed
+  float32_t FIR_int3_EX_Q_state[175];  // 48+128-1 = 175
 
-    // Interpolate by 2
-    arm_fir_interpolate_instance_f32 FIR_int1_EX_I;
-    arm_fir_interpolate_instance_f32 FIR_int1_EX_Q;
-    float32_t FIR_int1_EX_I_state[303]; // 256 + 48 - 1 = 303
-    float32_t FIR_int1_EX_Q_state[303]; // 256 + 48 - 1 = 303
+  // Interpolate by 2
+  arm_fir_interpolate_instance_f32 FIR_int1_EX_I;
+  arm_fir_interpolate_instance_f32 FIR_int1_EX_Q;
+  float32_t FIR_int1_EX_I_state[303];  // 256 + 48 - 1 = 303
+  float32_t FIR_int1_EX_Q_state[303];  // 256 + 48 - 1 = 303
 
-    // Interpolate by 4
-    arm_fir_interpolate_instance_f32 FIR_int2_EX_I;
-    arm_fir_interpolate_instance_f32 FIR_int2_EX_Q;
-    float32_t FIR_int2_EX_I_state[559]; // 512+48-1 = 559
-    float32_t FIR_int2_EX_Q_state[559]; // 512+48-1 = 559
+  // Interpolate by 4
+  arm_fir_interpolate_instance_f32 FIR_int2_EX_I;
+  arm_fir_interpolate_instance_f32 FIR_int2_EX_Q;
+  float32_t FIR_int2_EX_I_state[559];  // 512+48-1 = 559
+  float32_t FIR_int2_EX_Q_state[559];  // 512+48-1 = 559
 
-    // Steps that are peformed when a ReceiveFilterConfig object is created
-    TransmitFilterConfig() {}
-    ~TransmitFilterConfig() {}
+  // Steps that are peformed when a ReceiveFilterConfig object is created
+  TransmitFilterConfig() {}
+  ~TransmitFilterConfig() {}
 };
 
 
@@ -586,73 +697,73 @@ struct TransmitFilterConfig {
  * as it is used nowhere else.
  */
 struct AGCConfig {
-    // Start variables taken from wdsp
-    const float32_t tau_attack            = 0.001; // tau_attack
-    float32_t tau_decay                   = 0.250;
-    const float32_t n_tau                 = 4; 
-    const float32_t fixed_gain            = 20.0;
-    const float32_t max_input             = 1.0;
-    const float32_t out_targ              = 1.0; // target value of audio after AGC
-    const float32_t var_gain              = 1.5;
-    const float32_t tau_fast_backaverage  = 0.250;      // tau_fast_backaverage
-    float32_t fast_backaverage            = 0.0;
-    float32_t hang_backaverage            = 0.0;
-    const float32_t tau_fast_decay        = 0.005;      // tau_fast_decay
-    const float32_t pop_ratio             = 5.0;        // pop_ratio
-    const float32_t hang_enable           = 1; 
-    const float32_t tau_hang_backmult     = 0.500;      // tau_hang_backmult
-    float32_t hangtime                    = 0.250;      // hangtime
-    float32_t hang_thresh                 = 0.250;      // hang_thresh
-    const float32_t tau_hang_decay        = 0.100;      // tau_hang_decay
-    float32_t max_gain                    = 10000.0;
-    float32_t ring_max = 0.0;
-    const uint8_t pmode = 1;
-    uint8_t state = 0;
-    uint8_t agc_action = 0;
-    uint8_t decay_type = 0;
-    float32_t volts = 0.0;
-    float32_t save_volts = 0.0;
-    // #define MAX_SAMPLE_RATE (24000.0) 
-    // #define MAX_N_TAU (8)
-    // #define MAX_TAU_ATTACK (0.01)
-    uint32_t ring_buffsize = (uint32_t)(24000.0 * 8 * 0.01 + 1);
-    float32_t hang_level;
-    float32_t hang_backmult;
-    float32_t onemhang_backmult;
-    float32_t hang_decay_mult;
-    uint32_t attack_buffsize;
-    uint32_t in_index;
-    uint32_t out_index;
-    float32_t attack_mult;
-    float32_t decay_mult;
-    float32_t fast_decay_mult;
-    float32_t fast_backmult;
-    float32_t onemfast_backmult;
-    float32_t out_target;
-    float32_t inv_out_target;
-    float32_t inv_max_input;
-    float32_t min_volts;
-    float32_t slope_constant;
-    int32_t hang_counter;
+  // Start variables taken from wdsp
+  const float32_t tau_attack = 0.001;  // tau_attack
+  float32_t tau_decay = 0.250;
+  const float32_t n_tau = 4;
+  const float32_t fixed_gain = 20.0;
+  const float32_t max_input = 1.0;
+  const float32_t out_targ = 1.0;  // target value of audio after AGC
+  const float32_t var_gain = 1.5;
+  const float32_t tau_fast_backaverage = 0.250;  // tau_fast_backaverage
+  float32_t fast_backaverage = 0.0;
+  float32_t hang_backaverage = 0.0;
+  const float32_t tau_fast_decay = 0.005;  // tau_fast_decay
+  const float32_t pop_ratio = 5.0;         // pop_ratio
+  const float32_t hang_enable = 1;
+  const float32_t tau_hang_backmult = 0.500;  // tau_hang_backmult
+  float32_t hangtime = 0.250;                 // hangtime
+  float32_t hang_thresh = 0.250;              // hang_thresh
+  const float32_t tau_hang_decay = 0.100;     // tau_hang_decay
+  float32_t max_gain = 10000.0;
+  float32_t ring_max = 0.0;
+  const uint8_t pmode = 1;
+  uint8_t state = 0;
+  uint8_t agc_action = 0;
+  uint8_t decay_type = 0;
+  float32_t volts = 0.0;
+  float32_t save_volts = 0.0;
+  // #define MAX_SAMPLE_RATE (24000.0)
+  // #define MAX_N_TAU (8)
+  // #define MAX_TAU_ATTACK (0.01)
+  uint32_t ring_buffsize = (uint32_t)(24000.0 * 8 * 0.01 + 1);
+  float32_t hang_level;
+  float32_t hang_backmult;
+  float32_t onemhang_backmult;
+  float32_t hang_decay_mult;
+  uint32_t attack_buffsize;
+  uint32_t in_index;
+  uint32_t out_index;
+  float32_t attack_mult;
+  float32_t decay_mult;
+  float32_t fast_decay_mult;
+  float32_t fast_backmult;
+  float32_t onemfast_backmult;
+  float32_t out_target;
+  float32_t inv_out_target;
+  float32_t inv_max_input;
+  float32_t min_volts;
+  float32_t slope_constant;
+  int32_t hang_counter;
 
-    float32_t *ring;
-    float32_t *abs_ring;
+  float32_t *ring;
+  float32_t *abs_ring;
 
-    AGCConfig(){
-        ring = (float32_t *)malloc(sizeof(float32_t) * ring_buffsize * 2);
-        abs_ring = (float32_t *)malloc(sizeof(float32_t) * ring_buffsize);
-    }
+  AGCConfig() {
+    ring = (float32_t *)malloc(sizeof(float32_t) * ring_buffsize * 2);
+    abs_ring = (float32_t *)malloc(sizeof(float32_t) * ring_buffsize);
+  }
 
-    ~AGCConfig(){
-        free(ring);
-        free(abs_ring);
-    }
+  ~AGCConfig() {
+    free(ring);
+    free(abs_ring);
+  }
 };
 
-#define ESUCCESS             0
-#define ENOI2C              -1
-#define EGPIOWRITEFAIL      -2
-#define EFAIL               -10
+#define ESUCCESS 0
+#define ENOI2C -1
+#define EGPIOWRITEFAIL -2
+#define EFAIL -10
 
 // State machines
 #include "Mode.h"
@@ -722,15 +833,15 @@ extern elapsedMicros usec;
 
 /** Structure of a hardware register buffer entry */
 typedef struct {
-    uint32_t timestamp;
-    uint64_t register_value;
+  uint32_t timestamp;
+  uint64_t register_value;
 } BufferEntry;
 
 /** Rolling buffer to store hardware register changes */
 typedef struct {
-    BufferEntry entries[REGISTER_BUFFER_SIZE];
-    size_t head;        // Index where next entry will be written
-    size_t count;       // Number of valid entries (up to BUFFER_SIZE)
+  BufferEntry entries[REGISTER_BUFFER_SIZE];
+  size_t head;   // Index where next entry will be written
+  size_t count;  // Number of valid entries (up to BUFFER_SIZE)
 } RollingBuffer;
 extern RollingBuffer buffer;
 
@@ -752,4 +863,4 @@ void Flag(uint8_t val);
 void MyDelay(unsigned long millisWait);
 void UpdateDitLength(void);
 
-#endif // SDT_H
+#endif  // SDT_H

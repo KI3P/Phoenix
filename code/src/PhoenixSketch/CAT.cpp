@@ -17,6 +17,7 @@ If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "CAT.h"
+#include "Storage.h"  // for SaveDataToStorage() called from CL/GR write handlers
 
 // Kenwood TS-480 CAT Interface (partial)
 //
@@ -78,6 +79,14 @@ char *VX_write( char* cmd );
 char *VX_read( char* cmd );
 char *ED_read(  char* cmd );
 char *PR_read( char* cmd);
+char *TB_write( char* cmd );  // WSJT-X compatibility: split on/off (always reports off)
+char *TB_read(  char* cmd );
+char *SF_write( char* cmd );  // WSJT-X compatibility: VFO + frequency + mode (SFxyyyyyyyyyyyz;)
+char *SF_read(  char* cmd );
+char *CL_write( char* cmd );  // Phoenix-specific: operator callsign (13 chars, padded with spaces)
+char *CL_read(  char* cmd );
+char *GR_write( char* cmd );  // Phoenix-specific: Maidenhead grid (6 chars, padded with spaces)
+char *GR_read(  char* cmd );
 
 typedef struct  {
     char name[3];   //two chars plus zero terminator
@@ -90,19 +99,21 @@ typedef struct  {
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 25
+#define NUM_SUPPORTED_COMMANDS 29
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
         { "AI", 3+1,3, AI_write, AI_read },  //auto information
         { "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
         { "BU", 3,  0, BU_write, unsupported_cmd }, //band up
+        { "CL", 3+13, 3, CL_write, CL_read }, // Phoenix-specific: operator callsign, 13 chars padded with spaces
         { "DB", 3+4,3, DB_write, unsupported_cmd }, //dBm calibration
         { "FA", 3+11,3, FA_write, FA_read },  //VFO A
         { "FB", 3+11,3, FB_write, FB_read },  //VFO B
         { "FR", 3+1, 3, FR_write, FR_read }, // selects or reads the VFO of the receiver
         { "FT", 3+1, 3, FT_write, FT_read }, // selects or reads the VFO of the transmitter
         { "FW", 3+4,3+4,FW_write, FW_read }, // DSP filter bandwidth
+        { "GR", 3+6,  3, GR_write, GR_read }, // Phoenix-specific: Maidenhead grid, 6 chars padded with spaces
         { "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
         { "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
         { "KS", 3+1,3, KS_write, KS_read }, // keyer speed
@@ -114,6 +125,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
         { "PS", 3+1,3, PS_write, PS_read },  // Rig power on/off
         { "RX", 3,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
+        { "SF", 3+12,3+1, SF_write, SF_read }, // WSJT-X: SFxyyyyyyyyyyyz; write / SFx; read (VFO + 11-digit freq + mode)
+        { "TB", 3+1,  3, TB_write, TB_read },  // WSJT-X: split on/off (Phoenix has no split mode -- always reports off)
         { "TX", 3,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
         { "VX", 3+1, 3, VX_write, VX_read }, // VOX write/read
         { "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
@@ -350,6 +363,12 @@ char *FW_read(  char* cmd ){
             fhigh = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
             break;
         }
+        case NFM:
+            fhigh = 3000;  // fixed +-3 kHz audio passband
+            break;
+        case FM_WIDE:
+            fhigh = 10000; // fixed +-10 kHz passband (Carson's rule for +-5 kHz dev., 25 kHz channel)
+            break;
         case IQ:
         case DCF77:
             break;
@@ -422,6 +441,21 @@ char *IF_read(  char* cmd ){
             case AM:
             case SAM:
                 mode = 5; // AM
+                break;
+            case NFM:
+                mode = 4; // Kenwood TS-480 FM
+                break;
+            case FM_WIDE:
+                mode = 4; // Kenwood TS-480 FM (shared with NFM; no distinct
+                          // wide-FM code in Kenwood CAT). First-class clients
+                          // can disambiguate via the Phoenix-specific FW; or
+                          // by reading ED.modulation directly.
+                break;
+            case FT8_INTERNAL:
+                mode = 9; // Kenwood TS-480 DATA (used by WSJT-X for FT8)
+                break;
+            case PSK31:
+                mode = 7; // Kenwood TS-480 FSK (closest match for PSK31)
                 break;
             default:
                 mode = 1; // LSB
@@ -509,6 +543,25 @@ char *MD_write( char* cmd  ){
             bands[ ED.currentBand[ED.activeVFO] ].mode = SAM; // default to SAM rather than AM
             SetInterrupt(iMODE);
             break;
+        case 4: // Kenwood FM -> Phoenix NFM
+            bands[ ED.currentBand[ED.activeVFO] ].mode = NFM;
+            /* Mirror to ED.modulation so Demodulate() in DSP.cpp picks it up
+             * (the existing LSB/USB/AM/SAM cases above rely on a band-change
+             * sync to push bands[..].mode into ED.modulation; explicitly
+             * sync here so CAT-driven mode changes take effect immediately). */
+            ED.modulation[ED.activeVFO] = NFM;
+            SetInterrupt(iMODE);
+            break;
+        case 7: // Kenwood FSK -> Phoenix PSK31
+            bands[ ED.currentBand[ED.activeVFO] ].mode = PSK31;
+            ED.modulation[ED.activeVFO] = PSK31;
+            SetInterrupt(iMODE);
+            break;
+        case 9: // Kenwood DATA -> Phoenix FT8_INTERNAL
+            bands[ ED.currentBand[ED.activeVFO] ].mode = FT8_INTERNAL;
+            ED.modulation[ED.activeVFO] = FT8_INTERNAL;
+            SetInterrupt(iMODE);
+            break;
         default:
             break;
     }
@@ -532,6 +585,17 @@ char *MD_read( char* cmd ){
     if( bands[ ED.currentBand[ED.activeVFO] ].mode == USB ){ sprintf( obuf, "MD2;" ); return obuf; }
     if( bands[ ED.currentBand[ED.activeVFO] ].mode == AM  ){ sprintf( obuf, "MD5;" ); return obuf; }
     if( bands[ ED.currentBand[ED.activeVFO] ].mode == SAM ){ sprintf( obuf, "MD5;" ); return obuf; }
+    /* Kenwood TS-480 mode 4 = FM. Reported when narrow-band FM is selected. */
+    if( bands[ ED.currentBand[ED.activeVFO] ].mode == NFM ){ sprintf( obuf, "MD4;" ); return obuf; }
+    /* Kenwood TS-480 mode 4 = FM. Wide-band FM also reports MD4; (Kenwood CAT
+     * has no distinct wide-FM code). The wide vs. narrow distinction lives in
+     * ED.modulation only. */
+    if( bands[ ED.currentBand[ED.activeVFO] ].mode == FM_WIDE ){ sprintf( obuf, "MD4;" ); return obuf; }
+    /* Kenwood TS-480 mode 9 = DATA. WSJT-X uses this when configured for data
+     * modes; consider this our advertisement that the rig is ready for FT8. */
+    if( bands[ ED.currentBand[ED.activeVFO] ].mode == FT8_INTERNAL ){ sprintf( obuf, "MD9;" ); return obuf; }
+    /* Kenwood TS-480 mode 7 = FSK. Closest standard mapping for PSK31. */
+    if( bands[ ED.currentBand[ED.activeVFO] ].mode == PSK31 ){ sprintf( obuf, "MD7;" ); return obuf; }
     sprintf( obuf, "?;");
     return obuf;  //Huh? How'd we get here?
 }
@@ -755,6 +819,191 @@ char *ED_read(  char* cmd  ){
 char *PR_read(  char* cmd  ){
     buffer_pretty_print_last_entry();
     sprintf( obuf, "PR;");
+    return obuf;
+}
+
+/**
+ * CAT command TB - Split mode read (WSJT-X compatibility)
+ * @param cmd CAT command string
+ * @return Response "TB0;" -- Phoenix does not implement split mode, so always reports off.
+ *
+ * WSJT-X polls TB during its periodic status check (TS-890S subset). Returning a
+ * stable "off" value is acceptable for non-split operation. Mirrors T41_SDR/wsjt.cpp.
+ */
+char *TB_read( char* cmd ){
+    sprintf( obuf, "TB0;" );
+    return obuf;
+}
+
+/**
+ * CAT command TB - Split mode write (WSJT-X compatibility)
+ * @param cmd CAT command string of the form "TBx;"
+ * @return Empty string (no-op)
+ *
+ * Phoenix does not implement split mode. The write is accepted and silently
+ * ignored so WSJT-X does not stall on an unsupported-command response.
+ */
+char *TB_write( char* cmd ){
+    (void)cmd;
+    return empty_string_p;
+}
+
+/**
+ * CAT command SF - VFO + frequency + mode read (WSJT-X compatibility)
+ * @param cmd CAT command string of the form "SFx;" where x = 0 (VFO A) or 1 (VFO B)
+ * @return Response "SFxyyyyyyyyyyyz;" with 11-digit frequency yyyyyyyyyyy and mode digit z.
+ *
+ * Mirrors T41_SDR/wsjt.cpp. Mode digit follows Kenwood convention used in MD:
+ * 1=LSB, 2=USB, 3=CW, 5=AM/SAM. Used by WSJT-X during startup handshake and
+ * periodic poll. Phoenix has no split mode so VFO selection only affects which
+ * frequency is returned, not which is transmitted.
+ */
+char *SF_read( char* cmd ){
+    int vfo = atoi( &cmd[2] );
+    if (vfo < 0 || vfo > 1) {
+        sprintf( obuf, "?;" );
+        return obuf;
+    }
+    int mode;
+    if (( modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) |
+        ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK ) |
+        ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK ) |
+        ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE ) |
+        ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT ) |
+        ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK ) |
+        ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE )) {
+        mode = 3;
+    } else {
+        switch( bands[ ED.currentBand[vfo] ].mode ) {
+            case LSB: mode = 1; break;
+            case USB: mode = 2; break;
+            case AM:
+            case SAM: mode = 5; break;
+            case NFM: mode = 4; break;        /* Kenwood FM */
+            case FM_WIDE: mode = 4; break;    /* Kenwood FM (shared with NFM) */
+            case FT8_INTERNAL: mode = 9; break; /* Kenwood DATA */
+            case PSK31: mode = 7; break;        /* Kenwood FSK */
+            default:  mode = 1; break;
+        }
+    }
+    sprintf( obuf, "SF%d%011lld%d;", vfo, GetTXRXFreq((uint8_t)vfo), mode );
+    return obuf;
+}
+
+/**
+ * CAT command SF - VFO + frequency + mode write (WSJT-X compatibility)
+ * @param cmd CAT command string of the form "SFxyyyyyyyyyyyz;"
+ * @return Empty string
+ *
+ * Sets the named VFO's frequency. Phoenix has no split mode, so the embedded
+ * mode digit is accepted but not separately applied (use MD; for explicit mode
+ * changes). WSJT-X does not appear to use SF write in its core flow, but the
+ * handler is provided so an unsupported-cmd response isn't returned.
+ */
+char *SF_write( char* cmd ){
+    int vfo = atoi( &cmd[2] );
+    if (vfo < 0 || vfo > 1) {
+        sprintf( obuf, "?;" );
+        return obuf;
+    }
+    char freqbuf[12];
+    memcpy( freqbuf, &cmd[3], 11 );
+    freqbuf[11] = '\0';
+    long freq = atol( freqbuf );
+    set_vfo( freq, (uint8_t)vfo );
+    return empty_string_p;
+}
+
+/*
+ * Phoenix-specific operator-identity commands (CL = callsign, GR = grid).
+ * Used by FT8 + future digital modes. Both auto-save to flash so changes
+ * persist across power cycles.
+ *
+ * NOT Kenwood-standard. WSJT-X et al. won't use these; they're for
+ * Phoenix-aware tools (or a hand-typed terminal session) to set the
+ * operator's identity without recompiling Config.h.
+ */
+
+/* Strip ASCII spaces and any control bytes from the right end of s. */
+static void rtrim_spaces( char *s ){
+    int len = (int)strlen(s);
+    while (len > 0 && (s[len-1] == ' ' || (unsigned char)s[len-1] < 0x20)) {
+        s[--len] = '\0';
+    }
+}
+
+/**
+ * CAT command CL - Set operator callsign (Phoenix-specific)
+ * @param cmd CAT command string of the form "CLcccccccccccccc;" where the
+ *            13 chars are the callsign right-padded with spaces if shorter.
+ * @return Empty string on success, "?;" on bad length.
+ *
+ * Auto-saves to LittleFS flash via SaveDataToStorage(false).
+ */
+char *CL_write( char* cmd ){
+    /* Copy 13 chars of payload, nul-terminate, strip trailing spaces. */
+    if (strlen(cmd) < 16) {
+        sprintf( obuf, "?;" );
+        return obuf;
+    }
+    char buf[14];
+    memcpy( buf, &cmd[2], 13 );
+    buf[13] = '\0';
+    rtrim_spaces( buf );
+
+    strncpy( ED.callsign, buf, sizeof(ED.callsign) - 1 );
+    ED.callsign[ sizeof(ED.callsign) - 1 ] = '\0';
+
+    /* Persist immediately. SaveDataToStorage takes ~tens of milliseconds
+     * for the JSON serialize + flash write; acceptable for an occasional
+     * callsign change. */
+    SaveDataToStorage(false);
+    return empty_string_p;
+}
+
+/**
+ * CAT command CL - Read operator callsign
+ * @param cmd CAT command string "CL;"
+ * @return Response "CL<callsign>;" with the trimmed callsign.
+ */
+char *CL_read( char* cmd ){
+    sprintf( obuf, "CL%s;", ED.callsign );
+    return obuf;
+}
+
+/**
+ * CAT command GR - Set Maidenhead grid square (Phoenix-specific)
+ * @param cmd CAT command string of the form "GRgggggg;" where the 6 chars
+ *            are the grid right-padded with spaces if shorter (4-char grids
+ *            should be sent as e.g. "FN42  ").
+ * @return Empty string on success, "?;" on bad length.
+ *
+ * Auto-saves to LittleFS flash.
+ */
+char *GR_write( char* cmd ){
+    if (strlen(cmd) < 9) {
+        sprintf( obuf, "?;" );
+        return obuf;
+    }
+    char buf[7];
+    memcpy( buf, &cmd[2], 6 );
+    buf[6] = '\0';
+    rtrim_spaces( buf );
+
+    strncpy( ED.grid, buf, sizeof(ED.grid) - 1 );
+    ED.grid[ sizeof(ED.grid) - 1 ] = '\0';
+
+    SaveDataToStorage(false);
+    return empty_string_p;
+}
+
+/**
+ * CAT command GR - Read Maidenhead grid square
+ * @param cmd CAT command string "GR;"
+ * @return Response "GR<grid>;" with the trimmed grid (typically 4 or 6 chars).
+ */
+char *GR_read( char* cmd ){
+    sprintf( obuf, "GR%s;", ED.grid );
     return obuf;
 }
 
