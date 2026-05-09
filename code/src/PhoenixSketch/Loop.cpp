@@ -103,6 +103,7 @@ If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "SDT.h"
+#include "FrontPanel_USBHost.h"  // for TickUSBHost() (drives HID + ThumbDV/AMBE)
 
 // FIFO buffer for interrupt events
 #define INTERRUPT_BUFFER_SIZE 16
@@ -1457,6 +1458,11 @@ FASTRUN void loop(void){
     ProcessPTTDebounce();
     CheckForFrontPanelInterrupts();
     CheckForCATSerialEvents();
+    /* Run the USB host stack (HID keyboard/mouse + future ThumbDV/AMBE codec).
+     * No-op unless USB_HOST_INPUT_ENABLED or DMR_THUMBDV_ENABLED is set
+     * in Config.h. Must run before ConsumeInterrupt so keystrokes from a
+     * USB keyboard are visible this same iteration. */
+    TickUSBHost();
     ConsumeInterrupt();
     
     // Step 2: Perform signal processing

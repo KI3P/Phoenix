@@ -51,6 +51,23 @@ If not, see <https://www.gnu.org/licenses/>.
 //#define USE_ANALOG_SWR
 
 
+// USB host input (mouse + keyboard) -- ported from T41_SDR (plumbing only).
+// Uncomment to enable. When enabled the build requires the PJRC USBHost_t36
+// library (https://github.com/PaulStoffregen/USBHost_t36) to be installed.
+// When disabled (default) FrontPanel_USBHost.* / FrontPanel_USBKeyboard.* /
+// FrontPanel_USBMouse.* compile to no-ops and pull no extra dependencies.
+//#define USB_HOST_INPUT_ENABLED
+
+// Convenience: any feature that needs the USBHost_t36 stack must trigger
+// InitializeUSBHost/TickUSBHost. Defining either USB_HOST_INPUT_ENABLED
+// (HID keyboard/mouse) or DMR_THUMBDV_ENABLED (added in a later PR for
+// the DVSI ThumbDV/AMBE3000 codec) enables the stack via this combined
+// guard.
+#if defined(USB_HOST_INPUT_ENABLED) || defined(DMR_THUMBDV_ENABLED)
+#define USB_HOST_STACK_ENABLED
+#endif
+
+
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state
 #define DEFAULT_KEYER_WPM                       20 // Startup value for keyer wpm

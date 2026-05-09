@@ -25,6 +25,7 @@ If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "SDT.h"
+#include "FrontPanel_USBHost.h"  // for InitializeUSBHost() (HID + future ThumbDV/AMBE)
 
 struct config_t ED;
 bool psdupdated = false;
@@ -532,7 +533,8 @@ void setup(void){
     InitializeAudio();
     InitializeDisplay();
     InitializeRFHardware(); // RF board, LPF board, and BPF board
-    
+    InitializeUSBHost();    // No-op unless USB_HOST_INPUT_ENABLED or DMR_THUMBDV_ENABLED is defined in Config.h. Brings up HID keyboard/mouse and/or the ThumbDV (AMBE3000) DMR codec.
+
     // Initialize temperature monitoring
     uint16_t temp_check_frequency = 0x03U;  //updates the temp value at a RTC/3 clock rate
     //0xFFFF determines a 2 second sample rate period
