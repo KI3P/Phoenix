@@ -616,7 +616,6 @@ void DisplaydbM() {
 // State tracking for spectrum line rendering
 static int16_t x1 = 0;
 static int16_t y_left;
-static int16_t y_prev = pixelold[0];
 static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
 static int16_t y_current = offset;
 static int16_t smeterLength;
@@ -647,51 +646,74 @@ FASTRUN int16_t pixelnew(uint32_t i){
 
 /**
  * Render the real-time spectrum line display (FASTRUN - executes from RAM).
+ *
+ * Phase 1 back-buffer: at the start of each sweep, prime L2 with a clean
+ * spectrum surface (via DrawBandWidthIndicatorBar's opening fillRect) and
+ * restamp the filter highlight. Subsequent chunks accumulate yellow trace
+ * segments on L2 with no per-bin black-erase. At sweep end the whole
+ * spectrum rect is published to L1 in one BTE_move. The audio spectrum and
+ * waterfall colour stamp stay on L1, indexed exactly as the baseline did.
  */
 FASTRUN void ShowSpectrum(void){
+    // Sweep-start: prime L2 with a fresh spectrum surface + current filter bar.
+    if (x1 == 0 && modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT) {
+        tft.writeTo(L2);
+        DrawBandWidthIndicatorBar();   // its opening fillRect clears the spectrum rect
+        // Restamp the yellow frame: DrawBandWidthIndicatorBar's clear overlaps
+        // the bottom + left edges of the spectrum-pane border drawn at stale-redraw time.
+        tft.drawRect(PaneSpectrum.x0-2, PaneSpectrum.y0, MAX_WATERFALL_WIDTH+5, SPECTRUM_HEIGHT, RA8875_YELLOW);
+    }
+
+    int16_t x1_start = x1;
+
+    // Pass 1 - spectrum trace on L2 back buffer (no per-bin erase).
+    tft.writeTo(L2);
     for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
         y_left = y_current;
         y_current = offset - pixelnew(x1); // offset is line on screen where -124 dBm is located
-        if (ED.spectrumFloorAuto){
-            if (y_current > pixelmax) pixelmax = y_current;
-        }
-        y_current = y_current + (int16_t)adjustment;
+        if (ED.spectrumFloorAuto && y_current > pixelmax) pixelmax = y_current;
+        y_current += (int16_t)adjustment;
         if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
         if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
 
-        tft.drawLine(SPECTRUM_LEFT_X+x1, y_prev, SPECTRUM_LEFT_X+x1, pixelold[x1], RA8875_BLACK);
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
-        y_prev = pixelold[x1];
-        pixelold[x1] = y_current;
+        pixelold[x1] = y_current;       // retained as the per-bin y record for the waterfall colour pass
         x1++;
-        if (modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT){
-            if (x1 < 128) {
-                tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
-                if (audioYPixel[x1] > 2) {
-                    if (audioYPixel[x1] > CLIP_AUDIO_PEAK)
-                        audioYPixel[x1] = CLIP_AUDIO_PEAK;
-                    if (x1 == middleSlice) {
-                        smeterLength = y_current;
+    }
+
+    // Pass 2 - audio spectrum + waterfall colour on L1 (preserves baseline post-increment indexing).
+    tft.writeTo(L1);
+    if (modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT){
+        for (int16_t xb = x1_start + 1; xb <= x1; xb++){
+            if (xb < 128) {
+                tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*xb, PaneAudioSpectrum.y0+2,
+                                  AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
+                if (audioYPixel[xb] > 2) {
+                    if (audioYPixel[xb] > CLIP_AUDIO_PEAK)
+                        audioYPixel[xb] = CLIP_AUDIO_PEAK;
+                    if (xb == middleSlice) {
+                        smeterLength = pixelold[xb-1];
                     }
-                    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*x1+0, AUDIO_SPECTRUM_BOTTOM - audioYPixel[x1] - 1, audioYPixel[x1] - 2, RA8875_MAGENTA);
+                    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*xb,
+                                      AUDIO_SPECTRUM_BOTTOM - audioYPixel[xb] - 1,
+                                      audioYPixel[xb] - 2, RA8875_MAGENTA);
                 }
             }
-            if (x1 == 128){
+            if (xb == 128){
                 audioMaxSquaredAve = .5 * GetAudioPowerMax() + .5 * audioMaxSquaredAve;
                 DisplaydbM();
             }
-            int test1 = -y_current + 230;
+            int test1 = -pixelold[xb-1] + 230;
             if (test1 < 0)
                 test1 = 0;
             if (test1 > 117)
                 test1 = 117;
-            waterfall[x1] = gradient[test1];
+            waterfall[xb] = gradient[test1];
         }
     }
 
     if (x1 >= MAX_WATERFALL_WIDTH){
         x1 = 0;
-        y_prev = pixelold[0];
         y_current = offset;
         psdupdated = false;
         redrawSpectrum = false;
@@ -710,6 +732,12 @@ FASTRUN void ShowSpectrum(void){
         }
         // In case spectrumNoiseFloor was changed
         offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
+
+        // Publish back-buffered spectrum (L2 -> L1) in one hardware BTE blit.
+        tft.BTE_move(SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20,
+                     MAX_WATERFALL_WIDTH, SPECTRUM_HEIGHT - 20,
+                     SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20, 2, 1);
+        while (tft.readStatus()) ;
 
         static int ping = 1, pong = 2;
         tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, ping, pong);
@@ -746,7 +774,6 @@ void DrawSpectrumPane(void) {
     }
 
     if (psdupdated && redrawSpectrum){
-        tft.writeTo(L1);
         ShowSpectrum();
     }
 
