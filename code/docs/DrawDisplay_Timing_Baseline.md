@@ -192,8 +192,10 @@ only as the per-bin y record for the waterfall colour stamp), and a single
 `BTE_move(..., 2, 1)` publishes the spectrum rect to LAYER1 at the end of
 each 8-chunk sweep. The yellow spectrum-pane border is restamped on L2
 each sweep (DrawBandWidthIndicatorBar's opening fillRect overlaps the
-border's left + bottom edges). Audio spectrum and waterfall colour stay on
-LAYER1, indexed identically to the baseline. See GitHub issue
+border's left + bottom edges). Trace `y` is clipped to
+`SPECTRUM_TOP_Y + 20` so it cannot accumulate into the top 20-row band
+where the bandwidth/scale text lives. Audio spectrum and waterfall colour
+stay on LAYER1, indexed identically to the baseline. See GitHub issue
 [KI3P/Phoenix#20](https://github.com/KI3P/Phoenix/issues/20).
 
 ### Capture conditions (deltas from baseline)
@@ -202,6 +204,7 @@ LAYER1, indexed identically to the baseline. See GitHub issue
 |---|---|
 | Date | 2026-05-23 |
 | Commit | baseline + Phase 1 diff in `MainBoard_DisplayHome.cpp` |
+| Runs | 3 consecutive 1-second captures (numbers below are the middle run) |
 | Corrupt samples | 0 |
 | All other fields | as baseline (250 kHz, 1 s, debounce 8 µs, trigger Flag 1) |
 
@@ -209,43 +212,47 @@ LAYER1, indexed identically to the baseline. See GitHub issue
 
 | Stage | Baseline | Phase 1 | Δ |
 |---|---:|---:|---:|
-| `PerformSignalProcessing` (Flag 2) | 464 ms (46.4%) | 607 ms (60.7%) | +143 ms |
-| `DrawSpectrumPane` (Flag 3) | 510 ms (51.0%) | **366 ms (36.6%)** | **−144 ms** |
-| Rest of `DrawDisplay` (Flag 1) | 26 ms (2.6%) | 27 ms (2.7%) | — |
+| `PerformSignalProcessing` (Flag 2) | 464 ms (46.4%) | 524 ms (52.4%) | +60 ms |
+| `DrawSpectrumPane` (Flag 3) | 510 ms (51.0%) | **450 ms (45.0%)** | **−60 ms** |
+| Rest of `DrawDisplay` (Flag 1) | 26 ms (2.6%) | 26 ms (2.6%) | — |
 
 `DrawSpectrumPane` is no longer the dominant CPU consumer. Signal processing
 picked up the freed budget — its share rose because more loop iterations
-now fit per second (iteration count went from ~93 to ~96 in the 1-second
-window, modest at this measurement granularity).
+now fit per second.
 
 ### Flag 3 stats (Phase 1)
 
 | Stat | Baseline (µs) | Phase 1 (µs) | Δ |
 |---|---:|---:|---:|
-| Count | 95 | 95 | — |
+| Count | 95 | 93 | — |
 | Min | 8 | 8 | — |
-| Median | 5 064 | **2 036** | **−60%** |
-| Mean | 5 371 | **3 855** | **−28%** |
-| p95 | 13 093 | 15 809 | +21% |
-| p99 | 13 180 | 15 848 | +20% |
-| Max | 13 248 | 15 968 | +21% |
-| Stddev | 3 887 | 5 311 | +37% |
+| Median | 5 064 | **2 096** | **−59%** |
+| Mean | 5 371 | **4 835** | **−10%** |
+| p95 | 13 093 | 15 826 | +21% |
+| p99 | 13 180 | 15 920 | +21% |
+| Max | 13 248 | 15 964 | +21% |
+| Stddev | 3 887 | ~5 300 | +36% |
 
 ![DrawSpectrumPane Phase 1 distribution and scatter](DrawDisplay_phase1_flag3.png)
 
 **Distribution shape**: the four mid-weight lanes from baseline (5 / 7–8 /
-9–10 / 13 ms) collapse into a single dominant ~2 ms lane (typical chunk,
-no sweep-end work) plus a heavier ~16 ms lane (sweep-end chunk that runs
+9–10 / 13 ms) collapse into a dominant ~2 ms lane (typical chunk, no
+sweep-end work) plus a heavier ~16 ms lane (sweep-end chunk that runs
 `DrawBandWidthIndicatorBar`, the border restamp `drawRect`, spectrum
 `BTE_move`, and waterfall `BTE_move` on the same iteration). The
 early-return lane (~8 µs) survives unchanged.
 
 The slow lane gained ~2.7 ms because the spectrum `BTE_move`,
-once-per-sweep filter-bar restamp, and border restamp are now concentrated
-on the 8th chunk instead of spread across all 8. Cost-benefit per second:
-−3 ms × ~83 typical chunks = ~−250 ms saved on the median path;
-+2.7 ms × ~12 sweep-end chunks = +32 ms paid on the tail; net
-**−144 ms/sec measured**.
+once-per-sweep filter-bar restamp, and border restamp are concentrated on
+the 8th chunk instead of spread across all 8. The median-path saving (~3
+ms per typical chunk × ~80 typical chunks = ~−240 ms) outweighs the
+slow-lane cost (~+2.7 ms × ~12 sweep-end chunks = ~+30 ms) but the gap is
+smaller than a single-run measurement might suggest because per-bin
+`drawLine` time depends on trace shape, which varies sweep-to-sweep with
+spectrum content. Re-runs of the same configuration cluster tightly
+(±10 ms across 3 runs at the same radio state) but a single 1-second
+measurement should not be treated as authoritative — always take the
+median of 3+ runs when comparing.
 
 ### Per-loop-iteration timeline (Phase 1)
 

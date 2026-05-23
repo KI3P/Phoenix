@@ -81,6 +81,7 @@ A new home screen pane displays real-time SWR and forward power during transmit:
 - New `ReadSWRLastUpdateMs()` API function for tracking SWR measurement timing
 - Added `DIRECT_COUPLED_TX` compile-time option (disabled by default)
 - Added spare button mapping slot in Config.h
+- Spectrum draw faster: `ShowSpectrum()` now back-buffers the yellow trace on LAYER2 and publishes the whole spectrum rect to LAYER1 in a single hardware `BTE_move` per sweep instead of erasing and redrawing every bin individually. Median `DrawSpectrumPane` cost drops from ~5 ms to ~2 ms per chunk; total CPU share falls from ~51% to ~45%, freeing budget for signal processing. Trace is clipped to leave the top 20 rows free for the bandwidth/scale labels. Baseline + Phase 1 measurements and plots are in `code/docs/DrawDisplay_Timing_Baseline.md`.
 
 ## V1.1 Release Notes
 

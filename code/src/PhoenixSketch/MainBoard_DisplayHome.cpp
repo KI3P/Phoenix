@@ -42,7 +42,7 @@ If not, see <https://www.gnu.org/licenses/>.
 
 // External references to objects and variables defined in MainBoard_Display.cpp
 extern RA8875 tft;
-#define SPECTRUM_REFRESH_MS 120
+#define SPECTRUM_REFRESH_MS 100
 
 // Shared display state variables
 bool redrawParameter = true;
@@ -658,7 +658,7 @@ FASTRUN void ShowSpectrum(void){
     // Sweep-start: prime L2 with a fresh spectrum surface + current filter bar.
     if (x1 == 0 && modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT) {
         tft.writeTo(L2);
-        DrawBandWidthIndicatorBar();   // its opening fillRect clears the spectrum rect
+        DrawBandWidthIndicatorBar();   // its opening fillRect clears the spectrum body (y >= top+20)
         // Restamp the yellow frame: DrawBandWidthIndicatorBar's clear overlaps
         // the bottom + left edges of the spectrum-pane border drawn at stale-redraw time.
         tft.drawRect(PaneSpectrum.x0-2, PaneSpectrum.y0, MAX_WATERFALL_WIDTH+5, SPECTRUM_HEIGHT, RA8875_YELLOW);
@@ -674,7 +674,10 @@ FASTRUN void ShowSpectrum(void){
         if (ED.spectrumFloorAuto && y_current > pixelmax) pixelmax = y_current;
         y_current += (int16_t)adjustment;
         if (y_current > SPECTRUM_TOP_Y+SPECTRUM_HEIGHT) y_current = SPECTRUM_TOP_Y+SPECTRUM_HEIGHT;
-        if (y_current < SPECTRUM_TOP_Y) y_current = SPECTRUM_TOP_Y;
+        // Clip to the spectrum-body band (excludes the top 20 rows where bandwidth/scale text lives).
+        // Without this, trace pixels accumulate above DrawBandWidthIndicatorBar's clear region
+        // and gradually paint over the text on L2.
+        if (y_current < SPECTRUM_TOP_Y + 20) y_current = SPECTRUM_TOP_Y + 20;
 
         tft.drawLine(SPECTRUM_LEFT_X+x1, y_left, SPECTRUM_LEFT_X+x1, y_current, RA8875_YELLOW);
         pixelold[x1] = y_current;       // retained as the per-bin y record for the waterfall colour pass
