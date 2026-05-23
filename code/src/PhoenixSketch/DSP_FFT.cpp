@@ -852,8 +852,8 @@ void SidebandSelection(DataBlock *data){
 void TXDecimateBy4(DataBlock *data, TransmitFilterConfig *TXfilters){
     // 192KHz effective sample rate here
     // decimation-by-4 in-place!
-    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_I, data->I, data->I, BUFFER_SIZE * N_BLOCKS);
-    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_Q, data->Q, data->Q, BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_I, data->I, data->I, USB_BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_Q, data->Q, data->Q, USB_BUFFER_SIZE * N_BLOCKS);
     data->N = data->N/4;
     data->sampleRate_Hz = data->sampleRate_Hz/4;
 }

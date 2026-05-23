@@ -179,9 +179,9 @@ TEST(SignalProcessing, TestMockRead){
         Q_in_L.freeBuffer();
         Q_in_R.freeBuffer();
         // Make sure that we've read the values of L_mock and R_mock
-        for (size_t k = 0; k < BUFFER_SIZE; k++){
-            EXPECT_EQ(L[k],L_mock[i*BUFFER_SIZE+k]);
-            EXPECT_EQ(R[k],R_mock[i*BUFFER_SIZE+k]);
+        for (size_t k = 0; k < USB_BUFFER_SIZE; k++){
+            EXPECT_EQ(L[k],L_mock[i*USB_BUFFER_SIZE+k]);
+            EXPECT_EQ(R[k],R_mock[i*USB_BUFFER_SIZE+k]);
         }
     }
 }

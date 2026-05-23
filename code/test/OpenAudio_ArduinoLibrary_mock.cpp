@@ -1070,7 +1070,7 @@ int AudioRecordQueue::available(void) {
             return 0;
         }
         size_t samplesAvailable = SDL_Audio_SamplesAvailable();
-        return samplesAvailable / BUFFER_SIZE;
+        return samplesAvailable / USB_BUFFER_SIZE;
     }
 #endif
 
@@ -1080,12 +1080,12 @@ int AudioRecordQueue::available(void) {
         currentAudioSource == AUDIO_SOURCE_RXIQ_LSB ||
         currentAudioSource == AUDIO_SOURCE_RXIQ_USB) {
         size_t samplesAvailable = getToneSamplesAvailable();
-        return samplesAvailable / BUFFER_SIZE;
+        return samplesAvailable / USB_BUFFER_SIZE;
     }
 
     // AUDIO_SOURCE_MOCK_DATA or fallback: use file-based mock data
-    int blocks_available = 4*2048/BUFFER_SIZE;
-    int answer = (blocks_available-head+1)*BUFFER_SIZE;
+    int blocks_available = 4*2048/USB_BUFFER_SIZE;
+    int answer = (blocks_available-head+1)*USB_BUFFER_SIZE;
     if (answer >= 100) answer = 99;
     return answer;
 }
@@ -1136,27 +1136,27 @@ int16_t* AudioRecordQueue::readBuffer(void) {
     }
 
     // Static buffers for generated I/Q samples
-    static int16_t toneBuf_I[BUFFER_SIZE];
-    static int16_t toneBuf_Q[BUFFER_SIZE];
+    static int16_t toneBuf_I[USB_BUFFER_SIZE];
+    static int16_t toneBuf_Q[USB_BUFFER_SIZE];
     static bool qDataReady = false;
 
     // Handle tone generator sources
     if (currentAudioSource == AUDIO_SOURCE_TWO_TONE) {
         if (channel == 0 || channel == 2) {
             // I channel (Left) request - generate fresh data for both I and Q
-            generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            generateTwoToneSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
             qDataReady = true;
             return toneBuf_I;
         } else {
             // Q channel (Right) request - return cached Q data
             // Track samples consumed when Q is read (I+Q pair complete)
-            toneSamplesConsumed += BUFFER_SIZE;
+            toneSamplesConsumed += USB_BUFFER_SIZE;
             if (qDataReady) {
                 qDataReady = false;
                 return toneBuf_Q;
             } else {
                 // Q requested before I - generate fresh data
-                generateTwoToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                generateTwoToneSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
                 return toneBuf_Q;
             }
         }
@@ -1165,19 +1165,19 @@ int16_t* AudioRecordQueue::readBuffer(void) {
     if (currentAudioSource == AUDIO_SOURCE_RXIQ_LSB) {
         if (channel == 0 || channel == 2) {
             // I channel (Left) request - generate fresh data for both I and Q
-            generateRXIQLSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            generateRXIQLSBSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
             qDataReady = true;
             return toneBuf_I;
         } else {
             // Q channel (Right) request - return cached Q data
             // Track samples consumed when Q is read (I+Q pair complete)
-            toneSamplesConsumed += BUFFER_SIZE;
+            toneSamplesConsumed += USB_BUFFER_SIZE;
             if (qDataReady) {
                 qDataReady = false;
                 return toneBuf_Q;
             } else {
                 // Q requested before I - generate fresh data
-                generateRXIQLSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                generateRXIQLSBSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
                 return toneBuf_Q;
             }
         }
@@ -1186,19 +1186,19 @@ int16_t* AudioRecordQueue::readBuffer(void) {
     if (currentAudioSource == AUDIO_SOURCE_RXIQ_USB) {
         if (channel == 0 || channel == 2) {
             // I channel (Left) request - generate fresh data for both I and Q
-            generateRXIQUSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            generateRXIQUSBSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
             qDataReady = true;
             return toneBuf_I;
         } else {
             // Q channel (Right) request - return cached Q data
             // Track samples consumed when Q is read (I+Q pair complete)
-            toneSamplesConsumed += BUFFER_SIZE;
+            toneSamplesConsumed += USB_BUFFER_SIZE;
             if (qDataReady) {
                 qDataReady = false;
                 return toneBuf_Q;
             } else {
                 // Q requested before I - generate fresh data
-                generateRXIQUSBSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                generateRXIQUSBSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
                 return toneBuf_Q;
             }
         }
@@ -1207,19 +1207,19 @@ int16_t* AudioRecordQueue::readBuffer(void) {
     if (currentAudioSource == AUDIO_SOURCE_SINGLE_TONE) {
         if (channel == 0 || channel == 2) {
             // I channel (Left) request - generate fresh data for both I and Q
-            generateSingleToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+            generateSingleToneSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
             qDataReady = true;
             return toneBuf_I;
         } else {
             // Q channel (Right) request - return cached Q data
             // Track samples consumed when Q is read (I+Q pair complete)
-            toneSamplesConsumed += BUFFER_SIZE;
+            toneSamplesConsumed += USB_BUFFER_SIZE;
             if (qDataReady) {
                 qDataReady = false;
                 return toneBuf_Q;
             } else {
                 // Q requested before I - generate fresh data
-                generateSingleToneSamples(toneBuf_I, toneBuf_Q, BUFFER_SIZE);
+                generateSingleToneSamples(toneBuf_I, toneBuf_Q, USB_BUFFER_SIZE);
                 return toneBuf_Q;
             }
         }
@@ -1243,13 +1243,13 @@ int16_t* AudioRecordQueue::readBuffer(void) {
         // Static buffers for L and R channels
         // We read both channels together when L is requested,
         // then return cached R data when R is requested
-        static int16_t sdlReadBuf_L[BUFFER_SIZE];
-        static int16_t sdlReadBuf_R[BUFFER_SIZE];
+        static int16_t sdlReadBuf_L[USB_BUFFER_SIZE];
+        static int16_t sdlReadBuf_R[USB_BUFFER_SIZE];
         static bool rDataReady = false;
 
         if (channel == 0 || channel == 2) {
             // Left channel request - read fresh data for both L and R
-            SDL_Audio_ReadSamples(sdlReadBuf_L, sdlReadBuf_R, BUFFER_SIZE);
+            SDL_Audio_ReadSamples(sdlReadBuf_L, sdlReadBuf_R, USB_BUFFER_SIZE);
             rDataReady = true;
             return sdlReadBuf_L;
         } else {
@@ -1259,16 +1259,16 @@ int16_t* AudioRecordQueue::readBuffer(void) {
                 return sdlReadBuf_R;
             } else {
                 // R requested before L - read fresh data
-                SDL_Audio_ReadSamples(sdlReadBuf_L, sdlReadBuf_R, BUFFER_SIZE);
+                SDL_Audio_ReadSamples(sdlReadBuf_L, sdlReadBuf_R, USB_BUFFER_SIZE);
                 return sdlReadBuf_R;
             }
         }
     }
 #endif
     // Fallback to mock data (AUDIO_SOURCE_MOCK_DATA or fallback)
-    int16_t * ptr = &data[head*BUFFER_SIZE];
+    int16_t * ptr = &data[head*USB_BUFFER_SIZE];
     head += 1;
-    int blocks_available = 4*2048/BUFFER_SIZE;
+    int blocks_available = 4*2048/USB_BUFFER_SIZE;
     if (head == (blocks_available+1)) head = 0;
     return ptr;
 }
