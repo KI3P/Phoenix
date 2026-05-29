@@ -550,11 +550,6 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
-                case FILTER:{
-                    // I am not sure what the point of this button is, so ignore for now
-                    break;
-                }
-                // You are in UISm_StateId_[HOME,UPDATE] states
                 case DECODER_TOGGLE:{
                     if (ED.decoderFlag == 0)
                         ED.decoderFlag = 1;
@@ -597,6 +592,7 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
+                case FILTER:
                 case FILTER_BUTTON:{
                     if (changeFilterHiCut)
                         changeFilterHiCut = 0;
