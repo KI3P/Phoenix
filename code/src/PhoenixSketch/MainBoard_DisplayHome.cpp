@@ -451,21 +451,21 @@ FASTRUN void DrawBandWidthIndicatorBar(void){
                               bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) / 1000.0) * pixel_per_khz * 1.06);
     int16_t vline = SPECTRUM_LEFT_X + FreqToBin(GetTXRXFreq(ED.activeVFO));
     switch (ED.modulation[ED.activeVFO]) {
-        case LSB:
-            tft.fillRect(vline - filterWidth, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+        case LSB:{
+            int16_t barDelta = (int16_t)((-bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz / 1000.0) * pixel_per_khz * 1.06);
+            tft.fillRect(vline - filterWidth - barDelta, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
-
-        case USB:
-            tft.fillRect(vline, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
+        }
+        case USB:{
+            int16_t barDelta = (int16_t)((bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz / 1000.0) * pixel_per_khz * 1.06);
+            tft.fillRect(vline + barDelta, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
-
+        }
         case AM:
+        case SAM:{
             tft.fillRect(vline - (filterWidth ) * 0.93, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
             break;
-
-        case SAM:
-            tft.fillRect(vline - (filterWidth ) * 0.93, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
-            break;
+        }
         default:
             break;
     }
@@ -1190,7 +1190,8 @@ void DrawAudioSpectContainer() {
     int16_t filterLoPositionMarker = map(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, 0, 6000, 0, 256);
     int16_t filterHiPositionMarker = map(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz, 0, 6000, 0, 256);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterLoPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
-    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
+    if ((ED.modulation[ED.activeVFO] == LSB) || (ED.modulation[ED.activeVFO] == USB))
+        tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
 
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE){
         int16_t fcutoffs[] = {840,1080,1320,1800,2000,0};

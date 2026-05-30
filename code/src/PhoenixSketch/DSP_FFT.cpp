@@ -471,6 +471,8 @@ void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
  * @param filter_change The positive or negative increment to the filter bandwidth
  */
 void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
+    // The filter must be wider or equal to one encoder notch
+    int32_t minWidth = filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
     // Change the band parameters
     switch (bands[ED.currentBand[ED.activeVFO]].mode) {
         case LSB:{
@@ -478,9 +480,15 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
             {
                 bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz > (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth;
             } else {
                 bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz > 0)
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 0;
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz < (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth;
             }
             break;
         }
@@ -488,18 +496,27 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
             if (changeFilterHiCut == 0) {
                 bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz < (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth;
             } else {
                 bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz < 0)
+                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 0;
+                if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz > (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth;
             }
             break;
         }
         case AM:
         case SAM:{
-            bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
-              bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            if (changeFilterHiCut == 0){
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz < minWidth)
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = minWidth;
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            }
             break;
         }
         case IQ:

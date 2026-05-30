@@ -35,8 +35,7 @@ VolumeFunction volumeFunction = AudioVolume;
 
 struct band bands[NUMBER_OF_BANDS] = 
   {
-  //freqVFO1 freqVFO2 band low   band hi   name    mode      Hi    Low  Gain_dB  type  AGC
-  //                                                       filter filter                    
+  //freqVFO1 band lo  band hi  name   mode Hi_cut Lo_cut Gain_dB  type  AGC
     1850000, 1800000, 2000000, "160M", LSB, -200, -3000, 0, HAM_BAND, 20,     // 160M
 #if defined(ITU_REGION) && ITU_REGION == 1
     3700000, 3500000, 3800000, "80M", LSB, -200, -3000, 0, HAM_BAND, 20, 
