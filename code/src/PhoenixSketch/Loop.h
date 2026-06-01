@@ -86,6 +86,14 @@ void SetInterrupt(InterruptType i);
 void PrependInterrupt(InterruptType i);
 
 /**
+ * @brief Poll USB Serial (port 0) for a PJRC-format time-sync packet
+ * @note Packet format: 'T' + 10-digit Unix UTC timestamp + '\n' (or '\r')
+ * @note On valid packet, sets the Teensy hardware RTC and TimeLib software clock
+ * @note Non-blocking; drains the input buffer each call
+ */
+void CheckForSerialTimeSync(void);
+
+/**
  * @brief Main program loop executed repeatedly while radio is powered on
  * @note FASTRUN annotation places function in RAM for maximum execution speed
  * @note Must complete each iteration within ~10ms to prevent audio buffer overflow

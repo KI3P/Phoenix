@@ -427,7 +427,7 @@ uint16_t FILTER_PARAMETERS_Y = PaneSpectrum.y0+1;
 // Spectrum data buffers
 uint16_t pixelold[MAX_WATERFALL_WIDTH];
 uint16_t waterfall[MAX_WATERFALL_WIDTH];
-#define NCHUNKS 5
+#define NCHUNKS 6
 
 // S-meter constants (used by DisplaydbM function within spectrum rendering)
 #define SMETER_X PaneSMeter.x0+20
