@@ -243,8 +243,10 @@ extern SerialClass SerialUSB1;
 // Mock Teensy3Clock (Real-time clock)
 class Teensy3ClockClass {
 public:
+    time_t lastSet = 0;
+    bool wasSet = false;
     time_t get() { return 1234567890; } // Return a fixed timestamp for testing
-    void set(time_t t) { (void)t; }
+    void set(time_t t) { lastSet = t; wasSet = true; }
 };
 
 extern Teensy3ClockClass Teensy3Clock;
