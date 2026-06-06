@@ -42,7 +42,7 @@ If not, see <https://www.gnu.org/licenses/>.
 
 // External references to objects and variables defined in MainBoard_Display.cpp
 extern RA8875 tft;
-#define SPECTRUM_REFRESH_MS 100
+#define SPECTRUM_REFRESH_MS 50
 
 // Shared display state variables
 bool redrawParameter = true;
@@ -427,7 +427,7 @@ uint16_t FILTER_PARAMETERS_Y = PaneSpectrum.y0+1;
 // Spectrum data buffers
 uint16_t pixelold[MAX_WATERFALL_WIDTH];
 uint16_t waterfall[MAX_WATERFALL_WIDTH];
-#define NCHUNKS 8
+#define NCHUNKS 6
 
 // S-meter constants (used by DisplaydbM function within spectrum rendering)
 #define SMETER_X PaneSMeter.x0+20
@@ -615,6 +615,10 @@ void DisplaydbM() {
 
 // State tracking for spectrum line rendering
 static int16_t x1 = 0;
+static int16_t spectrumChunkIdx = 0;        // which chunk of NCHUNKS is being drawn this sweep
+static uint16_t spectrumFrameCtr = 0;       // increments once per spectrum frame; drives the throttles
+#define AUDIO_SPECTRUM_DECIMATE 2           // draw the audio spectrum / S-meter every Nth spectrum frame
+#define WATERFALL_DECIMATE 2                // scroll the waterfall every Nth frame (phase-offset from audio)
 static int16_t y_left;
 static int16_t offset = (SPECTRUM_TOP_Y+SPECTRUM_HEIGHT-ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]]);
 static int16_t y_current = offset;
@@ -656,6 +660,7 @@ FASTRUN int16_t pixelnew(uint32_t i){
  */
 FASTRUN void ShowSpectrum(void){
     // Sweep-start: prime L2 with a fresh spectrum surface + current filter bar.
+    if (x1 == 0) { spectrumChunkIdx = 0; spectrumFrameCtr++; } // new sweep: reset chunk idx, advance frame counter
     if (x1 == 0 && modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT) {
         tft.writeTo(L2);
         DrawBandWidthIndicatorBar();   // its opening fillRect clears the spectrum body (y >= top+20)
@@ -665,10 +670,16 @@ FASTRUN void ShowSpectrum(void){
     }
 
     int16_t x1_start = x1;
+    // Column boundary for this chunk. Using rounded boundaries (rather than a fixed
+    // MAX_WATERFALL_WIDTH/NCHUNKS step) makes the chunks always sum to exactly
+    // MAX_WATERFALL_WIDTH even when NCHUNKS does not divide it evenly (e.g. NCHUNKS=6 or 7).
+    int16_t x1_end = (int16_t)(((int32_t)(spectrumChunkIdx + 1) * MAX_WATERFALL_WIDTH) / NCHUNKS);
+    if (x1_end > MAX_WATERFALL_WIDTH) x1_end = MAX_WATERFALL_WIDTH;
+    spectrumChunkIdx++;
 
     // Pass 1 - spectrum trace on L2 back buffer (no per-bin erase).
     tft.writeTo(L2);
-    for (int j = 0; j < MAX_WATERFALL_WIDTH/NCHUNKS; j++){
+    for (; x1 < x1_end; ){
         y_left = y_current;
         y_current = offset - pixelnew(x1); // offset is line on screen where -124 dBm is located
         if (ED.spectrumFloorAuto && y_current > pixelmax) pixelmax = y_current;
@@ -685,10 +696,14 @@ FASTRUN void ShowSpectrum(void){
     }
 
     // Pass 2 - audio spectrum + waterfall colour on L1 (preserves baseline post-increment indexing).
+    // The small audio-spectrum + S-meter redraw is a separate, low-priority display element costing
+    // ~13 ms/frame, so it is throttled to every AUDIO_SPECTRUM_DECIMATE-th frame to free real-time
+    // budget for the main spectrum/waterfall. The waterfall colour computation is NOT throttled.
     tft.writeTo(L1);
     if (modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT){
+        bool drawAudioSpectrum = (spectrumFrameCtr % AUDIO_SPECTRUM_DECIMATE) == 0;
         for (int16_t xb = x1_start + 1; xb <= x1; xb++){
-            if (xb < 128) {
+            if (drawAudioSpectrum && xb < 128) {
                 tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + 2*xb, PaneAudioSpectrum.y0+2,
                                   AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
                 if (audioYPixel[xb] > 2) {
@@ -702,7 +717,7 @@ FASTRUN void ShowSpectrum(void){
                                       audioYPixel[xb] - 2, RA8875_MAGENTA);
                 }
             }
-            if (xb == 128){
+            if (drawAudioSpectrum && xb == 128){
                 audioMaxSquaredAve = .5 * GetAudioPowerMax() + .5 * audioMaxSquaredAve;
                 DisplaydbM();
             }
@@ -742,19 +757,24 @@ FASTRUN void ShowSpectrum(void){
                      SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20, 2, 1);
         while (tft.readStatus()) ;
 
-        static int ping = 1, pong = 2;
-        tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, ping, pong);
-        while (tft.readStatus()) ;
-        if(ping == 1) {
-          ping = 2;
-          pong = 1;
-          tft.writeTo(L2);
-        } else {
-          ping = 1;
-          pong = 2;
-          tft.writeTo(L1);
+        // EXPERIMENT: scroll the waterfall only every WATERFALL_DECIMATE-th frame (phase-offset
+        // from the audio-spectrum throttle so the two heavy ops fall on alternate frames). The
+        // waterfall therefore advances at spectrum_rate / WATERFALL_DECIMATE.
+        if ((spectrumFrameCtr % WATERFALL_DECIMATE) == 1) {
+            static int ping = 1, pong = 2;
+            tft.BTE_move(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, MAX_WATERFALL_ROWS - 2, WATERFALL_LEFT_X, FIRST_WATERFALL_LINE + 1, ping, pong);
+            while (tft.readStatus()) ;
+            if(ping == 1) {
+              ping = 2;
+              pong = 1;
+              tft.writeTo(L2);
+            } else {
+              ping = 1;
+              pong = 2;
+              tft.writeTo(L1);
+            }
+            tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
         }
-        tft.writeRect(WATERFALL_LEFT_X, FIRST_WATERFALL_LINE, MAX_WATERFALL_WIDTH, 1, waterfall);
         tft.writeTo(L1);
     }
 }
