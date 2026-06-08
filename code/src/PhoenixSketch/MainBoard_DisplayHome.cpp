@@ -804,6 +804,19 @@ void DrawSpectrumPane(void) {
         tft.writeTo(L1);
         return;
     }
+
+    // The static spectrum overlay (frequency labels + bandwidth/tuning bar) is
+    // redrawn on the L2 back-buffer, and DrawBandWidthIndicatorBar()'s opening
+    // fillRect clears the entire L2 spectrum body. If that runs mid-sweep it wipes
+    // the chunks ShowSpectrum() has already drawn for the current frame, leaving
+    // large blank regions (and a stale/duplicated tuning bar) when tuning rapidly.
+    // x1 != 0 means a chunked sweep is in progress, so defer the refresh - leaving
+    // PaneSpectrum.stale set - until the sweep is at a frame boundary (x1 == 0).
+    if (x1 != 0) {
+        tft.writeTo(L1);
+        return;
+    }
+
     oz = ED.spectrum_zoom;
     ocf = ED.centerFreq_Hz[ED.activeVFO];
     oft = ED.fineTuneFreq_Hz[ED.activeVFO];

@@ -1501,7 +1501,8 @@ FASTRUN void loop(void){
     // Step 1: Check for new events and handle them
     ProcessKey1Debounce();
     ProcessPTTDebounce();
-    CheckForFrontPanelInterrupts();
+    // Front-panel encoders/buttons are now drained by fpServiceTimer (1 ms, below
+    // audio priority) instead of being polled here once per loop iteration.
     CheckForCATSerialEvents();
     CheckForSerialTimeSync();
     ConsumeInterrupt();

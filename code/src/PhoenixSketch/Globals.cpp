@@ -556,6 +556,11 @@ void setup(void){
     SetupCWKeyInterrupts();
 
     timer1ms.begin(tick1ms, 1000);  // run tick1ms every 1ms
-    
+    // Run the 1 ms state-machine tick below the audio update ISR (priority 208).
+    // All IntervalTimers share IRQ_PIT at the highest requested priority, so this
+    // also governs the front-panel service timer (FrontPanel.cpp); keeping both at
+    // 240 ensures neither can delay audio servicing.
+    timer1ms.priority(240);
+
     Serial.println("...Setup done!");
 }

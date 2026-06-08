@@ -92,6 +92,8 @@ public:
         _interval_us = 0;
     }
 
+    void priority(uint8_t n) { (void)n; }
+
 private:
     voidFuncPtr _callback;
     uint32_t _interval_us;
