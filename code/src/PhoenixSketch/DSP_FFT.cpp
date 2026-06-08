@@ -375,7 +375,16 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
                                 RXfilters->n_att_dB, RXfilters->n_desired_BW_Hz, READ_BUFFER_SIZE/RXfilters->DF1);
 
     // FIR filter mask
-    InitFilterMask(FIR_filter_mask, RXfilters); 
+    InitFilterMask(FIR_filter_mask, RXfilters);
+
+    // Clear the convolution overlap-add history buffers. These are declared as
+    // static DMAMEM, which is NOT zero-initialized at cold boot on the Teensy 4.x
+    // (only the regular .bss section in DTCM is cleared at startup). After a cold
+    // power cycle they contain random bit patterns - some of which are NaN/Inf -
+    // that would otherwise be fed straight into the convolution FFT on the first
+    // frame and propagate downstream into the noise reduction feedback state.
+    CLEAR_VAR(last_sample_buffer_L);
+    CLEAR_VAR(last_sample_buffer_R);
 
     // Equalizer RXfilters
     for (size_t i = 0; i<14; i++){

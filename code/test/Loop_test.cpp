@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "../src/PhoenixSketch/SDT.h"
+#include "../src/PhoenixSketch/Loop.h"
 
 // Forward declare CAT functions for testing
 char *BU_write(char* cmd);
@@ -2084,4 +2085,73 @@ TEST(Loop, FineTuneIncrementButtonArrayValueVerification) {
     SetInterrupt(iBUTTON_PRESSED);
     ConsumeInterrupt();
     EXPECT_EQ(ED.stepFineTune, 10); // Back to beginning
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Serial time sync tests
+//
+// CheckForSerialTimeSync() accepts PJRC-format time packets on Serial:
+//   'T' + 10-digit Unix UTC timestamp + '\n' (or '\r')
+// and sets both the Teensy hardware RTC and the TimeLib software clock.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Helper: feed bytes to Serial, run the handler, drain the rest.
+// Re-feeds whatever the test poked in via Serial and processes it in one call.
+static void runSerialTimeSync(const char* packet) {
+    Serial.clearBuffer();
+    Teensy3Clock.wasSet = false;
+    Teensy3Clock.lastSet = 0;
+    Serial.feedData(packet);
+    CheckForSerialTimeSync();
+}
+
+TEST(Loop, TimeSyncValidPacketSetsRTC) {
+    runSerialTimeSync("T1748476800\n");
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(Loop, TimeSyncCarriageReturnTerminatorWorks) {
+    runSerialTimeSync("T1748476800\r");
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(Loop, TimeSyncRejectsShortTimestamp) {
+    runSerialTimeSync("T12345\n");  // only 5 digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(Loop, TimeSyncRejectsPreEpochSanityFailure) {
+    // 0000000001 parses but fails the t > 1000000000 sanity check
+    runSerialTimeSync("T0000000001\n");
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(Loop, TimeSyncIgnoresStreamWithoutHeader) {
+    runSerialTimeSync("1748476800\n");  // no 'T' header
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(Loop, TimeSyncNewHeaderResetsCollection) {
+    // First 'T' starts collection with garbage, second 'T' must reset
+    // cleanly and the following valid packet must be accepted.
+    runSerialTimeSync("Tabc123T1748476800\n");
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(Loop, TimeSyncRejectsOverrunPacket) {
+    // 11 digits then newline: tsidx hits TIME_SYNC_LEN before newline,
+    // 11th digit triggers overrun branch, clock must not be set.
+    runSerialTimeSync("T17484768000\n");
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(Loop, TimeSyncNoDataLeavesClockUntouched) {
+    Serial.clearBuffer();
+    Teensy3Clock.wasSet = false;
+    Teensy3Clock.lastSet = 0;
+    CheckForSerialTimeSync();
+    EXPECT_FALSE(Teensy3Clock.wasSet);
 }

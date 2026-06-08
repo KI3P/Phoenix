@@ -872,8 +872,10 @@ TEST(TransmitChain, TransmitReceiveProcessingPSDContainsCorrectTone){
     // For spectrum_zoom = 3, decimation by 8 gives effective sample rate of 24 kHz
     // The FFT is 512 points covering 24 kHz
     // Bin width = 24000 / 512 = 46.875 Hz
-    // For 6 kHz tone: bin = 512/2 + 512*6000/24000 = 256 + 128 = 384
-    int32_t expectedBin = frequency_to_bin(tone_Hz, 512, sampleRate_Hz / 8);
+    // ReadIQInputBuffer maps I<-L and Q<-R (image-formation fix, commit 04b277a),
+    // which places this tone in the lower sideband, so the peak is mirrored about
+    // the center bin: bin = 512/2 - 512*6000/24000 = 256 - 128 = 128
+    int32_t expectedBin = 512 - frequency_to_bin(tone_Hz, 512, sampleRate_Hz / 8);
 
     // Find the peak in the PSD
     float32_t maxPsd = -1e10;
