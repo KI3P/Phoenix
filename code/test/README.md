@@ -251,7 +251,7 @@ Mock objects simulate hardware behavior:
 ```cpp
 TEST(RFBoard, SetFrequency) {
     // Mock will record VFO commands
-    SetFrequency_dHz(145000000);  // 14.500 MHz
+    SetFrequency_cHz(145000000);  // 14.500 MHz
 
     // Verify mock received correct commands
     EXPECT_EQ(GetLastVFOFrequency(), 145000000);

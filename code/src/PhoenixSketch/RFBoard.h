@@ -88,27 +88,27 @@ void SetFrequencyCorrectionFactor(int32_t corr);
 
 /**
  * @brief Get the current RX VFO frequency setting
- * @return Frequency in decihertz (Hz × 10)
+ * @return Frequency in centihertz (Hz × 100)
  */
 int64_t GetRXVFOFrequency(void);
 
 /**
  * @brief Get the current TX VFO frequency setting
- * @return Frequency in decihertz (Hz × 10)
+ * @return Frequency in centihertz (Hz × 100)
  */
 int64_t GetTXVFOFrequency(void);
 
 /**
  * @brief Set the RX VFO frequency
- * @param frequency_dHz Desired frequency in decihertz (Hz × 10)
+ * @param frequency_cHz Desired frequency in centihertz (Hz × 100)
  */
-void SetRXVFOFrequency(int64_t frequency_dHz);
+void SetRXVFOFrequency(int64_t frequency_cHz);
 
 /**
  * @brief Set the TX VFO frequency
- * @param frequency_dHz Desired frequency in decihertz (Hz × 10)
+ * @param frequency_cHz Desired frequency in centihertz (Hz × 100)
  */
-void SetTXVFOFrequency(int64_t frequency_dHz);
+void SetTXVFOFrequency(int64_t frequency_cHz);
 
 /**
  * @brief Set the RX VFO output power level
@@ -162,16 +162,16 @@ errno_t InitTXVFO(void);
 
 /**
  * @brief Get the current CW VFO frequency setting
- * @return Frequency in decihertz (Hz × 10)
+ * @return Frequency in centihertz (Hz × 100)
  */
 int64_t GetCWVFOFrequency(void);
 
 /**
  * @brief Set the CW VFO frequency
- * @param frequency_dHz Desired frequency in decihertz (Hz × 10)
+ * @param frequency_cHz Desired frequency in centihertz (Hz × 100)
  * @note Frequency is applied to Si5351 CLK1 output
  */
-void SetCWVFOFrequency(int64_t frequency_dHz);
+void SetCWVFOFrequency(int64_t frequency_cHz);
 
 /**
  * @brief Set the CW VFO output power level

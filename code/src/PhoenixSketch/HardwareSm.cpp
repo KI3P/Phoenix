@@ -434,7 +434,7 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 DisableRXVFOOutput();
                 DisableTXVFOOutput();
                 // Set frequencyCW_Hz to appropriate value
-                //SetCWVFOFrequency( GetCWTXFreq_dHz() );
+                //SetCWVFOFrequency( GetCWTXFreq_cHz() );
                 UpdateTuneState();
                 // Set driveCurrentCW_mA to appropriate value
                 // > This does not change after initialization, so do nothing
@@ -656,7 +656,7 @@ void HandleTuneState(TuneState tuneState){
         }
         case TuneSSBTX:{
             // SSB Transmit:    TXfreq = centerFreq_Hz
-            int64_t newFreq = GetTXRXFreq_dHz();
+            int64_t newFreq = GetTXRXFreq_cHz();
             // Set transmit to the TXRX frequency
             SetTXVFOFrequency( newFreq );
             if (HasDualVFOs()){
@@ -668,7 +668,7 @@ void HandleTuneState(TuneState tuneState){
         }
         case TuneCWTX:{
             // CW Transmit:     TXfreq = centerFreq_Hz - fineTuneFreq_Hz - SampleRate/4 -/+ CWToneOffset
-            int64_t newFreq = GetCWTXFreq_dHz();
+            int64_t newFreq = GetCWTXFreq_cHz();
             SetCWVFOFrequency( newFreq );
             break;
         }
@@ -684,7 +684,7 @@ void HandleTuneState(TuneState tuneState){
                 // away from DC in the receive spectrum
                 SetTXVFOFrequency( (ED.centerFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4)*100 );
             } else {
-                SetTXVFOFrequency( GetTXRXFreq_dHz() );
+                SetTXVFOFrequency( GetTXRXFreq_cHz() );
             }
             break;
         }

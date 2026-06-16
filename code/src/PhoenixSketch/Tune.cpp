@@ -107,7 +107,7 @@ void AdjustFineTune(int32_t filter_change){
  * 
  * @return The effective transmit/receive frequency in units of Hz * 100
  */
-int64_t GetTXRXFreq_dHz(void){
+int64_t GetTXRXFreq_cHz(void){
     int64_t val = 100*(ED.centerFreq_Hz[ED.activeVFO] - ED.fineTuneFreq_Hz[ED.activeVFO] - SR[SampleRate].rate/4);
     return val;
 }
@@ -129,8 +129,8 @@ int64_t GetTXRXFreq(uint8_t vfo){
  * 
  * @return The CW tone transmit frequency in units of Hz * 100
  */
-int64_t GetCWTXFreq_dHz(void){
-    int64_t txrx = GetTXRXFreq_dHz();
+int64_t GetCWTXFreq_cHz(void){
+    int64_t txrx = GetTXRXFreq_cHz();
     int64_t offset = (int64_t)(100*CWToneOffsetsHz[ED.CWToneIndex]);
     if (bands[ED.currentBand[ED.activeVFO]].mode == LSB) {
         return txrx - offset;

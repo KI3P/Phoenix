@@ -224,7 +224,7 @@ static uint8_t activeVFO_old = 10;
  * Render both VFO A and VFO B frequency displays.
  */
 void DrawVFOPanes(void) {
-    int64_t TxRxFreq = GetTXRXFreq_dHz()/100;
+    int64_t TxRxFreq = GetTXRXFreq_cHz()/100;
     if ((TxRxFreq == TxRxFreq_old) && (ED.activeVFO == activeVFO_old) &&
         (!PaneVFOA.stale) && (!PaneVFOB.stale))
         return;

@@ -1265,7 +1265,7 @@ TEST(Loop, ResetTuningButtonCallsResetFunction) {
     // Set up initial state with non-zero fine tune
     ED.fineTuneFreq_Hz[ED.activeVFO] = 1500L;
     ED.centerFreq_Hz[ED.activeVFO] = 14200000L;
-    int64_t oldRXTX = GetTXRXFreq_dHz();
+    int64_t oldRXTX = GetTXRXFreq_cHz();
 
     // Call reset tuning button handler
     SetButton(RESET_TUNING);
@@ -1279,7 +1279,7 @@ TEST(Loop, ResetTuningButtonCallsResetFunction) {
     EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14198500L); // 14200000 - 1500
 
     // RXTX frequency should remain the same
-    EXPECT_EQ(GetTXRXFreq_dHz(), oldRXTX);
+    EXPECT_EQ(GetTXRXFreq_cHz(), oldRXTX);
 }
 
 TEST(Loop, ResetTuningButtonViaInterruptHandling) {

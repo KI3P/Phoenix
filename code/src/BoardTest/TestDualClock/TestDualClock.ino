@@ -41,9 +41,9 @@ Si5351 si5351;
 #define Si_5351_crystal 25000000L
 static int32_t txmultiple, oldtxMultiple;
 static int32_t rxmultiple, oldrxMultiple;
-static int64_t SSBTXVFOFreq_dHz;
-static int64_t SSBRXVFOFreq_dHz;
-static int64_t CWTXVFOFreq_dHz;
+static int64_t SSBTXVFOFreq_cHz;
+static int64_t SSBRXVFOFreq_cHz;
+static int64_t CWTXVFOFreq_cHz;
 
 void scanner(TwoWire *I2C) {
   byte error, address;
@@ -160,15 +160,15 @@ int32_t EvenDivisor(int64_t freq2_Hz) {
 /**
  * Set the CLK0 and CLK1 outputs as quadrature outputs at the specified frequency.
  *
- * @param frequency_dHz The desired clock frequency in (Hz * 100)
+ * @param frequency_cHz The desired clock frequency in (Hz * 100)
  */
-void SetSSBRXVFOFrequency(int64_t frequency_dHz){
+void SetSSBRXVFOFrequency(int64_t frequency_cHz){
     // No need to change if it's already at this setting
-    if (frequency_dHz == SSBRXVFOFreq_dHz) return;
+    if (frequency_cHz == SSBRXVFOFreq_cHz) return;
     Serial.print("Setting RX to: ");
-    Serial.println(frequency_dHz/100);
-    SSBRXVFOFreq_dHz = frequency_dHz;
-    int64_t Clk1SetFreq = frequency_dHz;
+    Serial.println(frequency_cHz/100);
+    SSBRXVFOFreq_cHz = frequency_cHz;
+    int64_t Clk1SetFreq = frequency_cHz;
     rxmultiple = EvenDivisor(Clk1SetFreq / SI5351_FREQ_MULT);
     uint64_t pll_freq = Clk1SetFreq * rxmultiple;
     uint64_t freq = pll_freq / rxmultiple;
@@ -214,15 +214,15 @@ void SetSSBRXVFOFrequency(int64_t frequency_dHz){
 /**
  * Set the CLK4 and CLK5 outputs as quadrature outputs at the specified frequency.
  *
- * @param frequency_dHz The desired clock frequency in (Hz * 100)
+ * @param frequency_cHz The desired clock frequency in (Hz * 100)
  */
-void SetSSBTXVFOFrequency(int64_t frequency_dHz){
+void SetSSBTXVFOFrequency(int64_t frequency_cHz){
     // No need to change if it's already at this setting
-    if (frequency_dHz == SSBTXVFOFreq_dHz) return;
+    if (frequency_cHz == SSBTXVFOFreq_cHz) return;
     Serial.print("Setting TX to: ");
-    Serial.println(frequency_dHz/100);
-    SSBTXVFOFreq_dHz = frequency_dHz;
-    int64_t Clk5SetFreq = frequency_dHz;
+    Serial.println(frequency_cHz/100);
+    SSBTXVFOFreq_cHz = frequency_cHz;
+    int64_t Clk5SetFreq = frequency_cHz;
     txmultiple = EvenDivisor(Clk5SetFreq / SI5351_FREQ_MULT);
     uint64_t pll_freq = Clk5SetFreq * txmultiple;
     uint64_t freq = pll_freq / txmultiple;
@@ -280,19 +280,19 @@ void SetSSBTXVFOFrequency(int64_t frequency_dHz){
  * (e.g., centerFreq + 700Hz for a 700Hz tone). The tune state machine handles
  * this offset calculation.
  *
- * @param frequency_dHz Desired CW VFO frequency in deca-Hertz (Hz × 100)
+ * @param frequency_cHz Desired CW VFO frequency in deca-Hertz (Hz × 100)
  *
  * @see GetCWVFOFrequency() to read current frequency
  * @see EnableCWVFOOutput() to enable CLK6 output
  * @see Tune.cpp for CW frequency offset handling
  */
-void SetCWTXVFOFrequency(int64_t frequency_dHz){
+void SetCWTXVFOFrequency(int64_t frequency_cHz){
     // No need to change if it's already at this setting
-    if (frequency_dHz == CWTXVFOFreq_dHz) return;
+    if (frequency_cHz == CWTXVFOFreq_cHz) return;
     Serial.print("Setting CW to: ");
-    Serial.println(frequency_dHz/100);
-    CWTXVFOFreq_dHz = frequency_dHz;
-    si5351.set_freq(CWTXVFOFreq_dHz, SI5351_CLK6);
+    Serial.println(frequency_cHz/100);
+    CWTXVFOFreq_cHz = frequency_cHz;
+    si5351.set_freq(CWTXVFOFreq_cHz, SI5351_CLK6);
 }
 
 /**
