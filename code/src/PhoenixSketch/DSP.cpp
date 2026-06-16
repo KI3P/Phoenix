@@ -719,7 +719,15 @@ float32_t VolumeToAmplification(int32_t volume) {
  * Adjust the volume
  */
 void AdjustVolume(DataBlock *data, ReceiveFilterConfig *RXfilters){
-    arm_scale_f32(data->I, RXfilters->DF * VolumeToAmplification(ED.audioVolume), data->I, data->N);
+    float32_t gain = RXfilters->DF * VolumeToAmplification(ED.audioVolume);
+#ifdef MUTE_ON_RAPID_TUNE
+    // Mute the output while a tune encoder is being spun fast, so the rapid VFO
+    // reprogramming is not heard as audio glitches. Resumes automatically when
+    // tuning stops (see IsRapidTuning() in Loop.cpp).
+    if (IsRapidTuning())
+        gain = 0.0f;
+#endif
+    arm_scale_f32(data->I, gain, data->I, data->N);
 }
 
 /**

@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-06-08
 tags: [loop, events, interrupts, real-time, cw-keyer]
 source_refs: []
-related: ["[[overview]]", "[[mode-state-machine]]", "[[ui-state-machine]]", "[[front-panel]]", "[[real-time-constraints]]", "[[cat-control]]"]
+related: ["[[overview]]", "[[mode-state-machine]]", "[[ui-state-machine]]", "[[front-panel]]", "[[real-time-constraints]]", "[[cat-control]]", "[[tune-frequency-control]]", "[[rapid-tune-mute-freeze]]"]
 ---
 
 # Main Loop & Event Dispatch (Loop.cpp)
@@ -47,6 +47,10 @@ encoders (volume / filter / center-tune / fine-tune ± ), buttons (`iBUTTON_PRES
 VFO/mode/power changes, tune update requests, equalizer, BIT display, and the five
 calibration triggers (`iCALIBRATE_POWER/FREQUENCY/RX_IQ/TX_IQ`, `iCALIBRATE_EXIT`) that
 drive the [[hardware-state-machine]].
+
+The four HOME-state center/fine tune cases in `ConsumeInterrupt()` also call
+`NoteTuneActivity()`, the entry point for the [[rapid-tune-mute-freeze]] detector (which then
+mutes audio and freezes/decouples the spectrum while a tune knob is spun fast).
 
 ## CW key / PTT handling
 

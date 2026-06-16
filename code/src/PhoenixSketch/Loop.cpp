@@ -357,6 +357,56 @@ void TimerInterrupt(void){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Rapid-tuning detection
+///////////////////////////////////////////////////////////////////////////////
+// When the Center Tune or Fine Tune encoders are spun quickly the tune events
+// queue up and the VFO is reprogrammed on nearly every loop iteration, which
+// produces audible glitches and a jerky spectrum sweep. We detect that condition
+// here from the timing of consumed tune events; callers (the audio output stage
+// and the spectrum redraw) use IsRapidTuning() to mute / pause until it ends.
+#ifdef MUTE_ON_RAPID_TUNE
+static uint32_t lastTuneEventMs = 0;
+static bool rapidTuning = false;
+static bool lastTuneWasFine = false;   // true if the latest tune event was Fine Tune
+
+void NoteTuneActivity(bool fineTune){
+    uint32_t now = millis();
+    // A short gap since the previous tune event means the knob is being spun.
+    if ((now - lastTuneEventMs) < RAPID_TUNE_ENGAGE_MS)
+        rapidTuning = true;
+    lastTuneEventMs = now;
+    lastTuneWasFine = fineTune;
+}
+
+bool IsRapidTuning(void){
+    // Release the latch once tuning has been idle long enough. The subtraction is
+    // done in uint32_t so it wraps correctly (matching the Teensy millis() width;
+    // the host test mock returns a wider type, hence the explicit cast).
+    if (rapidTuning && (((uint32_t)millis() - lastTuneEventMs) > RAPID_TUNE_RELEASE_MS))
+        rapidTuning = false;
+    return rapidTuning;
+}
+
+bool IsRapidCenterTuning(void){
+    // Center Tune re-centers the spectrum (it reprograms the VFO), so the whole
+    // trace/waterfall is frozen while it is spun fast.
+    return IsRapidTuning() && !lastTuneWasFine;
+}
+
+bool IsRapidFineTuning(void){
+    // Fine Tune leaves the center fixed and only slides the tuning marker, so the
+    // trace is frozen but the blue tuning bar keeps being redrawn at the new marker
+    // position (see the spectrum pane).
+    return IsRapidTuning() && lastTuneWasFine;
+}
+#else
+void NoteTuneActivity(bool fineTune){ (void)fineTune; }
+bool IsRapidTuning(void){ return false; }
+bool IsRapidCenterTuning(void){ return false; }
+bool IsRapidFineTuning(void){ return false; }
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
 // Code for handling button presses and state changes
 ///////////////////////////////////////////////////////////////////////////////
 void ChangeRXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
@@ -1070,6 +1120,7 @@ void ConsumeInterrupt(void){
                     break;
                 } // end of VOLUME_DECREASE, HOME state
                 case (iCENTERTUNE_INCREASE):{
+                    NoteTuneActivity(false);
                     ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
                     // Change the band if we tune out of the current band. However,
                     // if we tune to a frequency outside the ham bands, keep the last
@@ -1078,6 +1129,7 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iCENTERTUNE_DECREASE):{
+                    NoteTuneActivity(false);
                     ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
                     // check for minimum frequency supported by Si5351 quadrature signal generator
                     if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
@@ -1086,10 +1138,12 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iFINETUNE_INCREASE):{
+                    NoteTuneActivity(true);
                     AdjustFineTune(+1);
                     break;
                 }
                 case (iFINETUNE_DECREASE):{
+                    NoteTuneActivity(true);
                     AdjustFineTune(-1);
                     break;
                 }

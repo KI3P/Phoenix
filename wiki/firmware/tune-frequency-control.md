@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-06-16
 tags: [tuning, vfo, frequency, fs-over-4, cw-offset, fast-tune, power-calibration]
 source_refs: []
-related: ["[[overview]]", "[[hardware-state-machine]]", "[[rf-board]]", "[[mode-state-machine]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]"]
+related: ["[[overview]]", "[[hardware-state-machine]]", "[[rf-board]]", "[[mode-state-machine]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]", "[[rapid-tune-mute-freeze]]"]
 ---
 
 # Frequency Control & Tuning Math (Tune.cpp)
@@ -79,6 +79,12 @@ clamps the result so you can't tune outside what's usable:
 
 `AdjustBand()` in [[main-loop]] re-derives the band from the new frequency, keeping the last
 valid band if you tune outside the ham bands (so demod keeps working).
+
+Note `AdjustFineTune()` only moves `fineTuneFreq_Hz` — it never touches `centerFreq_Hz` or
+reprograms the Si5351, so a fine-tune spin leaves the spectrum **center fixed** and only slides
+the on-screen marker. [[rapid-tune-mute-freeze]] relies on exactly this distinction: it fully
+freezes the spectrum for Center Tune (which re-centers) but for Fine Tune holds the trace and
+just redraws the moving tuning bar.
 
 ## Per-mode VFO selection lives in HardwareSm
 The actual "which formula → which VFO register" dispatch is `HandleTuneState()`

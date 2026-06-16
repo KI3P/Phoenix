@@ -685,3 +685,22 @@ landed on this branch. Reconciled the three caveat-bearing pages:
 `updated:` bumped to 2026-06-16 on all three. No remaining stale `_dHz` identifier claims.
 **Suggested next:** promote the now-verified firmware pages from `draft`→`stable` (most are
 draft); consider a dedicated power-calibration theory page (flagged in tune-frequency-control).
+
+## [2026-06-16] decision | rapid-tune audio mute & spectrum freeze (encoder-i2c-speed)
+Documented a new `encoder-i2c-speed` feature, compile-gated by `MUTE_ON_RAPID_TUNE` (Config.h):
+when a tune encoder is spun fast, mute the output audio and freeze/decouple the spectrum redraw,
+resuming automatically. The two-tier encoder speedup ([[front-panel]]) made fast spins enqueue a
+tune event almost every loop, which surfaced audio glitches + a jerky sweep; this masks both
+without changing per-event tuning.
+**New page:** firmware/rapid-tune-mute-freeze.md (`type: decision`). Covers detection in Loop.cpp
+(`NoteTuneActivity(bool)`, `IsRapidTuning`/`IsRapidCenterTuning`/`IsRapidFineTuning`; uint32 millis
+wrap fix for the host mock), audio mute in `AdjustVolume()` (DSP.cpp), and the display split —
+Center Tune fully freezes; Fine Tune holds the trace but keeps the blue filter bar + cyan marker
+tracking via a one-time bar-less L2 backdrop (`BuildFrozenBackdrop`) + per-freq-change L2→L1 BTE
+blit (`RedrawFrozenSpectrumWithBar`) + `StampTuningBar` (refactored out of
+`DrawBandWidthIndicatorBar`). Noted the inverse relationship to [[spectrum-refresh-floor]] (pause
+vs speed-up; same draw-cost lesson) and the trace-over-highlight trade-off of the fast path.
+**Cross-links added:** front-panel, tune-frequency-control, display-subsystem, main-loop,
+spectrum-refresh-floor (all in `related` + inline). **index.md** bumped firmware 21→22 (44 content
+pages). Status `draft` — display fast-path is hardware-exercised, not unit-tested; thresholds
+(`RAPID_TUNE_ENGAGE_MS=60`/`RAPID_TUNE_RELEASE_MS=180`) pending bench tuning.

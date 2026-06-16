@@ -441,11 +441,11 @@ uint16_t pixels_per_s = 12;
 #define CLIP_AUDIO_PEAK 115
 
 /**
- * Draw Tuned Bandwidth on Spectrum Plot
+ * Stamp the tuning bar (filter-bandwidth highlight + cyan center marker) at the
+ * current tuned frequency onto whichever layer is currently selected for writing.
+ * Does not clear or switch layers - the caller owns the surface.
  */
-FASTRUN void DrawBandWidthIndicatorBar(void){
-    tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
-    tft.writeTo(L2);
+FASTRUN void StampTuningBar(void){
     float32_t pixel_per_khz = ((1 << ED.spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate);
     int16_t filterWidth = (int16_t)(((bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz -
                               bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) / 1000.0) * pixel_per_khz * 1.06);
@@ -470,6 +470,15 @@ FASTRUN void DrawBandWidthIndicatorBar(void){
             break;
     }
     tft.drawFastVLine(vline, SPECTRUM_TOP_Y + 20, SPECTRUM_HEIGHT-25, RA8875_CYAN);
+}
+
+/**
+ * Draw Tuned Bandwidth on Spectrum Plot
+ */
+FASTRUN void DrawBandWidthIndicatorBar(void){
+    tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
+    tft.writeTo(L2);
+    StampTuningBar();
 }
 
 /**
@@ -779,6 +788,57 @@ FASTRUN void ShowSpectrum(void){
     }
 }
 
+#ifdef MUTE_ON_RAPID_TUNE
+// State for the Fine Tune "frozen trace, moving bar" fast path.
+static bool fineFreezeBackdropReady = false;   // L2 holds a clean (bar-less) trace
+static int64_t fineFreezeLastFreq = 0;         // last marker freq we stamped
+
+/**
+ * Build the clean (bar-less) frozen-trace backdrop on the L2 back-buffer from
+ * pixelold[] (the per-column y values from the last completed sweep). Built once per
+ * Fine Tune freeze episode; every later bar update just blits this backdrop back to
+ * L1 to erase the old bar, which is far cheaper than repainting the whole trace.
+ */
+FASTRUN static void BuildFrozenBackdrop(void){
+    tft.writeTo(L2);
+    tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH + PaneSpectrum.x0,
+                 SPECTRUM_HEIGHT - 20, RA8875_BLACK);
+    tft.drawRect(PaneSpectrum.x0-2, PaneSpectrum.y0, MAX_WATERFALL_WIDTH+5, SPECTRUM_HEIGHT, RA8875_YELLOW);
+    for (int16_t x = 1; x < MAX_WATERFALL_WIDTH; x++)
+        tft.drawLine(SPECTRUM_LEFT_X + x, pixelold[x-1], SPECTRUM_LEFT_X + x, pixelold[x], RA8875_YELLOW);
+    tft.writeTo(L1);
+}
+
+/**
+ * Redraw the tuning bar over the *frozen* spectrum trace at the current Fine Tune
+ * position (FASTRUN - executes from RAM).
+ *
+ * Used while the Fine Tune knob is being spun fast: the center stays fixed, so the
+ * trace is held still (paused) and only the blue filter bar + cyan marker move to
+ * track where the operator is tuning. The first call builds a clean bar-less backdrop
+ * on L2; each call then hardware-blits that backdrop to L1 (erasing the previous bar)
+ * and stamps the bar at the current frequency on top. The waterfall is left frozen.
+ */
+FASTRUN void RedrawFrozenSpectrumWithBar(void){
+    if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) return;
+
+    if (!fineFreezeBackdropReady){
+        BuildFrozenBackdrop();
+        fineFreezeBackdropReady = true;
+    }
+
+    // Restore the clean trace under the previous bar in one hardware BTE blit (L2->L1).
+    tft.BTE_move(SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20,
+                 MAX_WATERFALL_WIDTH, SPECTRUM_HEIGHT - 20,
+                 SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20, 2, 1);
+    while (tft.readStatus()) ;
+
+    // Stamp the bar at the new tuned frequency directly on the visible layer.
+    tft.writeTo(L1);
+    StampTuningBar();
+}
+#endif
+
 // State tracking for spectrum pane updates
 static uint32_t oz = 8;
 static int64_t ocf = 0;
@@ -789,6 +849,34 @@ static ModulationType omd = IQ;
  * Render the RF spectrum display pane with waterfall.
  */
 void DrawSpectrumPane(void) {
+#ifdef MUTE_ON_RAPID_TUNE
+    // While the Center Tune knob is being spun fast, freeze the spectrum/waterfall:
+    // the trace and overlay would otherwise re-center and clear on nearly every loop,
+    // producing a jerky, half-drawn sweep. Mark the pane stale so it gets one clean
+    // repaint once tuning stops, and leave the last frozen trace on screen until then.
+    if (IsRapidCenterTuning()){
+        PaneSpectrum.stale = true;
+        fineFreezeBackdropReady = false;   // any held fine-tune backdrop is now stale
+        tft.writeTo(L1);
+        return;
+    }
+    // While the Fine Tune knob is being spun fast, the center stays put, so hold the
+    // trace frozen (no re-sweep) and only move the blue tuning bar/marker so the
+    // operator can see where they are tuning. Redraw on every frequency change (not on
+    // the 50 ms refresh timer) - each update is a cheap hardware blit + bar stamp, so
+    // the bar tracks the knob with no perceptible lag.
+    if (IsRapidFineTuning()){
+        PaneSpectrum.stale = true;   // force a clean overlay repaint once tuning stops
+        int64_t f = GetTXRXFreq(ED.activeVFO);
+        if (!fineFreezeBackdropReady || f != fineFreezeLastFreq){
+            RedrawFrozenSpectrumWithBar();
+            fineFreezeLastFreq = f;
+        }
+        tft.writeTo(L1);
+        return;
+    }
+    fineFreezeBackdropReady = false;   // not fine-tuning: drop any held backdrop
+#endif
     if ((oz != ED.spectrum_zoom) ||
         (ocf != ED.centerFreq_Hz[ED.activeVFO]) ||
         (oft != ED.fineTuneFreq_Hz[ED.activeVFO]) ||

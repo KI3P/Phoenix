@@ -6,7 +6,7 @@ created: 2026-06-09
 updated: 2026-06-09
 tags: [spectrum, waterfall, display, refresh-rate, nchunks, real-time, performance]
 source_refs: []
-related: ["[[real-time-constraints]]", "[[zoom-fft]]", "[[display-subsystem]]", "[[dsp-chain]]", "[[main-loop]]"]
+related: ["[[real-time-constraints]]", "[[zoom-fft]]", "[[display-subsystem]]", "[[dsp-chain]]", "[[main-loop]]", "[[rapid-tune-mute-freeze]]"]
 ---
 
 # Spectrum Refresh Rate Floor & Optimization

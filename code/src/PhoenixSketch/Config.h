@@ -43,6 +43,15 @@ If not, see <https://www.gnu.org/licenses/>.
 #define ENCODER_FACTOR 0.25F    // use 0.25f with cheap encoders that have 4 detents per step,
                                 // for other encoders or libs we use 1.0f
 
+// When the Center Tune or Fine Tune encoders are spun rapidly, the VFO is
+// reprogrammed every loop, which produces audible glitches and a jerky spectrum
+// sweep. Enabling MUTE_ON_RAPID_TUNE hides those artifacts: while rapid tuning is
+// detected the output audio is muted and the spectrum/waterfall redraw is paused,
+// both resuming automatically once tuning stops. Comment out to disable.
+#define MUTE_ON_RAPID_TUNE
+#define RAPID_TUNE_ENGAGE_MS   60   // gap (ms) below this between tune events = "spinning"
+#define RAPID_TUNE_RELEASE_MS  180  // no tune event for this long (ms) = "done spinning"
+
 // Direct coupled transmit
 //#define DIRECT_COUPLED_TX
 

@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-06-08
 tags: [display, ra8875, ui, spectrum, waterfall, menus, panes, stale-flags]
 source_refs: []
-related: ["[[overview]]", "[[ui-state-machine]]", "[[dsp-chain]]", "[[zoom-fft]]", "[[hardware-state-machine]]", "[[persistent-config]]"]
+related: ["[[overview]]", "[[ui-state-machine]]", "[[dsp-chain]]", "[[zoom-fft]]", "[[hardware-state-machine]]", "[[persistent-config]]", "[[spectrum-refresh-floor]]", "[[rapid-tune-mute-freeze]]"]
 ---
 
 # Display Subsystem (RA8875)
@@ -75,7 +75,11 @@ The main spectrum pane is fed by the **zoom FFT** display path ([[zoom-fft]], `p
 columns); the audio-spectrum pane by the channel-filter FFT in [[dsp-chain]] (`audioYPixel`).
 Refresh period is `≈ NCHUNKS × T_loop` — see [[spectrum-refresh-floor]] (governed by `NCHUNKS`
 and per-frame draw cost, not `SPECTRUM_REFRESH_MS`; shipped at 18.8 fps) and
-[[real-time-constraints]].
+[[real-time-constraints]]. `DrawBandWidthIndicatorBar()` draws the blue filter-bandwidth bar +
+cyan tuned-frequency marker over the trace; the bar-stamping math is factored into
+`StampTuningBar()` so it can be reused. While a tune encoder is spun fast,
+[[rapid-tune-mute-freeze]] hijacks `DrawSpectrumPane()` to freeze the sweep (and, for Fine Tune,
+keep only the bar moving via a cheap L2→L1 blit of a held bar-less backdrop).
 
 ## Parameter editing & menus
 - **`VariableParameter`** (`MainBoard_Display.h:103`) — a type-safe editor (union over i8/i16/

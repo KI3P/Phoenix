@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-06-16
 ---
 
-<!-- updated 2026-06-16: 43 content pages (firmware 21, theory 12, hardware 4, roadmap 6) + 1 source (7 schematics); split board *electronics* out of the firmware module pages into hardware/rf-board-electronics + hardware/filter-board-electronics (firmware/ rf-board & filter-boards now describe the code/API, hardware/ owns chips/pinouts/decode chains). Earlier (06-15): lint clean; fixed stale 3×AD8307→2×, phantom 2nd SGTL5000, deci→centi-Hz; added firmware/audio-io. -->
+<!-- updated 2026-06-16: 44 content pages (firmware 22, theory 12, hardware 4, roadmap 6) + 1 source (7 schematics); added firmware/rapid-tune-mute-freeze (encoder-i2c-speed: mute audio + freeze spectrum / move only the tuning bar during fast tuning), cross-linked from front-panel/tune-frequency-control/display-subsystem/main-loop/spectrum-refresh-floor. Earlier: split board *electronics* into hardware/rf-board-electronics + hardware/filter-board-electronics; lint clean; deci→centi-Hz; added firmware/audio-io. -->
 
 
 # Phoenix Wiki — Index
@@ -24,6 +24,7 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[state-machine-architecture]] — how the StateSmith-generated SM layer works.
 - [[real-time-constraints]] — the ~10 ms loop budget and timing rules.
 - [[spectrum-refresh-floor]] — why refresh ≈ NCHUNKS×T_loop; the 11.7→18.8 fps optimization. *(draft)*
+- [[rapid-tune-mute-freeze]] — `MUTE_ON_RAPID_TUNE`: mute audio + freeze spectrum on fast tuning; Fine Tune keeps only the blue bar moving. *(draft)*
 - [[code-heritage]] — lineage from DD4WH Teensy Convolution SDR; contributor list; GPLv3.
 
 **State machines**

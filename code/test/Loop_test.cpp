@@ -2155,3 +2155,67 @@ TEST(Loop, TimeSyncNoDataLeavesClockUntouched) {
     CheckForSerialTimeSync();
     EXPECT_FALSE(Teensy3Clock.wasSet);
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Rapid-tuning detection (MUTE_ON_RAPID_TUNE)
+///////////////////////////////////////////////////////////////////////////////
+#ifdef MUTE_ON_RAPID_TUNE
+// Drop out of the rapid-tuning latch into a known idle baseline. Jumping the
+// mock clock past the release window and querying clears the static latch.
+static void ResetRapidTune(void){
+    AddMillisTime(RAPID_TUNE_RELEASE_MS + 50);
+    (void)IsRapidTuning();
+}
+
+TEST(Loop, RapidTuningEngagesOnFastEvents){
+    ResetRapidTune();
+    NoteTuneActivity(false);     // baseline event (large gap, no latch)
+    NoteTuneActivity(false);     // immediate follow-up: gap < engage threshold
+    EXPECT_TRUE(IsRapidTuning());
+}
+
+TEST(Loop, RapidTuningReleasesAfterIdle){
+    ResetRapidTune();
+    NoteTuneActivity(false);
+    NoteTuneActivity(false);
+    EXPECT_TRUE(IsRapidTuning());
+    AddMillisTime(RAPID_TUNE_RELEASE_MS + 20);
+    EXPECT_FALSE(IsRapidTuning());
+}
+
+TEST(Loop, SlowTuningDoesNotEngage){
+    ResetRapidTune();
+    NoteTuneActivity(false);
+    AddMillisTime(RAPID_TUNE_ENGAGE_MS + 20);  // gap above engage threshold
+    NoteTuneActivity(false);
+    EXPECT_FALSE(IsRapidTuning());
+}
+
+TEST(Loop, RapidCenterTuningFreezesWholeSpectrum){
+    ResetRapidTune();
+    NoteTuneActivity(false);     // Center Tune
+    NoteTuneActivity(false);
+    EXPECT_TRUE(IsRapidTuning());
+    EXPECT_TRUE(IsRapidCenterTuning());   // center tune -> whole trace + waterfall frozen
+    EXPECT_FALSE(IsRapidFineTuning());
+}
+
+TEST(Loop, RapidFineTuningTracksBarOnly){
+    ResetRapidTune();
+    NoteTuneActivity(true);      // Fine Tune
+    NoteTuneActivity(true);
+    EXPECT_TRUE(IsRapidTuning());         // still mutes audio
+    EXPECT_FALSE(IsRapidCenterTuning());  // trace held frozen...
+    EXPECT_TRUE(IsRapidFineTuning());     // ...but the blue tuning bar keeps tracking
+}
+
+TEST(Loop, TuneSourceUpdatesWhenSwitchingEncoders){
+    ResetRapidTune();
+    NoteTuneActivity(false);     // start on Center Tune
+    NoteTuneActivity(false);
+    EXPECT_TRUE(IsRapidCenterTuning());
+    NoteTuneActivity(true);      // switch to Fine Tune mid-spin
+    EXPECT_TRUE(IsRapidFineTuning());
+    EXPECT_FALSE(IsRapidCenterTuning());
+}
+#endif // MUTE_ON_RAPID_TUNE

@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-06-08
 tags: [front-panel, encoders, buttons, leds, mcp23017, i2c, interrupts, real-time, rotary]
 source_refs: []
-related: ["[[overview]]", "[[main-loop]]", "[[ui-state-machine]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[real-time-constraints]]", "[[hardware-platform]]", "[[i2c-bus-map]]"]
+related: ["[[overview]]", "[[main-loop]]", "[[ui-state-machine]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[real-time-constraints]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[rapid-tune-mute-freeze]]"]
 ---
 
 # Front Panel (encoders, buttons, LEDs)
@@ -83,6 +83,10 @@ encoder handling…"*): tuning latency/step-loss is now bounded by the 1 ms tick
 main-loop budget, while audio integrity is preserved by the priority ordering. Relates to
 [[real-time-constraints]] and the [[spectrum-refresh-floor]] finding (both about not coupling
 responsiveness to the slow display path).
+
+The flip side: encoders are now responsive enough that a *fast* spin enqueues a tune event on
+nearly every loop, which surfaced audio glitches and a jerky spectrum sweep. The optional
+[[rapid-tune-mute-freeze]] feature detects that condition and masks both.
 
 ## Open questions
 - Per-button id → physical-label map (0–21 across the two expanders).
