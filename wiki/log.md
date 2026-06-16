@@ -666,3 +666,22 @@ Owner: the `_dHz`→`_cHz` rename is real but **not on `encoder-i2c-speed`** (un
 branch). Resolution: **keep the wiki at `_cHz`** and add a branch-caveat note to rf-board.md
 "Frequency units" and the documentation-todos entry, flagging that this working tree still shows
 `_dHz` and the pages will reconcile once the rename merges. Lint contradiction closed.
+
+## [2026-06-16] lint | full wiki health-check (post dHz→cHz merge)
+Triggered after the `_dHz`→`_cHz` rename (`65e6bba`) and the doc-fix commit (`c95f932`) were
+rebased/merged onto `encoder-i2c-speed`. **Structural:** 44 content pages — no orphans, no broken
+inter-page links (only the schema-example `[[page-name]]`/`[[other-page]]` in CLAUDE.md and
+historical `[[tune-state-machine]]`/`[[roadmap]]`/`[[theory]]` mentions inside log.md prose, all
+expected/immutable). Frontmatter complete on every content page.
+**Contradiction RESOLVED (was open from the two 2026-06-16 entries above):** source now shows
+**0 `_dHz` / 46 `_cHz`** in `code/src/PhoenixSketch/`, so the rename the wiki described has
+landed on this branch. Reconciled the three caveat-bearing pages:
+- rf-board.md "Frequency units" — dropped the "not yet present on encoder-i2c-speed" branch note;
+  now states source & wiki agree.
+- tune-frequency-control.md — renamed `GetTXRXFreq_dHz`/`GetCWTXFreq_dHz` → `_cHz` (4 refs) and
+  rewrote the "historical misnomer" prose to past tense.
+- documentation-todos.md — "VFO frequency unit" item marked reconciled; "Stale source comments"
+  blockquote updated from "not yet committed" → committed & merged (`c95f932`).
+`updated:` bumped to 2026-06-16 on all three. No remaining stale `_dHz` identifier claims.
+**Suggested next:** promote the now-verified firmware pages from `draft`→`stable` (most are
+draft); consider a dedicated power-calibration theory page (flagged in tune-frequency-control).

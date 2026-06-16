@@ -3,7 +3,7 @@ title: Frequency Control & Tuning Math (Tune.cpp)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-06-08
+updated: 2026-06-16
 tags: [tuning, vfo, frequency, fs-over-4, cw-offset, fast-tune, power-calibration]
 source_refs: []
 related: ["[[overview]]", "[[hardware-state-machine]]", "[[rf-board]]", "[[mode-state-machine]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]"]
@@ -54,14 +54,15 @@ digital mix — multiplies are just ±1, ±j.)
 | Function | Returns | Notes |
 |---|---|---|
 | `GetTXRXFreq(vfo)` | Hz | `centerFreq − fineTune − Fs/4` for a VFO (`Tune.cpp:121`) |
-| `GetTXRXFreq_dHz()` | **centi-Hz** (×100) | same, active VFO, in Si5351 resolution units (`Tune.cpp:110`) |
-| `GetCWTXFreq_dHz()` | centi-Hz | TXRX ± CW tone offset; **LSB subtracts, USB adds** (`Tune.cpp:132`) |
+| `GetTXRXFreq_cHz()` | **centi-Hz** (×100) | same, active VFO, in Si5351 resolution units (`Tune.cpp:110`) |
+| `GetCWTXFreq_cHz()` | centi-Hz | TXRX ± CW tone offset; **LSB subtracts, USB adds** (`Tune.cpp:132`) |
 | `ResetTuning()` | — | fold `fineTune` into `centerFreq`, zero `fineTune` (recenter, same freq) (`Tune.cpp:146`) |
 | `GetBand(freq)` | band idx or −1 | linear search of `bands[]` (`Tune.cpp:159`) |
 
-Frequencies are carried in **centi-Hz (Hz×100)** internally for Si5351 tuning resolution. (The
-`_dHz` suffix and the source docstrings say "deci-Hz", but ×100 is **centi**-Hz — a historical
-misnomer; see [[rf-board]] and [[documentation-todos]].)
+Frequencies are carried in **centi-Hz (Hz×100)** internally for Si5351 tuning resolution. The
+`_cHz` suffix and source docstrings now name this correctly; an earlier `_dHz`/"deci-Hz" naming
+was a misnomer (×100 is **centi**-Hz) and was renamed across the source on 2026-06-16. See
+[[rf-board]] and [[documentation-todos]].
 
 ## Fine-tune control & limits — `AdjustFineTune()` (`Tune.cpp:37`)
 
@@ -84,10 +85,10 @@ The actual "which formula → which VFO register" dispatch is `HandleTuneState()
 (`HardwareSm.cpp:639`), which also selects LPF/BPF band, antenna, PA, and refreshes the FIR
 mask before programming the VFO. Highlights:
 - `TuneReceive` → RX VFO = `centerFreq` (fine tune done in DSP).
-- `TuneSSBTX` → TX VFO = `GetTXRXFreq_dHz()`; on dual-VFO radios the RX VFO is set to
+- `TuneSSBTX` → TX VFO = `GetTXRXFreq_cHz()`; on dual-VFO radios the RX VFO is set to
   **freq/3** to watch the 3rd harmonic for the TX spectrum display (fundamental too strong)
   (`HardwareSm.cpp:662-666`).
-- `TuneCWTX` → CW VFO = `GetCWTXFreq_dHz()` (tone offset applied).
+- `TuneCWTX` → CW VFO = `GetCWTXFreq_cHz()` (tone offset applied).
 - `TuneCalReceiveIQ` / `TuneCalTransmitIQ` → calibration-specific VFO placement (TX-IQ offsets
   the TX VFO from RX so the image sits far from DC). See [[hardware-state-machine]],
   [[iq-imbalance-correction]].

@@ -3,7 +3,7 @@ title: RF Board & Si5351 Quadrature VFO (RFBoard)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-06-08
+updated: 2026-06-16
 tags: [rf, si5351, vfo, quadrature, attenuator, tr-switch, hardware-abstraction]
 source_refs: [sources/t41-ep-schematics]
 related: ["[[overview]]", "[[rf-board-electronics]]", "[[tune-frequency-control]]", "[[hardware-state-machine]]", "[[filter-boards]]", "[[ssb-phasing-method]]", "[[iq-quadrature-sampling]]", "[[iq-imbalance-correction]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]"]
@@ -68,12 +68,8 @@ The VFO frequency is carried in **Hz × 100 (centi-Hz, 0.01 Hz resolution)**:
 (`RFBoard.cpp:481`), matching the Etherkit `SI5351_FREQ_MULT = 100` and `HandleTuneState`'s
 `centerFreq*100`. The `_cHz` suffix names this correctly — these are centi-Hz. (Earlier code
 used a `_dHz`/"decihertz" naming, which was a misnomer; all uses have since been renamed to
-`cHz`.)
-
-> Branch note (2026-06-16): the `_dHz`→`_cHz` symbol rename is **not yet present on
-> `encoder-i2c-speed`** — that working tree still shows `_dHz` identifiers (docstrings already
-> flag the misnomer). This page reflects the intended/renamed state; expect it to match once the
-> rename branch merges.
+`cHz`.) The rename merged onto `encoder-i2c-speed` on 2026-06-16, so source and wiki now
+agree (0 `_dHz` / 46 `_cHz` occurrences in `code/src/PhoenixSketch/`).
 
 `SetFrequencyCorrectionFactor()` applies the crystal ppb correction (from frequency
 calibration, [[hardware-state-machine]]) via the Si5351 `set_correction`.

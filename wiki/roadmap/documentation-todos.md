@@ -3,7 +3,7 @@ title: Documentation TODOs & Open Questions
 type: roadmap
 status: draft
 created: 2026-06-08
-updated: 2026-06-14
+updated: 2026-06-16
 tags: [todo, open-questions, discrepancies, wiki-maintenance]
 source_refs: []
 related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]"]
@@ -98,14 +98,15 @@ is tagged **⚠ possible bug** so it stands out.
   / `Tune.h` docstrings were corrected to centi-Hz (Hz × 100) on 2026-06-14; then the owner
   completed the cross-file rename of every `_dHz` *symbol* (`GetTXRXFreq_dHz`, `frequency_dHz`,
   etc.) to `_cHz`, eliminating the historical "decihertz" misnomer entirely. Wiki updated to
-  match. *Branch caveat (2026-06-16 lint):* the rename is **not yet on `encoder-i2c-speed`** —
-  that working tree still carries `_dHz` identifiers (docstrings already note the misnomer); the
-  wiki reflects the post-rename state and will line up when that branch merges.
+  match. *Reconciled (2026-06-16):* the rename has now merged onto `encoder-i2c-speed` (0 `_dHz`
+  / 46 `_cHz` in `code/src/PhoenixSketch/`), so source and wiki agree — the earlier branch caveat
+  is closed.
   → [[rf-board]], [[tune-frequency-control]]
 
 ### Stale source comments
-> **All items below FIXED IN SOURCE (2026-06-14)** — comment-only edits on branch
-> `encoder-i2c-speed`, not yet committed. The wiki was already correct.
+> **All items below FIXED IN SOURCE (2026-06-14)** — comment-only edits now **committed and
+> merged** onto `encoder-i2c-speed` (commit `c95f932` "Unit and documentation fixes", 2026-06-16).
+> The wiki was already correct.
 - ~~**CAT protocol: TS-480 vs TS-2000.**~~ — Fixed `CAT.h:25` "TS-2000" → "TS-480" (now
   consistent with `CAT.cpp` and `code/docs/ts_480_pc.pdf`; ID020 = TS-480). → [[cat-control]]
 - ~~**"EEPROM" is actually LittleFS+SD JSON.**~~ — Fixed the `.ino` header ("Load settings
