@@ -29,7 +29,7 @@ This is the **Phoenix SDR (Software Defined Radio)** project - firmware for a Te
 - **ModeSm.cpp/h**: Radio mode state machine (generated code)
 - **UISm.cpp/h**: User interface state machine (generated code)
 - **RFBoard.cpp/h**: RF hardware control and VFO management
-- **Tune.cpp/h**: Frequency tuning and VFO control with state machine
+- **Tune.cpp/h**: Frequency tuning math and VFO control (pure functions; the tune *state* lives in HardwareSm.cpp)
 - **DSP*.cpp/h**: Digital signal processing modules
 - **CAT.cpp/h**: Computer control interface
 - **FrontPanel*.cpp/h**: Physical front panel interface
@@ -71,11 +71,15 @@ The project uses **StateSmith**-generated state machines for hardware control:
 - State transitions are event-driven and deterministic
 - All hardware state changes go through the state machines
 
-### Frequency Control State Machine
-The `Tune.cpp` module implements a frequency control state machine with three states:
+### Frequency Control State
+The frequency-control state machine lives in `HardwareSm.cpp` (`HandleTuneState`), not in
+`Tune.cpp`. Its `TuneState` enum has three normal states (plus calibration variants):
 - **TuneReceive**: Sets SSB VFO for RX operation
 - **TuneSSBTX**: Sets SSB VFO for TX operation  
 - **TuneCWTX**: Sets CW VFO with tone offset for TX operation
+
+`Tune.cpp` itself is a pure-function library (frequency math + power-curve fitting), not a
+state machine.
 
 ### Real-time Constraints
 - Main loop must complete within 10ms to avoid audio buffer overflows
@@ -101,7 +105,7 @@ The `Tune.cpp` module implements a frequency control state machine with three st
 - **Adding new DSP functions**: Follow patterns in `DSP_*.cpp` files
 - **Modifying state machines**: Update `.drawio` diagrams and regenerate with StateSmith
 - **New hardware interfaces**: Create a `.cpp` and a `.h` file to hold hardware-specific code (look at `RFBoard.cpp` for an example) with corresponding tests
-- **Frequency/tuning changes**: Work with the tune state machine in `Tune.cpp`
+- **Frequency/tuning changes**: Work with the tune state machine (`HandleTuneState`) in `HardwareSm.cpp`; the frequency math helpers are in `Tune.cpp`
 
 ### Build Commands
 ```bash
@@ -149,3 +153,7 @@ ctest -V
 - **Interface**: MCP23017 I2C GPIO expanders for front panel
 
 This is a sophisticated embedded project combining real-time signal processing, state machine control, and comprehensive testing in the amateur radio domain.
+
+## Knowledge Wiki
+
+The `wiki/` directory is an LLM-maintained knowledge base (firmware / theory / roadmap) following the "LLM Wiki" pattern. When ingesting sources, answering knowledge questions, or recording design decisions, work under `wiki/` and follow its schema in `wiki/CLAUDE.md`. The wiki is a reference and planning surface that is distinct from the codebase itself.

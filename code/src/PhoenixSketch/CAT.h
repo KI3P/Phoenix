@@ -22,7 +22,7 @@ If not, see <https://www.gnu.org/licenses/>.
 
 /**
  * @brief Poll and process CAT (Computer Aided Transceiver) serial commands
- * @note Called from main loop to handle Kenwood TS-2000 protocol commands
+ * @note Called from main loop to handle Kenwood TS-480 protocol commands
  * @note Reads from SerialUSB1, buffers until semicolon terminator, parses and executes
  * @note Supports frequency control, mode changes, power settings, and debugging commands
  * @note Requires Tools->USB Type set to Dual Serial in Arduino IDE

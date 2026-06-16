@@ -20,7 +20,7 @@ If not, see <https://www.gnu.org/licenses/>.
 
 /**
  * @brief Get effective TX/RX frequency for active VFO
- * @return Effective TX/RX frequency in deci-Hertz (Hz × 100)
+ * @return Effective TX/RX frequency in centi-Hz (Hz × 100)
  * @note Combines center frequency, fine tune offset, and sample rate quarter-shift
  * @note Formula: (centerFreq - fineTune - sampleRate/4) × 100
  */
@@ -37,7 +37,7 @@ int64_t GetTXRXFreq(uint8_t vfo);
 
 /**
  * @brief Get CW transmit frequency with tone offset applied
- * @return CW transmit frequency in deci-Hertz (Hz × 100)
+ * @return CW transmit frequency in centi-Hz (Hz × 100)
  * @note Adds/subtracts CW tone offset from TX/RX frequency
  * @note Offset direction depends on sideband (LSB subtracts, USB adds)
  */

@@ -672,7 +672,7 @@ void RestoreDataFromSDCard(void){
 
     ED.PowerCal_20W_to_100W_threshold_W = doc["PowerCal_20W_to_100W_threshold_W"] | ED.PowerCal_20W_to_100W_threshold_W;
 
-    // Save the data to the EEPROM so that it matches
+    // Save the data to flash/SD storage so that it matches
     SaveDataToStorage(false);
     Serial.println("Config data restored successfully");
 }
