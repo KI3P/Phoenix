@@ -7,6 +7,8 @@
  */
 
 #include "SDT.h"
+#include "Ft8UsbBridge.h"
+
 
 struct config_t ED;
 bool psdupdated = false;
@@ -497,6 +499,10 @@ void setup(void){
 #endif
 
     Serial.println("T41 SDT Setup");
+
+    Ft8UsbBridge_Init(192000.0f);
+    Serial.println("After Ft8UsbBridge init/enable:");
+    //Ft8UsbBridge_PrintStats(Serial);
 
     // get TIME from real time clock with 3V backup battery
     setSyncProvider(getTeensy3Time);

@@ -87,7 +87,7 @@
 #include "SDT.h"
 #include "MainBoard_AudioIO.h"
 #include "FrontPanel.h"
-
+#include "Ft8UsbBridge.h"
 
 // FIFO buffer for interrupt events
 #define INTERRUPT_BUFFER_SIZE 16
@@ -1453,7 +1453,8 @@ FASTRUN void loop(void){
     CheckForFrontPanelInterrupts();
     CheckForCATSerialEvents();
     ConsumeInterrupt();
-    
+
+   
     // Step 2: Perform signal processing
     PerformSignalProcessing();
 

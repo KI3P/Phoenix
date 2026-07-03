@@ -727,21 +727,35 @@ void PlayBuffer(DataBlock *data){
 
 #ifdef T41_USB_AUDIO
 static float32_t usbTmp[BUFFER_SIZE];
-static float32_t g_usbRxGain = 1.5f;   //      GAIN SET FOR WJST, DEFAULT IS 2
+static float usbPhase = 0.0f;
 
 void PlayUsbBufferPreVol(DataBlock *data){
-    for (unsigned i = 0; i < N_BLOCKS; i++) {
+    (void)data;  // unused for this test
+
+    static uint32_t usbCallCount = 0;
+    static elapsedMillis usbCallTimer = 0;
+
+    usbCallCount++;
+    if (usbCallTimer > 1000) {
+        usbCallTimer = 0;
+        Serial.print("PlayUsbBufferPreVol calls/sec = ");
+        Serial.println(usbCallCount);
+        usbCallCount = 0;
+    }
+
+
+    const float usbFs = 44100.0f;
+    const float f0 = 1000.0f;
+    const float dphi = 2.0f * PI * f0 / usbFs;
+
+    for (unsigned i = 0; i < 1; i++) {
         int16_t *pL = Q_usbOut_L.getBuffer();
         int16_t *pR = Q_usbOut_R.getBuffer();
 
-        // Copy one block then apply gain
-        arm_copy_f32(&data->I[BUFFER_SIZE * i], usbTmp, BUFFER_SIZE);
-        arm_scale_f32(usbTmp, g_usbRxGain, usbTmp, BUFFER_SIZE);
-
-        // Optional: clip to [-1, +1] to avoid wrap distortion
         for (size_t k = 0; k < BUFFER_SIZE; k++) {
-            if (usbTmp[k] > 1.0f) usbTmp[k] = 1.0f;
-            else if (usbTmp[k] < -1.0f) usbTmp[k] = -1.0f;
+            usbTmp[k] = 0.2f * sinf(usbPhase);
+            usbPhase += dphi;
+            if (usbPhase >= 2.0f * PI) usbPhase -= 2.0f * PI;
         }
 
         arm_float_to_q15(usbTmp, pL, BUFFER_SIZE);
@@ -960,15 +974,12 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Interpolate
     InterpolateReceiveData(&data, &RXfilters);
-
     #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
-        // Send audio to PC *before* volume knob affects it
-        PlayUsbBufferPreVol(&data);
+        Ft8UsbBridge_PutRxSamples(data.I, data.N);
     #endif
 
     // Speaker path volume knob
     AdjustVolume(&data, &RXfilters);
-
     SaveData(&data, 6); // used by the unit tests
 
     // Always feed the speaker output (works in both builds)
@@ -1004,30 +1015,25 @@ float32_t GetMicRRMS(void){
  * @param data The data block to put the samples in
  * @return ESUCCESS if samples were read, EFAIL if insufficient samples are available
  */ 
+
 errno_t ReadMicrophoneBuffer(DataBlock *data)
 {
     if (!data) return EFAIL;
 
 #ifdef T41_USB_AUDIO
-if (GetFt8Mode()) {
-    const uint32_t outCount = N_BLOCKS_EX * BUFFER_SIZE;
-
-    bool ok = Ft8UsbBridge_GetSamples(data->I, outCount);
-    if (!ok) {
-        memset(data->I, 0, outCount * sizeof(float32_t));
+    if (GetFt8Mode()) {
+        const uint32_t outCount = N_BLOCKS_EX * BUFFER_SIZE;
+        bool ok = Ft8UsbBridge_GetSamples(data->I, outCount);
+        if (!ok) {
+            memset(data->I, 0, outCount * sizeof(float32_t));
+        }
+        for (uint32_t i = 0; i < outCount; i++) {
+            data->Q[i] = data->I[i];
+        }
+        data->N = outCount;
+        data->sampleRate_Hz = SR[SampleRate].rate;
+        return ESUCCESS;
     }
-
-    // Dual-mono + attenuation (prevents harshness/clipping/pulsing)
-    for (uint32_t i = 0; i < outCount; i++) {
-        float s = data->I[i] * 0.20f;  // try 0.10–0.30
-        data->I[i] = s;
-        data->Q[i] = s;
-    }
-
-    data->N = outCount;
-    data->sampleRate_Hz = SR[SampleRate].rate;
-    return ESUCCESS;
-}
 #endif
 
     // ----- existing microphone code continues below -----

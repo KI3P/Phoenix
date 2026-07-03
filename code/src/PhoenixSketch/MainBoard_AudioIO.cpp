@@ -126,8 +126,8 @@ AudioOutputI2SQuad       i2s_quadOut;    //xy=1969.75,138
 #ifdef T41_USB_AUDIO
 AudioPlayQueue Q_usbOut_L;
 AudioPlayQueue Q_usbOut_R;
-AudioOutputUSB usbOut;
-// stereo gain blocks for the PC feed
+// usbOut removed from audio graph — tx_event owns USB transmit directly
+// AudioOutputUSB usbOut;
 AudioAmplifier usbRxGainL;
 AudioAmplifier usbRxGainR;
 #endif
@@ -156,13 +156,13 @@ AudioConnection          patchCord21(modeSelectOutExR, 0, i2s_quadOut, 1);
 AudioConnection          patchCord22(modeSelectOutR,   0, i2s_quadOut, 3);
 
 #ifdef T41_USB_AUDIO
-AudioConnection patchUsbGainL(Q_usbOut_L, 0, usbRxGainL, 0);
-AudioConnection patchUsbGainR(Q_usbOut_R, 0, usbRxGainR, 0);
-
-AudioConnection patchUsbL(usbRxGainL, 0, usbOut, 0);
-AudioConnection patchUsbR(usbRxGainR, 0, usbOut, 1);
+// Q_usbOut_L/R disconnected — Ft8UsbBridge_DrainToUSB() sends directly
+// AudioConnection patchUsbGainL(Q_usbOut_L, 0, usbRxGainL, 0);
+// AudioConnection patchUsbGainR(Q_usbOut_R, 0, usbRxGainR, 0);
+// AudioConnection patchUsbL(usbRxGainL, 0, usbOut, 0);
+// AudioConnection patchUsbR(usbRxGainR, 0, usbOut, 1);
+// USB audio input (from WSJT-X) connected to channel 2 of TX input mixer
 #endif
-
 
 AudioControlSGTL5000     pcm5102_mainBoard; //xy=874.75,449
 // GUItool: end automatically generated code
@@ -358,6 +358,7 @@ if (modeSM.state_id == previousAudioIOState){
         case (ModeSm_StateId_CALIBRATE_RX_IQ):
         case (ModeSm_StateId_CW_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
+            Ft8UsbBridge_SetTxActive(false);
             // Microphone input stops
             Q_in_L_Ex.end();
             Q_in_R_Ex.end();
@@ -380,17 +381,17 @@ if (modeSM.state_id == previousAudioIOState){
             break;
         }
         case (ModeSm_StateId_SSB_TRANSMIT):{
+            Ft8UsbBridge_SetTxActive(true);
             // IQ from receive continues
             Q_in_L.begin(); 
             Q_in_R.begin();
             // Microphone input starts
         #ifdef T41_USB_AUDIO
             if (GetFt8Mode()) {
-                // FT8 TX uses Ft8UsbBridge (not the mic record queues)
+                // FT8 TX audio comes from g_usbQueueL/R in Ft8UsbBridge.cpp directly
                 Q_in_L_Ex.end();
                 Q_in_R_Ex.end();
             } else {
-                // Normal voice SSB TX uses microphone queues
                 Q_in_L_Ex.begin();
                 Q_in_R_Ex.begin();
             }
@@ -547,12 +548,13 @@ void InitializeAudio(void){
     AudioMemory(500);
     AudioMemory_F32(10);
 
-
-    #ifdef T41_USB_AUDIO
+#ifdef T41_USB_AUDIO
     Ft8UsbBridge_Init((float)SR[SampleRate].rate);
-    usbRxGainL.gain(2.0f);   // try 1.0 to 6.0          FOR FT8 GAIN TO WINDOWS
-    usbRxGainR.gain(2.0f);
+    usbRxGainL.gain(0.1f);
+    usbRxGainR.gain(0.1f);
     SetFt8Mode(false);
+    static IntervalTimer usbAudioTimer;
+    usbAudioTimer.begin([]() { Ft8UsbBridge_DrainToUSB(); }, 2902);
     #endif
 
     sgtl5000_teensy.inputSelect(AUDIO_INPUT_MIC); // set mic pre-amp gain to 40dB & audio gain to 12dB

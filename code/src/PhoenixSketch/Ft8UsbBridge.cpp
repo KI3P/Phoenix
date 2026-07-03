@@ -13,6 +13,7 @@
 #include <string.h>
 #include "Ft8UsbBridge.h"
 #include "Config.h"
+static volatile bool g_ft8TxActive = false;
 
 #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
 
@@ -221,6 +222,80 @@ bool Ft8UsbBridge_GetSamples(float *out, uint32_t outCount)
 
     g_blocksSinceInit++;
     return true;
+}
+
+// ─────────────────────────────────────────────────────────────
+// RX PATH: 192kHz DSP audio → resample → FIFO → USB to PC
+// ─────────────────────────────────────────────────────────────
+static const uint32_t RX_FIFO_SIZE = 16384;
+DMAMEM static float g_rxFifo[RX_FIFO_SIZE];
+static volatile uint32_t g_rxWriteIdx = 0;
+static volatile uint32_t g_rxReadIdx  = 0;
+
+static inline uint32_t RxNextIdx(uint32_t i) { return (i + 1u) % RX_FIFO_SIZE; }
+
+static inline bool RxFifoPush(float x) {
+    uint32_t next = RxNextIdx(g_rxWriteIdx);
+    if (next == g_rxReadIdx) return false;
+    g_rxFifo[g_rxWriteIdx] = x;
+    g_rxWriteIdx = next;
+    return true;
+}
+
+static inline bool RxFifoPop(float *x) {
+    if (g_rxReadIdx == g_rxWriteIdx) return false;
+    *x = g_rxFifo[g_rxReadIdx];
+    g_rxReadIdx = RxNextIdx(g_rxReadIdx);
+    return true;
+}
+
+static inline uint32_t RxFifoCount(void) {
+    if (g_rxWriteIdx >= g_rxReadIdx) return g_rxWriteIdx - g_rxReadIdx;
+    return RX_FIFO_SIZE - g_rxReadIdx + g_rxWriteIdx;
+}
+
+void Ft8UsbBridge_PutRxSamples(const float *in, uint32_t count)
+{
+    if (!in || count < 2) return;
+    static float srcPos = 0.0f;
+    const float step = 192000.0f / 44100.0f;
+    while (srcPos < (float)(count - 1)) {
+        uint32_t i0 = (uint32_t)srcPos;
+        uint32_t i1 = i0 + 1;
+        float frac = srcPos - (float)i0;
+        float x = in[i0] + frac * (in[i1] - in[i0]);
+        if (x >  1.0f) x =  1.0f;
+        if (x < -1.0f) x = -1.0f;
+        RxFifoPush(x);
+        srcPos += step;
+    }
+    srcPos -= (float)(count - 1);
+}
+
+void Ft8UsbBridge_DrainToUSB(void)
+{
+
+    if (g_ft8TxActive) return;
+    if (RxFifoCount() < AUDIO_BLOCK_SAMPLES) return;
+
+    int16_t left_buf[AUDIO_BLOCK_SAMPLES];
+    int16_t right_buf[AUDIO_BLOCK_SAMPLES];
+
+    for (int k = 0; k < AUDIO_BLOCK_SAMPLES; k++) {
+        float x = 0.0f;
+        RxFifoPop(&x);
+        if (x >  1.0f) x =  1.0f;
+        if (x < -1.0f) x = -1.0f;
+        int16_t s = (int16_t)(x * 32767.0f);
+        left_buf[k] = s;
+        right_buf[k] = s;
+    }
+    usb_audio_push_block(left_buf, right_buf);
+}
+
+void Ft8UsbBridge_SetTxActive(bool on)
+{
+    g_ft8TxActive = on;
 }
 
 #endif

@@ -4,6 +4,8 @@
 #include <stdint.h>  
 #include <Arduino.h>
 #include "Config.h"
+#include <Audio.h>
+extern AudioSynthWaveformSine sidetone_oscillator;
 
 #define RIGNAME "T41-EP SDT"
 #define VERSION "Phx V1.3"                  //  WSJT VERSION 
@@ -15,6 +17,11 @@
   #define Debug(x) Serial.println(x)
 #else
   #define Debug(x) do {} while(0)
+#endif
+
+#ifdef T41_USB_AUDIO
+extern AudioPlayQueue Q_usbOut_L;
+extern AudioPlayQueue Q_usbOut_R;
 #endif
 
 
