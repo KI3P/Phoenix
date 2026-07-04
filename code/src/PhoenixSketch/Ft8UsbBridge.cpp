@@ -13,6 +13,11 @@
 #include <string.h>
 #include "Ft8UsbBridge.h"
 #include "Config.h"
+
+#if defined(T41_USB_AUDIO) && !defined(T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK)
+#warning "T41: core_mods/usb_audio.{cpp,h} not applied -- FT8 RX audio-to-PC path disabled (stub); TX still works. See code/docs/EXPERIMENT_LOG.md."
+#endif
+
 static volatile bool g_ft8TxActive = false;
 
 #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
@@ -278,6 +283,7 @@ void Ft8UsbBridge_DrainToUSB(void)
     if (g_ft8TxActive) return;
     if (RxFifoCount() < AUDIO_BLOCK_SAMPLES) return;
 
+#if defined(T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK)
     int16_t left_buf[AUDIO_BLOCK_SAMPLES];
     int16_t right_buf[AUDIO_BLOCK_SAMPLES];
 
@@ -291,6 +297,13 @@ void Ft8UsbBridge_DrainToUSB(void)
         right_buf[k] = s;
     }
     usb_audio_push_block(left_buf, right_buf);
+#else
+    // No core patch available: there's no way to deliver these samples to
+    // the PC. Drop them so the RX FIFO doesn't fill and stall; TX (PC ->
+    // radio) is unaffected since it doesn't depend on the core patch.
+    float x;
+    for (int k = 0; k < AUDIO_BLOCK_SAMPLES; k++) RxFifoPop(&x);
+#endif
 }
 
 void Ft8UsbBridge_SetTxActive(bool on)

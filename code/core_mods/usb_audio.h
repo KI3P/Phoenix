@@ -109,6 +109,11 @@ private:
 	audio_block_t *inputQueueArray[2];
 };
 
+// Sentinel: lets project code detect at compile time whether this patched
+// core (vs. a stock Teensyduino core) is installed. Anyone re-copying this
+// file into a Teensyduino install must bring this #define along with it.
+#define T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK 1
+
 void usb_audio_push_block(const int16_t *left_data, const int16_t *right_data);
 bool usb_audio_tx_has_room(void);
 void usb_audio_manual_transmit(const int16_t *left_data, const int16_t *right_data, unsigned int samples);

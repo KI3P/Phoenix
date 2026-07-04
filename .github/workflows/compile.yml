@@ -35,3 +35,37 @@ jobs:
           arduino-cli compile \
             --fqbn teensy:avr:teensy41:usb=serial2,speed=600,opt=o1lto \
             code/src/PhoenixSketch/PhoenixSketch.ino
+
+  # Minimal, separate job: compiles with the USB-audio-capable board option
+  # (usb=serialmidiaudio) so the FT8/T41_USB_AUDIO code path actually gets
+  # type-checked. This core is installed stock (no core_mods applied), so
+  # it also verifies the T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK gate in
+  # Ft8UsbBridge.cpp degrades cleanly instead of failing the build.
+  compile-usb-audio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Configure board support
+        run: |
+          arduino-cli config init
+          arduino-cli config set library.enable_unsafe_install true
+          arduino-cli config add board_manager.additional_urls \
+            https://www.pjrc.com/teensy/package_teensy_index.json
+          arduino-cli core update-index
+          arduino-cli core install teensy:avr
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib install ArduinoJson "Adafruit MCP23017 Arduino Library"
+          arduino-cli lib install --git-url \
+            https://github.com/chipaudette/OpenAudio_ArduinoLibrary.git
+
+      - name: Compile sketch (USB audio, stock core)
+        run: |
+          arduino-cli compile \
+            --fqbn teensy:avr:teensy41:usb=serialmidiaudio,speed=600,opt=o1lto \
+            code/src/PhoenixSketch/PhoenixSketch.ino
