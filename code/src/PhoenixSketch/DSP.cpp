@@ -17,6 +17,8 @@ If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "SDT.h"
+#include "Ft8UsbBridge.h"
+#include "MainBoard_AudioIO.h"   // for GetFt8Mode()
 
 float32_t DMAMEM float_buffer_L[READ_BUFFER_SIZE];
 float32_t DMAMEM float_buffer_R[READ_BUFFER_SIZE];
@@ -31,6 +33,11 @@ static uint32_t n_clear;
 static char *filename = nullptr;
 void SaveData(DataBlock *data, uint32_t suffix); // used by the unit tests
 static uint32_t swrTimer_ms = 0;
+
+#ifdef T41_USB_AUDIO
+extern AudioPlayQueue Q_usbOut_L;
+extern AudioPlayQueue Q_usbOut_R;
+#endif
 
 #define RXTXZoom 3
 #define TXIQZOOM 3
@@ -736,6 +743,50 @@ void PlayBuffer(DataBlock *data){
     }
 }
 
+#ifdef T41_USB_AUDIO
+static float32_t usbTmp[USB_BUFFER_SIZE];
+static float usbPhase = 0.0f;
+
+void PlayUsbBufferPreVol(DataBlock *data){
+    (void)data;  // unused for this test
+
+    static uint32_t usbCallCount = 0;
+    static elapsedMillis usbCallTimer = 0;
+
+    usbCallCount++;
+    if (usbCallTimer > 1000) {
+        usbCallTimer = 0;
+        Serial.print("PlayUsbBufferPreVol calls/sec = ");
+        Serial.println(usbCallCount);
+        usbCallCount = 0;
+    }
+
+
+    const float usbFs = 44100.0f;
+    const float f0 = 1000.0f;
+    const float dphi = 2.0f * PI * f0 / usbFs;
+
+    for (unsigned i = 0; i < 1; i++) {
+        int16_t *pL = Q_usbOut_L.getBuffer();
+        int16_t *pR = Q_usbOut_R.getBuffer();
+
+        for (size_t k = 0; k < USB_BUFFER_SIZE; k++) {
+            usbTmp[k] = 0.2f * sinf(usbPhase);
+            usbPhase += dphi;
+            if (usbPhase >= 2.0f * PI) usbPhase -= 2.0f * PI;
+        }
+
+        arm_float_to_q15(usbTmp, pL, USB_BUFFER_SIZE);
+        arm_float_to_q15(usbTmp, pR, USB_BUFFER_SIZE);
+
+        Q_usbOut_L.playBuffer();
+        Q_usbOut_R.playBuffer();
+    }
+}
+#endif
+
+
+
 /**
  * Initialize the global variables to their default startup values
  * 1) Configure the RXfilters
@@ -941,20 +992,19 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     // Interpolate
     InterpolateReceiveData(&data, &RXfilters);
+    #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
+        Ft8UsbBridge_PutRxSamples(data.I, data.N);
+    #endif
 
-    // Volume adjust for audio volume setting. I and Q contain duplicate data, don't 
-    // need to scale both
+    // Speaker path volume knob
     AdjustVolume(&data, &RXfilters);
-
     SaveData(&data, 6); // used by the unit tests
 
-    // Play sound on the speaker
+    // Always feed the speaker output (works in both builds)
     PlayBuffer(&data);
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
-    //Flag(0);
-
     return &data;
 }
 
@@ -975,7 +1025,7 @@ float32_t GetMicRRMS(void){
 //static int32_t counter = 0;
 
 /**
- * Read in N_BLOCKS blocks of BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex 
+ * Read in N_BLOCKS blocks of USB_BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex
  * AudioRecordQueue objects into the data float buffers. This is the transmit chain,
  * input comes from the microphone. The samples are converted to normalized floats in 
  * the range -1 to +1.
@@ -983,7 +1033,29 @@ float32_t GetMicRRMS(void){
  * @param data The data block to put the samples in
  * @return ESUCCESS if samples were read, EFAIL if insufficient samples are available
  */ 
-errno_t ReadMicrophoneBuffer(DataBlock *data){
+
+errno_t ReadMicrophoneBuffer(DataBlock *data)
+{
+    if (!data) return EFAIL;
+
+#ifdef T41_USB_AUDIO
+    if (GetFt8Mode()) {
+        const uint32_t outCount = N_BLOCKS_EX * USB_BUFFER_SIZE;
+        bool ok = Ft8UsbBridge_GetSamples(data->I, outCount);
+        if (!ok) {
+            memset(data->I, 0, outCount * sizeof(float32_t));
+        }
+        for (uint32_t i = 0; i < outCount; i++) {
+            data->Q[i] = data->I[i];
+        }
+        data->N = outCount;
+        data->sampleRate_Hz = SR[SampleRate].rate;
+        return ESUCCESS;
+    }
+#endif
+
+    // ----- existing microphone code continues below -----
+
     // are there at least N_BLOCKS buffers in each channel available ?
     if ((uint32_t)Q_in_L_Ex.available() > N_BLOCKS_EX+0 && (uint32_t)Q_in_R_Ex.available() > N_BLOCKS_EX+0) {
         //counter++;
