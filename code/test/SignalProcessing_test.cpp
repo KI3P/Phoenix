@@ -179,9 +179,9 @@ TEST(SignalProcessing, TestMockRead){
         Q_in_L.freeBuffer();
         Q_in_R.freeBuffer();
         // Make sure that we've read the values of L_mock and R_mock
-        for (size_t k = 0; k < BUFFER_SIZE; k++){
-            EXPECT_EQ(L[k],L_mock[i*BUFFER_SIZE+k]);
-            EXPECT_EQ(R[k],R_mock[i*BUFFER_SIZE+k]);
+        for (size_t k = 0; k < USB_BUFFER_SIZE; k++){
+            EXPECT_EQ(L[k],L_mock[i*USB_BUFFER_SIZE+k]);
+            EXPECT_EQ(R[k],R_mock[i*USB_BUFFER_SIZE+k]);
         }
     }
 }
@@ -202,10 +202,12 @@ TEST(SignalProcessing, ReadDataIntoBuffers){
     ReadIQInputBuffer(&data);
     #include "mock_R_data_int.c"
     #include "mock_L_data_int.c"
-    EXPECT_NEAR(data.I[1],(float)R_mock[1]/32768.0,0.00001);
-    EXPECT_NEAR(data.Q[1],(float)L_mock[1]/32768.0,0.00001);
-    EXPECT_NEAR(data.I[2047],(float)R_mock[2047]/32768.0,0.00001);
-    EXPECT_NEAR(data.Q[2047],(float)L_mock[2047]/32768.0,0.00001);
+    // I is read from the L channel and Q from the R channel (see ReadIQInputBuffer
+    // after the image-formation fix in commit 04b277a).
+    EXPECT_NEAR(data.I[1],(float)L_mock[1]/32768.0,0.00001);
+    EXPECT_NEAR(data.Q[1],(float)R_mock[1]/32768.0,0.00001);
+    EXPECT_NEAR(data.I[2047],(float)L_mock[2047]/32768.0,0.00001);
+    EXPECT_NEAR(data.Q[2047],(float)R_mock[2047]/32768.0,0.00001);
 }
 
 // Reading data into the input buffers returns false when it is empty

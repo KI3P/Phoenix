@@ -33,9 +33,31 @@ void start_timer1ms() {
 
     timer_running.store(true);
     timer_thread = std::thread([]() {
+        // The CW keyer state machine measures elapsed time by *counting* DO events:
+        // every timer1ms() dispatch advances markCount_ms/spaceCount_ms by one, and
+        // transitions fire when those counts reach ditDuration_ms etc. So one DO
+        // event must correspond to one millisecond. The test, however, checks state
+        // transitions against the wall-clock millis().
+        //
+        // The naive "timer1ms(); sleep_for(1ms);" loop drifts: sleep_for() sleeps for
+        // *at least* 1ms (and the thread can be starved under load), so the DO-event
+        // clock falls progressively behind the wall clock. Over a full dit/dah that
+        // drift exceeds the test's grace windows and the SM ends up a whole state
+        // behind what the test expects -- the source of the flakiness.
+        //
+        // Instead, lock the DO-event clock to the wall clock: fire exactly one DO per
+        // millisecond of wall time that has actually elapsed. Polling well under 1ms
+        // keeps the lag tiny, and detecting a backwards jump re-baselines after the
+        // StartMillis() resets the test performs.
+        int64_t last = millis();
         while (timer_running.load()) {
-            timer1ms();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            int64_t now = millis();
+            if (now < last) last = now;     // millis() was reset via StartMillis()
+            while (last < now) {            // catch up: one DO per elapsed ms
+                timer1ms();
+                last++;
+            }
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
         }
     });
 }
@@ -387,7 +409,7 @@ TEST(Radio, RadioStateRunThrough) {
     for (size_t i = 0; i < 600; i++){
         loop(); MyDelay(1);
         int64_t m = millis();
-        
+
         // Check that the mode state machine is changing as expected
         if (m-m0 < DIT_DURATION_MS-2){
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
@@ -397,10 +419,14 @@ TEST(Radio, RadioStateRunThrough) {
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
             CheckThatStateIsCWTransmitSpace();
         }
-        if ((m-m0 > 2*DIT_DURATION_MS+10) & (m-m0 < (2*DIT_DURATION_MS+CW_TRANSMIT_SPACE_TIMEOUT_MS+1))){
+        // Upper bound is exclusive at the WAIT->RECEIVE transition (no +1): with the
+        // wall-clock-locked DO timer a transition can only land at or after its
+        // nominal time, so sampling the transition tick itself would spuriously see
+        // RECEIVE. (Matches the dit-dit-dah loop below.)
+        if ((m-m0 > 2*DIT_DURATION_MS+10) & (m-m0 < (2*DIT_DURATION_MS+CW_TRANSMIT_SPACE_TIMEOUT_MS))){
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
             CheckThatStateIsCWTransmitSpace();
-        }        
+        }
         if (m-m0 > (2*DIT_DURATION_MS+CW_TRANSMIT_SPACE_TIMEOUT_MS+25+150)){ // 25 ms grace + 150 ms hardware change
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
             CheckThatStateIsReceive();
@@ -431,10 +457,12 @@ TEST(Radio, RadioStateRunThrough) {
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE);
             CheckThatStateIsCWTransmitSpace();
         }
-        if ((m-m0 > DIT_DURATION_MS*4+30) & (m-m0 < (DIT_DURATION_MS*4+CW_TRANSMIT_SPACE_TIMEOUT_MS+1))){
+        // Upper bound is exclusive at the WAIT->RECEIVE transition (no +1); see note
+        // in the dit loop above.
+        if ((m-m0 > DIT_DURATION_MS*4+30) & (m-m0 < (DIT_DURATION_MS*4+CW_TRANSMIT_SPACE_TIMEOUT_MS))){
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
             CheckThatStateIsCWTransmitSpace();
-        }        
+        }
         if (m-m0 > (DIT_DURATION_MS*4+CW_TRANSMIT_SPACE_TIMEOUT_MS+35+150)){ // 35 ms grace + 150 ms hardware change
             //Debug(String(m-m0));
             EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);

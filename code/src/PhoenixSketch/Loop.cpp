@@ -1,3 +1,21 @@
+/* 
+Copyright (C) 2026 T41 EP Software Contributors
+See Contributors.txt for list of known authors.
+
+This file is part of Phoenix.
+
+Phoenix is free software: you can redistribute it and/or modify it under the 
+terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+Phoenix is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with Phoenix. 
+If not, see <https://www.gnu.org/licenses/>.
+*/
+
 /**
  * @file Loop.cpp
  * @brief Main program loop implementation for Phoenix SDR Radio
@@ -535,11 +553,6 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
-                case FILTER:{
-                    // I am not sure what the point of this button is, so ignore for now
-                    break;
-                }
-                // You are in UISm_StateId_[HOME,UPDATE] states
                 case DECODER_TOGGLE:{
                     if (ED.decoderFlag == 0)
                         ED.decoderFlag = 1;
@@ -582,6 +595,7 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
+                case FILTER:
                 case FILTER_BUTTON:{
                     if (changeFilterHiCut)
                         changeFilterHiCut = 0;
@@ -1443,6 +1457,56 @@ void ShutdownTeensy(void){
  * @see PerformSignalProcessing() for DSP implementation
  * @see ConsumeInterrupt() for event processing
  */
+// Serial time sync (USB Serial port 0)
+//
+// Accepts PJRC-standard time packets from a PC-side utility:
+//   'T' + 10-digit Unix UTC timestamp + '\n'  e.g. "T1748476800\n"
+//
+// Sets both the Teensy hardware RTC (coin-cell backed) and the TimeLib
+// software clock so that hour()/minute()/second() stay accurate.
+// WSJT-X requires the clock to be within +/- 1 second of UTC.
+//
+// PC-side one-liner (Python 3):
+//   python -c "import serial,time; s=serial.Serial('COMx',115200); s.write(('T'+str(int(time.time()))+'\n').encode()); s.close()"
+// Replace COMx with the Teensy USB serial port (e.g. COM6).
+#define TIME_SYNC_HEADER 'T'
+#define TIME_SYNC_LEN    10    // digits in a Unix timestamp until ~year 2286
+
+void CheckForSerialTimeSync(void) {
+    static char tsbuf[TIME_SYNC_LEN + 2];
+    static uint8_t tsidx = 0;
+    static bool collecting = false;
+
+    while (Serial.available() > 0) {
+        char c = (char)Serial.read();
+        if (c == TIME_SYNC_HEADER) {
+            collecting = true;
+            tsidx = 0;
+            memset(tsbuf, 0, sizeof(tsbuf));
+        } else if (collecting) {
+            if (c == '\n' || c == '\r') {
+                if (tsidx == TIME_SYNC_LEN) {
+                    time_t t = (time_t)atoll(tsbuf);
+                    if (t > 1000000000UL) {   // sanity: after ~2001
+                        Teensy3Clock.set(t);
+                        setTime(t);
+                        Serial.print("Time set: ");
+                        Serial.println((int64_t)t);
+                    }
+                }
+                collecting = false;
+                tsidx = 0;
+            } else if (tsidx < TIME_SYNC_LEN) {
+                tsbuf[tsidx++] = c;
+            } else {
+                // Overrun - not a valid timestamp packet
+                collecting = false;
+                tsidx = 0;
+            }
+        }
+    }
+}
+
 FASTRUN void loop(void){
     // Check for signal to begin shutdown and perform shutdown routine if requested
     if (digitalRead(BEGIN_TEENSY_SHUTDOWN)) ShutdownTeensy();
@@ -1452,9 +1516,9 @@ FASTRUN void loop(void){
     ProcessPTTDebounce();
     CheckForFrontPanelInterrupts();
     CheckForCATSerialEvents();
+    CheckForSerialTimeSync();
     ConsumeInterrupt();
 
-   
     // Step 2: Perform signal processing
     PerformSignalProcessing();
 

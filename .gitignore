@@ -63,3 +63,5 @@ all_*_tests
 # MkDocs
 site/
 .cache/
+
+.claude/settings.local.json

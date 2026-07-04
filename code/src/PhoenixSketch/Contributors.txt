@@ -1,10 +1,11 @@
-This code base is heavily derived from the Teensy Convolution SDR, copyright Frank Dziock - DD4WH, substantially 
-modified by Jack Purdum, W8TEE, and Al Peter, AC8GY
+This code base is originally derived from the Teensy Convolution SDR, copyright 
+Frank Dziock DD4WH, substantially modified by the contributors listed below.
 https://github.com/DD4WH/Teensy-ConvolutionSDR
 
 Known contributors to the code:
-* Al Peter, AC8GY
+* Oliver King, KI3P
 * Jack Purdum, W8TEE
+* Al Peter, AC8GY
 * Greg Raven, KF5N
 * John Melton, GO0RX
 * Jerry Kaidor, KF6VB
@@ -14,3 +15,4 @@ Known contributors to the code:
 * David Martin, VK3KQT
 * Joerg Uthoff, DB2OO
 * Harry Brash, GM3RVL
+* Tom Metty, AJ8X

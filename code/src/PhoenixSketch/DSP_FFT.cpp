@@ -1,3 +1,21 @@
+/* 
+Copyright (C) 2026 T41 EP Software Contributors
+See Contributors.txt for list of known authors.
+
+This file is part of Phoenix.
+
+Phoenix is free software: you can redistribute it and/or modify it under the 
+terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+Phoenix is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with Phoenix. 
+If not, see <https://www.gnu.org/licenses/>.
+*/
+
 #include "DSP_FFT.h"
 
 float32_t DMAMEM buffer_spec_FFT[2*SPECTRUM_RES] __attribute__((aligned(4))); /** Used by multiple functions */
@@ -357,7 +375,16 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
                                 RXfilters->n_att_dB, RXfilters->n_desired_BW_Hz, READ_BUFFER_SIZE/RXfilters->DF1);
 
     // FIR filter mask
-    InitFilterMask(FIR_filter_mask, RXfilters); 
+    InitFilterMask(FIR_filter_mask, RXfilters);
+
+    // Clear the convolution overlap-add history buffers. These are declared as
+    // static DMAMEM, which is NOT zero-initialized at cold boot on the Teensy 4.x
+    // (only the regular .bss section in DTCM is cleared at startup). After a cold
+    // power cycle they contain random bit patterns - some of which are NaN/Inf -
+    // that would otherwise be fed straight into the convolution FFT on the first
+    // frame and propagate downstream into the noise reduction feedback state.
+    CLEAR_VAR(last_sample_buffer_L);
+    CLEAR_VAR(last_sample_buffer_R);
 
     // Equalizer RXfilters
     for (size_t i = 0; i<14; i++){
@@ -453,6 +480,8 @@ void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
  * @param filter_change The positive or negative increment to the filter bandwidth
  */
 void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
+    // The filter must be wider or equal to one encoder notch
+    int32_t minWidth = filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
     // Change the band parameters
     switch (bands[ED.currentBand[ED.activeVFO]].mode) {
         case LSB:{
@@ -460,9 +489,15 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
             {
                 bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz > (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth;
             } else {
                 bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz - filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz > 0)
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 0;
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz < (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth;
             }
             break;
         }
@@ -470,18 +505,27 @@ void FilterSetSSB(int32_t filter_change, uint8_t changeFilterHiCut) {
             if (changeFilterHiCut == 0) {
                 bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz < (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz+minWidth;
             } else {
                 bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 
                   bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz < 0)
+                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = 0;
+                if (bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz > (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth))
+                    bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz-minWidth;
             }
             break;
         }
         case AM:
         case SAM:{
-            bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
-              bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
-            bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            if (changeFilterHiCut == 0){
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = 
+                  bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz + filter_change * (int32_t)(40.0 * ENCODER_FACTOR);
+                if (bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz < minWidth)
+                    bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = minWidth;
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            }
             break;
         }
         case IQ:
@@ -834,8 +878,8 @@ void SidebandSelection(DataBlock *data){
 void TXDecimateBy4(DataBlock *data, TransmitFilterConfig *TXfilters){
     // 192KHz effective sample rate here
     // decimation-by-4 in-place!
-    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_I, data->I, data->I, BUFFER_SIZE * N_BLOCKS);
-    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_Q, data->Q, data->Q, BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_I, data->I, data->I, USB_BUFFER_SIZE * N_BLOCKS);
+    arm_fir_decimate_f32(&TXfilters->FIR_dec1_EX_Q, data->Q, data->Q, USB_BUFFER_SIZE * N_BLOCKS);
     data->N = data->N/4;
     data->sampleRate_Hz = data->sampleRate_Hz/4;
 }

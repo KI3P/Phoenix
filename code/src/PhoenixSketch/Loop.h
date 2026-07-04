@@ -1,3 +1,21 @@
+/* 
+Copyright (C) 2026 T41 EP Software Contributors
+See Contributors.txt for list of known authors.
+
+This file is part of Phoenix.
+
+Phoenix is free software: you can redistribute it and/or modify it under the 
+terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+Phoenix is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with Phoenix. 
+If not, see <https://www.gnu.org/licenses/>.
+*/
+
 #ifndef LOOP_H
 #define LOOP_H
 
@@ -66,6 +84,14 @@ void SetInterrupt(InterruptType i);
  * @note If buffer is full (16 events), oldest event is dropped
  */
 void PrependInterrupt(InterruptType i);
+
+/**
+ * @brief Poll USB Serial (port 0) for a PJRC-format time-sync packet
+ * @note Packet format: 'T' + 10-digit Unix UTC timestamp + '\n' (or '\r')
+ * @note On valid packet, sets the Teensy hardware RTC and TimeLib software clock
+ * @note Non-blocking; drains the input buffer each call
+ */
+void CheckForSerialTimeSync(void);
 
 /**
  * @brief Main program loop executed repeatedly while radio is powered on

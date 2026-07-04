@@ -43,6 +43,14 @@ void CheckDahTiming(ModeSm *sm){
     EXPECT_EQ(sm->state_id, ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT);
 }
 
+void FakeHamBandActive() {
+    bands[ED.currentBand[ED.activeVFO]].band_type = HAM_BAND;
+}
+
+void FakeNonHamBandActive() {
+    bands[ED.currentBand[ED.activeVFO]].band_type = MISC_BAND;
+}
+
 // Enter the SSB_Receive state upon initialization
 TEST(ModeSm, EnterSSBReceiveUponInitialization){
     //ModeSM sm;
@@ -50,17 +58,29 @@ TEST(ModeSm, EnterSSBReceiveUponInitialization){
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 } 
 
-// Enter SSB_Transmit state from SSB_Receive when a PTT_Pressed event is recorded
-TEST(ModeSm, EnterSSBTransmitFromReceiveUponPTTPressed){
+// Enter SSB_Transmit state from SSB_Receive when a PTT_Pressed 
+// event is recorded while a ham band is active
+TEST(ModeSm, EnterSSBTransmitFromReceiveUponPTTPressedWhileHamBandIsActive){
     //ModeSM sm;
+    FakeHamBandActive();
     ModeSm_start(&modeSM);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
 } 
 
+// Ignore PTT_PRESSED while a non ham band is active
+TEST(ModeSm, IgnorePTTPressedWhileNonHamBandIsActive) {
+    //ModeSM sm;
+    FakeNonHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
 // Move between SSB_Receive and SSB_Transmit states
 TEST(ModeSm, NavigateBetweeenSSBReceiveAndSSBTransmitStates){
     //ModeSM sm;
+    FakeHamBandActive();
     ModeSm_start(&modeSM);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
@@ -83,6 +103,7 @@ TEST(ModeSm, NavigateBetweeenSSBReceiveAndCWReceiveStates){
 // Move to CW_TRANSMIT_MARK from SSB_RECEIVE
 TEST(ModeSm, StraightKeyNavigateToCWTransmitMark){
     //ModeSM sm;
+    FakeHamBandActive();
     ModeSm_start(&modeSM);
     modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
@@ -105,21 +126,51 @@ TEST(ModeSm, StraightKeyNavigateToCWTransmitMark){
         
 } 
 
-// Get to the transmit dit state
-TEST(ModeSm, NavigateToCWTransmitDit){
+// Ignore KEY_PRESSED while a non ham band is active
+TEST(ModeSm, IgnoreKeyPressedWhileNonHamBandIsActive) {
+    FakeNonHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+// Get to the transmit dit state while a ham band is active
+TEST(ModeSm, NavigateToCWTransmitDitWhileHamBandIsActive){
+    FakeHamBandActive();
     ModeSm_start(&modeSM);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DIT_MARK);
 }
 
+// Ignore DIT_PRESSED while a non ham band is active
+TEST(ModeSm, IgnoreDitPressedWhileNonHamBandIsActive) {
+    FakeNonHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
 // Get to the transmit dah state through the two viable logic flows
-TEST(ModeSm, NavigateToCWTransmitDah){
+TEST(ModeSm, NavigateToCWTransmitDahWhileHamBandIsActive){
     //ModeSM sm;
+    FakeHamBandActive();
     ModeSm_start(&modeSM);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_DAH_MARK);
+}
+
+// Ignore DAH_PRESSED while a non ham band is active
+TEST(ModeSm, IgnoreDahPressedWhileNonHamBandIsActive) {
+    //ModeSM sm;
+    FakeNonHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
 }
 
 // When in dit mark, move from mark to space in the correct amount of time

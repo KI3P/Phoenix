@@ -1,3 +1,21 @@
+/* 
+Copyright (C) 2026 T41 EP Software Contributors
+See Contributors.txt for list of known authors.
+
+This file is part of Phoenix.
+
+Phoenix is free software: you can redistribute it and/or modify it under the 
+terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+Phoenix is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with Phoenix. 
+If not, see <https://www.gnu.org/licenses/>.
+*/
+
 #include "DSP_Noise.h"
 
 // DMAMEM places these in OCRAM, which is accessible by DMA and is slower
@@ -213,12 +231,12 @@ void Kim1_NR(DataBlock *data){
         for (int bindx = VAD_low; bindx < VAD_high; bindx++) { // take first 128 bin values of the FFT result
             if (NR_use_X) {
             NR_G[bindx] = 1.0 - (NR_lambda[bindx] * NR_KIM_K / NR_X[bindx][NR_X_pointer]);
-            if (NR_G[bindx] < 0.0)
-                NR_G[bindx] = 0.0;
+            if (!(NR_G[bindx] > 0.0))  // '!(x > 0)' also catches NaN/Inf, which would
+                NR_G[bindx] = 0.0;     // otherwise latch permanently into NR_Gts below
             } else {
             NR_G[bindx] = 1.0 - (NR_lambda[bindx] * NR_KIM_K / NR_E[bindx][NR_E_pointer]);
-            if (NR_G[bindx] < 0.0)
-                NR_G[bindx] = 0.0;
+            if (!(NR_G[bindx] > 0.0))  // '!(x > 0)' also catches NaN/Inf, which would
+                NR_G[bindx] = 0.0;     // otherwise latch permanently into NR_Gts below
             }
 
             // time smoothing
@@ -288,7 +306,13 @@ void Xanr(DataBlock *data, uint8_t ANR_notch) {
   float32_t nel, nev;
 
   for (int i = 0; i < ANR_buff_size; i++) {
-    ANR_d[ANR_in_idx] = data->I[i];
+    // Sanitize at the input: a non-finite sample would otherwise latch
+    // permanently into the adaptive weights ANR_w and never recover.
+    float32_t in_sample = data->I[i];
+    if (!isfinite(in_sample)) {
+        in_sample = 0.0;
+    }
+    ANR_d[ANR_in_idx] = in_sample;
 
     y = 0;
     sigma = 0;
@@ -458,6 +482,12 @@ void SpectralNoiseReduction(DataBlock *data){
         for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++) {
             // this is squared magnitude for the current frame
             NR_X[bindx][0] = (NR_FFT_buffer[bindx * 2] * NR_FFT_buffer[bindx * 2] + NR_FFT_buffer[bindx * 2 + 1] * NR_FFT_buffer[bindx * 2 + 1]);
+            // Sanitize at the single entry point: a NaN/Inf reaching the noise
+            // estimate (xt) or the gain feedback would otherwise latch permanently
+            // and silence the audio until NR is toggled off.
+            if (!isfinite(NR_X[bindx][0])) {
+                NR_X[bindx][0] = 0.0;
+            }
         }
 
         if (NR_first_time_2 == 2) { // TODO: properly initialize all the variables
@@ -484,6 +514,11 @@ void SpectralNoiseReduction(DataBlock *data){
             }
             xtr = (1.0 - ph1y[bindx]) * NR_X[bindx][0] + ph1y[bindx] * xt[bindx];
             xt[bindx] = ax * xt[bindx] + (1.0 - ax) * xtr;
+            // xt is a self-referential noise estimate: once non-finite it can never
+            // recover on its own. Reset it to the current frame power if that happens.
+            if (!isfinite(xt[bindx])) {
+                xt[bindx] = NR_X[bindx][0];
+            }
         }
         for (int bindx = 0; bindx < NR_FFT_L / 2; bindx++) { // 1. Step of NR - calculate the SNR's
             NR_SNR_post[bindx] = fmax(fmin(NR_X[bindx][0] / xt[bindx], 1000.0), snr_prio_min); // limited to +30 /-15 dB, might be still too much of reduction, let's try it?

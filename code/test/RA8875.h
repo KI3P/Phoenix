@@ -71,6 +71,7 @@ public:
     void print(int value);
     void print(int64_t value);
     void print(float value);
+    void print(float value, int digits);
     uint8_t getFontWidth();
     uint8_t getFontHeight();
 

@@ -59,6 +59,30 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 # Version History
 
+## V1.2 Release Notes
+
+### New Features
+
+**Optional Analog SWR Measurement**
+A new compile-time option `USE_ANALOG_SWR` enables SWR measurement using Teensy ADC pins 26 (forward) and 27 (reverse) instead of the AD7991 digital ADC. This provides an alternative for builders who prefer analog measurement or don't have the AD7991 chip. Enable this option by uncommenting `#define USE_ANALOG_SWR` in `Config.h`.
+
+**SWR/Power Display Pane**
+A new home screen pane displays real-time SWR and forward power during transmit:
+- Shows SWR value (1.0-10.0) and forward power in watts
+- Updates at 4 Hz during transmit
+- Text displays in red during active transmit, white during receive
+- Automatically detects transmit activity based on SWR measurement timing
+
+### Under-the-Hood Changes
+
+- Hardware register expanded from 32 to 64 bits to support TXVFOBIT for dual VFO tracking
+- Display code optimized to skip spectrum/waterfall updates during SSB transmit mode
+- Added `SI5351_DUAL_VFO_ADDR` constant (0x61) for dual VFO hardware configuration
+- New `ReadSWRLastUpdateMs()` API function for tracking SWR measurement timing
+- Added `DIRECT_COUPLED_TX` compile-time option (disabled by default)
+- Added spare button mapping slot in Config.h
+- Spectrum draw faster: `ShowSpectrum()` now back-buffers the yellow trace on LAYER2 and publishes the whole spectrum rect to LAYER1 in a single hardware `BTE_move` per sweep instead of erasing and redrawing every bin individually. Median `DrawSpectrumPane` cost drops from ~5 ms to ~2 ms per chunk; total CPU share falls from ~51% to ~45%, freeing budget for signal processing. Trace is clipped to leave the top 20 rows free for the bandwidth/scale labels. Baseline + Phase 1 measurements and plots are in `code/docs/DrawDisplay_Timing_Baseline.md`.
+
 ## V1.1 Release Notes
 
 ### Major New Features
@@ -176,6 +200,7 @@ This code has been tested with the Arduino IDE version 2.3.6. Configure your Ard
 Install the following libraries via the Arduino Library Manager:
 
 * Adafruit MCP23017 Arduino Library, by Adafruit (v2.3.2) (note: install with dependencies)
+* ArduinoJson, by Benoit Blanchon (v7.4.3)
 
 Some libraries need to be installed manually. The manual process is:
 

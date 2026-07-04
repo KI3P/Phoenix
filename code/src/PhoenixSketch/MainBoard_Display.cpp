@@ -1,3 +1,21 @@
+/* 
+Copyright (C) 2026 T41 EP Software Contributors
+See Contributors.txt for list of known authors.
+
+This file is part of Phoenix.
+
+Phoenix is free software: you can redistribute it and/or modify it under the 
+terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+Phoenix is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with Phoenix. 
+If not, see <https://www.gnu.org/licenses/>.
+*/
+
 /**
  * @file MainBoard_Display.cpp
  * @brief Core display infrastructure for Phoenix SDR
@@ -134,12 +152,15 @@ void DrawBIT(void){
         tft.setCursor(5 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
         if (!bit_results.RF_Si5351_present) {
             tft.setTextColor(RA8875_RED);
-            sprintf(tmpbuf, "RF SI5351 I2C not found at 0x%02X", SI5351_BUS_BASE_ADDR);
+            sprintf(tmpbuf, "RF SI5351 I2C not found at 0x%02X or 0x%02X", SI5351_BUS_BASE_ADDR, SI5351_DUAL_VFO_ADDR);
             tft.print(tmpbuf);
         } else {
             tft.setTextColor(RA8875_GREEN);
             tft.setCursor(10 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
-            sprintf(tmpbuf, "0x%02X", SI5351_BUS_BASE_ADDR);
+            if (HasDualVFOs())
+                sprintf(tmpbuf, "0x%02X", SI5351_DUAL_VFO_ADDR);
+            else
+                sprintf(tmpbuf, "0x%02X", SI5351_BUS_BASE_ADDR);
             tft.print("RF SI5351 I2C:");
             tft.setCursor(col1, WINDOW_HEIGHT/10 + yoff);
             tft.print(tmpbuf);

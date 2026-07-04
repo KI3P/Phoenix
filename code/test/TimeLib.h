@@ -42,4 +42,6 @@ inline int year() {
     return timeinfo->tm_year + 1900;
 }
 
+inline void setTime(time_t t) { (void)t; }
+
 #endif
