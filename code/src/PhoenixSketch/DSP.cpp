@@ -744,7 +744,7 @@ void PlayBuffer(DataBlock *data){
 }
 
 #ifdef T41_USB_AUDIO
-static float32_t usbTmp[BUFFER_SIZE];
+static float32_t usbTmp[USB_BUFFER_SIZE];
 static float usbPhase = 0.0f;
 
 void PlayUsbBufferPreVol(DataBlock *data){
@@ -770,14 +770,14 @@ void PlayUsbBufferPreVol(DataBlock *data){
         int16_t *pL = Q_usbOut_L.getBuffer();
         int16_t *pR = Q_usbOut_R.getBuffer();
 
-        for (size_t k = 0; k < BUFFER_SIZE; k++) {
+        for (size_t k = 0; k < USB_BUFFER_SIZE; k++) {
             usbTmp[k] = 0.2f * sinf(usbPhase);
             usbPhase += dphi;
             if (usbPhase >= 2.0f * PI) usbPhase -= 2.0f * PI;
         }
 
-        arm_float_to_q15(usbTmp, pL, BUFFER_SIZE);
-        arm_float_to_q15(usbTmp, pR, BUFFER_SIZE);
+        arm_float_to_q15(usbTmp, pL, USB_BUFFER_SIZE);
+        arm_float_to_q15(usbTmp, pR, USB_BUFFER_SIZE);
 
         Q_usbOut_L.playBuffer();
         Q_usbOut_R.playBuffer();
@@ -1025,7 +1025,7 @@ float32_t GetMicRRMS(void){
 //static int32_t counter = 0;
 
 /**
- * Read in N_BLOCKS blocks of BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex 
+ * Read in N_BLOCKS blocks of USB_BUFFER_SIZE samples each from Q_in_R_Ex and Q_in_L_Ex
  * AudioRecordQueue objects into the data float buffers. This is the transmit chain,
  * input comes from the microphone. The samples are converted to normalized floats in 
  * the range -1 to +1.
@@ -1040,7 +1040,7 @@ errno_t ReadMicrophoneBuffer(DataBlock *data)
 
 #ifdef T41_USB_AUDIO
     if (GetFt8Mode()) {
-        const uint32_t outCount = N_BLOCKS_EX * BUFFER_SIZE;
+        const uint32_t outCount = N_BLOCKS_EX * USB_BUFFER_SIZE;
         bool ok = Ft8UsbBridge_GetSamples(data->I, outCount);
         if (!ok) {
             memset(data->I, 0, outCount * sizeof(float32_t));
