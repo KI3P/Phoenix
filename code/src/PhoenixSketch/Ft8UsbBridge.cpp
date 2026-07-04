@@ -20,6 +20,107 @@
 
 static volatile bool g_ft8TxActive = false;
 
+// ─────────────────────────────────────────────────────────────
+// RX PATH: 192kHz DSP audio → resample → FIFO → USB to PC
+//
+// None of this touches AudioInputUSB/AudioOutputUSB directly, so it's kept
+// unconditional (safe to call regardless of board USB Type). The one spot
+// that does need the real USB audio interface -- the final handoff to
+// usb_audio_push_block() inside Ft8UsbBridge_DrainToUSB() -- is already
+// gated on T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK, which usb_audio.h only
+// defines when the interface actually exists (see core_mods/usb_audio.h).
+// ─────────────────────────────────────────────────────────────
+static const uint32_t RX_FIFO_SIZE = 16384;
+DMAMEM static float g_rxFifo[RX_FIFO_SIZE];
+static volatile uint32_t g_rxWriteIdx = 0;
+static volatile uint32_t g_rxReadIdx  = 0;
+
+static inline uint32_t RxNextIdx(uint32_t i) { return (i + 1u) % RX_FIFO_SIZE; }
+
+static inline bool RxFifoPush(float x) {
+    uint32_t next = RxNextIdx(g_rxWriteIdx);
+    if (next == g_rxReadIdx) return false;
+    g_rxFifo[g_rxWriteIdx] = x;
+    g_rxWriteIdx = next;
+    return true;
+}
+
+static inline bool RxFifoPop(float *x) {
+    if (g_rxReadIdx == g_rxWriteIdx) return false;
+    *x = g_rxFifo[g_rxReadIdx];
+    g_rxReadIdx = RxNextIdx(g_rxReadIdx);
+    return true;
+}
+
+static inline uint32_t RxFifoCount(void) {
+    if (g_rxWriteIdx >= g_rxReadIdx) return g_rxWriteIdx - g_rxReadIdx;
+    return RX_FIFO_SIZE - g_rxReadIdx + g_rxWriteIdx;
+}
+
+void Ft8UsbBridge_PutRxSamples(const float *in, uint32_t count)
+{
+    if (!in || count < 2) return;
+    static float srcPos = 0.0f;
+    const float step = 192000.0f / 44100.0f;
+    while (srcPos < (float)(count - 1)) {
+        uint32_t i0 = (uint32_t)srcPos;
+        uint32_t i1 = i0 + 1;
+        float frac = srcPos - (float)i0;
+        float x = in[i0] + frac * (in[i1] - in[i0]);
+        if (x >  1.0f) x =  1.0f;
+        if (x < -1.0f) x = -1.0f;
+        RxFifoPush(x);
+        srcPos += step;
+    }
+    srcPos -= (float)(count - 1);
+}
+
+void Ft8UsbBridge_DrainToUSB(void)
+{
+
+    if (g_ft8TxActive) return;
+    if (RxFifoCount() < AUDIO_BLOCK_SAMPLES) return;
+
+#if defined(T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK)
+    int16_t left_buf[AUDIO_BLOCK_SAMPLES];
+    int16_t right_buf[AUDIO_BLOCK_SAMPLES];
+
+    for (int k = 0; k < AUDIO_BLOCK_SAMPLES; k++) {
+        float x = 0.0f;
+        RxFifoPop(&x);
+        if (x >  1.0f) x =  1.0f;
+        if (x < -1.0f) x = -1.0f;
+        int16_t s = (int16_t)(x * 32767.0f);
+        left_buf[k] = s;
+        right_buf[k] = s;
+    }
+    usb_audio_push_block(left_buf, right_buf);
+#else
+    // No core patch available (or no USB audio interface in this build):
+    // there's no way to deliver these samples to the PC. Drop them so the
+    // RX FIFO doesn't fill and stall; TX (PC -> radio) is unaffected since
+    // it doesn't depend on the core patch.
+    float x;
+    for (int k = 0; k < AUDIO_BLOCK_SAMPLES; k++) RxFifoPop(&x);
+#endif
+}
+
+void Ft8UsbBridge_SetTxActive(bool on)
+{
+    g_ft8TxActive = on;
+}
+
+// ─────────────────────────────────────────────────────────────
+// TX PATH: USB (WSJT-X) → resample → Phoenix SDR
+//
+// This is the one part of the bridge that genuinely needs a USB-audio-
+// capable board (AudioInputUSB/AudioRecordQueue require AUDIO_INTERFACE,
+// which usb_audio.h only defines for USB Type = Audio / Serial+MIDI+Audio).
+// Ft8UsbBridge_Init()/Ft8UsbBridge_GetSamples() are called unconditionally
+// from elsewhere in the project (Globals.cpp, DSP.cpp), so when the
+// interface isn't available they fall back to safe stubs below instead of
+// requiring every caller to match this exact gate.
+// ─────────────────────────────────────────────────────────────
 #if defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL))
 
 // -----------------------------------------------------------------------------
@@ -229,86 +330,22 @@ bool Ft8UsbBridge_GetSamples(float *out, uint32_t outCount)
     return true;
 }
 
-// ─────────────────────────────────────────────────────────────
-// RX PATH: 192kHz DSP audio → resample → FIFO → USB to PC
-// ─────────────────────────────────────────────────────────────
-static const uint32_t RX_FIFO_SIZE = 16384;
-DMAMEM static float g_rxFifo[RX_FIFO_SIZE];
-static volatile uint32_t g_rxWriteIdx = 0;
-static volatile uint32_t g_rxReadIdx  = 0;
+#else // !(defined(T41_USB_AUDIO) && (defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL)))
 
-static inline uint32_t RxNextIdx(uint32_t i) { return (i + 1u) % RX_FIFO_SIZE; }
+// No USB audio interface in this build (T41_USB_AUDIO disabled, or a board
+// USB Type without Audio -- e.g. plain/Dual/Triple Serial). Stub out the
+// TX-path entry points so callers don't need to know which USB Type is
+// selected.
+void Ft8UsbBridge_Init(float sdrSampleRateHz)
+{
+    (void)sdrSampleRateHz;
+}
 
-static inline bool RxFifoPush(float x) {
-    uint32_t next = RxNextIdx(g_rxWriteIdx);
-    if (next == g_rxReadIdx) return false;
-    g_rxFifo[g_rxWriteIdx] = x;
-    g_rxWriteIdx = next;
+bool Ft8UsbBridge_GetSamples(float *out, uint32_t outCount)
+{
+    if (!out || outCount == 0) return false;
+    memset(out, 0, outCount * sizeof(float));
     return true;
-}
-
-static inline bool RxFifoPop(float *x) {
-    if (g_rxReadIdx == g_rxWriteIdx) return false;
-    *x = g_rxFifo[g_rxReadIdx];
-    g_rxReadIdx = RxNextIdx(g_rxReadIdx);
-    return true;
-}
-
-static inline uint32_t RxFifoCount(void) {
-    if (g_rxWriteIdx >= g_rxReadIdx) return g_rxWriteIdx - g_rxReadIdx;
-    return RX_FIFO_SIZE - g_rxReadIdx + g_rxWriteIdx;
-}
-
-void Ft8UsbBridge_PutRxSamples(const float *in, uint32_t count)
-{
-    if (!in || count < 2) return;
-    static float srcPos = 0.0f;
-    const float step = 192000.0f / 44100.0f;
-    while (srcPos < (float)(count - 1)) {
-        uint32_t i0 = (uint32_t)srcPos;
-        uint32_t i1 = i0 + 1;
-        float frac = srcPos - (float)i0;
-        float x = in[i0] + frac * (in[i1] - in[i0]);
-        if (x >  1.0f) x =  1.0f;
-        if (x < -1.0f) x = -1.0f;
-        RxFifoPush(x);
-        srcPos += step;
-    }
-    srcPos -= (float)(count - 1);
-}
-
-void Ft8UsbBridge_DrainToUSB(void)
-{
-
-    if (g_ft8TxActive) return;
-    if (RxFifoCount() < AUDIO_BLOCK_SAMPLES) return;
-
-#if defined(T41_CORE_HAS_USB_AUDIO_PUSH_BLOCK)
-    int16_t left_buf[AUDIO_BLOCK_SAMPLES];
-    int16_t right_buf[AUDIO_BLOCK_SAMPLES];
-
-    for (int k = 0; k < AUDIO_BLOCK_SAMPLES; k++) {
-        float x = 0.0f;
-        RxFifoPop(&x);
-        if (x >  1.0f) x =  1.0f;
-        if (x < -1.0f) x = -1.0f;
-        int16_t s = (int16_t)(x * 32767.0f);
-        left_buf[k] = s;
-        right_buf[k] = s;
-    }
-    usb_audio_push_block(left_buf, right_buf);
-#else
-    // No core patch available: there's no way to deliver these samples to
-    // the PC. Drop them so the RX FIFO doesn't fill and stall; TX (PC ->
-    // radio) is unaffected since it doesn't depend on the core patch.
-    float x;
-    for (int k = 0; k < AUDIO_BLOCK_SAMPLES; k++) RxFifoPop(&x);
-#endif
-}
-
-void Ft8UsbBridge_SetTxActive(bool on)
-{
-    g_ft8TxActive = on;
 }
 
 #endif
