@@ -78,6 +78,13 @@ ModeSm_StateId GetAudioPreviousState(void);
 void UpdateTransmitAudioGain(void);
 
 /**
+ * @brief Apply current sidetone volume setting 
+ * @note Applies ED.sidetoneVolume to sidetone_oscillator object 
+ * @note Called when user adjusts sidetone volume
+ */
+void UpdateSidetoneOscillator(void);
+
+/**
  * @brief Warm up audio I/O by cycling transmit/receive routing without RF changes
  * @note Clears I2S and SGTL5000 codec initialization issues that cause anomalous output on first PTT press
  * @note Performs two complete transmit/receive cycles with 50ms delays for audio interrupt processing

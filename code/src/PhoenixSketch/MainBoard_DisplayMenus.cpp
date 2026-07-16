@@ -361,7 +361,7 @@ VariableParameter cwf = {
 VariableParameter stv = {
     .variable = &ED.sidetoneVolume,
     .type = TYPE_F32,
-    .limits = {.f32 = {.min = 0.0F, .max=100.0F, .step=0.5F}}
+    .limits = {.f32 = {.min = 0.0F, .max=500.0F, .step=1.0F}}
 };
 
 struct SecondaryMenuOption CWOptions[6] = {
@@ -370,7 +370,7 @@ struct SecondaryMenuOption CWOptions[6] = {
     "Keyer", functionOption, NULL, (void *)SelectKeyer, NULL,
     "Flip paddle", functionOption, NULL, (void *)FlipPaddle, NULL,
     "CW Filter", variableOption, &cwf, NULL, NULL,
-    "Sidetone volume", variableOption, &stv, NULL, NULL,
+    "Sidetone volume", variableOption, &stv, NULL, (void *)UpdateSidetoneOscillator,
 };
 
 /**

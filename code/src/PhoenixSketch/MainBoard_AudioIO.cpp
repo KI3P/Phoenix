@@ -234,6 +234,20 @@ void UpdateTransmitAudioGain(void){
 }
 
 /**
+ * Update the sidetone amplitude for CW transmission.
+ *
+ * Applies the current sidetone volume setting (ED.sidetoneVolume) to the
+ * sidetone_oscillator object that generates the sidetone sinusoid.
+ *
+ * Should be called when:
+ * - User adjusts sidetone volume
+ * - Restoring settings from storage
+ */
+void UpdateSidetoneOscillator(void){
+    sidetone_oscillator.amplitude(ED.sidetoneVolume / 500);
+}
+
+/**
  * Reconfigure audio I/O routing based on current radio mode state.
  *
  * This is the central audio routing function that responds to ModeSm state changes.

@@ -1033,6 +1033,7 @@ void ConsumeInterrupt(void){
                             ED.sidetoneVolume += 1.0;
                             if (ED.sidetoneVolume > 500) 
                                 ED.sidetoneVolume = 500; // 0 to 500 range
+                            UpdateSidetoneOscillator();
                             break;
                         }
                         default:
@@ -1062,6 +1063,7 @@ void ConsumeInterrupt(void){
                             ED.sidetoneVolume -= 1.0;
                             if (ED.sidetoneVolume < 0) 
                                 ED.sidetoneVolume = 0; // 0 to 500 range
+                            UpdateSidetoneOscillator();
                             break;
                         }
                         default:
