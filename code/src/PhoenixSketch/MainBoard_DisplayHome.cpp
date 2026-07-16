@@ -441,34 +441,48 @@ uint16_t pixels_per_s = 12;
 #define CLIP_AUDIO_PEAK 115
 
 /**
+ * Compute the effective audio passband edges (Hz, relative to the carrier) for
+ * the *current* modulation.
+ *
+ * The stored FLoCut_Hz/FHiCut_Hz follow the sign convention of the band's
+ * default mode (bands[].mode), which is not necessarily the current
+ * ED.modulation: the front-panel DEMODULATION toggle changes ED.modulation
+ * without converting the stored cuts. InitFilterMask() applies this same
+ * normalization so the audio passband ends up on the correct sideband - display
+ * code that positions filter markers must do it too, otherwise (for example) a
+ * USB-over-an-LSB-band bar draws on the LSB side, or an AM-over-an-SSB-band
+ * marker lands on the wrong edge.
+ */
+static void EffectivePassbandEdges_Hz(int32_t *low_Hz, int32_t *high_Hz){
+    int32_t loCut = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+    int32_t hiCut = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+    if (ED.modulation[ED.activeVFO] == bands[ED.currentBand[ED.activeVFO]].mode){
+        *low_Hz = loCut; *high_Hz = hiCut;
+    } else if (ED.modulation[ED.activeVFO] == LSB || ED.modulation[ED.activeVFO] == USB){
+        // Switched sideband from the band default: flip the cuts
+        *low_Hz = -hiCut; *high_Hz = -loCut;
+    } else { // AM / SAM: symmetric passband about the carrier
+        int32_t edge = max(abs(hiCut), abs(loCut));
+        *low_Hz = -edge; *high_Hz = edge;
+    }
+}
+
+/**
  * Draw Tuned Bandwidth on Spectrum Plot
  */
 FASTRUN void DrawBandWidthIndicatorBar(void){
     tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
     tft.writeTo(L2);
     float32_t pixel_per_khz = ((1 << ED.spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate);
-    int16_t filterWidth = (int16_t)(((bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz -
-                              bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz) / 1000.0) * pixel_per_khz * 1.06);
     int16_t vline = SPECTRUM_LEFT_X + FreqToBin(GetTXRXFreq(ED.activeVFO));
-    switch (ED.modulation[ED.activeVFO]) {
-        case LSB:{
-            int16_t barDelta = (int16_t)((-bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz / 1000.0) * pixel_per_khz * 1.06);
-            tft.fillRect(vline - filterWidth - barDelta, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
-            break;
-        }
-        case USB:{
-            int16_t barDelta = (int16_t)((bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz / 1000.0) * pixel_per_khz * 1.06);
-            tft.fillRect(vline + barDelta, SPECTRUM_TOP_Y + 20, filterWidth, SPECTRUM_HEIGHT - 20, FILTER_WIN);
-            break;
-        }
-        case AM:
-        case SAM:{
-            tft.fillRect(vline - (filterWidth ) * 0.93, SPECTRUM_TOP_Y + 20, 2*filterWidth * 0.95, SPECTRUM_HEIGHT - 20, FILTER_WIN);
-            break;
-        }
-        default:
-            break;
-    }
+
+    int32_t low_Hz, high_Hz;
+    EffectivePassbandEdges_Hz(&low_Hz, &high_Hz);
+
+    float32_t scale = pixel_per_khz * 1.06 / 1000.0;
+    int16_t xLeft  = vline + (int16_t)(low_Hz  * scale);
+    int16_t xRight = vline + (int16_t)(high_Hz * scale);
+    tft.fillRect(xLeft, SPECTRUM_TOP_Y + 20, xRight - xLeft, SPECTRUM_HEIGHT - 20, FILTER_WIN);
     tft.drawFastVLine(vline, SPECTRUM_TOP_Y + 20, SPECTRUM_HEIGHT-25, RA8875_CYAN);
 }
 
@@ -1207,11 +1221,17 @@ void DrawAudioSpectContainer() {
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(fLo), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(fHi), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
 
-    int16_t filterLoPositionMarker = map(bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz, 0, 6000, 0, 256);
-    int16_t filterHiPositionMarker = map(bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz, 0, 6000, 0, 256);
+    // Use the effective passband edges for the current modulation, not the raw
+    // stored cuts (which carry the band-default sideband's sign convention). For
+    // AM/SAM the two |edges| coincide at the symmetric bandwidth; for LSB/USB
+    // they are the low and high audio cutoffs. Drawing both markers works for
+    // every mode - overlapping harmlessly in the AM/SAM case.
+    int32_t low_Hz, high_Hz;
+    EffectivePassbandEdges_Hz(&low_Hz, &high_Hz);
+    int16_t filterLoPositionMarker = map(low_Hz, 0, 6000, 0, 256);
+    int16_t filterHiPositionMarker = map(high_Hz, 0, 6000, 0, 256);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterLoPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
-    if ((ED.modulation[ED.activeVFO] == LSB) || (ED.modulation[ED.activeVFO] == USB))
-        tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
+    tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
 
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE){
         int16_t fcutoffs[] = {840,1080,1320,1800,2000,0};
