@@ -155,14 +155,14 @@ function ConvertFrom-OffsetString {
 
 # ---------------------------------------------------------------- list and exit
 if ($List) {
-    $teensy = Get-TeensyPort
+    $teensy = @(Get-TeensyPort)
     if ($teensy.Count -gt 0) {
         Write-Host 'Teensy ports:'
         $teensy | ForEach-Object { Write-Host "  $($_.Device)  ($($_.Description))" }
     } else {
         Write-Host 'no Teensy ports found'
     }
-    $every = Get-AnyPort
+    $every = @(Get-AnyPort)
     if ($every.Count -gt 0) {
         Write-Host 'all serial ports:'
         $every | ForEach-Object { Write-Host "  $($_.Device)" }
@@ -178,9 +178,9 @@ if ($Utc -and $Offset) {
 if ($Port) {
     $device = $Port
 } else {
-    $teensy = Get-TeensyPort
+    $teensy = @(Get-TeensyPort)
     if ($teensy.Count -eq 0) {
-        $every = Get-AnyPort
+        $every = @(Get-AnyPort)
         if ($every.Count -eq 0) {
             Stop-WithError 'no Teensy found' 'no serial ports at all - check the USB cable and that the radio is on'
         }
