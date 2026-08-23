@@ -113,6 +113,8 @@ static void CW_RECEIVE_do(ModeSm* sm);
 
 static void CW_RECEIVE_key_pressed(ModeSm* sm);
 
+static void CW_RECEIVE_to_digital_mode(ModeSm* sm);
+
 static void CW_RECEIVE_to_ssb_mode(ModeSm* sm);
 
 static void CW_TRANSMIT_DAH_MARK_enter(ModeSm* sm);
@@ -157,6 +159,28 @@ static void CW_TRANSMIT_SPACE_do(ModeSm* sm);
 
 static void CW_TRANSMIT_SPACE_key_pressed(ModeSm* sm);
 
+static void DIGITAL_STATES_enter(ModeSm* sm);
+
+static void DIGITAL_STATES_exit(ModeSm* sm);
+
+static void DIGITAL_STATES_InitialState_transition(ModeSm* sm);
+
+static void DIGITAL_RECEIVE_enter(ModeSm* sm);
+
+static void DIGITAL_RECEIVE_exit(ModeSm* sm);
+
+static void DIGITAL_RECEIVE_ptt_pressed(ModeSm* sm);
+
+static void DIGITAL_RECEIVE_to_cw_mode(ModeSm* sm);
+
+static void DIGITAL_RECEIVE_to_ssb_mode(ModeSm* sm);
+
+static void DIGITAL_TRANSMIT_enter(ModeSm* sm);
+
+static void DIGITAL_TRANSMIT_exit(ModeSm* sm);
+
+static void DIGITAL_TRANSMIT_ptt_released(ModeSm* sm);
+
 static void SSB_RECEIVE_enter(ModeSm* sm);
 
 static void SSB_RECEIVE_exit(ModeSm* sm);
@@ -164,6 +188,8 @@ static void SSB_RECEIVE_exit(ModeSm* sm);
 static void SSB_RECEIVE_ptt_pressed(ModeSm* sm);
 
 static void SSB_RECEIVE_to_cw_mode(ModeSm* sm);
+
+static void SSB_RECEIVE_to_digital_mode(ModeSm* sm);
 
 static void SSB_TRANSMIT_enter(ModeSm* sm);
 
@@ -336,6 +362,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_KEY_PRESSED: CW_RECEIVE_key_pressed(sm); break;
                 case ModeSm_EventId_DAH_PRESSED: CW_RECEIVE_dah_pressed(sm); break;
                 case ModeSm_EventId_DIT_PRESSED: CW_RECEIVE_dit_pressed(sm); break;
+                case ModeSm_EventId_TO_DIGITAL_MODE: CW_RECEIVE_to_digital_mode(sm); break;
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
@@ -432,12 +459,56 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             }
             break;
         
+        // STATE: DIGITAL_STATES
+        case ModeSm_StateId_DIGITAL_STATES:
+            switch (event_id)
+            {
+                case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: DIGITAL_RECEIVE
+        case ModeSm_StateId_DIGITAL_RECEIVE:
+            switch (event_id)
+            {
+                case ModeSm_EventId_PTT_PRESSED: DIGITAL_RECEIVE_ptt_pressed(sm); break;
+                case ModeSm_EventId_TO_SSB_MODE: DIGITAL_RECEIVE_to_ssb_mode(sm); break;
+                case ModeSm_EventId_TO_CW_MODE: DIGITAL_RECEIVE_to_cw_mode(sm); break;
+                case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: DIGITAL_TRANSMIT
+        case ModeSm_StateId_DIGITAL_TRANSMIT:
+            switch (event_id)
+            {
+                case ModeSm_EventId_PTT_RELEASED: DIGITAL_TRANSMIT_ptt_released(sm); break;
+                case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
+                case ModeSm_EventId_CALIBRATE_POWER: NORMAL_STATES_calibrate_power(sm); break; // First ancestor handler for this event
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
         // STATE: SSB_RECEIVE
         case ModeSm_StateId_SSB_RECEIVE:
             switch (event_id)
             {
-                case ModeSm_EventId_TO_CW_MODE: SSB_RECEIVE_to_cw_mode(sm); break;
                 case ModeSm_EventId_PTT_PRESSED: SSB_RECEIVE_ptt_pressed(sm); break;
+                case ModeSm_EventId_TO_DIGITAL_MODE: SSB_RECEIVE_to_digital_mode(sm); break;
+                case ModeSm_EventId_TO_CW_MODE: SSB_RECEIVE_to_cw_mode(sm); break;
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
@@ -505,6 +576,12 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state)
             case ModeSm_StateId_CW_TRANSMIT_MARK: CW_TRANSMIT_MARK_exit(sm); break;
             
             case ModeSm_StateId_CW_TRANSMIT_SPACE: CW_TRANSMIT_SPACE_exit(sm); break;
+            
+            case ModeSm_StateId_DIGITAL_STATES: DIGITAL_STATES_exit(sm); break;
+            
+            case ModeSm_StateId_DIGITAL_RECEIVE: DIGITAL_RECEIVE_exit(sm); break;
+            
+            case ModeSm_StateId_DIGITAL_TRANSMIT: DIGITAL_TRANSMIT_exit(sm); break;
             
             case ModeSm_StateId_SSB_RECEIVE: SSB_RECEIVE_exit(sm); break;
             
@@ -1277,6 +1354,27 @@ static void CW_RECEIVE_key_pressed(ModeSm* sm)
     // No ancestor handles this event.
 }
 
+static void CW_RECEIVE_to_digital_mode(ModeSm* sm)
+{
+    // CW_RECEIVE behavior
+    // uml: TO_DIGITAL_MODE TransitionTo(DIGITAL_STATES)
+    {
+        // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
+        CW_RECEIVE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `DIGITAL_STATES`.
+        DIGITAL_STATES_enter(sm);
+        
+        // Finish transition by calling pseudo state transition function.
+        DIGITAL_STATES_InitialState_transition(sm);
+        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+    } // end of behavior for CW_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
 static void CW_RECEIVE_to_ssb_mode(ModeSm* sm)
 {
     // CW_RECEIVE behavior
@@ -1683,6 +1781,177 @@ static void CW_TRANSMIT_SPACE_key_pressed(ModeSm* sm)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// event handlers for state DIGITAL_STATES
+////////////////////////////////////////////////////////////////////////////////
+
+static void DIGITAL_STATES_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_DIGITAL_STATES;
+    
+    // DIGITAL_STATES behavior
+    // uml: enter / { EnterDigitalMode(); }
+    {
+        // Step 1: execute action `EnterDigitalMode();`
+        EnterDigitalMode();
+    } // end of behavior for DIGITAL_STATES
+}
+
+static void DIGITAL_STATES_exit(ModeSm* sm)
+{
+    // DIGITAL_STATES behavior
+    // uml: exit / { ExitDigitalMode(); }
+    {
+        // Step 1: execute action `ExitDigitalMode();`
+        ExitDigitalMode();
+    } // end of behavior for DIGITAL_STATES
+    
+    sm->state_id = ModeSm_StateId_NORMAL_STATES;
+}
+
+static void DIGITAL_STATES_InitialState_transition(ModeSm* sm)
+{
+    // DIGITAL_STATES.<InitialState> behavior
+    // uml: TransitionTo(DIGITAL_RECEIVE)
+    {
+        // Step 1: Exit states until we reach `DIGITAL_STATES` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `DIGITAL_RECEIVE`.
+        DIGITAL_RECEIVE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for DIGITAL_STATES.<InitialState>
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state DIGITAL_RECEIVE
+////////////////////////////////////////////////////////////////////////////////
+
+static void DIGITAL_RECEIVE_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+    
+    // DIGITAL_RECEIVE behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for DIGITAL_RECEIVE
+}
+
+static void DIGITAL_RECEIVE_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_DIGITAL_STATES;
+}
+
+static void DIGITAL_RECEIVE_ptt_pressed(ModeSm* sm)
+{
+    // DIGITAL_RECEIVE behavior
+    // uml: PTT_PRESSED [IsTxAllowed()] TransitionTo(DIGITAL_TRANSMIT)
+    if (IsTxAllowed())
+    {
+        // Step 1: Exit states until we reach `DIGITAL_STATES` state (Least Common Ancestor for transition).
+        DIGITAL_RECEIVE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `DIGITAL_TRANSMIT`.
+        DIGITAL_TRANSMIT_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for DIGITAL_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
+static void DIGITAL_RECEIVE_to_cw_mode(ModeSm* sm)
+{
+    // DIGITAL_RECEIVE behavior
+    // uml: TO_CW_MODE TransitionTo(CW_RECEIVE)
+    {
+        // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_NORMAL_STATES);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CW_RECEIVE`.
+        CW_RECEIVE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for DIGITAL_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
+static void DIGITAL_RECEIVE_to_ssb_mode(ModeSm* sm)
+{
+    // DIGITAL_RECEIVE behavior
+    // uml: TO_SSB_MODE TransitionTo(SSB_RECEIVE)
+    {
+        // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_NORMAL_STATES);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `SSB_RECEIVE`.
+        SSB_RECEIVE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for DIGITAL_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state DIGITAL_TRANSMIT
+////////////////////////////////////////////////////////////////////////////////
+
+static void DIGITAL_TRANSMIT_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_DIGITAL_TRANSMIT;
+    
+    // DIGITAL_TRANSMIT behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for DIGITAL_TRANSMIT
+}
+
+static void DIGITAL_TRANSMIT_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_DIGITAL_STATES;
+}
+
+static void DIGITAL_TRANSMIT_ptt_released(ModeSm* sm)
+{
+    // DIGITAL_TRANSMIT behavior
+    // uml: PTT_RELEASED TransitionTo(DIGITAL_RECEIVE)
+    {
+        // Step 1: Exit states until we reach `DIGITAL_STATES` state (Least Common Ancestor for transition).
+        DIGITAL_TRANSMIT_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `DIGITAL_RECEIVE`.
+        DIGITAL_RECEIVE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for DIGITAL_TRANSMIT
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // event handlers for state SSB_RECEIVE
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1739,6 +2008,27 @@ static void SSB_RECEIVE_to_cw_mode(ModeSm* sm)
         
         // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
         return;
+    } // end of behavior for SSB_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
+static void SSB_RECEIVE_to_digital_mode(ModeSm* sm)
+{
+    // SSB_RECEIVE behavior
+    // uml: TO_DIGITAL_MODE TransitionTo(DIGITAL_STATES)
+    {
+        // Step 1: Exit states until we reach `NORMAL_STATES` state (Least Common Ancestor for transition).
+        SSB_RECEIVE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `DIGITAL_STATES`.
+        DIGITAL_STATES_enter(sm);
+        
+        // Finish transition by calling pseudo state transition function.
+        DIGITAL_STATES_InitialState_transition(sm);
+        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
     } // end of behavior for SSB_RECEIVE
     
     // No ancestor handles this event.
@@ -1809,6 +2099,9 @@ char const * ModeSm_state_id_to_string(ModeSm_StateId id)
         case ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT: return "CW_TRANSMIT_KEYER_WAIT";
         case ModeSm_StateId_CW_TRANSMIT_MARK: return "CW_TRANSMIT_MARK";
         case ModeSm_StateId_CW_TRANSMIT_SPACE: return "CW_TRANSMIT_SPACE";
+        case ModeSm_StateId_DIGITAL_STATES: return "DIGITAL_STATES";
+        case ModeSm_StateId_DIGITAL_RECEIVE: return "DIGITAL_RECEIVE";
+        case ModeSm_StateId_DIGITAL_TRANSMIT: return "DIGITAL_TRANSMIT";
         case ModeSm_StateId_SSB_RECEIVE: return "SSB_RECEIVE";
         case ModeSm_StateId_SSB_TRANSMIT: return "SSB_TRANSMIT";
         default: return "?";
@@ -1835,6 +2128,7 @@ char const * ModeSm_event_id_to_string(ModeSm_EventId id)
         case ModeSm_EventId_PTT_PRESSED: return "PTT_PRESSED";
         case ModeSm_EventId_PTT_RELEASED: return "PTT_RELEASED";
         case ModeSm_EventId_TO_CW_MODE: return "TO_CW_MODE";
+        case ModeSm_EventId_TO_DIGITAL_MODE: return "TO_DIGITAL_MODE";
         case ModeSm_EventId_TO_SSB_MODE: return "TO_SSB_MODE";
         default: return "?";
     }

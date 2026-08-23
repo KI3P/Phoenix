@@ -148,6 +148,29 @@ static void updateAudioSourceForRFState() {
 
 // Simulated time is handled by Arduino_mock.cpp
 
+// Track the sample rate SDL audio was configured for, so we can re-init the SDL
+// audio devices when the firmware changes it at run time (Sample Rate menu).
+static uint8_t previousSampleRate = 0xFF;
+
+/**
+ * Re-initialize SDL audio when the radio's sample rate changes.
+ * ChangeSampleRate() (firmware) reconfigures the DSP for the new rate; the SDL
+ * output device rate depends on it too (it decimates the DSP output by 4), so the
+ * simulator must re-open the SDL audio devices. Called once per loop iteration.
+ */
+static void updateAudioForSampleRateChange() {
+    if (SampleRate == previousSampleRate) {
+        return;
+    }
+    if (previousSampleRate != 0xFF) {
+        // Not the first call: the rate was changed at run time. Re-init SDL audio.
+        std::cout << "Sample rate changed to " << SR[SampleRate].rate
+                  << " Hz - re-initializing SDL audio" << std::endl;
+        SDL_Audio_Init(SR[SampleRate].rate);
+    }
+    previousSampleRate = SampleRate;
+}
+
 // Simple keyboard event handler
 enum SimulatorAction {
     ACTION_NONE,
@@ -428,10 +451,11 @@ int main(int argc, char* argv[]) {
     Q_out_L_Ex.setAudioChannel(2); // I channel (IQ output)
     Q_out_R_Ex.setAudioChannel(3); // Q channel (IQ output)
 
-    // Initialize SDL audio for demodulated audio playback
-    // Using 192kHz to match the DSP output sample rate (SR[SampleRate].rate)
-    // Most modern audio systems can handle this via software resampling
-    if (!SDL_Audio_Init(192000)) {
+    // Initialize SDL audio for demodulated audio playback.
+    // Use the current radio sample rate (SR[SampleRate].rate); the mock decimates
+    // this by 4 for the speaker output. See updateAudioForSampleRateChange() below,
+    // which re-initializes SDL audio when the Sample Rate menu changes the rate.
+    if (!SDL_Audio_Init(SR[SampleRate].rate)) {
         std::cerr << "Warning: SDL Audio initialization failed. Audio playback disabled." << std::endl;
     } else {
         std::cout << "SDL Audio initialized for demodulated audio playback" << std::endl;
@@ -480,6 +504,9 @@ int main(int argc, char* argv[]) {
 
         // Update audio source based on RF hardware state (for calibration modes)
         updateAudioSourceForRFState();
+
+        // Re-initialize SDL audio if the sample rate was changed at run time
+        updateAudioForSampleRateChange();
 
         // Update the SDL display once per frame (not on every draw call)
         tft.updateScreen();

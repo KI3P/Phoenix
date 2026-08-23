@@ -23,11 +23,22 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.3.2"
+#define VERSION "Phx V1.4.0"
 
 #include "BuildInfo.h"
 
+// Teensyduino has no "Dual Serial + Audio" USB type, so a build with a USB audio
+// interface (usb=serialmidiaudio, which digital mode requires) has only one serial
+// port. CAT then shares the primary Serial, and Debug() must go quiet or its
+// output would corrupt the CAT stream. Without USB audio, nothing changes: CAT
+// keeps its own SerialUSB1 and Debug() keeps Serial to itself.
+#ifdef AUDIO_INTERFACE
+#define CATSerial Serial
+#define Debug(x)
+#else
+#define CATSerial SerialUSB1
 #define Debug(x) Serial.println(x)
+#endif
 
 #include <Adafruit_MCP23X17.h>         // Installed via Arduino library manager
 #include <OpenAudio_ArduinoLibrary.h>  // https://github.com/chipaudette/OpenAudio_ArduinoLibrary
@@ -207,6 +218,18 @@ enum FilterType {
     Notch =    5
 };
 
+/** One second-order analog bandpass section of a stagger-tuned cascade.
+ *
+ * The section is (wn/Q)s / (s^2 + (wn/Q)s + wn^2). wnRatio is wn expressed as a
+ * fraction of the cascade's centre frequency, so the same prototype describes
+ * the filter shape at any centre frequency and any sample rate.
+ * See CalcBandpassCascadeCoeffs().
+ */
+struct BandpassProtoSection {
+    float32_t wnRatio;  /** Section resonance as a fraction of the centre frequency */
+    float32_t Q;        /** Section quality factor */
+};
+
 enum TXRXType {
     TX = 1,
     RX = 0
@@ -272,6 +295,7 @@ extern struct config_t {
     int16_t spectrumNoiseFloor[NUMBER_OF_BANDS] = {50,50,50,50,50,50,50,50,50,50,50,50,50 }; /** Shift spectrum up/down on display */
     int8_t spectrumFloorAuto = 1;   /** Automatically adjust the spectrum floor */
     uint32_t spectrum_zoom = 1;     /** Zoom level for spectrum */
+    uint8_t sampleRate = SAMPLE_RATE_192K; /** Audio sample rate selector (index into SR[]) */
     int32_t CWFilterIndex = 5;      /** Selects the receive CW audio filter */
     int32_t CWToneIndex = 3;        /** Selects the transmitted CW tone frequency */
     int32_t decoderFlag = 0;        /** CW decoder on/off */
@@ -288,6 +312,16 @@ extern struct config_t {
     int32_t equalizerRec[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Receive audio equalizer amplitudes */
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
     int32_t currentMicGain = 20;   /** Gain of the mic used for SSB */
+    int32_t digitalDriveLevel = 50; /** Drive level (0-100) applied to USB transmit audio in digital mode */
+    /** Level (0-100) applied to USB receive audio in digital mode.
+     *
+     * The receive audio arriving at the USB tap is unregulated: with AGC off the
+     * AGC stage applies a fixed gain of 20, so the level is whatever the antenna
+     * and the DSP chain produce, and a strong signal reaches full scale and clips.
+     * The default of 25 is -12 dB, leaving headroom while staying far above the
+     * chain's noise floor (measured ~66 dB below a strong carrier).
+     */
+    int32_t digitalRxLevel = 25;
     float32_t dbm_calibration[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Calibrates the S-meter scale on the display */
     float32_t powerOutCW[NUMBER_OF_BANDS] = {DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
                                             DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,DEFAULT_POWER_LEVEL,
@@ -353,9 +387,22 @@ struct band {
     int64_t fBandLow_Hz;    /** Lower band edge */
     int64_t fBandHigh_Hz;   /** Upper band edge */
     const char *name;       /** Name of band */
-    ModulationType mode;    /** Modulation type (USB, LSB) */
-    int32_t FHiCut_Hz;      /** Audio bandpass filter edge */
-    int32_t FLoCut_Hz;      /** Audio bandpass filter edge */
+    /** The band's DEFAULT modulation - not the current one.
+     *
+     * The current modulation is ED.modulation[activeVFO]; that is what Demodulate()
+     * switches on and what the user selects. This field is the fixed reference the
+     * default is measured against, and the sign of FHiCut_Hz/FLoCut_Hz below is
+     * expressed in its convention (negative below the carrier for an LSB default).
+     * InitFilterMask() mirrors the stored cutoffs whenever the current modulation
+     * differs from this, which is how the other sideband is produced.
+     *
+     * Nothing may write this at run time. Doing so silently flips the sideband:
+     * making it agree with a newly selected modulation removes the mirroring and
+     * hands back the band-default passband instead of the requested one.
+     */
+    ModulationType mode;
+    int32_t FHiCut_Hz;      /** Audio bandpass filter edge, in the mode-default convention */
+    int32_t FLoCut_Hz;      /** Audio bandpass filter edge, in the mode-default convention */
     float32_t RFgain_dB;    /** Gain applied in the DSP receive chain */
     BandType band_type;     /** type of band */
     int32_t AGC_thresh;     /** AGC threshold value used by DSP receive code */
@@ -382,9 +429,9 @@ struct DecimationFilter{
     float32_t n_samplerate_Hz;  /** Samplerate before decimation, Hz */
     float32_t n_att_dB;         /** Attenuation of the stopband, dB */
     float32_t n_desired_BW_Hz;  /** Desired max BW of the filters, Hz */
-    float32_t *FIR_dec_I_state; /** Pointer to the state vector for I decimator FIR filter*/
-    float32_t *FIR_dec_Q_state; /** Pointer to the state vector for Q decimator FIR filter */
-    float32_t *FIR_dec_coeffs;  /** Pointer to the decimator FIR filter coefficients */
+    float32_t *FIR_dec_I_state = nullptr; /** Pointer to the state vector for I decimator FIR filter*/
+    float32_t *FIR_dec_Q_state = nullptr; /** Pointer to the state vector for Q decimator FIR filter */
+    float32_t *FIR_dec_coeffs = nullptr;  /** Pointer to the decimator FIR filter coefficients */
     float32_t n_fpass;          /** FIR filter passband edge */
     float32_t n_fstop;          /** FIR filter stopband edge */
     uint16_t n_dec_taps;        /** Number of taps in FIR filter*/
@@ -426,6 +473,14 @@ struct ReceiveFilterConfig {
     arm_biquad_casd_df1_inst_f32 biquadAudioLowPass;
     const uint32_t N_stages_biquad_lowpass1 = 1;
     float32_t biquad_lowpass1_coeffs[5] = { 0, 0, 0, 0, 0 };
+
+    // AM demodulation DC blocker. A one pole highpass, y[n] = x[n] - x[n-1] +
+    // pole*y[n-1], that strips the carrier's DC term out of the envelope. The
+    // pole is derived from the audio sample rate in InitializeFilters() so the
+    // corner stays put when the rate changes.
+    const float32_t amDCBlockCorner_Hz = 38.0;  /** Corner of the AM DC blocker */
+    float32_t amDCBlockPole = 0.99;             /** Pole position, set from the audio rate */
+    float32_t amDCBlockState = 0.0;             /** Filter history, one sample */
 
     // Audio equalization filters
     const uint32_t eqNumStages = 4;
@@ -673,6 +728,7 @@ struct AGCConfig {
 #include "DSP_CWProcessing.h"
 #include "DSP.h"
 #include "MainBoard_AudioIO.h"
+#include "USBAudio.h"
 #include "FrontPanel.h"
 #include "FrontPanel_Rotary.h"
 #include "RFBoard.h"
@@ -711,7 +767,7 @@ extern AudioPlayQueue Q_out_R_Ex;
 
 
 extern const float32_t CWToneOffsetsHz[];
-extern uint8_t SampleRate;
+extern uint8_t& SampleRate;  // reference to ED.sampleRate (persisted); keeps SR[SampleRate] usage working
 
 extern VolumeFunction volumeFunction;
 

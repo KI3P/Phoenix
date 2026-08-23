@@ -32,12 +32,13 @@ typedef enum ModeSm_EventId
     ModeSm_EventId_PTT_PRESSED = 12,
     ModeSm_EventId_PTT_RELEASED = 13,
     ModeSm_EventId_TO_CW_MODE = 14,
-    ModeSm_EventId_TO_SSB_MODE = 15
+    ModeSm_EventId_TO_DIGITAL_MODE = 15,
+    ModeSm_EventId_TO_SSB_MODE = 16
 } ModeSm_EventId;
 
 enum
 {
-    ModeSm_EventIdCount = 16
+    ModeSm_EventIdCount = 17
 };
 
 typedef enum ModeSm_StateId
@@ -60,13 +61,16 @@ typedef enum ModeSm_StateId
     ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 15,
     ModeSm_StateId_CW_TRANSMIT_MARK = 16,
     ModeSm_StateId_CW_TRANSMIT_SPACE = 17,
-    ModeSm_StateId_SSB_RECEIVE = 18,
-    ModeSm_StateId_SSB_TRANSMIT = 19
+    ModeSm_StateId_DIGITAL_STATES = 18,
+    ModeSm_StateId_DIGITAL_RECEIVE = 19,
+    ModeSm_StateId_DIGITAL_TRANSMIT = 20,
+    ModeSm_StateId_SSB_RECEIVE = 21,
+    ModeSm_StateId_SSB_TRANSMIT = 22
 } ModeSm_StateId;
 
 enum
 {
-    ModeSm_StateIdCount = 20
+    ModeSm_StateIdCount = 23
 };
 
 

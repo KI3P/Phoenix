@@ -39,3 +39,43 @@ void ModeCWTransmitSpaceEnter(void){
 bool IsTxAllowed(void) {
     return bands[ED.currentBand[ED.activeVFO]].band_type == HAM_BAND;
 }
+
+bool IsSSBTransmit(void) {
+    return (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) ||
+           (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT);
+}
+
+// The sample rate the radio was using before DIGITAL mode was entered, so it can
+// be put back on the way out. SAMPLE_RATE_MAX+1 means "nothing saved".
+#define NO_SAVED_SAMPLE_RATE (SAMPLE_RATE_MAX + 1)
+static uint8_t preDigitalSampleRate = NO_SAVED_SAMPLE_RATE;
+
+/**
+ * Entry action for the DIGITAL_STATES composite.
+ *
+ * DIGITAL mode only works at 176.4 ksps: that is the rate at which the receive
+ * chain's Fs/4 tap is exactly 44,100 Hz and one DSP block is exactly 512 samples,
+ * which is what lets the USB audio endpoint run at its native 44.1 kHz with no
+ * resampling. Force the rate here and remember what to restore.
+ */
+void EnterDigitalMode(void){
+    preDigitalSampleRate = SampleRate;
+    // ChangeSampleRate() is a no-op if we are already at 176.4 ksps
+    ChangeSampleRate(SAMPLE_RATE_176K);
+    USBAudioBegin();
+}
+
+/**
+ * Exit action for the DIGITAL_STATES composite.
+ *
+ * Runs on every way out - the mode buttons, a CAT command, or a calibration
+ * event dispatched at the NORMAL_STATES level - so the sample rate is always
+ * restored no matter how DIGITAL mode is left.
+ */
+void ExitDigitalMode(void){
+    USBAudioEnd();
+    if (preDigitalSampleRate != NO_SAVED_SAMPLE_RATE){
+        ChangeSampleRate(preDigitalSampleRate);
+        preDigitalSampleRate = NO_SAVED_SAMPLE_RATE;
+    }
+}

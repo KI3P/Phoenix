@@ -178,11 +178,19 @@ private:
 // Global frequency-shifted feedback processor
 static FreqShiftedFeedback g_freqShiftFeedback;
 
+// Current radio audio sample rate (Hz). Follows the global SampleRate selector so
+// the simulator's mock audio tracks run-time sample-rate changes (Sample Rate menu).
+static inline double MockRadioSampleRate(void) {
+    return (double)SR[SampleRate].rate;
+}
+
 // ============== Tone Generator ==============
-// Sample rate is 192kHz
+// Sample rate follows MockRadioSampleRate() (192kHz, 176.4kHz, ...).
 // For I/Q signal at frequency f: I = cos(2*pi*f*t), Q = -sin(2*pi*f*t)
 // (negative sin for USB representation where positive frequency = lower sideband)
-static const double TONE_SAMPLE_RATE = 192000.0;
+// The RF carrier the tones sit on is the sample rate / 4, because the receive DSP
+// translates the input by +Fs/4 (FreqShiftFs4) before demodulation. Tying the
+// carrier to Fs/4 keeps the injected tones at the intended audio pitch at any rate.
 static const double TONE_TWO_PI = 2.0 * M_PI;
 
 // Phase accumulators for continuous tone generation
@@ -215,9 +223,9 @@ static size_t getToneSamplesAvailable() {
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - toneStartTime);
 
-    // Calculate total samples that should have been generated at 192kHz
-    // samples = time_in_seconds * 192000
-    uint64_t totalSamplesExpected = (elapsed.count() * 192000) / 1000000;
+    // Calculate total samples that should have been generated at the current rate
+    // samples = time_in_seconds * sampleRate
+    uint64_t totalSamplesExpected = (elapsed.count() * (uint64_t)MockRadioSampleRate()) / 1000000;
 
     // Available = expected - consumed
     if (totalSamplesExpected > toneSamplesConsumed) {
@@ -229,18 +237,19 @@ static size_t getToneSamplesAvailable() {
 // Generate I/Q samples for two-tone test signal
 // Tones at 700Hz and 1900Hz offset from 48kHz carrier
 static void generateTwoToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
-    // Audio offsets from 48kHz
+    const double sampleRate = MockRadioSampleRate();
+    // Audio offsets from the Fs/4 carrier
     const double audioFreq1 = 700.0;   // Hz
     const double audioFreq2 = 1900.0;  // Hz
-    // RF carrier offset
-    const double carrierFreq = 48000.0;  // Hz
+    // RF carrier offset = Fs/4 (undone by the DSP FreqShiftFs4 step)
+    const double carrierFreq = sampleRate / 4.0;
 
     // Combined frequencies
-    const double freq1 = carrierFreq + audioFreq1;  // 48700 Hz
-    const double freq2 = carrierFreq + audioFreq2;  // 49900 Hz
+    const double freq1 = carrierFreq + audioFreq1;
+    const double freq2 = carrierFreq + audioFreq2;
 
-    const double phaseInc1 = TONE_TWO_PI * freq1 / TONE_SAMPLE_RATE;
-    const double phaseInc2 = TONE_TWO_PI * freq2 / TONE_SAMPLE_RATE;
+    const double phaseInc1 = TONE_TWO_PI * freq1 / sampleRate;
+    const double phaseInc2 = TONE_TWO_PI * freq2 / sampleRate;
 
     // Amplitude for each tone (half amplitude so sum doesn't clip)
     const double amplitude = 1380.0;
@@ -269,8 +278,9 @@ static void generateTwoToneSamples(int16_t* samplesI, int16_t* samplesQ, int num
 // Generate I/Q samples for single-tone test signal
 // Tone at -49kHz (1kHz below -48kHz, will appear at 1kHz audio)
 static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
-    const double freq = 49000.0;  // Hz (48kHz + 1kHz = 49kHz)
-    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double sampleRate = MockRadioSampleRate();
+    const double freq = sampleRate / 4.0 + 1000.0;  // Fs/4 carrier + 1kHz -> 1kHz audio
+    const double phaseInc = TONE_TWO_PI * freq / sampleRate;
     const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
     // Noise amplitude is 1/20th of signal amplitude
     const double noiseAmp = amplitude / 20.0;
@@ -293,8 +303,9 @@ static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int 
 // Generate I/Q samples for RX LSB IQ calibration case
 // Tone at 48kHz carrier, with a small error included
 static void generateRXIQLSBSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
-    const double freq = 48000.0;  // Hz
-    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double sampleRate = MockRadioSampleRate();
+    const double freq = sampleRate / 4.0;  // Fs/4 carrier
+    const double phaseInc = TONE_TWO_PI * freq / sampleRate;
     const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
     // Noise amplitude is 1/40th of signal amplitude
     const double noiseAmp = amplitude / 40.0;
@@ -317,8 +328,9 @@ static void generateRXIQLSBSamples(int16_t* samplesI, int16_t* samplesQ, int num
 // Generate I/Q samples for RX USB IQ calibration case
 // Tone at -48kHz carrier, with a small error included
 static void generateRXIQUSBSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
-    const double freq = -48000.0;  // Hz
-    const double phaseInc = TONE_TWO_PI * freq / TONE_SAMPLE_RATE;
+    const double sampleRate = MockRadioSampleRate();
+    const double freq = -sampleRate / 4.0;  // -Fs/4 carrier
+    const double phaseInc = TONE_TWO_PI * freq / sampleRate;
     const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
     // Noise amplitude is 1/40th of signal amplitude
     const double noiseAmp = amplitude / 40.0;
@@ -454,11 +466,23 @@ bool SDL_Audio_Init(int sampleRate) {
         }
     }
 
+    // Close any devices from a previous initialization so this function can be
+    // called again at run time when the sample rate changes (Sample Rate menu).
+    if (audioOutDevice != 0) {
+        SDL_CloseAudioDevice(audioOutDevice);
+        audioOutDevice = 0;
+    }
+    if (audioInDevice != 0) {
+        SDL_CloseAudioDevice(audioInDevice);
+        audioInDevice = 0;
+    }
+
     currentSampleRate = sampleRate;
 
     // ---- Initialize Audio Output (Playback) ----
-    // DSP output is at 192kHz, downsample to 48kHz for playback
-    int outputRate = 48000;
+    // The DSP output is at the full radio sample rate; decimate by DOWNSAMPLE_FACTOR
+    // for playback (e.g. 192k->48k, 176.4k->44.1k).
+    int outputRate = sampleRate / DOWNSAMPLE_FACTOR;
 
     SDL_AudioSpec outDesired, outObtained;
     SDL_zero(outDesired);
@@ -872,7 +896,7 @@ public:
 
         // Calculate how many samples should have been generated since last call
         uint64_t elapsedUs = nowUs - lastGenerateTime;
-        uint64_t samplesExpected = (elapsedUs * 192000) / 1000000;
+        uint64_t samplesExpected = (elapsedUs * (uint64_t)MockRadioSampleRate()) / 1000000;
 
         // Generate complete blocks only
         uint64_t blocksToGenerate = samplesExpected / BLOCK_SIZE;
@@ -934,7 +958,7 @@ public:
         }
 
         // Update timestamp
-        lastGenerateTime += blocksToGenerate * (BLOCK_SIZE * 1000000 / 192000);
+        lastGenerateTime += blocksToGenerate * (BLOCK_SIZE * 1000000 / (uint64_t)MockRadioSampleRate());
     }
 
     // Get number of blocks available for I channel

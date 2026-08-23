@@ -40,13 +40,13 @@ This validates the hardware configuration needed for full-duplex-capable VFO ope
 
 ## Key Functions
 
-### `SetSSBRXVFOFrequency(int64_t frequency_dHz)`
+### `SetSSBRXVFOFrequency(int64_t frequency_cHz)`
 Sets CLK0/CLK1 as quadrature outputs using PLLA. Uses phase offset method for frequencies above 3.2 MHz, and timed delay technique for lower frequencies.
 
-### `SetSSBTXVFOFrequency(int64_t frequency_dHz)`
+### `SetSSBTXVFOFrequency(int64_t frequency_cHz)`
 Sets CLK4/CLK5 as quadrature outputs using PLLB. Same quadrature generation techniques as RX.
 
-### `SetCWTXVFOFrequency(int64_t frequency_dHz)`
+### `SetCWTXVFOFrequency(int64_t frequency_cHz)`
 Sets CLK6 for CW transmission using standard Si5351 frequency setting.
 
 ### `EvenDivisor(int64_t freq2_Hz)`

@@ -197,7 +197,7 @@ void print_frequency_state(void){
     line += String(ED.fineTuneFreq_Hz[ED.activeVFO]);
     while (line.length() < 32) line += " ";
     line += " | ";
-    line += String(GetTXRXFreq_dHz()/100);
+    line += String(GetTXRXFreq_cHz()/100);
     while (line.length() < 49) line += " ";
     line += " | ";
     line += String(GetRXVFOFrequency());
@@ -282,7 +282,7 @@ TEST(Radio, RadioStateRunThrough) {
     Debug("Before fine tune change:");print_frequency_state();
     SetInterrupt(iFINETUNE_INCREASE);
     loop(); MyDelay(10);
-    int64_t oldrxtx = GetTXRXFreq_dHz();
+    int64_t oldrxtx = GetTXRXFreq_cHz();
     Debug("After fine tune change:");print_frequency_state();
 
     // Change the zoom level
@@ -304,7 +304,7 @@ TEST(Radio, RadioStateRunThrough) {
         MyDelay(10);
     }
     CheckThatStateIsSSBTransmit();
-    EXPECT_EQ(oldrxtx, GetTXRXFreq_dHz());
+    EXPECT_EQ(oldrxtx, GetTXRXFreq_cHz());
     EXPECT_EQ(oldrxtx, GetTXVFOFrequency()*100);
     Debug("In TX mode:");print_frequency_state();
 
@@ -314,7 +314,7 @@ TEST(Radio, RadioStateRunThrough) {
     loop(); MyDelay(10);
     CheckThatStateIsSSBTransmit();
     EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], oldfreq+ED.freqIncrement);
-    EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_dHz());
+    EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_cHz());
     int64_t txcentfreq = ED.centerFreq_Hz[ED.activeVFO];
     Debug("After center change:");print_frequency_state();
 
@@ -323,7 +323,7 @@ TEST(Radio, RadioStateRunThrough) {
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     CheckThatStateIsReceive();
-    EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_dHz()); // rxtx should stay the same
+    EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_cHz()); // rxtx should stay the same
     Debug("Back to SSB receive mode:");print_frequency_state();
     
     // Switch to CW receive mode
@@ -332,7 +332,7 @@ TEST(Radio, RadioStateRunThrough) {
     loop(); MyDelay(10);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
     CheckThatStateIsReceive();
-    EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_dHz()); // rxtx should stay the same
+    EXPECT_EQ(oldrxtx+100*ED.freqIncrement, GetTXRXFreq_cHz()); // rxtx should stay the same
     Debug("Change to CW receive mode:");print_frequency_state();
     
     // Press the key to start transmitting
@@ -342,7 +342,7 @@ TEST(Radio, RadioStateRunThrough) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK);
     CheckThatStateIsCWTransmitMark();
     Debug("Change to CW transmit mark mode:");print_frequency_state();
-    EXPECT_EQ(GetCWVFOFrequency()*100, GetCWTXFreq_dHz());
+    EXPECT_EQ(GetCWVFOFrequency()*100, GetCWTXFreq_cHz());
     for (size_t i = 0; i < 50; i++){
         loop();
         MyDelay(10);

@@ -66,6 +66,7 @@ void SaveDataToStorage(bool savetosd){
         doc["spectrumNoiseFloor"][i] = ED.spectrumNoiseFloor[i];
     }
     doc["spectrum_zoom"] = ED.spectrum_zoom;
+    doc["sampleRate"] = ED.sampleRate;
     doc["CWFilterIndex"] = ED.CWFilterIndex;
     doc["CWToneIndex"] = ED.CWToneIndex;
     doc["decoderFlag"] = ED.decoderFlag;
@@ -93,6 +94,8 @@ void SaveDataToStorage(bool savetosd){
     }
 
     doc["currentMicGain"] = ED.currentMicGain;
+    doc["digitalDriveLevel"] = ED.digitalDriveLevel;
+    doc["digitalRxLevel"] = ED.digitalRxLevel;
 
     // Band-specific arrays
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
@@ -274,6 +277,7 @@ void RestoreDataFromStorage(void){
         }
     }
     ED.spectrum_zoom = doc["spectrum_zoom"] | ED.spectrum_zoom;
+    ED.sampleRate = doc["sampleRate"] | ED.sampleRate;
     ED.CWFilterIndex = doc["CWFilterIndex"] | ED.CWFilterIndex;
     ED.CWToneIndex = doc["CWToneIndex"] | ED.CWToneIndex;
     ED.decoderFlag = doc["decoderFlag"] | ED.decoderFlag;
@@ -315,6 +319,8 @@ void RestoreDataFromStorage(void){
     }
 
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
+    ED.digitalDriveLevel = doc["digitalDriveLevel"] | ED.digitalDriveLevel;
+    ED.digitalRxLevel = doc["digitalRxLevel"] | ED.digitalRxLevel;
 
     if (doc["dbm_calibration"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
@@ -499,6 +505,7 @@ void RestoreDataFromSDCard(void){
         }
     }
     ED.spectrum_zoom = doc["spectrum_zoom"] | ED.spectrum_zoom;
+    ED.sampleRate = doc["sampleRate"] | ED.sampleRate;
     ED.CWFilterIndex = doc["CWFilterIndex"] | ED.CWFilterIndex;
     ED.CWToneIndex = doc["CWToneIndex"] | ED.CWToneIndex;
     ED.decoderFlag = doc["decoderFlag"] | ED.decoderFlag;
@@ -540,6 +547,8 @@ void RestoreDataFromSDCard(void){
     }
 
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
+    ED.digitalDriveLevel = doc["digitalDriveLevel"] | ED.digitalDriveLevel;
+    ED.digitalRxLevel = doc["digitalRxLevel"] | ED.digitalRxLevel;
 
     if (doc["dbm_calibration"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
@@ -672,7 +681,7 @@ void RestoreDataFromSDCard(void){
 
     ED.PowerCal_20W_to_100W_threshold_W = doc["PowerCal_20W_to_100W_threshold_W"] | ED.PowerCal_20W_to_100W_threshold_W;
 
-    // Save the data to the EEPROM so that it matches
+    // Save the data to flash/SD storage so that it matches
     SaveDataToStorage(false);
     Serial.println("Config data restored successfully");
 }
@@ -695,6 +704,7 @@ void PrintEDToSerial(void){
     }
     Serial.println();
     Serial.print("spectrum_zoom:     "); Serial.println(ED.spectrum_zoom);
+    Serial.print("sampleRate:        "); Serial.println(ED.sampleRate);
     Serial.print("CWFilterIndex:     "); Serial.println(ED.CWFilterIndex);
     Serial.print("CWToneIndex:       "); Serial.println(ED.CWToneIndex);
     Serial.print("decoderFlag:       "); Serial.println(ED.decoderFlag);
@@ -713,6 +723,8 @@ void PrintEDToSerial(void){
     Serial.print("fineTuneFreq_Hz[0]: "); Serial.println(ED.fineTuneFreq_Hz[0]);
     Serial.print("fineTuneFreq_Hz[1]: "); Serial.println(ED.fineTuneFreq_Hz[1]);
     Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
+    Serial.print("digitalDriveLevel: "); Serial.println(ED.digitalDriveLevel);
+    Serial.print("digitalRxLevel:    "); Serial.println(ED.digitalRxLevel);
     Serial.print("dbm_calibration: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.dbm_calibration[i]);

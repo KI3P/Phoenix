@@ -12,6 +12,7 @@ public:
     ~TwoWire() {}
 
     void begin() {}
+    void setClock(uint32_t clock) {}
     void beginTransmission(uint8_t address) {}
     size_t write(uint8_t data) { return 1; }
     uint8_t endTransmission(void) { return 0; }

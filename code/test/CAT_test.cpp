@@ -37,13 +37,27 @@ char *PS_write(char* cmd);
 char *PS_read(char* cmd);
 char *RX_write(char* cmd);
 char *TX_write(char* cmd);
+char *FW_write(char* cmd);
+char *FW_read(char* cmd);
+char *SR_write(char* cmd);
+char *SR_read(char* cmd);
+char *DG_write(char* cmd);
+char *DG_read(char* cmd);
+char *DR_write(char* cmd);
+char *DR_read(char* cmd);
+char *CF_write(char* cmd);
+char *CF_read(char* cmd);
+char *EQ_write(char* cmd);
+char *EQ_read(char* cmd);
+char *FL_write(char* cmd);
+char *FL_read(char* cmd);
 void UpdateTransmitAudioGain(void);
 void ShutdownTeensy(void);
 
 // External variables needed for testing
 extern struct config_t ED;
 extern const struct SR_Descriptor SR[];
-extern uint8_t SampleRate;
+extern uint8_t& SampleRate;
 extern struct band bands[];
 
 TEST(CAT, ChangeBandUp){
@@ -883,9 +897,10 @@ TEST(CAT, MD_write_SetsLSBMode) {
     
     char command[] = "MD1;"; // LSB mode
     char *result = MD_write(command);
-    
-    // Verify LSB mode was set
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, LSB);
+
+    // The current modulation is what changes; bands[].mode is the band default
+    // and must be left alone (see SetModulation).
+    EXPECT_EQ(ED.modulation[VFO_A], LSB);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iMODE);
@@ -903,7 +918,7 @@ TEST(CAT, MD_write_SetsUSBMode) {
     char *result = MD_write(command);
     
     // Verify USB mode was set
-    EXPECT_EQ(bands[ED.currentBand[VFO_B]].mode, USB);
+    EXPECT_EQ(ED.modulation[VFO_B], USB);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iMODE);
@@ -922,7 +937,7 @@ TEST(CAT, MD_write_SetsCWModeFromSSBReceive) {
     char *result = MD_write(command);
     
     // Verify LSB mode was set for low band
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, LSB);
+    EXPECT_EQ(ED.modulation[VFO_A], LSB);
     
     // Verify mode state machine event was dispatched
     // Note: We can't easily verify ModeSm_dispatch_event was called in unit test
@@ -943,7 +958,7 @@ TEST(CAT, MD_write_SetsCWModeHighBandUSB) {
     char *result = MD_write(command);
     
     // Verify USB mode was set for high band
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    EXPECT_EQ(ED.modulation[VFO_A], USB);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iMODE);
@@ -957,13 +972,13 @@ TEST(CAT, MD_write_CWModeIgnoredWhenNotInSSBReceive) {
     modeSM.state_id = ModeSm_StateId_CW_RECEIVE; // Different mode
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_20M;
-    bands[BAND_20M].mode = USB; // Set initial mode
-    
+    ED.modulation[VFO_A] = USB; // Set initial modulation
+
     char command[] = "MD3;"; // CW mode
     char *result = MD_write(command);
     
     // Verify mode was NOT changed (should remain USB)
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    EXPECT_EQ(ED.modulation[VFO_A], USB);
     
     // Should return empty string
     EXPECT_STREQ(result, "");
@@ -978,7 +993,7 @@ TEST(CAT, MD_write_SetsAMMode) {
     char *result = MD_write(command);
     
     // Verify SAM mode was set (defaults to SAM rather than AM)
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, SAM);
+    EXPECT_EQ(ED.modulation[VFO_A], SAM);
     
     // Verify interrupt was set
     EXPECT_EQ(GetInterrupt(), iMODE);
@@ -991,13 +1006,13 @@ TEST(CAT, MD_write_InvalidModeIgnored) {
     // Set up test conditions
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_20M;
-    bands[BAND_20M].mode = USB; // Set initial mode
-    
+    ED.modulation[VFO_A] = USB; // Set initial modulation
+
     char command[] = "MD9;"; // Invalid mode
     char *result = MD_write(command);
     
     // Verify mode was not changed
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    EXPECT_EQ(ED.modulation[VFO_A], USB);
     
     // Should return empty string
     EXPECT_STREQ(result, "");
@@ -1019,11 +1034,11 @@ TEST(CAT, MD_read_ReturnsLSBMode) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_40M;
-    bands[BAND_40M].mode = LSB;
-    
+    ED.modulation[VFO_A] = LSB;   // the modulation in use, not the band default
+
     char command[] = "MD;";
     char *result = MD_read(command);
-    
+
     // Should return LSB mode (1)
     EXPECT_STREQ(result, "MD1;");
 }
@@ -1033,7 +1048,7 @@ TEST(CAT, MD_read_ReturnsUSBMode) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
     ED.activeVFO = VFO_B;
     ED.currentBand[VFO_B] = BAND_20M;
-    bands[BAND_20M].mode = USB;
+    ED.modulation[VFO_B] = USB;
     
     char command[] = "MD;";
     char *result = MD_read(command);
@@ -1047,13 +1062,14 @@ TEST(CAT, MD_read_ReturnsAMMode) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_10M;
-    bands[BAND_10M].mode = AM;
+    ED.modulation[VFO_A] = AM;
     
     char command[] = "MD;";
     char *result = MD_read(command);
-    
-    // Should return AM mode (5)
-    EXPECT_STREQ(result, "MD5;");
+
+    // AM and SAM are distinct demodulators, so they read back distinctly:
+    // MD4 for AM, MD5 for SAM.
+    EXPECT_STREQ(result, "MD4;");
 }
 
 TEST(CAT, MD_read_ReturnsSAMMode) {
@@ -1061,7 +1077,7 @@ TEST(CAT, MD_read_ReturnsSAMMode) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_15M;
-    bands[BAND_15M].mode = SAM;
+    ED.modulation[VFO_A] = SAM;
     
     char command[] = "MD;";
     char *result = MD_read(command);
@@ -1075,7 +1091,7 @@ TEST(CAT, MD_read_ReturnsErrorForUnknownMode) {
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE; // Not CW mode
     ED.activeVFO = VFO_A;
     ED.currentBand[VFO_A] = BAND_20M;
-    bands[BAND_20M].mode = (ModulationType)99; // Invalid mode
+    ED.modulation[VFO_A] = (ModulationType)99; // Invalid modulation
     
     char command[] = "MD;";
     char *result = MD_read(command);
@@ -1096,7 +1112,7 @@ TEST(CAT, command_parser_RecognizesMDCommands) {
     char *result = command_parser(md_write);
     
     // Verify mode was set
-    EXPECT_EQ(bands[ED.currentBand[VFO_A]].mode, USB);
+    EXPECT_EQ(ED.modulation[VFO_A], USB);
     EXPECT_STREQ(result, "");
     
     // Test MD read command
@@ -1140,7 +1156,7 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInSSBReceive) {
     SampleRate = SAMPLE_RATE_48K;
     ED.centerFreq_Hz[VFO_A] = 14200000L + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[VFO_A] = 0;
-    bands[BAND_20M].mode = USB;
+    ED.modulation[VFO_A] = USB;
 
     char command[] = "IF;";
     char *result = IF_read(command);
@@ -1190,7 +1206,7 @@ TEST(CAT, IF_read_ReturnsCorrectFormatInSSBTransmit) {
     SampleRate = SAMPLE_RATE_48K;
     ED.centerFreq_Hz[VFO_A] = 21200000L + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[VFO_A] = 0;
-    bands[BAND_15M].mode = USB;
+    ED.modulation[VFO_A] = USB;
 
     char command[] = "IF;";
     char *result = IF_read(command);
@@ -1259,23 +1275,23 @@ TEST(CAT, IF_read_HandlesAllModeTypes) {
     ED.freqIncrement = 1000;
     
     // Test LSB mode
-    bands[BAND_20M].mode = LSB;
+    ED.modulation[VFO_A] = LSB;
     char command[] = "IF;";
     char *result = IF_read(command);
     EXPECT_EQ(result[29], '1'); // LSB = mode 1
     
-    // Test USB mode  
-    bands[BAND_20M].mode = USB;
+    // Test USB mode
+    ED.modulation[VFO_A] = USB;
     result = IF_read(command);
     EXPECT_EQ(result[29], '2'); // USB = mode 2
     
     // Test AM mode
-    bands[BAND_20M].mode = AM;
+    ED.modulation[VFO_A] = AM;
     result = IF_read(command);
     EXPECT_EQ(result[29], '5'); // AM = mode 5
     
     // Test SAM mode (should return as AM)
-    bands[BAND_20M].mode = SAM;
+    ED.modulation[VFO_A] = SAM;
     result = IF_read(command);
     EXPECT_EQ(result[29], '5'); // SAM = mode 5 (reported as AM)
 }
@@ -1287,7 +1303,7 @@ TEST(CAT, IF_read_HandlesFrequencyIncrement) {
     SampleRate = SAMPLE_RATE_48K;
     ED.centerFreq_Hz[VFO_A] = 7100000L + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[VFO_A] = 0;
-    bands[BAND_40M].mode = LSB;
+    ED.modulation[VFO_A] = LSB;
 
     // Test IF command
     char command[] = "IF;";
@@ -1328,7 +1344,7 @@ TEST(CAT, command_parser_RecognizesIFCommand) {
     SampleRate = SAMPLE_RATE_48K;
     ED.centerFreq_Hz[VFO_A] = 14200000L + SR[SampleRate].rate/4;
     ED.fineTuneFreq_Hz[VFO_A] = 0;
-    bands[BAND_20M].mode = USB;
+    ED.modulation[VFO_A] = USB;
 
     // Test IF read command through command parser
     char if_read[] = "IF;";
@@ -2343,4 +2359,901 @@ TEST(CAT, command_parser_RecognizesTXCommands){
     char tx_cmd[] = "TX;";
     char *result = command_parser(tx_cmd);
     EXPECT_STREQ(result, "");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// PTT through command_parser(), with the optional TX parameter
+//
+// ts_480_pc.pdf p.21: the TX set form is "TX P1;" where P1 is 0 (normal/MIC),
+// 1 (DTS via ANI input) or 2 (TX Tune), and "if no P1 parameter is specified,
+// P1=0 is used". So TX;, TX0;, TX1; and TX2; are all valid ways to key.
+//
+// This matters in the field because Hamlib - which WSJT-X, fldigi and Pat all
+// drive the radio through - picks its form from the PTT type: TX; for
+// RIG_PTT_ON, TX0; for RIG_PTT_ON_MIC and TX1; for RIG_PTT_ON_DATA.
+//
+// These go through command_parser() deliberately. The TX_write tests above call
+// the handler directly, so they passed even while the parser was rejecting
+// TX0; and TX1; with "?;" - the handler ignores its argument, and the
+// dispatcher was the part that was wrong.
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(CAT, command_parser_TXAcceptsOptionalParameterFromSSBReceive){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    const char *forms[] = { "TX;", "TX0;", "TX1;", "TX2;" };
+
+    for (const char *form : forms) {
+        modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+        char cmd[8];
+        strcpy(cmd, form);
+        char *result = command_parser(cmd);
+
+        // Accepted, and silent: TX_write returns empty_string_p
+        EXPECT_STREQ(result, "") << "form " << form << " was not accepted";
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT)
+            << "form " << form << " did not key the radio";
+    }
+}
+
+TEST(CAT, command_parser_TXAcceptsOptionalParameterFromCWReceive){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    const char *forms[] = { "TX;", "TX0;", "TX1;", "TX2;" };
+
+    for (const char *form : forms) {
+        modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+        char cmd[8];
+        strcpy(cmd, form);
+        char *result = command_parser(cmd);
+
+        EXPECT_STREQ(result, "") << "form " << form << " was not accepted";
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_TRANSMIT_MARK)
+            << "form " << form << " did not key the radio";
+    }
+}
+
+TEST(CAT, command_parser_RXAcceptsOptionalParameter){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // The TS-480 set form is a bare RX;, but TS-2000 style clients address the
+    // main/sub receiver as RX0;/RX1;. Accept all three; Phoenix has one receiver.
+    const char *forms[] = { "RX;", "RX0;", "RX1;" };
+
+    for (const char *form : forms) {
+        modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+
+        char cmd[8];
+        strcpy(cmd, form);
+        char *result = command_parser(cmd);
+
+        EXPECT_STREQ(result, "") << "form " << form << " was not accepted";
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE)
+            << "form " << form << " did not unkey the radio";
+    }
+}
+
+TEST(CAT, command_parser_RejectsMalformedPTTCommands){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+
+    // Two parameter characters is not a form the spec defines, and accepting the
+    // optional parameter must not turn the length check into "anything goes".
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    char tx_too_long[] = "TX00;";
+    EXPECT_STREQ(command_parser(tx_too_long), "?;");
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+
+    char rx_too_long[] = "RX00;";
+    EXPECT_STREQ(command_parser(rx_too_long), "?;");
+}
+
+TEST(CAT, command_parser_ZeroLengthFieldCommandsStillDispatch){
+    UISm_start(&uiSM);
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    // Read-only commands carry set_len 0, so the parser must not evaluate the
+    // write-length test for them - command[set_len - 1] would be command[-1].
+    // Each must reach its read handler and answer something other than "?;".
+    const char *reads[] = { "ID;", "IF;", "PD;", "ED;", "PR;" };
+
+    for (const char *form : reads) {
+        char cmd[8];
+        strcpy(cmd, form);
+        char *result = command_parser(cmd);
+
+        EXPECT_STRNE(result, "?;") << "read command " << form << " was rejected";
+        EXPECT_NE(result[0], '\0') << "read command " << form << " answered nothing";
+    }
+
+    // The mirror case: band up/down are writes with read_len 0.
+    char bd[] = "BD;";
+    EXPECT_STRNE(command_parser(bd), "?;");
+    char bu[] = "BU;";
+    EXPECT_STRNE(command_parser(bu), "?;");
+}
+
+// ============================================================================
+// Commands added for the hardware-in-the-loop filter test suite
+//
+// These drive radio state that was previously reachable only from the
+// touchscreen menus. Every one of them is exercised through command_parser() as
+// well as directly, because the parser selects write-vs-read purely by where the
+// semicolon falls: it tests the write length first, so a command whose set_len
+// and read_len are equal can never reach its read function.
+// ============================================================================
+
+TEST(CAT, SR_write_SetsSampleRate) {
+    uint8_t saved = SampleRate;
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    char cmd176[] = "SR0;";
+    EXPECT_STREQ(SR_write(cmd176), "");
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
+
+    char cmd192[] = "SR1;";
+    EXPECT_STREQ(SR_write(cmd192), "");
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_192K);
+
+    SampleRate = saved;
+}
+
+TEST(CAT, SR_read_ReturnsSampleRateIndex) {
+    uint8_t saved = SampleRate;
+
+    SampleRate = SAMPLE_RATE_176K;
+    char cmd[] = "SR;";
+    EXPECT_STREQ(SR_read(cmd), "SR0;");
+
+    SampleRate = SAMPLE_RATE_192K;
+    EXPECT_STREQ(SR_read(cmd), "SR1;");
+
+    SampleRate = saved;
+}
+
+TEST(CAT, SR_write_RejectsOutOfRange) {
+    uint8_t saved = SampleRate;
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    SampleRate = SAMPLE_RATE_192K;
+
+    char cmd[] = "SR2;";
+    EXPECT_STREQ(SR_write(cmd), "?;");
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_192K) << "a rejected rate must not change anything";
+
+    SampleRate = saved;
+}
+
+TEST(CAT, SR_write_RefusedWhileTransmitting) {
+    uint8_t saved = SampleRate;
+    SampleRate = SAMPLE_RATE_192K;
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+
+    char cmd[] = "SR0;";
+    EXPECT_STREQ(SR_write(cmd), "?;");
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_192K)
+        << "changing rate mid-transmission would reconfigure the I2S clock underneath the TX chain";
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    SampleRate = saved;
+}
+
+TEST(CAT, SR_ParserReachesBothForms) {
+    uint8_t saved = SampleRate;
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    char write_cmd[] = "SR0;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
+
+    char read_cmd[] = "SR;";
+    EXPECT_STREQ(command_parser(read_cmd), "SR0;");
+
+    SampleRate = saved;
+}
+
+TEST(CAT, CF_write_SetsCWFilterIndex) {
+    int32_t saved = ED.CWFilterIndex;
+
+    for (int i = 0; i <= 5; i++) {
+        char cmd[] = "CF0;";
+        cmd[2] = '0' + i;
+        EXPECT_STREQ(CF_write(cmd), "");
+        EXPECT_EQ(ED.CWFilterIndex, i);
+    }
+
+    ED.CWFilterIndex = saved;
+}
+
+TEST(CAT, CF_read_ReturnsCWFilterIndex) {
+    int32_t saved = ED.CWFilterIndex;
+
+    ED.CWFilterIndex = 4;
+    char cmd[] = "CF;";
+    EXPECT_STREQ(CF_read(cmd), "CF4;");
+
+    ED.CWFilterIndex = saved;
+}
+
+TEST(CAT, CF_write_RejectsOutOfRange) {
+    int32_t saved = ED.CWFilterIndex;
+    ED.CWFilterIndex = 2;
+
+    char cmd[] = "CF6;";
+    EXPECT_STREQ(CF_write(cmd), "?;");
+    EXPECT_EQ(ED.CWFilterIndex, 2);
+
+    ED.CWFilterIndex = saved;
+}
+
+TEST(CAT, CF_ParserReachesBothForms) {
+    int32_t saved = ED.CWFilterIndex;
+
+    char write_cmd[] = "CF3;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(ED.CWFilterIndex, 3);
+
+    char read_cmd[] = "CF;";
+    EXPECT_STREQ(command_parser(read_cmd), "CF3;");
+
+    ED.CWFilterIndex = saved;
+}
+
+TEST(CAT, EQ_write_SetsEqualizerCell) {
+    int32_t saved = ED.equalizerRec[7];
+
+    char cmd[] = "EQ07050;";
+    EXPECT_STREQ(EQ_write(cmd), "");
+    EXPECT_EQ(ED.equalizerRec[7], 50);
+
+    ED.equalizerRec[7] = saved;
+}
+
+TEST(CAT, EQ_read_ReturnsEqualizerCell) {
+    int32_t saved = ED.equalizerRec[13];
+
+    ED.equalizerRec[13] = 100;
+    char cmd[] = "EQ13;";
+    EXPECT_STREQ(EQ_read(cmd), "EQ13100;");
+
+    ED.equalizerRec[13] = 0;
+    EXPECT_STREQ(EQ_read(cmd), "EQ13000;");
+
+    ED.equalizerRec[13] = saved;
+}
+
+TEST(CAT, EQ_write_RejectsOutOfRange) {
+    int32_t saved = ED.equalizerRec[0];
+    ED.equalizerRec[0] = 100;
+
+    char bad_cell[] = "EQ14050;";
+    EXPECT_STREQ(EQ_write(bad_cell), "?;");
+
+    char bad_value[] = "EQ00101;";
+    EXPECT_STREQ(EQ_write(bad_value), "?;");
+    EXPECT_EQ(ED.equalizerRec[0], 100);
+
+    char bad_read[] = "EQ14;";
+    EXPECT_STREQ(EQ_read(bad_read), "?;");
+
+    ED.equalizerRec[0] = saved;
+}
+
+TEST(CAT, EQ_ParserReachesBothForms) {
+    int32_t saved = ED.equalizerRec[2];
+
+    char write_cmd[] = "EQ02075;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(ED.equalizerRec[2], 75);
+
+    char read_cmd[] = "EQ02;";
+    EXPECT_STREQ(command_parser(read_cmd), "EQ02075;");
+
+    ED.equalizerRec[2] = saved;
+}
+
+TEST(CAT, FL_write_SetsLowCutOnUSB) {
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB;
+    bands[BAND_20M].FLoCut_Hz = 200;
+    bands[BAND_20M].FHiCut_Hz = 3000;
+
+    char cmd[] = "FL0400;";
+    EXPECT_STREQ(FL_write(cmd), "");
+    EXPECT_EQ(bands[BAND_20M].FLoCut_Hz, 400);
+    EXPECT_EQ(bands[BAND_20M].FHiCut_Hz, 3000) << "FL must not disturb the other edge";
+
+    bands[BAND_20M].FLoCut_Hz = 200;
+}
+
+TEST(CAT, FL_write_RejectsCrossingTheHighCut) {
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB;
+    bands[BAND_20M].FLoCut_Hz = 200;
+    bands[BAND_20M].FHiCut_Hz = 3000;
+
+    char cmd[] = "FL3500;";
+    FL_write(cmd);
+    EXPECT_EQ(bands[BAND_20M].FLoCut_Hz, 200) << "low cut must stay below the high cut";
+}
+
+TEST(CAT, FL_read_ReturnsLowCut) {
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB;
+    bands[BAND_20M].FLoCut_Hz = 300;
+
+    char cmd[] = "FL;";
+    EXPECT_STREQ(FL_read(cmd), "FL0300;");
+
+    bands[BAND_20M].FLoCut_Hz = 200;
+}
+
+TEST(CAT, FW_read_IsReachableThroughTheParser) {
+    // FW used to declare set_len == read_len, and because command_parser tests
+    // the write form first, "FW;" fell through to "?;" and the bandwidth could
+    // be set but never read back.
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB;
+    bands[BAND_20M].FLoCut_Hz = 200;
+    bands[BAND_20M].FHiCut_Hz = 2800;
+
+    char read_cmd[] = "FW;";
+    EXPECT_STREQ(command_parser(read_cmd), "FW2800;");
+
+    char write_cmd[] = "FW2400;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(bands[BAND_20M].FHiCut_Hz, 2400);
+    EXPECT_STREQ(command_parser(read_cmd), "FW2400;");
+
+    bands[BAND_20M].FHiCut_Hz = 3000;
+}
+
+TEST(CAT, MD_write_SetsModulationAndLeavesTheBandDefault) {
+    // Demodulate() switches on ED.modulation, while InitFilterMask() compares it
+    // against bands[].mode and mirrors the passband when they disagree. So
+    // bands[].mode is the fixed reference, not a second copy of the current mode:
+    // writing it is what made MD select the band default instead of the requested
+    // sideband. This test previously asserted the opposite and passed, which is
+    // how the bug survived - it encoded the defect as the contract.
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ModulationType bandDefault = bands[BAND_20M].mode;
+
+    const ModulationType wanted[4] = { USB, LSB, AM, SAM };
+    const char *cmds[4] = { "MD2;", "MD1;", "MD4;", "MD5;" };
+
+    for (int i = 0; i < 4; i++) {
+        char cmd[8];
+        strcpy(cmd, cmds[i]);
+        MD_write(cmd);
+        EXPECT_EQ(ED.modulation[VFO_A], wanted[i]);
+        EXPECT_EQ(bands[BAND_20M].mode, bandDefault)
+            << "the band default must survive a modulation change";
+    }
+}
+
+TEST(CAT, MD_write_LeavesCWReceive) {
+    // TO_SSB_MODE used to be reachable only from the front-panel TOGGLE_MODE
+    // button, so CAT could enter CW receive and never get back out.
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    char cw[] = "MD3;";
+    MD_write(cw);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+
+    char usb[] = "MD2;";
+    MD_write(usb);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE)
+        << "MD1/MD2 must be able to bring the radio back out of CW receive";
+    EXPECT_EQ(ED.modulation[VFO_A], USB);
+}
+
+// ============================================================================
+// DG - digital (USB audio) mode
+//
+// These tests run in a build without AUDIO_INTERFACE, so DG_write always
+// reports "?;": digital mode has no transport to offer. What they pin down is
+// that the refusal is total - no state change, no sample-rate change - and that
+// DG_read still answers honestly. The mode transitions themselves are covered
+// by the ModeSm suite, which does not depend on the USB build configuration.
+// ============================================================================
+
+TEST(CAT, DG_read_ReportsDigitalModeOff) {
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    char cmd[] = "DG;";
+    EXPECT_STREQ(DG_read(cmd), "DG0;");
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    EXPECT_STREQ(DG_read(cmd), "DG0;");
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+}
+
+TEST(CAT, DG_read_ReportsDigitalModeOn) {
+    ModeSm_start(&modeSM);
+    char cmd[] = "DG;";
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+    EXPECT_STREQ(DG_read(cmd), "DG1;");
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_TRANSMIT;
+    EXPECT_STREQ(DG_read(cmd), "DG1;")
+        << "digital mode is still on while transmitting";
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+}
+
+TEST(CAT, DG_write_RejectsOutOfRange) {
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    char cmd[] = "DG2;";
+    EXPECT_STREQ(DG_write(cmd), "?;");
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE)
+        << "a rejected parameter must not change the mode";
+}
+
+TEST(CAT, DG_ParserReachesBothForms) {
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    // The parser tests the write length first, so confirm a bare DG; still
+    // reaches the read handler rather than being taken as a malformed write.
+    char read_cmd[] = "DG;";
+    EXPECT_STREQ(command_parser(read_cmd), "DG0;");
+
+    char write_cmd[] = "DG1;";
+    char *out = command_parser(write_cmd);
+#ifdef AUDIO_INTERFACE
+    EXPECT_STREQ(out, "");
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    char off[] = "DG0;";
+    command_parser(off);
+#else
+    EXPECT_STREQ(out, "?;") << "no USB audio interface compiled in";
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+#endif
+}
+
+// WSJT-X sends MD2; to force USB on startup and before every transmission. If
+// that were treated as a request to leave digital mode, the mode would be
+// impossible to hold. Only DG0; or the front panel MODE button may leave it.
+TEST(CAT, MD_write_DoesNotLeaveDigitalMode) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+
+    char usb[] = "MD2;";
+    MD_write(usb);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE)
+        << "a modulation change must not drop the radio out of digital mode";
+    EXPECT_EQ(ED.modulation[VFO_A], USB) << "but it must still take effect";
+
+    char lsb[] = "MD1;";
+    MD_write(lsb);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    EXPECT_EQ(ED.modulation[VFO_A], LSB);
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+}
+
+// MD3; is a genuine mode change and must be honoured from digital mode
+TEST(CAT, MD_write_LeavesDigitalModeForCW) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+
+    char cw[] = "MD3;";
+    MD_write(cw);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+}
+
+TEST(CAT, MD_read_ReportsSidebandInDigitalMode) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    ED.modulation[VFO_A] = USB;
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+
+    char cmd[] = "MD;";
+    EXPECT_STREQ(MD_read(cmd), "MD2;")
+        << "hamlib must see a sane sideband, not an unknown mode, in digital mode";
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+}
+
+// This is how WSJT-X keys the rig
+TEST(CAT, TX_and_RX_write_KeyDigitalTransmit) {
+    ModeSm_start(&modeSM);
+    bands[ED.currentBand[ED.activeVFO]].band_type = HAM_BAND;
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+
+    char tx[] = "TX;";
+    TX_write(tx);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_TRANSMIT);
+
+    char rx[] = "RX;";
+    RX_write(rx);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+}
+
+TEST(CAT, SR_write_RefusedInDigitalMode) {
+    uint8_t saved = SampleRate;
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+    SampleRate = SAMPLE_RATE_176K;
+
+    char cmd[] = "SR1;";
+    EXPECT_STREQ(SR_write(cmd), "?;");
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K)
+        << "digital mode pins the rate so the USB endpoint needs no resampling";
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    SampleRate = saved;
+}
+
+TEST(CAT, IF_read_ReportsReceiveInDigitalMode) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_20M;
+    bands[BAND_20M].mode = USB;
+    char cmd[] = "IF;";
+
+    // Nothing but the mode state differs between these two, and both are receive
+    // states reporting the same sideband, so the responses must match exactly.
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    std::string ssb = IF_read(cmd);
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+    std::string digital = IF_read(cmd);
+
+    EXPECT_EQ(digital, ssb)
+        << "digital receive must report RX and the same sideband as SSB receive";
+
+    // ...and a transmit state must differ, or the comparison above proves nothing
+    modeSM.state_id = ModeSm_StateId_DIGITAL_TRANSMIT;
+    EXPECT_NE(std::string(IF_read(cmd)), ssb) << "digital transmit must report TX";
+
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+}
+
+// ============================================================================
+// Sideband selection: MD must change the sideband that is actually received
+//
+// The receive passband is bands[].FLoCut_Hz/FHiCut_Hz, stored in the convention
+// of the band's DEFAULT modulation (negative below the carrier for an LSB-default
+// band). InitFilterMask() mirrors those cutoffs whenever the CURRENT modulation
+// differs from that default - which is the only thing that produces the opposite
+// sideband.
+//
+// SetModulation() used to write bands[].mode too. That made the default agree
+// with the newly requested modulation, which switched the mirroring OFF and
+// handed back the band-default passband. On 40 m, "MD2;" (select USB) therefore
+// tuned the radio to LSB, with the display still reading USB because it reads
+// ED.modulation[]. These tests pin the boundary.
+// ============================================================================
+
+/** Effective receive passband, computed the same way InitFilterMask() does. */
+static void EffectivePassband(int32_t *low_Hz, int32_t *high_Hz) {
+    int band = ED.currentBand[ED.activeVFO];
+    if (ED.modulation[ED.activeVFO] == bands[band].mode) {
+        *low_Hz = bands[band].FLoCut_Hz;
+        *high_Hz = bands[band].FHiCut_Hz;
+    } else {
+        *low_Hz = -bands[band].FHiCut_Hz;
+        *high_Hz = -bands[band].FLoCut_Hz;
+    }
+}
+
+TEST(CAT, MD_write_DoesNotDisturbTheBandDefault) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+    ModulationType bandDefault = bands[BAND_40M].mode;
+
+    char usb[] = "MD2;";
+    MD_write(usb);
+
+    EXPECT_EQ(bands[BAND_40M].mode, bandDefault)
+        << "bands[].mode is the band default and is the reference the passband "
+           "mirroring is measured against; writing it flips the sideband";
+    EXPECT_EQ(ED.modulation[VFO_A], USB);
+}
+
+// The bug, stated as behaviour: asking for USB on an LSB-default band must put
+// the passband above the carrier.
+TEST(CAT, MD_write_USBOnLSBBandGivesAnUpperSideband) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+    ASSERT_EQ(bands[BAND_40M].mode, LSB) << "40 m is an LSB-default band";
+
+    char usb[] = "MD2;";
+    MD_write(usb);
+
+    int32_t low_Hz, high_Hz;
+    EffectivePassband(&low_Hz, &high_Hz);
+    EXPECT_GT(high_Hz, 0) << "USB passband must lie above the carrier";
+    EXPECT_GE(low_Hz, 0);
+}
+
+TEST(CAT, MD_write_LSBOnLSBBandGivesALowerSideband) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+
+    char lsb[] = "MD1;";
+    MD_write(lsb);
+
+    int32_t low_Hz, high_Hz;
+    EffectivePassband(&low_Hz, &high_Hz);
+    EXPECT_LT(low_Hz, 0) << "LSB passband must lie below the carrier";
+    EXPECT_LE(high_Hz, 0);
+}
+
+// ...and the same on a band whose default is the other way round, or the fix
+// would just be moving the bug to the opposite set of bands.
+TEST(CAT, MD_write_LSBOnUSBBandGivesALowerSideband) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_4M;
+    ASSERT_EQ(bands[BAND_4M].mode, USB) << "4 m is a USB-default band";
+
+    char lsb[] = "MD1;";
+    MD_write(lsb);
+
+    int32_t low_Hz, high_Hz;
+    EffectivePassband(&low_Hz, &high_Hz);
+    EXPECT_LT(low_Hz, 0) << "LSB passband must lie below the carrier";
+    EXPECT_LE(high_Hz, 0);
+}
+
+TEST(CAT, MD_write_SelectingBothSidebandsGivesDifferentPassbands) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+
+    char lsb[] = "MD1;";
+    MD_write(lsb);
+    int32_t lsbLow, lsbHigh;
+    EffectivePassband(&lsbLow, &lsbHigh);
+
+    char usb[] = "MD2;";
+    MD_write(usb);
+    int32_t usbLow, usbHigh;
+    EffectivePassband(&usbLow, &usbHigh);
+
+    // Before the fix both produced the band default, so this was the assertion
+    // that would have caught it.
+    EXPECT_NE(lsbLow, usbLow);
+    EXPECT_EQ(lsbLow, -usbHigh) << "the two sidebands are mirror images";
+    EXPECT_EQ(lsbHigh, -usbLow);
+}
+
+// MD_read reported bands[].mode, so it announced the band default rather than
+// what the operator had actually selected - including via the front panel, which
+// has always written ED.modulation[] alone.
+TEST(CAT, MD_read_ReportsCurrentModulationNotBandDefault) {
+    ModeSm_start(&modeSM);
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+    ASSERT_EQ(bands[BAND_40M].mode, LSB);
+
+    // Exactly what the front-panel DEMODULATION button does
+    ED.modulation[VFO_A] = USB;
+
+    char cmd[] = "MD;";
+    EXPECT_STREQ(MD_read(cmd), "MD2;")
+        << "MD; must report the modulation in use, not the band default";
+}
+
+TEST(CAT, IF_read_ReportsCurrentModulationNotBandDefault) {
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    ED.activeVFO = VFO_A;
+    ED.currentBand[VFO_A] = BAND_40M;
+    ASSERT_EQ(bands[BAND_40M].mode, LSB);
+
+    char cmd[] = "IF;";
+
+    ED.modulation[VFO_A] = USB;
+    std::string usbReply = IF_read(cmd);
+    ED.modulation[VFO_A] = LSB;
+    std::string lsbReply = IF_read(cmd);
+
+    EXPECT_NE(usbReply, lsbReply)
+        << "the IF mode digit must track the modulation in use";
+}
+
+// ============================================================================
+// DR - digital-mode receive level
+//
+// The audio the radio sends to the host is unregulated: with AGC off the AGC
+// stage applies a fixed gain of 20, so a strong signal reaches full scale and
+// clips. A 20 s bench capture sat at 98 % of full scale with only 0.15 dB of
+// headroom. DR is the attenuation that buys that headroom back.
+// ============================================================================
+
+TEST(CAT, DR_write_SetsReceiveLevel) {
+    int32_t saved = ED.digitalRxLevel;
+
+    char cmd[] = "DR040;";
+    EXPECT_STREQ(DR_write(cmd), "");
+    EXPECT_EQ(ED.digitalRxLevel, 40);
+
+    char zero[] = "DR000;";
+    EXPECT_STREQ(DR_write(zero), "");
+    EXPECT_EQ(ED.digitalRxLevel, 0) << "0 is a legal level - it mutes the USB stream";
+
+    char full[] = "DR100;";
+    EXPECT_STREQ(DR_write(full), "");
+    EXPECT_EQ(ED.digitalRxLevel, 100);
+
+    ED.digitalRxLevel = saved;
+}
+
+TEST(CAT, DR_write_RejectsOutOfRange) {
+    int32_t saved = ED.digitalRxLevel;
+    ED.digitalRxLevel = 25;
+
+    char cmd[] = "DR101;";
+    EXPECT_STREQ(DR_write(cmd), "?;");
+    EXPECT_EQ(ED.digitalRxLevel, 25) << "a rejected level must not change anything";
+
+    ED.digitalRxLevel = saved;
+}
+
+TEST(CAT, DR_read_ReturnsLevelZeroPadded) {
+    int32_t saved = ED.digitalRxLevel;
+    char cmd[] = "DR;";
+
+    ED.digitalRxLevel = 25;
+    EXPECT_STREQ(DR_read(cmd), "DR025;");
+
+    ED.digitalRxLevel = 100;
+    EXPECT_STREQ(DR_read(cmd), "DR100;");
+
+    ED.digitalRxLevel = 0;
+    EXPECT_STREQ(DR_read(cmd), "DR000;");
+
+    ED.digitalRxLevel = saved;
+}
+
+TEST(CAT, DR_ParserReachesBothForms) {
+    int32_t saved = ED.digitalRxLevel;
+
+    char write_cmd[] = "DR030;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(ED.digitalRxLevel, 30);
+
+    char read_cmd[] = "DR;";
+    EXPECT_STREQ(command_parser(read_cmd), "DR030;");
+
+    ED.digitalRxLevel = saved;
+}
+
+// ============================================================================
+// Time-sync packets on the CAT port
+//
+// In a build with a USB audio interface there is one CDC port, CATSerial is
+// Serial, and CheckForCATSerialEvents() drains it before CheckForSerialTimeSync()
+// could run. The CAT reader therefore has to recognise the PJRC packet itself -
+// 'T' + 10 digits + '\n', unchanged on the wire - and everything else that
+// arrives newline-terminated has to be discarded rather than prepended to the
+// next command. These tests drive CATSerial directly, so they exercise that path
+// in either build.
+// ============================================================================
+
+// Helper: feed bytes to the CAT port and process them in one call.
+static void runCATSerial(const char* bytes) {
+    Teensy3Clock.wasSet = false;
+    Teensy3Clock.lastSet = 0;
+    CATSerial.clearBuffer();
+    CATSerial.feedData(bytes);
+    CheckForCATSerialEvents();
+}
+
+TEST(CAT, TimeSyncPacketOnCATPortSetsClock) {
+    runCATSerial("T1748476800\n");
+    EXPECT_TRUE(Teensy3Clock.wasSet)
+        << "the CAT reader owns the port on a USB-audio build and must honour "
+           "the time packet itself";
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(CAT, TimeSyncPacketOnCATPortAcceptsCarriageReturn) {
+    runCATSerial("T1748476800\r");
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(CAT, TimeSyncPacketDoesNotCorruptTheNextCATCommand) {
+    // The bug this fixes: the packet's bytes stayed in catCommand, so the next
+    // command parsed as "T1748476800\nFA00014200000;" and came back "?;".
+    int64_t savedFreq = ED.centerFreq_Hz[VFO_A];
+    int32_t savedBand = ED.currentBand[VFO_A];
+
+    runCATSerial("T1748476800\nFA00014200000;");
+    ConsumeInterrupt();
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 14200000L + SR[SampleRate].rate/4)
+        << "a command arriving straight after a time packet must still execute";
+
+    ED.centerFreq_Hz[VFO_A] = savedFreq;
+    ED.currentBand[VFO_A] = savedBand;
+}
+
+TEST(CAT, TimeSyncPacketRejectsMalformedTimestamps) {
+    runCATSerial("T12345\n");            // too few digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("T17484768000\n");      // too many digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("T0000000001\n");       // parses, but fails the ~2001 sanity check
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("Tabcdefghij\n");       // right length, not digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("T -174847680\n");      // atoll() would stop at the space
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("1748476800\n");        // no 'T' header
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(CAT, TCommandsAreStillCATCommands) {
+    // "TX;" and "TX0;" start with 'T' too. They are semicolon-terminated, so the
+    // newline branch must never see them.
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    runCATSerial("TX;");
+    ConsumeInterrupt();
+    EXPECT_FALSE(Teensy3Clock.wasSet)
+        << "TX; must not be mistaken for a time packet";
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
+
+    runCATSerial("RX;");
+    ConsumeInterrupt();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+TEST(CAT, StrayNewlineTerminatedBytesAreDiscarded) {
+    // A client that ends its commands with CRLF used to leave the line ending in
+    // catCommand, which then prefixed - and broke - the following command.
+    int64_t savedFreq = ED.centerFreq_Hz[VFO_A];
+    int32_t savedBand = ED.currentBand[VFO_A];
+
+    runCATSerial("FA00014200000;\r\nFA00007100000;");
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 7100000L + SR[SampleRate].rate/4)
+        << "a CRLF between commands must not break the command after it";
+
+    ED.centerFreq_Hz[VFO_A] = savedFreq;
+    ED.currentBand[VFO_A] = savedBand;
 }

@@ -44,11 +44,13 @@ void PerformSignalProcessing(void){
         case (ModeSm_StateId_CALIBRATE_FREQUENCY):
         case (ModeSm_StateId_CALIBRATE_RX_IQ):
         case (ModeSm_StateId_SSB_RECEIVE):
+        case (ModeSm_StateId_DIGITAL_RECEIVE):
         case (ModeSm_StateId_CW_RECEIVE):{
             ReceiveProcessing(nullptr);
             break;
         }
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
+        case (ModeSm_StateId_DIGITAL_TRANSMIT):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             TransmitProcessing(nullptr);
             if (HasDualVFOs())
@@ -71,6 +73,7 @@ void PerformSignalProcessing(void){
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
+        case (ModeSm_StateId_DIGITAL_TRANSMIT):
         case (ModeSm_StateId_SSB_TRANSMIT):
         case (ModeSm_StateId_CW_TRANSMIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
@@ -625,7 +628,6 @@ float32_t GetSAMCarrierOffset(void){
  * 
  * @param data Pointer to the DataBlock to act upon
  */
-static float32_t wold = 0;
 void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters){
     // Demodulation: our time domain output is a combination of the real part (left channel) 
     // AND the imaginary part (right channel) of the second half of the FFT_buffer
@@ -651,9 +653,10 @@ void Demodulate(DataBlock *data, ReceiveFilterConfig *RXfilters){
           if (isnan(audiotmp)){
             audiotmp = 0.0;
           }
-          w = audiotmp + wold * 0.99f;  // Response to below 200Hz
-          data->I[i] = w - wold;
-          wold = w;
+          // One pole DC blocker, cornered at RXfilters->amDCBlockCorner_Hz.
+          w = audiotmp + RXfilters->amDCBlockState * RXfilters->amDCBlockPole;
+          data->I[i] = w - RXfilters->amDCBlockState;
+          RXfilters->amDCBlockState = w;
         }
         arm_biquad_cascade_df1_f32(&RXfilters->biquadAudioLowPass, data->I, data->Q, data->N);
         arm_copy_f32(data->Q, data->I, data->N);
@@ -700,6 +703,13 @@ void InterpolateReceiveData(DataBlock *data, ReceiveFilterConfig *RXfilters){
     arm_fir_interpolate_f32(&RXfilters->FIR_int1, data->I, data->Q, READ_BUFFER_SIZE / RXfilters->DF);
     data->N = data->N * RXfilters->DF2;
     data->sampleRate_Hz = data->sampleRate_Hz * RXfilters->DF2;
+    // Sample rate is now Fs/4, which at the 176.4 ksps that DIGITAL mode forces
+    // is exactly 44,100 Hz - the native rate of the USB audio endpoint - and the
+    // block is exactly 512 samples. Tap the audio for the host here, before
+    // AdjustVolume(), so the level sent to the PC is independent of the
+    // front-panel volume knob.
+    if (modeSM.state_id == ModeSm_StateId_DIGITAL_RECEIVE)
+        USBAudioWriteRx(data->Q, data->N);
     arm_fir_interpolate_f32(&RXfilters->FIR_int2, data->Q, data->I, READ_BUFFER_SIZE / RXfilters->DF1);
     data->N = data->N * RXfilters->DF1;
     data->sampleRate_Hz = data->sampleRate_Hz * RXfilters->DF1;
@@ -719,7 +729,15 @@ float32_t VolumeToAmplification(int32_t volume) {
  * Adjust the volume
  */
 void AdjustVolume(DataBlock *data, ReceiveFilterConfig *RXfilters){
-    arm_scale_f32(data->I, RXfilters->DF * VolumeToAmplification(ED.audioVolume), data->I, data->N);
+    float32_t gain = RXfilters->DF * VolumeToAmplification(ED.audioVolume);
+#ifdef MUTE_ON_RAPID_TUNE
+    // Mute the output while a tune encoder is being spun fast, so the rapid VFO
+    // reprogramming is not heard as audio glitches. Resumes automatically when
+    // tuning stops (see IsRapidTuning() in Loop.cpp).
+    if (IsRapidTuning())
+        gain = 0.0f;
+#endif
+    arm_scale_f32(data->I, gain, data->I, data->N);
 }
 
 /**
@@ -742,6 +760,10 @@ void PlayBuffer(DataBlock *data){
  * 2) Configure the AGC
  * 3) Configure the noise reduction
  * 4) Set all arrays in DMAMEM to zero before using them
+ *
+ * InitializeFilters() and InitializeTransmitFilters() regenerate the
+ * sample-rate-dependent coefficient tables as their first step, so calling this
+ * after a rate change is all that is needed to retune the whole chain.
  */
 void InitializeSignalProcessing(void){
     InitializeFilters(ED.spectrum_zoom,&RXfilters);
@@ -889,7 +911,9 @@ DataBlock * ReceiveProcessing(const char *fname){
     // x + shift Hz after this step.
     float32_t sideToneShift_Hz = 0;
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE ) {
-        if (bands[ED.currentBand[ED.activeVFO]].mode == 1) {
+        // Which way the sidetone offset goes follows the CURRENT modulation, not
+        // the band default (LSB is ModulationType 1; spelling it out here).
+        if (ED.modulation[ED.activeVFO] == LSB) {
             sideToneShift_Hz = CWToneOffsetsHz[ED.CWToneIndex];
         } else {
             sideToneShift_Hz = -CWToneOffsetsHz[ED.CWToneIndex];
@@ -1107,6 +1131,59 @@ void TXGain(DataBlock *data){
 }
 
 /**
+ * Read a block of transmit audio from the USB audio link for digital mode.
+ *
+ * The microphone queues are still what paces this: they fill from the I2S DMA at
+ * exactly the rate the transmit DAC drains, so gating on them keeps
+ * TransmitProcessing() locked to the I2S clock. The samples themselves are
+ * discarded - the audio comes from the host instead. Letting the host's USB
+ * clock pace the DSP loop is what starved the transmit output queue in earlier
+ * attempts at this feature.
+ *
+ * Produces 512 samples at Fs/4, which is 44,100 Hz at the 176.4 ksps that
+ * digital mode forces, so the chain is entered one stage down - after
+ * TXDecimateBy4() rather than before it.
+ *
+ * @param data Block to fill; I and Q both receive the (mono) transmit audio
+ * @return ESUCCESS if a block was produced, EFAIL if the I2S clock has not ticked
+ */
+errno_t ReadUSBTransmitBuffer(DataBlock *data){
+    if ((uint32_t)Q_in_L_Ex.available() <= N_BLOCKS_EX || (uint32_t)Q_in_R_Ex.available() <= N_BLOCKS_EX)
+        return EFAIL;
+
+    // Drain the microphone blocks we are using purely as a clock. No conversion,
+    // the samples are not wanted.
+    for (unsigned i = 0; i < N_BLOCKS_EX; i++) {
+        Q_in_L_Ex.readBuffer();
+        Q_in_R_Ex.readBuffer();
+        Q_in_L_Ex.freeBuffer();
+        Q_in_R_Ex.freeBuffer();
+    }
+
+    data->N = USB_AUDIO_BLOCK_SAMPLES;
+    data->sampleRate_Hz = SR[SampleRate].rate / 4;
+
+    if (!USBAudioReadTx(data->I, USB_AUDIO_BLOCK_SAMPLES)) {
+        // Host underrun. Emit silence rather than failing, so the transmit output
+        // queue keeps being fed and never starves.
+        memset(data->I, 0, USB_AUDIO_BLOCK_SAMPLES * sizeof(float32_t));
+    } else {
+        // Software drive control, the digital-mode analogue of microphone gain
+        arm_scale_f32(data->I, ED.digitalDriveLevel / 100.0f, data->I, data->N);
+    }
+
+    float32_t buffer_rms = 0;
+    for (size_t k = 0; k < USB_AUDIO_BLOCK_SAMPLES; k++)
+        buffer_rms += data->I[k] * data->I[k];
+    buffer_rms = sqrt(buffer_rms / USB_AUDIO_BLOCK_SAMPLES);
+    L_in_RMS = 0.9 * L_in_RMS + 0.1 * buffer_rms;
+    R_in_RMS = L_in_RMS;
+
+    arm_copy_f32(data->I, data->Q, USB_AUDIO_BLOCK_SAMPLES);
+    return ESUCCESS;
+}
+
+/**
  * Read a block of samples from the microphone and perform transmit signal processing
  */
 DataBlock * TransmitProcessing(const char *fname){
@@ -1114,13 +1191,20 @@ DataBlock * TransmitProcessing(const char *fname){
     data.I = float_buffer_L;
     data.Q = float_buffer_R;
 
-    // Read data from microphone input buffer
-    if (ReadMicrophoneBuffer(&data)){
-        // There is no data available, skip the rest
-        return NULL;
+    if (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT){
+        // Audio comes from the host over USB, already at Fs/4, so the
+        // decimate-by-4 stage below is skipped.
+        if (ReadUSBTransmitBuffer(&data))
+            return NULL;
+    } else {
+        // Read data from microphone input buffer
+        if (ReadMicrophoneBuffer(&data)){
+            // There is no data available, skip the rest
+            return NULL;
+        }
+        //Flag(2);
+        TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     }
-    //Flag(2);
-    TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
     TXGain(&data); // apply the DSP gain factor

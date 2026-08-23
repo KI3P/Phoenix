@@ -11,6 +11,7 @@
 
 typedef float float32_t;
 #define AudioInterrupts()
+#define AudioNoInterrupts()
 #define DMAMEM
 #define FASTRUN
 #define DEC 10
@@ -91,6 +92,8 @@ public:
         _callback = nullptr;
         _interval_us = 0;
     }
+
+    void priority(uint8_t n) { (void)n; }
 
 private:
     voidFuncPtr _callback;

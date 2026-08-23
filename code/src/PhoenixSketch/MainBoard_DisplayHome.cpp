@@ -224,7 +224,7 @@ static uint8_t activeVFO_old = 10;
  * Render both VFO A and VFO B frequency displays.
  */
 void DrawVFOPanes(void) {
-    int64_t TxRxFreq = GetTXRXFreq_dHz()/100;
+    int64_t TxRxFreq = GetTXRXFreq_cHz()/100;
     if ((TxRxFreq == TxRxFreq_old) && (ED.activeVFO == activeVFO_old) &&
         (!PaneVFOA.stale) && (!PaneVFOB.stale))
         return;
@@ -292,6 +292,12 @@ void DrawVFOPanes(void) {
         tft.print(freqBuffer);
         PaneVFOB.stale = false;
     }
+
+    // The font source is sticky in the RA8875 library: setFontScale() does not clear a
+    // GFX font, only setFontDefault() does. These are the only panes that install one, so
+    // put the shared font state back before any other pane draws, otherwise those panes
+    // render their text in FreeSansBold and overflow their boxes.
+    tft.setFontDefault();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -342,6 +348,10 @@ void DrawFreqBandModPane(void) {
         case ModeSm_StateId_SSB_RECEIVE:
         case ModeSm_StateId_SSB_TRANSMIT:
             tft.print("SSB ");
+            break;
+        case ModeSm_StateId_DIGITAL_RECEIVE:
+        case ModeSm_StateId_DIGITAL_TRANSMIT:
+            tft.print("DATA");
             break;
         default:
             tft.print("CW ");
@@ -468,11 +478,11 @@ static void EffectivePassbandEdges_Hz(int32_t *low_Hz, int32_t *high_Hz){
 }
 
 /**
- * Draw Tuned Bandwidth on Spectrum Plot
+ * Stamp the tuning bar (filter-bandwidth highlight + cyan center marker) at the
+ * current tuned frequency onto whichever layer is currently selected for writing.
+ * Does not clear or switch layers - the caller owns the surface.
  */
-FASTRUN void DrawBandWidthIndicatorBar(void){
-    tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
-    tft.writeTo(L2);
+FASTRUN void StampTuningBar(void){
     float32_t pixel_per_khz = ((1 << ED.spectrum_zoom) * SPECTRUM_RES * 1000.0 / SR[SampleRate].rate);
     int16_t vline = SPECTRUM_LEFT_X + FreqToBin(GetTXRXFreq(ED.activeVFO));
 
@@ -484,6 +494,15 @@ FASTRUN void DrawBandWidthIndicatorBar(void){
     int16_t xRight = vline + (int16_t)(high_Hz * scale);
     tft.fillRect(xLeft, SPECTRUM_TOP_Y + 20, xRight - xLeft, SPECTRUM_HEIGHT - 20, FILTER_WIN);
     tft.drawFastVLine(vline, SPECTRUM_TOP_Y + 20, SPECTRUM_HEIGHT-25, RA8875_CYAN);
+}
+
+/**
+ * Draw Tuned Bandwidth on Spectrum Plot
+ */
+FASTRUN void DrawBandWidthIndicatorBar(void){
+    tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH+PaneSpectrum.x0, SPECTRUM_HEIGHT - 20, RA8875_BLACK);
+    tft.writeTo(L2);
+    StampTuningBar();
 }
 
 /**
@@ -528,70 +547,56 @@ void ShowBandwidth() {
 void DrawFrequencyBarValue(void) {
     char txt[16];
 
-    int bignum;
-    int centerIdx;
-    int pos_help;
-    float disp_freq;
-    float freq_calc;
-    float grat;
-    int centerLine = MAX_WATERFALL_WIDTH / 2 + SPECTRUM_LEFT_X;
-    const static int idx2pos[2][9] = {
-        { -43, 21, 50, 250, 140, 250, 232, 250, 315 },
-        { -43, 21, 50, 85, 200, 200, 232, 218, 315 }
-    };
-
-    grat = (float)(SR[SampleRate].rate / 8000.0) / (float)(1 << ED.spectrum_zoom);
-
-    tft.setTextColor(RA8875_WHITE);
     tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)0);
-    tft.fillRect(0, WATERFALL_TOP_Y, MAX_WATERFALL_WIDTH + PaneSpectrum.x0 + 10, tft.getFontHeight(), RA8875_BLACK);
+    // Clear the tick + label strip. The ticks extend 5 px above WATERFALL_TOP_Y
+    // (up to the spectrum-pane bottom border), so the clear must start there too;
+    // otherwise old ticks persist when they move (e.g. on a zoom change), since
+    // FreqToBin-based ticks are not redrawn at the same pixels each time.
+    tft.fillRect(0, WATERFALL_TOP_Y - 5, MAX_WATERFALL_WIDTH + PaneSpectrum.x0 + 10, tft.getFontHeight() + 5, RA8875_BLACK);
+    // Restore the spectrum-pane bottom border that the clear above overlaps.
+    tft.drawFastHLine(PaneSpectrum.x0 - 2, WATERFALL_TOP_Y - 5, MAX_WATERFALL_WIDTH + 5, RA8875_YELLOW);
 
-    freq_calc = (float)GetCenterFreq_Hz();
+    // Position every tick/label from its frequency via FreqToBin() - the same
+    // mapping the spectrum trace uses - so ticks stay aligned with the trace at any
+    // sample rate. (The previous version used a hand-tuned fixed pixel table and a
+    // non-round label step, which drifted at sample rates other than 192 ksps.)
+    int64_t lower_Hz = GetLowerFreq_Hz();
+    int64_t upper_Hz = GetUpperFreq_Hz();
+    int64_t center_Hz = GetCenterFreq_Hz();
+    double span_kHz = (double)(upper_Hz - lower_Hz) / 1000.0;
 
-    if (ED.spectrum_zoom < 5) {
-        freq_calc = roundf(freq_calc / 1000);
+    // Choose a "nice" label step (1/2/5 x 10^n kHz) giving roughly 8 divisions.
+    double raw = span_kHz / 8.0;
+    double mag = pow(10.0, floor(log10(raw)));
+    double norm = raw / mag;
+    double step_kHz = (norm < 1.5 ? 1.0 : (norm < 3.0 ? 2.0 : (norm < 7.0 ? 5.0 : 10.0))) * mag;
+
+    int charW = tft.getFontWidth();
+    // First labelled frequency at or above the lower edge, snapped to the step.
+    double first_kHz = ceil((double)lower_Hz / 1000.0 / step_kHz) * step_kHz;
+
+    for (double f_kHz = first_kHz; f_kHz * 1000.0 <= (double)upper_Hz; f_kHz += step_kHz) {
+        int64_t f_Hz = (int64_t)llround(f_kHz * 1000.0);
+        int16_t px = SPECTRUM_LEFT_X + FreqToBin(f_Hz);
+
+        if (step_kHz >= 1.0)
+            snprintf(txt, sizeof(txt), "%ld", (long)llround(f_kHz));
+        else
+            snprintf(txt, sizeof(txt), "%.1f", f_kHz);
+
+        // Highlight the tick nearest the center frequency in green.
+        int64_t dCenter = (f_Hz > center_Hz) ? (f_Hz - center_Hz) : (center_Hz - f_Hz);
+        tft.setTextColor(dCenter < (int64_t)(step_kHz * 500.0) ? RA8875_GREEN : RA8875_WHITE);
+
+        // Yellow tick mark with the label centered underneath it.
+        tft.drawFastVLine(px, WATERFALL_TOP_Y - 5, 7, RA8875_YELLOW);
+        int16_t labelX = px - (int16_t)(strlen(txt) * charW) / 2;
+        if (labelX < SPECTRUM_LEFT_X) labelX = SPECTRUM_LEFT_X;
+        tft.setCursor(labelX, WATERFALL_TOP_Y);
+        tft.print(txt);
     }
-
-    if (ED.spectrum_zoom != 0)
-        centerIdx = 0;
-    else
-        centerIdx = -2;
-
-    ultoa((freq_calc + (centerIdx * grat)), txt, DEC);
-    disp_freq = freq_calc + (centerIdx * grat);
-    bignum = (int)disp_freq;
-    itoa(bignum, txt, DEC);
-    tft.setTextColor(RA8875_GREEN);
-
-    if (ED.spectrum_zoom == 0) {
-        tft.setCursor(centerLine - 140, WATERFALL_TOP_Y);
-    } else {
-        tft.setCursor(centerLine - 20, WATERFALL_TOP_Y);
-    }
-    tft.print(txt);
     tft.setTextColor(RA8875_WHITE);
-
-    for (int idx = -4; idx < 5; idx++) {
-        pos_help = idx2pos[ED.spectrum_zoom < 3 ? 0 : 1][idx + 4];
-        if (idx != centerIdx) {
-            ultoa((freq_calc + (idx * grat)), txt, DEC);
-            if (ED.spectrum_zoom == 0) {
-                tft.setCursor(WATERFALL_LEFT_X + pos_help * xExpand + 40, WATERFALL_TOP_Y);
-            } else {
-                tft.setCursor(WATERFALL_LEFT_X + pos_help * xExpand + 40, WATERFALL_TOP_Y);
-            }
-            tft.print(txt);
-            if (idx < 4) {
-                tft.drawFastVLine((WATERFALL_LEFT_X + pos_help * xExpand + 60), WATERFALL_TOP_Y - 5, 7, RA8875_YELLOW);
-            } else {
-                tft.drawFastVLine((WATERFALL_LEFT_X + (pos_help + 9) * xExpand + 60), WATERFALL_TOP_Y - 5, 7, RA8875_YELLOW);
-            }
-        }
-        if (ED.spectrum_zoom > 2 || freq_calc > 1000) {
-            idx++;
-        }
-    }
 }
 
 // State tracking for S-meter display
@@ -675,7 +680,7 @@ FASTRUN int16_t pixelnew(uint32_t i){
 FASTRUN void ShowSpectrum(void){
     // Sweep-start: prime L2 with a fresh spectrum surface + current filter bar.
     if (x1 == 0) { spectrumChunkIdx = 0; spectrumFrameCtr++; } // new sweep: reset chunk idx, advance frame counter
-    if (x1 == 0 && modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT) {
+    if (x1 == 0 && !IsSSBTransmit()) {
         tft.writeTo(L2);
         DrawBandWidthIndicatorBar();   // its opening fillRect clears the spectrum body (y >= top+20)
         // Restamp the yellow frame: DrawBandWidthIndicatorBar's clear overlaps
@@ -714,7 +719,7 @@ FASTRUN void ShowSpectrum(void){
     // ~13 ms/frame, so it is throttled to every AUDIO_SPECTRUM_DECIMATE-th frame to free real-time
     // budget for the main spectrum/waterfall. The waterfall colour computation is NOT throttled.
     tft.writeTo(L1);
-    if (modeSM.state_id != ModeSm_StateId_SSB_TRANSMIT){
+    if (!IsSSBTransmit()){
         bool drawAudioSpectrum = (spectrumFrameCtr % AUDIO_SPECTRUM_DECIMATE) == 0;
         for (int16_t xb = x1_start + 1; xb <= x1; xb++){
             if (drawAudioSpectrum && xb < 128) {
@@ -750,7 +755,7 @@ FASTRUN void ShowSpectrum(void){
         psdupdated = false;
         redrawSpectrum = false;
 
-        if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)
+        if (IsSSBTransmit())
             return; // don't do the rest of these steps in transmit mode
 
         // if we're shifting the spectrum automatically, update the adjustment
@@ -793,6 +798,57 @@ FASTRUN void ShowSpectrum(void){
     }
 }
 
+#ifdef MUTE_ON_RAPID_TUNE
+// State for the Fine Tune "frozen trace, moving bar" fast path.
+static bool fineFreezeBackdropReady = false;   // L2 holds a clean (bar-less) trace
+static int64_t fineFreezeLastFreq = 0;         // last marker freq we stamped
+
+/**
+ * Build the clean (bar-less) frozen-trace backdrop on the L2 back-buffer from
+ * pixelold[] (the per-column y values from the last completed sweep). Built once per
+ * Fine Tune freeze episode; every later bar update just blits this backdrop back to
+ * L1 to erase the old bar, which is far cheaper than repainting the whole trace.
+ */
+FASTRUN static void BuildFrozenBackdrop(void){
+    tft.writeTo(L2);
+    tft.fillRect(0, SPECTRUM_TOP_Y + 20, MAX_WATERFALL_WIDTH + PaneSpectrum.x0,
+                 SPECTRUM_HEIGHT - 20, RA8875_BLACK);
+    tft.drawRect(PaneSpectrum.x0-2, PaneSpectrum.y0, MAX_WATERFALL_WIDTH+5, SPECTRUM_HEIGHT, RA8875_YELLOW);
+    for (int16_t x = 1; x < MAX_WATERFALL_WIDTH; x++)
+        tft.drawLine(SPECTRUM_LEFT_X + x, pixelold[x-1], SPECTRUM_LEFT_X + x, pixelold[x], RA8875_YELLOW);
+    tft.writeTo(L1);
+}
+
+/**
+ * Redraw the tuning bar over the *frozen* spectrum trace at the current Fine Tune
+ * position (FASTRUN - executes from RAM).
+ *
+ * Used while the Fine Tune knob is being spun fast: the center stays fixed, so the
+ * trace is held still (paused) and only the blue filter bar + cyan marker move to
+ * track where the operator is tuning. The first call builds a clean bar-less backdrop
+ * on L2; each call then hardware-blits that backdrop to L1 (erasing the previous bar)
+ * and stamps the bar at the current frequency on top. The waterfall is left frozen.
+ */
+FASTRUN void RedrawFrozenSpectrumWithBar(void){
+    if (IsSSBTransmit()) return;
+
+    if (!fineFreezeBackdropReady){
+        BuildFrozenBackdrop();
+        fineFreezeBackdropReady = true;
+    }
+
+    // Restore the clean trace under the previous bar in one hardware BTE blit (L2->L1).
+    tft.BTE_move(SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20,
+                 MAX_WATERFALL_WIDTH, SPECTRUM_HEIGHT - 20,
+                 SPECTRUM_LEFT_X, SPECTRUM_TOP_Y + 20, 2, 1);
+    while (tft.readStatus()) ;
+
+    // Stamp the bar at the new tuned frequency directly on the visible layer.
+    tft.writeTo(L1);
+    StampTuningBar();
+}
+#endif
+
 // State tracking for spectrum pane updates
 static uint32_t oz = 8;
 static int64_t ocf = 0;
@@ -803,6 +859,34 @@ static ModulationType omd = IQ;
  * Render the RF spectrum display pane with waterfall.
  */
 void DrawSpectrumPane(void) {
+#ifdef MUTE_ON_RAPID_TUNE
+    // While the Center Tune knob is being spun fast, freeze the spectrum/waterfall:
+    // the trace and overlay would otherwise re-center and clear on nearly every loop,
+    // producing a jerky, half-drawn sweep. Mark the pane stale so it gets one clean
+    // repaint once tuning stops, and leave the last frozen trace on screen until then.
+    if (IsRapidCenterTuning()){
+        PaneSpectrum.stale = true;
+        fineFreezeBackdropReady = false;   // any held fine-tune backdrop is now stale
+        tft.writeTo(L1);
+        return;
+    }
+    // While the Fine Tune knob is being spun fast, the center stays put, so hold the
+    // trace frozen (no re-sweep) and only move the blue tuning bar/marker so the
+    // operator can see where they are tuning. Redraw on every frequency change (not on
+    // the 50 ms refresh timer) - each update is a cheap hardware blit + bar stamp, so
+    // the bar tracks the knob with no perceptible lag.
+    if (IsRapidFineTuning()){
+        PaneSpectrum.stale = true;   // force a clean overlay repaint once tuning stops
+        int64_t f = GetTXRXFreq(ED.activeVFO);
+        if (!fineFreezeBackdropReady || f != fineFreezeLastFreq){
+            RedrawFrozenSpectrumWithBar();
+            fineFreezeLastFreq = f;
+        }
+        tft.writeTo(L1);
+        return;
+    }
+    fineFreezeBackdropReady = false;   // not fine-tuning: drop any held backdrop
+#endif
     if ((oz != ED.spectrum_zoom) ||
         (ocf != ED.centerFreq_Hz[ED.activeVFO]) ||
         (oft != ED.fineTuneFreq_Hz[ED.activeVFO]) ||
@@ -818,6 +902,19 @@ void DrawSpectrumPane(void) {
         tft.writeTo(L1);
         return;
     }
+
+    // The static spectrum overlay (frequency labels + bandwidth/tuning bar) is
+    // redrawn on the L2 back-buffer, and DrawBandWidthIndicatorBar()'s opening
+    // fillRect clears the entire L2 spectrum body. If that runs mid-sweep it wipes
+    // the chunks ShowSpectrum() has already drawn for the current frame, leaving
+    // large blank regions (and a stale/duplicated tuning bar) when tuning rapidly.
+    // x1 != 0 means a chunked sweep is in progress, so defer the refresh - leaving
+    // PaneSpectrum.stale set - until the sweep is at a frame boundary (x1 == 0).
+    if (x1 != 0) {
+        tft.writeTo(L1);
+        return;
+    }
+
     oz = ED.spectrum_zoom;
     ocf = ED.centerFreq_Hz[ED.activeVFO];
     oft = ED.fineTuneFreq_Hz[ED.activeVFO];
@@ -893,7 +990,7 @@ void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
  * VU meters of transmit amplitude in SSB transmit mode.
  */
 void DrawStateOfHealthPane(void) {
-    if ((modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) && PaneStateOfHealth.stale){
+    if (IsSSBTransmit() && PaneStateOfHealth.stale){
 
         // Draw some color bars to warn when the audio power is getting too large for
         // the transmit IQ chain. The RF board starts to clip when RMS values exceed 0.6.
@@ -1081,10 +1178,12 @@ void DrawTXRXStatusPane(void) {
     if (oldMState != modeSM.state_id){
         switch (modeSM.state_id){
             case ModeSm_StateId_CW_RECEIVE:
+            case ModeSm_StateId_DIGITAL_RECEIVE:
             case ModeSm_StateId_SSB_RECEIVE:
                 PaneTXRXStatus.stale = true;
                 state = RX;
                 break;
+            case ModeSm_StateId_DIGITAL_TRANSMIT:
             case ModeSm_StateId_SSB_TRANSMIT:
             case ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT:
             case ModeSm_StateId_CW_TRANSMIT_DAH_MARK:
@@ -1209,15 +1308,21 @@ void DrawAudioSpectContainer() {
     tft.setFontScale((enum RA8875tsize)0);
     tft.setTextColor(RA8875_WHITE);
     tft.drawRect(PaneAudioSpectrum.x0, PaneAudioSpectrum.y0, PaneAudioSpectrum.width, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0, RA8875_GREEN);
-    for (int k = 0; k < 6; k++) {
-        tft.drawFastVLine(PaneAudioSpectrum.x0 + k * 43.8, AUDIO_SPECTRUM_BOTTOM, 15, RA8875_GREEN);
-        tft.setCursor(PaneAudioSpectrum.x0 - 4 + k * 43.8, AUDIO_SPECTRUM_BOTTOM + 16);
+    // The audio spectrum shows the first 128 bins of a 512-point FFT of the audio,
+    // which runs at Fs/8. So the 256-pixel-wide pane (bin k drawn at pixel 2k) spans
+    // 0 .. 128*(Fs/8)/512 = Fs/32 Hz (6 kHz at 192ksps, 5.5 kHz at 176.4ksps).
+    // Deriving the axis from the sample rate keeps the ticks/markers correct at any rate.
+    int32_t audioSpan_Hz = SR[SampleRate].rate / 32;
+    float pxPerKHz = 256.0f * 1000.0f / (float)audioSpan_Hz;
+    for (int k = 0; k * 1000 <= audioSpan_Hz; k++) {
+        tft.drawFastVLine(PaneAudioSpectrum.x0 + (int)(k * pxPerKHz), AUDIO_SPECTRUM_BOTTOM, 15, RA8875_GREEN);
+        tft.setCursor(PaneAudioSpectrum.x0 - 4 + (int)(k * pxPerKHz), AUDIO_SPECTRUM_BOTTOM + 16);
         tft.print(k);
         tft.print("k");
     }
     tft.writeTo(L2);
-    int16_t fLo = map(olo, 0, 6000, 0, 256);
-    int16_t fHi = map(ohi, 0, 6000, 0, 256);
+    int16_t fLo = map(olo, 0, audioSpan_Hz, 0, 256);
+    int16_t fHi = map(ohi, 0, audioSpan_Hz, 0, 256);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(fLo), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(fHi), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
 
@@ -1228,17 +1333,17 @@ void DrawAudioSpectContainer() {
     // every mode - overlapping harmlessly in the AM/SAM case.
     int32_t low_Hz, high_Hz;
     EffectivePassbandEdges_Hz(&low_Hz, &high_Hz);
-    int16_t filterLoPositionMarker = map(low_Hz, 0, 6000, 0, 256);
-    int16_t filterHiPositionMarker = map(high_Hz, 0, 6000, 0, 256);
+    int16_t filterLoPositionMarker = map(low_Hz, 0, audioSpan_Hz, 0, 256);
+    int16_t filterHiPositionMarker = map(high_Hz, 0, audioSpan_Hz, 0, 256);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterLoPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
     tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + abs(filterHiPositionMarker), PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_LIGHT_GREY);
 
     if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE){
         int16_t fcutoffs[] = {840,1080,1320,1800,2000,0};
 
-        int16_t fcw = map(fcutoffs[ofi], 0, 6000, 0, 256);
+        int16_t fcw = map(fcutoffs[ofi], 0, audioSpan_Hz, 0, 256);
         tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + fcw, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_BLACK);
-        int16_t cwFilterPosition = map(fcutoffs[ED.CWFilterIndex], 0, 6000, 0, 256);
+        int16_t cwFilterPosition = map(fcutoffs[ED.CWFilterIndex], 0, audioSpan_Hz, 0, 256);
         if (cwFilterPosition > 0)
             tft.drawFastVLine(PaneAudioSpectrum.x0 + 2 + cwFilterPosition, PaneAudioSpectrum.y0+2, AUDIO_SPECTRUM_BOTTOM-PaneAudioSpectrum.y0-3, RA8875_YELLOW);
     }
@@ -1449,7 +1554,9 @@ void UpdateRFGainSetting(void){
         case ModeSm_StateId_CW_RECEIVE:
             comp = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
             break;
+        case ModeSm_StateId_DIGITAL_RECEIVE:
         case ModeSm_StateId_SSB_RECEIVE:
+            // Digital transmit uses the SSB transmit path, so no CW attenuation
             comp = 0.0;
             break;
         default:
@@ -1544,6 +1651,22 @@ void UpdateKeyTypeSetting(void){
     UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
         (char *)"Key Type:", 9,
         valueText, 15,
+        PaneSettings.height/5 + 6*tft.getFontHeight() + 1,true,true);
+}
+
+// State tracking for sample rate setting display
+static uint8_t oldSampleRateSetting = 0xFF;
+
+void UpdateSampleRateSetting(void){
+    if ((oldSampleRateSetting == SampleRate) && (!PaneSettings.stale))
+        return;
+    oldSampleRateSetting = SampleRate;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[8];
+    sprintf(valueText,"%s",SR[SampleRate].text);
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+        (char *)"Rate:", 5,
+        valueText, 7,
         PaneSettings.height/5 + 5*tft.getFontHeight() + 1,true,true);
 }
 
@@ -1615,9 +1738,11 @@ void UpdateAntennaSetting(void){
 }
 
 void DrawSettingsPane(void) {
+    // The individual settings only set the font scale, so select the built-in font here
+    // for all of them rather than inheriting whatever font was last installed.
+    tft.setFontDefault();
     if (PaneSettings.stale){
         tft.fillRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_BLACK);
-        tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)1);
         column1x = 5.5*tft.getFontWidth();
         column2x = 13.5*tft.getFontWidth();
@@ -1630,6 +1755,7 @@ void DrawSettingsPane(void) {
     UpdateRFGainSetting();
     UpdateNoiseSetting();
     UpdateZoomSetting();
+    UpdateSampleRateSetting();
     UpdateKeyTypeSetting();
     UpdateDecoderSetting();
     UpdateDSPGainSetting();
@@ -1651,6 +1777,7 @@ void MorseCharacterDisplay() {
     if (!IsMorseCharacterBufferUpdated())
         return;
     tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height+2, RA8875_BLACK);
+    tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
     tft.setTextColor(RA8875_WHITE);
     tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
@@ -1718,7 +1845,7 @@ void DrawHome(){
         timerDisplay_ms = millis();
         if (redrawSpectrum == false)
             redrawSpectrum = true;
-        if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT)
+        if (IsSSBTransmit())
             PaneStateOfHealth.stale = true;
     }
     for (size_t i = 0; i < NUMBER_OF_PANES; i++){

@@ -152,6 +152,51 @@ void CalcFIRCoeffs(float *coeffs_I, int numCoeffs, float32_t fc_Hz, float32_t As
 void SetIIRCoeffs(float32_t *coefficient_set, float32_t f0, float32_t Q,
                     float32_t sample_rate, FilterType filter_type);
 
+/**
+ * @brief Design a Chebyshev type I lowpass as a cascade of ARM biquads
+ * @param coeffs Output buffer, order/2 sections of 5 coefficients
+ * @param order Filter order, must be even
+ * @param ripple_dB Peak-to-peak passband ripple
+ * @param fRippleEdge_Hz Frequency at which the passband ripple ends
+ * @param Fs_Hz Sample rate the filter will run at
+ * @note Poles are placed in closed form and prewarped, so the response lands on
+ *       the same frequencies at any sample rate. Normalised to unity at DC.
+ */
+void CalcChebyshevILowpassCoeffs(float32_t *coeffs, uint32_t order, float32_t ripple_dB,
+                                 float32_t fRippleEdge_Hz, float32_t Fs_Hz);
+
+/**
+ * @brief Design a stagger-tuned bandpass cascade as ARM biquads
+ * @param coeffs Output buffer, nSections sections of 5 coefficients
+ * @param proto Prototype sections, resonances given as fractions of fc
+ * @param nSections Number of sections in the cascade
+ * @param fc_Hz Centre frequency the cascade should peak at
+ * @param gain Per-section gain used to normalise the cascade peak
+ * @param Fs_Hz Sample rate the filter will run at
+ * @note Emits b0 negative and b2 positive to match the sign convention that
+ *       ApplyEQBandFilter() depends on.
+ */
+void CalcBandpassCascadeCoeffs(float32_t *coeffs, const BandpassProtoSection *proto,
+                               uint32_t nSections, float32_t fc_Hz, float32_t gain,
+                               float32_t Fs_Hz);
+
+/**
+ * @brief Regenerate the receive audio filter tables for the current sample rate
+ * @param audioFs_Hz Sample rate of the decimated audio stream
+ * @note Called from InitializeFilters(). Covers the CW audio filters, the CW
+ *       decoder input filter and the equaliser cells - the stages whose corners
+ *       are specified in Hz rather than as a fraction of Fs.
+ */
+void InitializeReceiveAudioFilterCoeffs(float32_t audioFs_Hz);
+
+/**
+ * @brief Regenerate the transmit filter tables for the current sample rate
+ * @param audioFs_Hz Sample rate of the decimated audio stream
+ * @note Called from InitializeTransmitFilters(). Covers the two stages either
+ *       side of the Hilbert transform.
+ */
+void InitializeTransmitFilterCoeffs(float32_t audioFs_Hz);
+
 // Filter Management
 
 /**

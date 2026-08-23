@@ -103,7 +103,10 @@ ReceiveFilterConfig RXTXfilters;
 ReceiveFilterConfig TXIQfilters;
 TransmitFilterConfig TXfilters;
 AGCConfig agc;
-uint8_t SampleRate = SAMPLE_RATE_192K;
+// SampleRate is a reference to the persisted ED.sampleRate so that the many
+// SR[SampleRate] call sites keep working while the value lives in (and is saved
+// with) the ED config struct. ED is defined above, so it is constructed first.
+uint8_t& SampleRate = ED.sampleRate;
 
 const float32_t CWToneOffsetsHz[] = {400, 562.5, 656.5, 750.0, 843.75 };
 
@@ -504,8 +507,12 @@ time_t getTeensy3Time() {
 
 void setup(void){
     Serial.begin(115200);
+#ifndef AUDIO_INTERFACE
+    // With a USB audio interface there is only one CDC port and CATSerial is
+    // Serial, already opened above. See the CATSerial definition in SDT.h.
     SerialUSB1.begin(38400); // For CAT control
     Serial.println("T41 SDT Setup");
+#endif
 
     // get TIME from real time clock with 3V backup battery
     setSyncProvider(getTeensy3Time);
@@ -556,6 +563,11 @@ void setup(void){
     SetupCWKeyInterrupts();
 
     timer1ms.begin(tick1ms, 1000);  // run tick1ms every 1ms
-    
+    // Run the 1 ms state-machine tick below the audio update ISR (priority 208).
+    // All IntervalTimers share IRQ_PIT at the highest requested priority, so this
+    // also governs the front-panel service timer (FrontPanel.cpp); keeping both at
+    // 240 ensures neither can delay audio servicing.
+    timer1ms.priority(240);
+
     Serial.println("...Setup done!");
 }

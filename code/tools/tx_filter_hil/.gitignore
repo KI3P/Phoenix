@@ -1,0 +1,8 @@
+# Run outputs: JSON, Markdown and figures, all timestamped per run.
+# Everything needed to regenerate a report is in its JSON, so the artifacts
+# themselves are not worth versioning. Commit one deliberately if a particular
+# run is worth keeping as a reference.
+results/
+
+__pycache__/
+*.pyc

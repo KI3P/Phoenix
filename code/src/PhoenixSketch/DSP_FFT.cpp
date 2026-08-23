@@ -336,9 +336,15 @@ void UpdateFIRFilterMask(ReceiveFilterConfig *RXfilters){
  */
 void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
     // ****************************************************************************************
+    // *  Regenerate the coefficient tables that are specified in Hz
+    // ****************************************************************************************
+    // Must come first: the ARM instances below are bound to these arrays.
+    InitializeReceiveAudioFilterCoeffs((float32_t)SR[SampleRate].rate / RXfilters->DF);
+
+    // ****************************************************************************************
     // *  Zoom FFT: Initiate decimation and interpolation FIR RXfilters AND IIR RXfilters
     // ****************************************************************************************
-    
+
     ZoomFFTPrep(spectrum_zoom, RXfilters);
     for (unsigned i = 0; i < 4 * RXfilters->IIR_biquad_Zoom_FFT_N_stages; i++) {
         RXfilters->biquadZoomI.pState[i] = 0.0;  // set state variables to zero
@@ -355,9 +361,16 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
     int32_t LP_F_help = bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
     if (LP_F_help < -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz)
         LP_F_help = -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
-    SetIIRCoeffs(RXfilters->biquad_lowpass1_coeffs, 
-            (float32_t)LP_F_help, 1.3, 
+    SetIIRCoeffs(RXfilters->biquad_lowpass1_coeffs,
+            (float32_t)LP_F_help, 1.3,
             (float32_t)SR[SampleRate].rate / RXfilters->DF, Lowpass);
+
+    // AM DC blocker. Placing the pole at exp(-2*pi*fc/Fs) holds the corner at
+    // amDCBlockCorner_Hz whatever the sample rate; the fixed 0.99 this replaces
+    // moved with it. Drop the history along with the old pole.
+    RXfilters->amDCBlockPole = expf(-TWO_PI * RXfilters->amDCBlockCorner_Hz
+                                    / ((float32_t)SR[SampleRate].rate / RXfilters->DF));
+    RXfilters->amDCBlockState = 0.0;
 
     // ****************************************************************************************
     // *  Decimate: RXfilters involved with decimate by 2 and decimate by 4
@@ -380,7 +393,7 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
     CLEAR_VAR(last_sample_buffer_R);
 
     // Equalizer RXfilters
-    for (size_t i = 0; i<14; i++){
+    for (size_t i = 0; i<EQUALIZER_CELL_COUNT; i++){
         for (size_t j = 0; j < RXfilters->eqNumStages*2; j++) {
             RXfilters->S_Rec[i].pState[j] = 0;
             RXfilters->S_Xmt[i].pState[j] = 0;
@@ -389,6 +402,22 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
         RXfilters->S_Rec[i].pCoeffs = *EQ_Coeffs[i];
         RXfilters->S_Xmt[i].pCoeffs = *EQ_Coeffs[i];
     }
+
+    // *********************************************
+    // * CW audio filters and the CW decoder input filter
+    // *********************************************
+    // These read coefficient tables that InitializeReceiveAudioFilterCoeffs()
+    // has just regenerated for the current sample rate, so their history has to
+    // go with the old coefficients - the delay line of a biquad cascade is only
+    // meaningful for the filter that produced it.
+    CLEAR_VAR(RXfilters->CW_AudioFilter1_state);
+    CLEAR_VAR(RXfilters->CW_AudioFilter2_state);
+    CLEAR_VAR(RXfilters->CW_AudioFilter3_state);
+    CLEAR_VAR(RXfilters->CW_AudioFilter4_state);
+    CLEAR_VAR(RXfilters->CW_AudioFilter5_state);
+    // Re-initialising also clears the FIR delay line.
+    arm_fir_init_f32(&RXfilters->FIR_CW_Decode, 64, CW_Filter_Coeffs2,
+                     RXfilters->FIR_CW_Decode_state, READ_BUFFER_SIZE/RXfilters->DF);
 
     // Interpolation RXfilters
     CalcFIRCoeffs(RXfilters->FIR_int1_coeffs, 48, (float32_t)(RXfilters->n_desired_BW_Hz), RXfilters->n_att_dB, 
@@ -410,6 +439,13 @@ void InitializeFilters(uint32_t spectrum_zoom, ReceiveFilterConfig *RXfilters) {
  * @param TXfilters Struct holding the filter variables and objects
  */
 void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
+    // ****************************************************************************************
+    // *  Regenerate the coefficient tables that are specified in Hz
+    // ****************************************************************************************
+    // Must come first: the ARM instances below are bound to these arrays. The
+    // transmit chain decimates by the same DF1 * DF2 the receive chain does.
+    InitializeTransmitFilterCoeffs((float32_t)SR[SampleRate].rate / RXfilters.DF);
+
     // ****************************************************************************************
     // *  Decimate by 4: 192K to 48K SPS
     // ****************************************************************************************
@@ -784,21 +820,21 @@ void ApplyEQBandFilter(DataBlock *data, ReceiveFilterConfig *RXfilters, uint8_t 
     if (TXRX == RX) scale = (float)ED.equalizerRec[bf] / 100.0;
     else scale = (float)ED.equalizerXmt[bf] / 100.0;
 
+    arm_biquad_cascade_df2T_instance_f32 *band = (TXRX == RX) ? &RXfilters->S_Rec[bf]
+                                                             : &RXfilters->S_Xmt[bf];
+
     // Fix the weird bug where the pState array gets a nan in it upon entering loop
-    // after a power cycle
+    // after a power cycle. Scrub whichever instance is about to run - the
+    // transmit one needs it as much as the receive one.
     for (size_t i = 0; i < 2*RXfilters->eqNumStages; i++){
-        if (isnan(RXfilters->S_Rec[bf].pState[i])){
-            memset(RXfilters->S_Rec[bf].pState,0,sizeof(float32_t)*2*RXfilters->eqNumStages);
+        if (isnan(band->pState[i])){
+            memset(band->pState,0,sizeof(float32_t)*2*RXfilters->eqNumStages);
             break;
         }
     }
 
     // Filter I with this band's biquad
-    if (TXRX == RX){
-        arm_biquad_cascade_df2T_f32(&RXfilters->S_Rec[bf], data->I, RXfilters->eqFiltBuffer, data->N);
-    }else{
-        arm_biquad_cascade_df2T_f32(&RXfilters->S_Xmt[bf], data->I, RXfilters->eqFiltBuffer, data->N);
-    }
+    arm_biquad_cascade_df2T_f32(band, data->I, RXfilters->eqFiltBuffer, data->N);
     // Scale the amplitude by the overall level scaler
     arm_scale_f32(RXfilters->eqFiltBuffer, (float32_t)sign*scale, RXfilters->eqFiltBuffer, data->N);
     // Add to the accumulator buffer

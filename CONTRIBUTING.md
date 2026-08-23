@@ -4,15 +4,51 @@ Thank you for your interest in contributing to the Phoenix SDR project! This gui
 
 ## Table of Contents
 
-1. [Quick Reference Summary](#quick-reference-summary)
-2. [Project Structure](#project-structure)
-3. [File Naming Conventions](#file-naming-conventions)
-4. [Coding Style](#coding-style)
-5. [Architecture Rules](#architecture-rules)
-6. [Adding Display Screens](#adding-display-screens)
-7. [Testing Guidelines](#testing-guidelines)
-8. [State Machine Modifications](#state-machine-modifications)
-9. [Pull Request Process](#pull-request-process)
+1. [Repository Setup](#repository-setup)
+2. [Quick Reference Summary](#quick-reference-summary)
+3. [Project Structure](#project-structure)
+4. [File Naming Conventions](#file-naming-conventions)
+5. [Coding Style](#coding-style)
+6. [Architecture Rules](#architecture-rules)
+7. [Adding Display Screens](#adding-display-screens)
+8. [Testing Guidelines](#testing-guidelines)
+9. [State Machine Modifications](#state-machine-modifications)
+10. [Pull Request Process](#pull-request-process)
+
+## Repository Setup
+
+Run this once per clone:
+
+```bash
+./hooks/install.sh
+```
+
+Git cannot install hooks automatically on clone, so this step is manual. It
+points `core.hooksPath` at the versioned `hooks/` directory and defines one
+merge driver. Skipping it does not break the build - you simply will not get the
+pre-commit hook.
+
+**What the hook does.** `code/src/PhoenixSketch/BuildInfo.h` records the commit
+the firmware was built from, so a running radio can report its version. The
+pre-commit hook regenerates that file and stages it, so it is part of the commit
+and the working tree stays clean afterwards.
+
+The hash it records is the **parent** of the commit containing it. That is not
+an oversight: a commit cannot record its own hash, because the hash is computed
+from the tree that `BuildInfo.h` is part of. Firmware built from a checkout
+therefore reports the commit immediately before the one it was built from. The
+timestamp is exact.
+
+**Why the merge driver.** Because every commit restamps `BuildInfo.h`, every
+branch touches it, and a merge or rebase between two branches would conflict on
+it every time. `.gitattributes` marks the file `merge=ours` so git resolves it
+silently instead of stopping; the installer defines the driver that makes that
+work. The file is generated rather than authored, so either side is correct -
+the next commit restamps it anyway.
+
+Note that `core.hooksPath` replaces `.git/hooks` rather than adding to it. If
+you keep your own hooks there, move them into `hooks/`; the installer warns you
+if it finds any.
 
 ## Quick Reference Summary
 

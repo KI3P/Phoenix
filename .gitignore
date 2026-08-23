@@ -1,5 +1,12 @@
 ArduinoOutput/*
+ArduinoOutput_DMA/
 code/test/*.txt
+# Bench captures and host-side Python environment: large, machine-local, regenerable.
+# The transmit test program itself is tracked; everything it writes is not.
+code/test/transmit/*
+!code/test/transmit/transmit_test.py
+code/tools/venv/
+code/txiq_log*.txt
 *.bkp
 code/test/.ipynb_checkpoints/
 code/test/CMSIS/
@@ -12,6 +19,9 @@ code/test/CMakeCache.txt
 code/test/Makefile
 code/test/all_*.cmake
 code/test/all_*.a
+code/tools/*.png
+code/tools/*.csv
+code/tools/__pycache__/
 *.log
 *.bin
 *.so

@@ -1265,7 +1265,7 @@ TEST(Loop, ResetTuningButtonCallsResetFunction) {
     // Set up initial state with non-zero fine tune
     ED.fineTuneFreq_Hz[ED.activeVFO] = 1500L;
     ED.centerFreq_Hz[ED.activeVFO] = 14200000L;
-    int64_t oldRXTX = GetTXRXFreq_dHz();
+    int64_t oldRXTX = GetTXRXFreq_cHz();
 
     // Call reset tuning button handler
     SetButton(RESET_TUNING);
@@ -1279,7 +1279,7 @@ TEST(Loop, ResetTuningButtonCallsResetFunction) {
     EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], 14198500L); // 14200000 - 1500
 
     // RXTX frequency should remain the same
-    EXPECT_EQ(GetTXRXFreq_dHz(), oldRXTX);
+    EXPECT_EQ(GetTXRXFreq_cHz(), oldRXTX);
 }
 
 TEST(Loop, ResetTuningButtonViaInterruptHandling) {
@@ -2141,6 +2141,20 @@ TEST(Loop, TimeSyncNewHeaderResetsCollection) {
     EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
 }
 
+TEST(Loop, TimeSyncRejectsNonDigitTimestamp) {
+    // Right length, wrong characters. atoll() alone would return 0 here and the
+    // sanity check would catch it, but the CAT reader feeds ApplyTimeSyncDigits()
+    // arbitrary newline-terminated bytes, so the digit check has to be explicit.
+    runSerialTimeSync("Tabcdefghij\n");
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(Loop, TimeSyncRejectsSignedTimestamp) {
+    // atoll() would stop at the space and hand back a plausible-looking number.
+    runSerialTimeSync("T -174847680\n");
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
 TEST(Loop, TimeSyncRejectsOverrunPacket) {
     // 11 digits then newline: tsidx hits TIME_SYNC_LEN before newline,
     // 11th digit triggers overrun branch, clock must not be set.
@@ -2155,3 +2169,67 @@ TEST(Loop, TimeSyncNoDataLeavesClockUntouched) {
     CheckForSerialTimeSync();
     EXPECT_FALSE(Teensy3Clock.wasSet);
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Rapid-tuning detection (MUTE_ON_RAPID_TUNE)
+///////////////////////////////////////////////////////////////////////////////
+#ifdef MUTE_ON_RAPID_TUNE
+// Drop out of the rapid-tuning latch into a known idle baseline. Jumping the
+// mock clock past the release window and querying clears the static latch.
+static void ResetRapidTune(void){
+    AddMillisTime(RAPID_TUNE_RELEASE_MS + 50);
+    (void)IsRapidTuning();
+}
+
+TEST(Loop, RapidTuningEngagesOnFastEvents){
+    ResetRapidTune();
+    NoteTuneActivity(false);     // baseline event (large gap, no latch)
+    NoteTuneActivity(false);     // immediate follow-up: gap < engage threshold
+    EXPECT_TRUE(IsRapidTuning());
+}
+
+TEST(Loop, RapidTuningReleasesAfterIdle){
+    ResetRapidTune();
+    NoteTuneActivity(false);
+    NoteTuneActivity(false);
+    EXPECT_TRUE(IsRapidTuning());
+    AddMillisTime(RAPID_TUNE_RELEASE_MS + 20);
+    EXPECT_FALSE(IsRapidTuning());
+}
+
+TEST(Loop, SlowTuningDoesNotEngage){
+    ResetRapidTune();
+    NoteTuneActivity(false);
+    AddMillisTime(RAPID_TUNE_ENGAGE_MS + 20);  // gap above engage threshold
+    NoteTuneActivity(false);
+    EXPECT_FALSE(IsRapidTuning());
+}
+
+TEST(Loop, RapidCenterTuningFreezesWholeSpectrum){
+    ResetRapidTune();
+    NoteTuneActivity(false);     // Center Tune
+    NoteTuneActivity(false);
+    EXPECT_TRUE(IsRapidTuning());
+    EXPECT_TRUE(IsRapidCenterTuning());   // center tune -> whole trace + waterfall frozen
+    EXPECT_FALSE(IsRapidFineTuning());
+}
+
+TEST(Loop, RapidFineTuningTracksBarOnly){
+    ResetRapidTune();
+    NoteTuneActivity(true);      // Fine Tune
+    NoteTuneActivity(true);
+    EXPECT_TRUE(IsRapidTuning());         // still mutes audio
+    EXPECT_FALSE(IsRapidCenterTuning());  // trace held frozen...
+    EXPECT_TRUE(IsRapidFineTuning());     // ...but the blue tuning bar keeps tracking
+}
+
+TEST(Loop, TuneSourceUpdatesWhenSwitchingEncoders){
+    ResetRapidTune();
+    NoteTuneActivity(false);     // start on Center Tune
+    NoteTuneActivity(false);
+    EXPECT_TRUE(IsRapidCenterTuning());
+    NoteTuneActivity(true);      // switch to Fine Tune mid-spin
+    EXPECT_TRUE(IsRapidFineTuning());
+    EXPECT_FALSE(IsRapidCenterTuning());
+}
+#endif // MUTE_ON_RAPID_TUNE

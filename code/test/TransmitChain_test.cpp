@@ -981,3 +981,409 @@ TEST(TransmitChain, TransmitReceiveProcessingAppliesGainAndCorrection){
     ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = originalPhsCorr;
 }
 
+
+// ============================================================================
+// 176.4 kHz transmit-chain stage-response measurement
+// ----------------------------------------------------------------------------
+// The transmit chain is mostly built from anti-alias and anti-image filters
+// whose corners are specified as a fraction of the sample rate. Those scale with
+// Fs by design and need no adjustment. Two stages are different:
+//
+//   * TXInterpolateBy2Again (FIR_int3) is what actually limits the transmit
+//     audio bandwidth, at -3 dB around 2.76 kHz. Left to scale with Fs it would
+//     drop to 2.53 kHz at 176.4 ksps, narrowing the transmitted audio.
+//   * TXDecimateBy2Again (coeffs12K_8K_LPF_FIR) feeds a decimate-by-2, so
+//     anything above a quarter of its input rate folds back into the audio. The
+//     table it used to carry was flat well past that point.
+//
+// Both are now generated from the sample rate. These tests confirm the audio
+// bandwidth holds in Hz across a rate change, and that the decimator stops.
+//
+// Non-destructive: SampleRate is saved and restored, and the filters rebuilt at
+// the original rate.
+// ============================================================================
+
+// Amplitude of one frequency component, by correlating against a complex
+// exponential through a Hann window. Peak picking (getmax) misses the true peak
+// of a sampled sine by up to a decibel when there are few samples per cycle,
+// which is too coarse for comparing corner frequencies across rates.
+static float32_t TXToneAmplitude(const float32_t *signal, uint32_t nSamples,
+                                 float32_t tone_Hz, float32_t fs_Hz){
+    double sumI = 0.0, sumQ = 0.0, windowSum = 0.0;
+    const double w = 2.0 * M_PI * (double)tone_Hz / (double)fs_Hz;
+    for (uint32_t n = 0; n < nSamples; n++){
+        const double hann = 0.5 * (1.0 - cos(2.0 * M_PI * (double)n / (double)(nSamples - 1)));
+        windowSum += hann;
+        sumI += hann * (double)signal[n] * cos(w * (double)n);
+        sumQ += hann * (double)signal[n] * sin(w * (double)n);
+    }
+    if (windowSum == 0.0) return 0.0;
+    return (float32_t)(2.0 * sqrt(sumI * sumI + sumQ * sumQ) / windowSum);
+}
+
+// Gain of the transmit audio path (decimate by 2, Hilbert, interpolate by 2) at
+// one frequency. Runs the real stage functions on 256-sample blocks, which is
+// what TransmitProcessing() feeds them.
+static float32_t TXAudioPathGain(float32_t tone_Hz, float32_t audioFs_Hz){
+    const uint32_t N = 256;
+    float32_t I[N], Q[N];
+    DataBlock data;
+
+    InitializeTransmitFilters(&TXfilters);
+
+    // Several blocks so the FIR delay lines fill before the measurement.
+    for (int block = 0; block < 4; block++){
+        const double w = 2.0 * M_PI * (double)tone_Hz / (double)audioFs_Hz;
+        for (uint32_t n = 0; n < N; n++){
+            I[n] = (float32_t)cos(w * (double)(n + block * N));
+            Q[n] = I[n];
+        }
+        data.I = I;
+        data.Q = Q;
+        data.N = N;
+        data.sampleRate_Hz = audioFs_Hz;
+        TXDecimateBy2Again(&data, &TXfilters);   // 256 in, 128 out
+        HilbertTransform(&data, &TXfilters);     // 128
+        TXInterpolateBy2Again(&data, &TXfilters);// 128 in, 256 out
+    }
+    // TXInterpolateBy2Again applies a gain of 2 to make up for the upsampling.
+    return TXToneAmplitude(data.I, N, tone_Hz, audioFs_Hz) / 2.0f;
+}
+
+// Frequency at which the transmit audio path first falls level_dB below its
+// passband value, by linear interpolation between sweep points.
+static float32_t TXAudioCornerHz(float32_t audioFs_Hz, float32_t level_dB){
+    const float32_t fStart = 300.0f, fStop = 6000.0f, fStep = 20.0f;
+    const float32_t reference = TXAudioPathGain(fStart, audioFs_Hz);
+    const float32_t target = reference * powf(10.0f, level_dB / 20.0f);
+    float32_t prevF = fStart, prevG = reference;
+    for (float32_t f = fStart + fStep; f <= fStop; f += fStep){
+        const float32_t g = TXAudioPathGain(f, audioFs_Hz);
+        if (g <= target){
+            return prevF + (target - prevG) * (f - prevF) / (g - prevG);
+        }
+        prevF = f;
+        prevG = g;
+    }
+    return -1.0f;
+}
+
+TEST(TransmitChain176k, AudioBandwidthHoldsAcrossRates){
+    uint8_t saved_rate = SampleRate;
+
+    SampleRate = SAMPLE_RATE_192K;
+    float32_t fs_192 = (float32_t)SR[SampleRate].rate / RXfilters.DF;
+    float32_t corner_192 = TXAudioCornerHz(fs_192, -3.0f);
+
+    SampleRate = SAMPLE_RATE_176K;
+    float32_t fs_176 = (float32_t)SR[SampleRate].rate / RXfilters.DF;
+    float32_t corner_176 = TXAudioCornerHz(fs_176, -3.0f);
+
+    // Restore before asserting.
+    SampleRate = saved_rate;
+    InitializeTransmitFilters(&TXfilters);
+
+    FILE *f = fopen("176k_transmit_shift_summary.txt", "w");
+    if (f != nullptr){
+        fprintf(f, "stage,type,f_192k_Hz,f_176k_Hz,measured_ratio,expected_ratio\n");
+        fprintf(f, "TX_audio_bandwidth_minus3dB,fs_derived,%.1f,%.1f,%.4f,%.4f\n",
+                corner_192, corner_176, corner_176 / corner_192, 1.0f);
+        fclose(f);
+    }
+
+    ASSERT_GT(corner_192, 0.0f);
+    ASSERT_GT(corner_176, 0.0f);
+
+    // The transmit passband is specified in Hz, so it must not follow the rate.
+    // Before FIR_int3 was generated from Fs this ratio read 176400/192000.
+    EXPECT_NEAR(corner_176 / corner_192, 1.0f, 0.02)
+        << "transmit audio bandwidth moved from " << corner_192 << " Hz to "
+        << corner_176 << " Hz across the rate change";
+
+    // And it should still be about where it has always been.
+    EXPECT_NEAR(corner_192, 2760.0f, 150.0f);
+}
+
+TEST(TransmitChain176k, DecimatorStopsBeforeTheFoldPoint){
+    uint8_t saved_rate = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+
+    for (int r = 0; r < 2; r++){
+        SampleRate = rates[r];
+        InitializeTransmitFilters(&TXfilters);
+        const float32_t audioFs = (float32_t)SR[SampleRate].rate / RXfilters.DF;
+
+        // TXDecimateBy2Again halves the rate, so audioFs/4 is where the
+        // stopband has to have taken hold.
+        float32_t sum = 0.0f;
+        for (int i = 0; i < 48; i++) sum += coeffs12K_8K_LPF_FIR[i];
+        EXPECT_NEAR(sum, 1.0f, 0.01f) << "decimator should have unity DC gain";
+
+        // Evaluate the tap set directly at the fold point.
+        double re = 0.0, im = 0.0;
+        const double w = 2.0 * M_PI * 0.25;  // audioFs/4 normalised to audioFs
+        for (int i = 0; i < 48; i++){
+            re += (double)coeffs12K_8K_LPF_FIR[i] * cos(w * i);
+            im -= (double)coeffs12K_8K_LPF_FIR[i] * sin(w * i);
+        }
+        const float32_t atFold_dB = 20.0f * log10f((float32_t)sqrt(re*re + im*im) + 1e-30f);
+        EXPECT_LT(atFold_dB, -60.0f)
+            << "transmit decimator is only " << atFold_dB << " dB down at "
+            << (audioFs / 4.0f) << " Hz, running at " << SR[SampleRate].rate << " sps";
+    }
+
+    SampleRate = saved_rate;
+    InitializeTransmitFilters(&TXfilters);
+}
+
+/**
+ * Amplitude response of the DIGITAL-mode transmit chain, in software.
+ *
+ * Digital mode feeds USB audio in at Fs/4 and so skips TXDecimateBy4; this walks
+ * the same stages ReadUSBTransmitBuffer() hands to TransmitProcessing().
+ *
+ * The point is to separate the DSP from everything downstream of it. A bench
+ * sweep of the exciter I/Q at 176.4 ksps measured a ~2.8 dB spread over
+ * 200-2200 Hz, but modelling the filters accounted for only about 0.6 dB of it
+ * plus 1.9 dB from BandEQ. Running the chain here, with no codec, no analog path
+ * and no instrument, says how much of the measured shape is actually the DSP.
+ */
+static void DigitalTxChain(float32_t *I, float32_t *Q, uint32_t sampleRate_Hz){
+    DataBlock data;
+    data.I = I; data.Q = Q;
+    data.N = 512;
+    data.sampleRate_Hz = sampleRate_Hz;      // Fs/4, the USB audio rate
+    TXDecimateBy2(&data,&TXfilters);         // 512 in, 256 out
+    BandEQ(&data, &RXfilters, TX);
+    arm_copy_f32(data.I,data.Q,256);
+    TXDecimateBy2Again(&data,&TXfilters);    // 256 in, 128 out
+    HilbertTransform(&data,&TXfilters);      // 128
+    TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+    ApplyIQCorrection(&data,
+        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    SidebandSelection(&data);
+    TXInterpolateBy2(&data,&TXfilters);      // 256 in, 512 out
+    TXInterpolateBy4(&data,&TXfilters);      // 512 in, 2048 out
+}
+
+/**
+ * Amplitude response of the SSB (microphone) transmit chain, in software.
+ *
+ * The digital-mode model above enters the chain one stage down, at Fs/4. SSB
+ * enters it at the top, so TXDecimateBy4 is in series as well - and, on the
+ * bench, so are the codec's ADC and the microphone input network, neither of
+ * which the digital-mode sweep exercised.
+ *
+ * Same purpose as DigitalTxChain: everything this reproduces is the DSP, so
+ * whatever the bench measures on top of it is not.
+ */
+static void MicTxChain(float32_t *I, float32_t *Q, uint32_t sampleRate_Hz){
+    DataBlock data;
+    data.I = I; data.Q = Q;
+    data.N = 2048;
+    data.sampleRate_Hz = sampleRate_Hz;      // Fs, the microphone rate
+    TXDecimateBy4(&data,&TXfilters);         // 2048 in, 512 out
+    TXDecimateBy2(&data,&TXfilters);         // 512 in, 256 out
+    BandEQ(&data, &RXfilters, TX);
+    arm_copy_f32(data.I,data.Q,256);
+    TXDecimateBy2Again(&data,&TXfilters);    // 256 in, 128 out
+    HilbertTransform(&data,&TXfilters);      // 128
+    TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+    ApplyIQCorrection(&data,
+        ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],
+        ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]);
+    SidebandSelection(&data);
+    TXInterpolateBy2(&data,&TXfilters);      // 256 in, 512 out
+    TXInterpolateBy4(&data,&TXfilters);      // 512 in, 2048 out
+}
+
+/**
+ * The SSB transmit passband the DSP alone produces, at both sample rates.
+ *
+ * Writes mic_tx_passband.csv (rate_sps,f_Hz,amplitude,dB_re_800Hz) for the bench
+ * comparison in Transmit_Passband_Investigation.md. Subtracting this from a
+ * microphone-driven bench sweep leaves the codec, the analog paths and the
+ * instrument - which is the residual under investigation.
+ *
+ * Amplitude is read by correlation over four concatenated output blocks (8192
+ * samples) rather than by peak picking: at 200 Hz a single 2048-sample block is
+ * only 2.3 FFT bins from DC, which is inside the Hann main lobe.
+ */
+TEST(TransmitChain176k, MicPassbandAcrossRates){
+    uint8_t saved_rate = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_176K, SAMPLE_RATE_192K};
+
+    const float32_t fStart = 200.0f, fStop = 3400.0f, fStep = 100.0f;
+    const int NF = (int)((fStop - fStart)/fStep) + 1;
+
+    const int CAPTURE_BLOCKS = 4;
+    const int SETTLE_BLOCKS  = 8;
+    static float32_t I[2048], Q[2048];
+    static float32_t out[2048*4];
+
+    FILE *f = fopen("mic_tx_passband.csv","w");
+    if (f) fprintf(f, "rate_sps,f_Hz,amplitude,dB\n");
+
+    for (int r = 0; r < 2; r++){
+        SampleRate = rates[r];
+        InitializeFilters(ED.spectrum_zoom, &RXfilters);
+        InitializeTransmitFilters(&TXfilters);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+
+        float32_t resp[64];
+        for (int k = 0; k < NF; k++){
+            const float32_t tone = fStart + fStep*(float32_t)k;
+            int captured = 0;
+            for (int blk = 0; blk < SETTLE_BLOCKS + CAPTURE_BLOCKS; blk++){
+                for (uint32_t i = 0; i < 2048; i++){
+                    const double t = (double)(blk*2048 + (int)i)/(double)fs;
+                    I[i] = 0.5f*(float32_t)sin(2.0*M_PI*(double)tone*t);
+                    Q[i] = I[i];
+                }
+                MicTxChain(I, Q, (uint32_t)fs);
+                if (blk >= SETTLE_BLOCKS){
+                    memcpy(&out[captured*2048], I, 2048*sizeof(float32_t));
+                    captured++;
+                }
+            }
+            resp[k] = TXToneAmplitude(out, 2048*CAPTURE_BLOCKS, tone, fs);
+        }
+
+        // Referenced to 800 Hz, which is where the bench sweeps peak and how the
+        // measured tables in the investigation are normalised.
+        const int ref = (int)((800.0f - fStart)/fStep);
+        printf("\n  SSB (microphone) TX chain, software only, %d sps\n",
+               SR[SampleRate].rate);
+        for (int k = 0; k < NF; k++){
+            const float32_t db = 20.0f*log10f(resp[k]/resp[ref]);
+            printf("  %8.0f Hz %+8.2f dB\n", fStart + fStep*(float32_t)k, db);
+            if (f) fprintf(f, "%d,%.0f,%.8f,%.4f\n", SR[SampleRate].rate,
+                           fStart + fStep*(float32_t)k, resp[k], db);
+        }
+        EXPECT_GT(resp[ref], 0.0f);
+    }
+    if (f) fclose(f);
+
+    SampleRate = saved_rate;
+    InitializeFilters(ED.spectrum_zoom, &RXfilters);
+    InitializeTransmitFilters(&TXfilters);
+}
+
+/**
+ * The digital-mode passband on the same fine grid as MicPassbandAcrossRates.
+ *
+ * Writes digital_tx_passband_fine.csv in the same shape as mic_tx_passband.csv
+ * so the same tool differences either bench sweep against its own model. Digital
+ * mode forces 176.4 ksps, so there is only the one rate.
+ */
+TEST(TransmitChain176k, DigitalPassbandFineGrid){
+    uint8_t saved_rate = SampleRate;
+    SampleRate = SAMPLE_RATE_176K;
+    InitializeFilters(ED.spectrum_zoom, &RXfilters);
+    InitializeTransmitFilters(&TXfilters);
+    const float32_t audioFs = (float32_t)SR[SampleRate].rate / 4.0f;   // 44100
+    const float32_t fs = (float32_t)SR[SampleRate].rate;
+
+    const float32_t fStart = 200.0f, fStop = 3400.0f, fStep = 100.0f;
+    const int NF = (int)((fStop - fStart)/fStep) + 1;
+    const int CAPTURE_BLOCKS = 4, SETTLE_BLOCKS = 8;
+
+    static float32_t I[2048], Q[2048];
+    static float32_t out[2048*4];
+    float32_t resp[64];
+
+    for (int k = 0; k < NF; k++){
+        const float32_t tone = fStart + fStep*(float32_t)k;
+        int captured = 0;
+        for (int blk = 0; blk < SETTLE_BLOCKS + CAPTURE_BLOCKS; blk++){
+            for (uint32_t i = 0; i < 512; i++){
+                const double t = (double)(blk*512 + (int)i)/(double)audioFs;
+                I[i] = 0.5f*(float32_t)sin(2.0*M_PI*(double)tone*t);
+                Q[i] = I[i];
+            }
+            DigitalTxChain(I, Q, (uint32_t)audioFs);
+            if (blk >= SETTLE_BLOCKS){
+                memcpy(&out[captured*2048], I, 2048*sizeof(float32_t));
+                captured++;
+            }
+        }
+        resp[k] = TXToneAmplitude(out, 2048*CAPTURE_BLOCKS, tone, fs);
+    }
+
+    const int ref = (int)((800.0f - fStart)/fStep);
+    FILE *f = fopen("digital_tx_passband_fine.csv","w");
+    if (f) fprintf(f, "rate_sps,f_Hz,amplitude,dB\n");
+    printf("\n  digital TX chain, software only, 176400 sps\n");
+    for (int k = 0; k < NF; k++){
+        const float32_t db = 20.0f*log10f(resp[k]/resp[ref]);
+        printf("  %8.0f Hz %+8.2f dB\n", fStart + fStep*(float32_t)k, db);
+        if (f) fprintf(f, "176400,%.0f,%.8f,%.4f\n",
+                       fStart + fStep*(float32_t)k, resp[k], db);
+    }
+    if (f) fclose(f);
+    EXPECT_GT(resp[ref], 0.0f);
+
+    SampleRate = saved_rate;
+    InitializeFilters(ED.spectrum_zoom, &RXfilters);
+    InitializeTransmitFilters(&TXfilters);
+}
+
+TEST(TransmitChain176k, DigitalPassbandIsFlatInBand){
+    uint8_t saved_rate = SampleRate;
+    SampleRate = SAMPLE_RATE_176K;
+    InitializeFilters(ED.spectrum_zoom, &RXfilters);
+    InitializeTransmitFilters(&TXfilters);
+    const float32_t audioFs = (float32_t)SR[SampleRate].rate / 4.0f;   // 44100
+
+    const float32_t freqs[] = {200,400,600,800,1000,1200,1400,1600,1800,
+                               2000,2200,2400,2600,2800,3000,3200};
+    const int NF = sizeof(freqs)/sizeof(freqs[0]);
+    float32_t resp[NF];
+
+    float32_t I[2048], Q[2048];
+    for (int k = 0; k < NF; k++){
+        float32_t amp = 0.0f;
+        // Several blocks so the FIR state settles; measure the last one.
+        for (int rep = 0; rep < 8; rep++){
+            for (uint32_t i = 0; i < 512; i++){
+                float32_t t = (float32_t)(rep*512 + i)/audioFs;
+                I[i] = 0.5f*sinf(TWO_PI*freqs[k]*t);
+                Q[i] = I[i];
+            }
+            DigitalTxChain(I, Q, audioFs);
+            if (rep == 7) amp = getmax(I, 2048);
+        }
+        resp[k] = amp;
+    }
+
+    float32_t peak = 0.0f;
+    for (int k = 0; k < NF; k++) if (resp[k] > peak) peak = resp[k];
+
+    FILE *f = fopen("digital_tx_passband.txt","w");
+    printf("\n  digital TX chain response at 176.4 ksps (software only)\n");
+    printf("  %8s %10s %9s\n", "f (Hz)", "amp", "dB");
+    for (int k = 0; k < NF; k++){
+        float32_t db = 20.0f*log10f(resp[k]/peak);
+        printf("  %8.0f %10.5f %+9.2f\n", freqs[k], resp[k], db);
+        if (f) fprintf(f, "%.0f,%.6f,%.3f\n", freqs[k], resp[k], db);
+    }
+    if (f) fclose(f);
+
+    // In-band flatness, 200-2200 Hz (indices 0..10)
+    float32_t lo = 1e9f, hi = -1e9f;
+    for (int k = 0; k <= 10; k++){
+        float32_t db = 20.0f*log10f(resp[k]/peak);
+        if (db < lo) lo = db;
+        if (db > hi) hi = db;
+    }
+    printf("  200-2200 Hz spread: %.2f dB\n", hi-lo);
+
+    SampleRate = saved_rate;
+    InitializeFilters(ED.spectrum_zoom, &RXfilters);
+    InitializeTransmitFilters(&TXfilters);
+
+    // Loose bound: this documents what the DSP actually does. The bench measured
+    // 2.8 dB; if the DSP is much flatter than that the rest is downstream.
+    EXPECT_LT(hi-lo, 6.0f) << "digital transmit passband spread over 200-2200 Hz";
+}

@@ -357,6 +357,56 @@ void TimerInterrupt(void){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Rapid-tuning detection
+///////////////////////////////////////////////////////////////////////////////
+// When the Center Tune or Fine Tune encoders are spun quickly the tune events
+// queue up and the VFO is reprogrammed on nearly every loop iteration, which
+// produces audible glitches and a jerky spectrum sweep. We detect that condition
+// here from the timing of consumed tune events; callers (the audio output stage
+// and the spectrum redraw) use IsRapidTuning() to mute / pause until it ends.
+#ifdef MUTE_ON_RAPID_TUNE
+static uint32_t lastTuneEventMs = 0;
+static bool rapidTuning = false;
+static bool lastTuneWasFine = false;   // true if the latest tune event was Fine Tune
+
+void NoteTuneActivity(bool fineTune){
+    uint32_t now = millis();
+    // A short gap since the previous tune event means the knob is being spun.
+    if ((now - lastTuneEventMs) < RAPID_TUNE_ENGAGE_MS)
+        rapidTuning = true;
+    lastTuneEventMs = now;
+    lastTuneWasFine = fineTune;
+}
+
+bool IsRapidTuning(void){
+    // Release the latch once tuning has been idle long enough. The subtraction is
+    // done in uint32_t so it wraps correctly (matching the Teensy millis() width;
+    // the host test mock returns a wider type, hence the explicit cast).
+    if (rapidTuning && (((uint32_t)millis() - lastTuneEventMs) > RAPID_TUNE_RELEASE_MS))
+        rapidTuning = false;
+    return rapidTuning;
+}
+
+bool IsRapidCenterTuning(void){
+    // Center Tune re-centers the spectrum (it reprograms the VFO), so the whole
+    // trace/waterfall is frozen while it is spun fast.
+    return IsRapidTuning() && !lastTuneWasFine;
+}
+
+bool IsRapidFineTuning(void){
+    // Fine Tune leaves the center fixed and only slides the tuning marker, so the
+    // trace is frozen but the blue tuning bar keeps being redrawn at the new marker
+    // position (see the spectrum pane).
+    return IsRapidTuning() && lastTuneWasFine;
+}
+#else
+void NoteTuneActivity(bool fineTune){ (void)fineTune; }
+bool IsRapidTuning(void){ return false; }
+bool IsRapidCenterTuning(void){ return false; }
+bool IsRapidFineTuning(void){ return false; }
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
 // Code for handling button presses and state changes
 ///////////////////////////////////////////////////////////////////////////////
 void ChangeRXIQIncrement(void); // forward declare from MainBoard_DisplayCalibration.cpp
@@ -398,7 +448,8 @@ void HandleButtonPress(int32_t button){
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE) ||
-        (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) || 
+        (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) ||
+        (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK))
         return;
@@ -474,6 +525,9 @@ void HandleButtonPress(int32_t button){
                 }
                 // You are in UISm_StateId_[HOME,UPDATE] states
                 case TOGGLE_MODE:{
+                    // Cycle SSB -> CW -> DIGITAL -> SSB. The DIGITAL leg only
+                    // exists in builds with a USB audio interface; without one
+                    // the cycle is the original SSB <-> CW toggle.
                     switch(modeSM.state_id){
                         case ModeSm_StateId_SSB_RECEIVE:{
                             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
@@ -481,6 +535,15 @@ void HandleButtonPress(int32_t button){
                             break;
                         }
                         case ModeSm_StateId_CW_RECEIVE:{
+                            #ifdef AUDIO_INTERFACE
+                            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+                            #else
+                            ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+                            #endif
+                            UpdateRFHardwareState();
+                            break;
+                        }
+                        case ModeSm_StateId_DIGITAL_RECEIVE:{
                             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
                             UpdateRFHardwareState();
                             break;
@@ -1072,6 +1135,7 @@ void ConsumeInterrupt(void){
                     break;
                 } // end of VOLUME_DECREASE, HOME state
                 case (iCENTERTUNE_INCREASE):{
+                    NoteTuneActivity(false);
                     ED.centerFreq_Hz[ED.activeVFO] += (int64_t)ED.freqIncrement;
                     // Change the band if we tune out of the current band. However,
                     // if we tune to a frequency outside the ham bands, keep the last
@@ -1080,6 +1144,7 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iCENTERTUNE_DECREASE):{
+                    NoteTuneActivity(false);
                     ED.centerFreq_Hz[ED.activeVFO] -= (int64_t)ED.freqIncrement;
                     // check for minimum frequency supported by Si5351 quadrature signal generator
                     if (ED.centerFreq_Hz[ED.activeVFO] < 250000)
@@ -1088,10 +1153,12 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iFINETUNE_INCREASE):{
+                    NoteTuneActivity(true);
                     AdjustFineTune(+1);
                     break;
                 }
                 case (iFINETUNE_DECREASE):{
+                    NoteTuneActivity(true);
                     AdjustFineTune(-1);
                     break;
                 }
@@ -1458,8 +1525,56 @@ void ShutdownTeensy(void){
 // PC-side one-liner (Python 3):
 //   python -c "import serial,time; s=serial.Serial('COMx',115200); s.write(('T'+str(int(time.time()))+'\n').encode()); s.close()"
 // Replace COMx with the Teensy USB serial port (e.g. COM6).
+//
+// Which routine reads the packet depends on the USB type. Without a USB audio
+// interface there are two CDC ports and CheckForSerialTimeSync() below has
+// Serial to itself. With AUDIO_INTERFACE there is only one, CATSerial is Serial,
+// and CheckForCATSerialEvents() drains everything available before this could
+// run - so there the CAT reader recognises the packet by its newline terminator
+// and calls ApplyTimeSyncDigits() directly. The bytes on the wire are identical
+// either way; only the reader that sees them differs.
 #define TIME_SYNC_HEADER 'T'
 #define TIME_SYNC_LEN    10    // digits in a Unix timestamp until ~year 2286
+
+/**
+ * Set both clocks from the digit field of a PJRC time-sync packet.
+ *
+ * Shared by the two readers that can receive the packet so that a build with a
+ * USB audio interface and a build without accept exactly the same bytes.
+ *
+ * @param digits Timestamp digits alone - no 'T' header, no terminator
+ * @param count  Number of digits available
+ * @return true if the timestamp was valid and the clocks were set
+ */
+bool ApplyTimeSyncDigits(const char* digits, uint8_t count) {
+    if (count != TIME_SYNC_LEN) return false;
+
+    // atoll() would accept a leading sign or embedded spaces and quietly stop at
+    // the first non-digit, so vet every character before trusting the value. The
+    // CAT reader hands over whatever arrived newline-terminated, which is not
+    // necessarily a timestamp.
+    for (uint8_t i = 0; i < count; i++) {
+        if (digits[i] < '0' || digits[i] > '9') return false;
+    }
+
+    char tsbuf[TIME_SYNC_LEN + 1];
+    memcpy(tsbuf, digits, count);
+    tsbuf[count] = '\0';
+
+    time_t t = (time_t)atoll(tsbuf);
+    if (t <= 1000000000UL) return false;   // sanity: after ~2001
+
+    Teensy3Clock.set(t);
+    setTime(t);
+#ifndef AUDIO_INTERFACE
+    // Only safe on a two-port build. Where CAT shares this port the confirmation
+    // would land in the middle of the CAT client's response stream - the same
+    // reason Debug() is stubbed out in those builds (see SDT.h).
+    Serial.print("Time set: ");
+    Serial.println((int64_t)t);
+#endif
+    return true;
+}
 
 void CheckForSerialTimeSync(void) {
     static char tsbuf[TIME_SYNC_LEN + 2];
@@ -1474,15 +1589,7 @@ void CheckForSerialTimeSync(void) {
             memset(tsbuf, 0, sizeof(tsbuf));
         } else if (collecting) {
             if (c == '\n' || c == '\r') {
-                if (tsidx == TIME_SYNC_LEN) {
-                    time_t t = (time_t)atoll(tsbuf);
-                    if (t > 1000000000UL) {   // sanity: after ~2001
-                        Teensy3Clock.set(t);
-                        setTime(t);
-                        Serial.print("Time set: ");
-                        Serial.println((int64_t)t);
-                    }
-                }
+                ApplyTimeSyncDigits(tsbuf, tsidx);
                 collecting = false;
                 tsidx = 0;
             } else if (tsidx < TIME_SYNC_LEN) {
@@ -1503,9 +1610,15 @@ FASTRUN void loop(void){
     // Step 1: Check for new events and handle them
     ProcessKey1Debounce();
     ProcessPTTDebounce();
-    CheckForFrontPanelInterrupts();
+    // Front-panel encoders/buttons are now drained by fpServiceTimer (1 ms, below
+    // audio priority) instead of being polled here once per loop iteration.
     CheckForCATSerialEvents();
+#ifndef AUDIO_INTERFACE
+    // Only on a two-port build. With a USB audio interface CAT owns this port
+    // and has already drained it, so calling this could only steal the tail of a
+    // packet the CAT reader is handling; it recognises time packets itself.
     CheckForSerialTimeSync();
+#endif
     ConsumeInterrupt();
 
     // Step 2: Perform signal processing

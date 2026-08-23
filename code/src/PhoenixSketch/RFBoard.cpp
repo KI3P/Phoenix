@@ -38,18 +38,18 @@ bool dualVFO = true; /** Set to true if we have separate RX and TX VFOs */
 // There are three VFOs: RX, TX, and CW. They are controlled separately.
 #define SI5351_DRIVE_CURRENT_RX SI5351_DRIVE_8MA
 static int32_t rxmultiple, oldrxMultiple;
-static int64_t RXVFOFreq_dHz;
+static int64_t RXVFOFreq_cHz;
 si5351_clock CLK0RX   = SI5351_CLK0;
 si5351_clock CLK90RX  = SI5351_CLK1;
 
 #define SI5351_DRIVE_CURRENT_TX SI5351_DRIVE_2MA
 static int32_t txmultiple, oldtxMultiple;
-static int64_t TXVFOFreq_dHz;
+static int64_t TXVFOFreq_cHz;
 si5351_clock CLK0TX   = SI5351_CLK4;
 si5351_clock CLK90TX  = SI5351_CLK5;
 
 #define SI5351_DRIVE_CURRENT_CW SI5351_DRIVE_2MA
-static int64_t CWVFOFreq_dHz;
+static int64_t CWVFOFreq_cHz;
 si5351_clock CLKCW  = SI5351_CLK6;
 #define CLKCWSINGLEVFO SI5351_CLK2
 
@@ -306,7 +306,7 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 
 void SetFrequencyCorrectionFactor(int32_t corr){
     int64_t freq = GetRXVFOFrequency();
-    RXVFOFreq_dHz = 0;
+    RXVFOFreq_cHz = 0;
 
     si5351.reset();
     si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);
@@ -322,35 +322,35 @@ void SetFrequencyCorrectionFactor(int32_t corr){
  * Get the current RX VFO frequency setting.
  *
  * Returns the frequency of the RX VFO (CLK0RX & CLK90RX quadrature outputs)
- * used for reception. The internal frequency is stored in deci-Hertz (Hz × 10) 
+ * used for reception. The internal frequency is stored in centi-Hertz (Hz × 100) 
  * but this function returns the value in Hertz.
  *
  * @return Current RX VFO frequency in Hz
  *
  * @see SetRXVFOFrequency() to change the frequency
- * @see RXVFOFreq_dHz internal storage variable
+ * @see RXVFOFreq_cHz internal storage variable
  */
 int64_t GetRXVFOFrequency(void){
-    return RXVFOFreq_dHz/100;
+    return RXVFOFreq_cHz/100;
 }
 
 /**
  * Get the current TX VFO frequency setting.
  *
  * Returns the frequency of the TX VFO (CLK0TX & CLK90TX quadrature outputs)
- * used for SSB transmission. The internal frequency is stored in deci-Hertz 
- * (Hz × 10) but this function returns the value in Hertz.
+ * used for SSB transmission. The internal frequency is stored in centi-Hertz 
+ * (Hz × 100) but this function returns the value in Hertz.
  *
  * @return Current TX VFO frequency in Hz
  *
  * @see SetTXVFOFrequency() to change the frequency
- * @see TXVFOFreq_dHz internal storage variable
+ * @see TXVFOFreq_cHz internal storage variable
  */
 int64_t GetTXVFOFrequency(void){
     if (!dualVFO){
         return GetRXVFOFrequency();
     }
-    return TXVFOFreq_dHz/100;
+    return TXVFOFreq_cHz/100;
 }
 
 /**
@@ -478,13 +478,13 @@ int32_t EvenDivisor(int64_t freq2_Hz) {
 /**
  * Set the CLK0RX and CLK90RX outputs as quadrature outputs at the specified frequency.
  *
- * @param frequency_dHz The desired clock frequency in (Hz * 100)
+ * @param frequency_cHz The desired clock frequency in (Hz * 100)
  */
-void SetRXVFOFrequency(int64_t frequency_dHz){
+void SetRXVFOFrequency(int64_t frequency_cHz){
     // No need to change if it's already at this setting
-    if (frequency_dHz == RXVFOFreq_dHz) return;
-    RXVFOFreq_dHz = frequency_dHz;
-    int64_t ClkSetFreq = frequency_dHz;
+    if (frequency_cHz == RXVFOFreq_cHz) return;
+    RXVFOFreq_cHz = frequency_cHz;
+    int64_t ClkSetFreq = frequency_cHz;
     rxmultiple = EvenDivisor(ClkSetFreq / SI5351_FREQ_MULT);
     uint64_t pll_freq = ClkSetFreq * rxmultiple;
     uint64_t freq = pll_freq / rxmultiple;
@@ -529,17 +529,17 @@ void SetRXVFOFrequency(int64_t frequency_dHz){
 /**
  * Set the CLK0TX and CLK90TX outputs as quadrature outputs at the specified frequency.
  *
- * @param frequency_dHz The desired clock frequency in (Hz * 100)
+ * @param frequency_cHz The desired clock frequency in (Hz * 100)
  */
-void SetTXVFOFrequency(int64_t frequency_dHz){
+void SetTXVFOFrequency(int64_t frequency_cHz){
     if (!dualVFO){
-        SetRXVFOFrequency(frequency_dHz);
+        SetRXVFOFrequency(frequency_cHz);
         return;
     }
     // No need to change if it's already at this setting
-    if (frequency_dHz == TXVFOFreq_dHz) return;
-    TXVFOFreq_dHz = frequency_dHz;
-    int64_t ClkSetFreq = frequency_dHz;
+    if (frequency_cHz == TXVFOFreq_cHz) return;
+    TXVFOFreq_cHz = frequency_cHz;
+    int64_t ClkSetFreq = frequency_cHz;
     txmultiple = EvenDivisor(ClkSetFreq / SI5351_FREQ_MULT);
     uint64_t pll_freq = ClkSetFreq * txmultiple;
     uint64_t freq = pll_freq / txmultiple;
@@ -631,7 +631,7 @@ void DisableTXVFOOutput(void){
  * Set the CW VFO frequency for Morse code transmission.
  *
  * Configures the Si5351 CLKCW output frequency used for CW (Morse code) operation.
- * The frequency is stored and set in deci-Hertz units (Hz × 10) for high precision.
+ * The frequency is stored and set in centi-Hertz units (Hz × 100) for high precision.
  *
  * Optimization: Skips the Si5351 write if the requested frequency matches the
  * current setting, preventing unnecessary I2C transactions.
@@ -640,36 +640,36 @@ void DisableTXVFOOutput(void){
  * (e.g., centerFreq + 700Hz for a 700Hz tone). The tune state machine handles
  * this offset calculation.
  *
- * @param frequency_dHz Desired CW VFO frequency in deci-Hertz (Hz × 10)
+ * @param frequency_cHz Desired CW VFO frequency in centi-Hertz (Hz × 100)
  *
  * @see GetCWVFOFrequency() to read current frequency
  * @see EnableCWVFOOutput() to enable CLK2 output
  * @see Tune.cpp for CW frequency offset handling
  */
-void SetCWVFOFrequency(int64_t frequency_dHz){
+void SetCWVFOFrequency(int64_t frequency_cHz){
     // No need to change if it's already at this setting
-    if (frequency_dHz == CWVFOFreq_dHz) return;
-    CWVFOFreq_dHz = frequency_dHz;
+    if (frequency_cHz == CWVFOFreq_cHz) return;
+    CWVFOFreq_cHz = frequency_cHz;
     if (dualVFO)
-        si5351.set_freq(CWVFOFreq_dHz, CLKCW);
+        si5351.set_freq(CWVFOFreq_cHz, CLKCW);
     else
-        si5351.set_freq(CWVFOFreq_dHz, CLKCWSINGLEVFO);
+        si5351.set_freq(CWVFOFreq_cHz, CLKCWSINGLEVFO);
 }
 
 /**
  * Get the current CW VFO frequency setting.
  *
  * Returns the frequency of the CW VFO (CLK2 output) used for CW transmission.
- * The internal frequency is stored in deci-Hertz (Hz × 10) but this function
+ * The internal frequency is stored in centi-Hertz (Hz × 100) but this function
  * returns the value in Hertz.
  *
  * @return Current CW VFO frequency in Hz
  *
  * @see SetCWVFOFrequency() to change the frequency
- * @see CWVFOFreq_dHz internal storage variable
+ * @see CWVFOFreq_cHz internal storage variable
  */
 int64_t GetCWVFOFrequency(void){
-    return CWVFOFreq_dHz/100;
+    return CWVFOFreq_cHz/100;
 }
 
 /**
@@ -1000,7 +1000,7 @@ uint16_t GetRFMCPRegisters(void){
 void ResetVFOState(void){
     oldrxMultiple = 0;
     oldtxMultiple = 0;
-    RXVFOFreq_dHz = 0;
-    TXVFOFreq_dHz = 0;
-    CWVFOFreq_dHz = 0;
+    RXVFOFreq_cHz = 0;
+    TXVFOFreq_cHz = 0;
+    CWVFOFreq_cHz = 0;
 }

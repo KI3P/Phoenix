@@ -376,3 +376,163 @@ TEST(ModeSm, ExitOffsetModeToSSBReceive){
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 }
 
+
+// ============================================================================
+// Digital (USB audio) mode
+//
+// DIGITAL_RECEIVE and DIGITAL_TRANSMIT live inside a DIGITAL_STATES composite
+// whose enter/exit actions force the radio to 176.4 ksps and put the previous
+// rate back. The composite matters: every way out of digital mode has to restore
+// the sample rate, including the calibration events dispatched at the
+// NORMAL_STATES level.
+// ============================================================================
+
+// Reach digital mode from SSB and get back again
+TEST(ModeSm, NavigateBetweenSSBReceiveAndDigitalReceive){
+    ModeSm_start(&modeSM);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+// Reach digital mode from CW and go back to CW, which is the front panel's
+// SSB -> CW -> DIGITAL -> SSB cycle in both directions
+TEST(ModeSm, NavigateBetweenCWReceiveAndDigitalReceive){
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+}
+
+// PTT keys digital transmit, which is how WSJT-X keys the rig over CAT
+TEST(ModeSm, NavigateBetweenDigitalReceiveAndDigitalTransmitStates){
+    FakeHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_TRANSMIT);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+}
+
+// The out-of-band interlock guards digital transmit exactly as it guards SSB
+TEST(ModeSm, IgnorePTTPressedInDigitalModeWhileNonHamBandIsActive){
+    FakeNonHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    FakeHamBandActive();
+}
+
+// Digital receive must not respond to the CW keying events
+TEST(ModeSm, DigitalReceiveIgnoresKeyEvents){
+    FakeHamBandActive();
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_KEY_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DIT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DAH_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+}
+
+// A calibration event dispatched at the NORMAL_STATES level exits the composite,
+// so ExitDigitalMode() runs and the sample rate is restored
+TEST(ModeSm, EnterCalibrationFromDigitalReceive){
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_FREQUENCY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_FREQUENCY);
+    // Calibration always returns to SSB receive, never back into digital mode
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_EXIT);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+// Entering digital mode forces 176.4 ksps; leaving puts the old rate back. This
+// is the whole reason the mode exists at that rate: Fs/4 is then exactly the
+// 44.1 kHz the USB audio endpoint runs at, so nothing has to be resampled.
+TEST(ModeSm, DigitalModeForcesAndRestoresSampleRate){
+    uint8_t saved = SampleRate;
+
+    SampleRate = SAMPLE_RATE_192K;
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_RECEIVE);
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K)
+        << "digital mode only works where Fs/4 == 44100 Hz";
+
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_192K) << "the previous rate must come back";
+
+    SampleRate = saved;
+}
+
+// Transmitting and returning must not disturb the saved rate: the composite is
+// not exited on a PTT press, so EnterDigitalMode() must not run again and
+// overwrite the saved rate with 176.4 ksps.
+TEST(ModeSm, DigitalTransmitDoesNotClobberSavedSampleRate){
+    uint8_t saved = SampleRate;
+    FakeHamBandActive();
+
+    SampleRate = SAMPLE_RATE_192K;
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_DIGITAL_TRANSMIT);
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_192K)
+        << "a transmit round trip must not lose the pre-digital sample rate";
+
+    SampleRate = saved;
+}
+
+// Entering digital mode when already at 176.4 ksps must still restore correctly
+TEST(ModeSm, DigitalModeFromNativeRateRestoresSameRate){
+    uint8_t saved = SampleRate;
+
+    SampleRate = SAMPLE_RATE_176K;
+    ModeSm_start(&modeSM);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
+
+    SampleRate = saved;
+}
+
+// Regression: EnterDigitalMode() and ExitDigitalMode() are the DIGITAL_STATES
+// composite's entry and exit actions, so they run while state_id is still the
+// composite rather than a leaf. Both call ChangeSampleRate(), which ends in
+// UpdateTuneState(). If the composite is not handled there, UpdateTuneState()
+// falls through to its default branch and calls HandleTuneState() with whatever
+// tune state was left over from before - reprogramming the VFO from stale state
+// on every entry to and exit from digital mode.
+TEST(ModeSm, DigitalModeTransitionsHandleTheCompositeState){
+    uint8_t saved = SampleRate;
+    SampleRate = SAMPLE_RATE_192K;
+    ModeSm_start(&modeSM);
+
+    Serial.lines.clear();
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+
+    for (const std::string &line : Serial.lines) {
+        EXPECT_EQ(line.find("Unhandled modeSM.state_id"), std::string::npos)
+            << "unhandled state during a digital mode transition: " << line;
+    }
+
+    SampleRate = saved;
+}

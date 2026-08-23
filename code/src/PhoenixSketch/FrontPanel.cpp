@@ -37,6 +37,12 @@ static volatile bool interrupted1 = false;
 static Adafruit_MCP23X17 mcp2;
 static volatile bool interrupted2 = false;
 
+// Drains the front-panel MCP23017s on a fixed 1 ms tick, decoupled from the main
+// loop's display/DSP cadence. Runs at NVIC priority 240 (see InitializeFrontPanel),
+// i.e. BELOW the OpenAudio update ISR (priority 208), so encoder/button I2C work
+// can never delay audio servicing.
+static IntervalTimer fpServiceTimer;
+
 static int32_t button_press_ms;
 static int32_t ButtonPressed = -1;
 
@@ -224,6 +230,45 @@ static void interrupt2() {
 }
 
 /**
+ * Hardware ISR for the MCP23017 #1 INT line (pin 14, open-drain active-LOW).
+ * Deliberately minimal: it only records that an interrupt is pending. The actual
+ * I2C servicing happens later in ServiceFrontPanel() at a lower priority, so we
+ * never perform a blocking I2C transfer inside a high-priority GPIO ISR.
+ */
+FASTRUN
+static void fpInterrupt1ISR(void) {
+    interrupted1 = true;
+}
+
+/**
+ * Hardware ISR for the MCP23017 #2 INT line (pin 15, open-drain active-LOW).
+ * See fpInterrupt1ISR() - flag only, no I2C here.
+ */
+FASTRUN
+static void fpInterrupt2ISR(void) {
+    interrupted2 = true;
+}
+
+/**
+ * Timer-driven front-panel service routine (1 ms tick, NVIC priority 240).
+ * Performs the deferred I2C drain for whichever MCP23017 has signalled. The pin
+ * level is checked as well as the flag: the MCP INT line stays asserted (LOW)
+ * until its GPIO is read, so testing the level recovers any edge the ISR could
+ * have missed while the line was already low.
+ */
+FASTRUN
+static void ServiceFrontPanel(void) {
+    if (interrupted1 || digitalRead(INT_PIN_1) == 0) {
+        interrupted1 = false;
+        interrupt1();
+    }
+    if (interrupted2 || digitalRead(INT_PIN_2) == 0) {
+        interrupted2 = false;
+        interrupt2();
+    }
+}
+
+/**
  * Initialize the front panel hardware.
  * Configures two MCP23017 I2C GPIO expanders for:
  * - MCP1: 16 front panel switches (pins 0-15)
@@ -248,6 +293,11 @@ void InitializeFrontPanel(void) {
     }
 
     if(failed) return;
+
+    // The front-panel MCP23017s are the only devices on Wire1, so raise the bus
+    // clock from the 100 kHz default to 400 kHz (Fast-mode). This shortens every
+    // encoder/button register read, letting fast encoder edges be drained quicker.
+    Wire1.setClock(400000);
 
     // setup the mcp23017 devices
     mcp1.setupInterrupts(true, true, LOW);
@@ -279,7 +329,19 @@ void InitializeFrontPanel(void) {
 
     // Configure pins to check for button press interrupts
     pinMode(INT_PIN_1, INPUT_PULLUP);
-    pinMode(INT_PIN_2, INPUT_PULLUP);  
+    pinMode(INT_PIN_2, INPUT_PULLUP);
+
+    // Flag-setting ISRs on the MCP INT lines so an encoder edge is noticed
+    // immediately, instead of waiting for the next main-loop poll.
+    attachInterrupt(digitalPinToInterrupt(INT_PIN_1), fpInterrupt1ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(INT_PIN_2), fpInterrupt2ISR, FALLING);
+
+    // Drain the front panel every 1 ms at a priority below the audio update ISR.
+    // NOTE: all IntervalTimers share IRQ_PIT, whose priority is forced to the
+    // highest (lowest-numbered) requester, so timer1ms is also lowered to 240 in
+    // setup() (Globals.cpp) - otherwise this drain would run at 128, above audio.
+    fpServiceTimer.begin(ServiceFrontPanel, 1000); // microseconds -> 1 ms
+    fpServiceTimer.priority(240);
 }
 
 /**

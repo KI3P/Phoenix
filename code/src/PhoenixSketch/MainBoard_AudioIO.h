@@ -53,6 +53,21 @@ int SetI2SFreq(int freq);
 void InitializeAudio(void);
 
 /**
+ * @brief Recompute oscillator frequencies that are specified relative to the sample rate
+ * @note Sets the sidetone and TX IQ calibration oscillator frequencies for SR[SampleRate]
+ * @note Called by InitializeAudio() and whenever the sample rate changes
+ */
+void UpdateSampleRateDependentOscillators(void);
+
+/**
+ * @brief Change the radio's audio sample rate at run time
+ * @param newRate Sample-rate selector index (e.g. SAMPLE_RATE_192K, SAMPLE_RATE_176K)
+ * @note Reconfigures the I2S clock, rebuilds the DSP filter chain and oscillators, and flushes the audio input queues
+ * @note Safe to call from the main loop; briefly disables audio interrupts. No-op if the rate is unchanged.
+ */
+void ChangeSampleRate(uint8_t newRate);
+
+/**
  * @brief Reconfigure audio routing based on current radio mode state
  * @note Responds to ModeSm state changes by reconfiguring mixers and queues
  * @note SSB_RECEIVE/CW_RECEIVE: Routes RX I/Q → DSP → speaker

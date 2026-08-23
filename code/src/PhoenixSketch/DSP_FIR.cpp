@@ -26,150 +26,33 @@ If not, see <https://www.gnu.org/licenses/>.
 
 static char *dspfirfilename = nullptr;
 
-// 12 pole Chebyshev 24KSPS 840HZ Fc CW LPF
-//   b0                     b1                   b2   
-float32_t CW_AudioFilterCoeffs1[30] = {
-0.001045672652953040, 0.002091345305906081, 0.001045672652953040, 1.882585857812263620, -0.886768548424075709, //0
-0.002423227458078301, 0.004846454916156603, 0.002423227458078301, 1.884529132690991200, -0.894222042523304395, //1
-0.004829291756048423, 0.009658583512096846, 0.004829291756048423, 1.889384468765871410, -0.908701635790065021, //2
-0.007653393822000297, 0.015306787644000595, 0.007653393822000297, 1.898775913252934710, -0.929389488540935838, //3
-0.010174875101599359, 0.020349750203198718, 0.010174875101599359, 1.914432845416308200, -0.955132345822705675, //4
-0.011739876965796040, 0.023479753931592080, 0.011739876965796040, 1.937529526031872560, -0.984489033895056709, //5
-};
-// 12 pole Chebyshev 24KSPS 1.08KHZ Fc CW LPF
-//   b0                     b1                   b2                        -a1                    -a2
-float32_t CW_AudioFilterCoeffs2[30] = {
-0.001708601686569496, 0.003417203373138993, 0.001708601686569496, 1.849644394115178780, -0.856478800861456779, //0
-0.003960135567320385, 0.007920271134640770, 0.003960135567320385, 1.850063728088927160, -0.865904270358208716, //1
-0.007896110863694851, 0.015792221727389703, 0.007896110863694851, 1.852618721585121530, -0.884203165039901040, //2
-0.012527469693062619, 0.025054939386125238, 0.012527469693062619, 1.860233461308907320, -0.910343340081157804, //3
-0.016688500558372531, 0.033377001116745061, 0.016688500558372531, 1.876160539268528550, -0.942914541502018699, //4
-0.019316527156182765, 0.038633054312365529, 0.019316527156182765, 1.902936487120827410, -0.980202595745558458  //5
-};
+// ============================================================================
+//  Filter tables generated at run time
+//
+//  These used to be coefficient tables designed offline for one audio sample
+//  rate (24 ksps: 192 ksps at the ADC, decimated by 8). Running the radio at
+//  any other rate scaled every corner and centre frequency by the ratio of the
+//  rates, so at 176.4 ksps a filter labelled 2.0 kHz actually cut at 1.84 kHz.
+//
+//  They are now regenerated from an analog design spec on every sample rate
+//  change, which puts each response back on its labelled frequency at any rate.
+//  See InitializeReceiveAudioFilterCoeffs() and InitializeTransmitFilterCoeffs()
+//  at the bottom of this file.
+//
+//  The original tables are kept verbatim in code/test/reference_filters.cpp so
+//  the test suite can measure the generated filters against them.
+// ============================================================================
 
-// 12 pole Chebyshev 24KSPS 1.32KHZ Fc CW LPF
-//   b0                     b1                   b2                        -a1                    -a2
-float32_t CW_AudioFilterCoeffs3[30] = {
- 0.002526205346474786, 0.005052410692949571, 0.002526205346474786, 1.816854531214501690, -0.826959352600400766, //0
- 0.005854757343402014, 0.011709514686804028, 0.005854757343402014, 1.814915209210166580, -0.838334238583774649, //1
- 0.011674800234072332, 0.023349600468144664, 0.011674800234072332, 1.813684163704128990, -0.860383364640418424, //2
- 0.018533877701340070, 0.037067755402680140, 0.018533877701340070, 1.817698744288731130, -0.891834255094091533, //3
- 0.024728610789430342, 0.049457221578860684, 0.024728610789430342, 1.832107309882979650, -0.931021753040700895, //4
- 0.028704640967983489, 0.057409281935966977, 0.028704640967983489, 1.861191141633472320, -0.976009705505406111  //5
-};
+// CW audio lowpass filters: 12 pole Chebyshev type I, 0.02 dB ripple.
+// 6 biquad sections of {b0, b1, b2, -a1, -a2}.
+float32_t CW_AudioFilterCoeffs1[30] = {0};  /** CW audio lowpass, 840 Hz nominal */
+float32_t CW_AudioFilterCoeffs2[30] = {0};  /** CW audio lowpass, 1080 Hz nominal */
+float32_t CW_AudioFilterCoeffs3[30] = {0};  /** CW audio lowpass, 1320 Hz nominal */
+float32_t CW_AudioFilterCoeffs4[30] = {0};  /** CW audio lowpass, 1800 Hz nominal */
+float32_t CW_AudioFilterCoeffs5[30] = {0};  /** CW audio lowpass, 2000 Hz nominal */
 
-// 12 pole Chebyshev 24KSPS 1.80KHZ Fc CW LPF
-//   b0                     b1                   b2                        -a1                    -a2
-float32_t CW_AudioFilterCoeffs4[30] = {
-0.004619667602890411, 0.009239335205780823, 0.004619667602890411, 1.751482350458491770, -0.769961020870053470, //0
-0.010697965393132404, 0.021395930786264807, 0.010697965393132404, 1.742463879042789540, -0.785255740615319220, //1
-0.021310846818856619, 0.042621693637713239, 0.021310846818856619, 1.729488942947587930, -0.814732330223014500, //2
-0.033824238912754968, 0.067648477825509937, 0.033824238912754968, 1.721199473469051890, -0.856496429120071845, //3
-0.045209476618282299, 0.090418953236564598, 0.045209476618282299, 1.727486625620660020, -0.908324532093789383, //4
-0.052728229128958234, 0.105456458257916469, 0.052728229128958234, 1.757051114234371440, -0.967964030750204318  //5
-};
-
-// 12 pole Chebyshev 24KSPS 2.0KHZ Fc CW LPF
-//   b0                     b1                   b2                        -a1                    -a2
-float32_t CW_AudioFilterCoeffs5[30] = {
-0.005895699392492981, 0.011791398784985962, 0.005895699392492981, 1.718777480550920830, -0.742360278120892780, //0
-0.013642906943512292, 0.027285813887024585, 0.013642906943512292, 1.705095001540683390, -0.759666629314732500, //1
-0.027147671747232219, 0.054295343494464438, 0.027147671747232219, 1.684291091887056610, -0.792881778875985654, //2
-0.043053647931610858, 0.086107295863221717, 0.043053647931610858, 1.667486185665950420, -0.839700777392394016, //3
-0.057557746560508744, 0.115115493121017487, 0.057557746560508744, 1.667342067521431660, -0.897573053763466633, //4
-0.067256465545230904, 0.134512931090461807, 0.067256465545230904, 1.695113706470476880, -0.964139568651400491, //5
-};
-
-// High pass 4.79KHz Butterworth 1 pole
-float32_t HP_DC_Filter_Coeffs2[5] = {  
-   0.927176191943378969,  -0.927176191943378969,   0.000000000000000000,   0.854352383886757938,   0.000000000000000000,
-};
-
-float32_t HP_DC_Filter_Coeffs[15] = {  //2KHz
-  0.939110434187240273,  -1.878220868374480550,  0.939110434187240273,  1.876175647911858760,  -0.880266088837102556,
-  0.954420583383374654,  -1.908841166766749310,  0.954420583383374654,  1.906762603441262800,  -0.910919730092235702, 
-  0.982153973603849595,  -1.964307947207699190,  0.982153973603849595,  1.962168985344285850,  -0.966446909071112525
-};
-
-// == CW FIR 64 taps 24ksps Fc = 1560 Parks-McCellan Sinc window (Constant group delay)
-float32_t CW_Filter_Coeffs2[64] = {
-   14.11649337493100380E-6,
- 26.00645116880263790E-6,
- 36.68870031589199950E-6,
- 13.68412619593411960E-6,
--78.97178111806820770E-6,
--270.5543007271240870E-6,
--560.2226272240251320E-6,
--895.0536349136069700E-6,
--0.001157191426061149,
--0.001175458847337361,
--766.0401423335821390E-6,
- 198.2564157371532760E-6,
- 0.001706652959686771,
- 0.003541671954793736,
- 0.005255696919539346,
- 0.006219189024066382,
- 0.005752477145569307,
- 0.003326972676367999,
--0.001205019703557342,
--0.007414366866133686,
--0.014201761944376253,
--0.019862184667500584,
--0.022329078747153890,
--0.019572975891131203,
--0.010081421213164831,
- 0.006688661092777364,
- 0.030004344392895913,
- 0.057792920156185819,
- 0.086867005627322011,
- 0.113416964025259234,
- 0.133680156710101528,
- 0.144647031609622528,
- 0.144647031609622528,
- 0.133680156710101528,
- 0.113416964025259234,
- 0.086867005627322011,
- 0.057792920156185819,
- 0.030004344392895913,
- 0.006688661092777364,
--0.010081421213164831,
--0.019572975891131203,
--0.022329078747153890,
--0.019862184667500584,
--0.014201761944376253,
--0.007414366866133686,
--0.001205019703557342,
- 0.003326972676367999,
- 0.005752477145569307,
- 0.006219189024066382,
- 0.005255696919539346,
- 0.003541671954793736,
- 0.001706652959686771,
- 198.2564157371532760E-6,
--766.0401423335821390E-6,
--0.001175458847337361,
--0.001157191426061149,
--895.0536349136069700E-6,
--560.2226272240251320E-6,
--270.5543007271240870E-6,
--78.97178111806820770E-6,
- 13.68412619593411960E-6,
- 36.68870031589199950E-6,
- 26.00645116880263790E-6,
- 14.11649337493100380E-6
-};
-
-//--------------------------  CW Filter IIR coefficients fc= 720, BW= 480 Butterworth  -------------------
-float32_t CW_Filter_Coeffs[40] = {
-  -0.052435730923943512, 0.000000000000000000, 0.052435730923943512, 1.873536650623021550, -0.903491018266337598,
-  -0.051776963065707407, 0.000000000000000000, 0.051776963065707407, 1.854421028977223380, -0.892140154407832897,
-  -0.053279899528479190, 0.000000000000000000, 0.053279899528479190, 1.901909218086668130, -0.926406121830538831,
-  -0.051720218776406826, 0.000000000000000000, 0.051720218776406826, 1.852473692114126940, -0.899287118048469503,
-  -0.054005568085281293, 0.000000000000000000, 0.054005568085281293, 1.933191203570882030, -0.954501171264401371,
-  -0.052478365750058854, 0.000000000000000000, 0.052478365750058854, 1.872162227117124540, -0.927509206002122499,
-  -0.054571370864953707, 0.000000000000000000, 0.054571370864953707, 1.964566474379490390, -0.984561106211203962,
-  -0.053941343239090896, 0.000000000000000000, 0.053941343239090896, 1.911926697739624980, -0.973194327505971346
-};
+/** CW decoder input lowpass, 64 tap Kaiser windowed sinc */
+float32_t CW_Filter_Coeffs2[64] = {0};
 
 //=================== Excite Coefficients ============
 //48 Tap Kaiser 192KHz 8HKZ Fc RXfilters Dec and Interpolation
@@ -273,204 +156,30 @@ float32_t coeffs48K_8K_LPF_FIR[48] = {
   -140.7585461814297220E-6,
   42.07251256297374200E-6
 };
-//=== 2x interpolate LP FIT+R 12K sps 48 taps 4K cutoff
-float32_t coeffs12K_8K_LPF_FIR[48] = {
-  292.7121266034897080E-6,
--488.3180342813371910E-6,
- 645.8040165558306850E-6,
--638.1198881550581060E-6,
- 309.3480302449689250E-6,
- 476.3212758864665380E-6,
--0.001765071979170106,
- 0.003440388897049947,
--0.005171865011484901,
- 0.006413537425933360,
--0.006472731205884527,
- 0.004654709846338252,
--466.7626569695900680E-6,
--0.006156455313021720,
- 0.014659150255493822,
--0.023755580034778335,
- 0.031441372818989677,
--0.035120434578160220,
- 0.031776095760559758,
--0.017990662560858503,
--0.010720286031718308,
- 0.063232870546293687,
--0.170792976311007899,
- 0.622296121514180789,
- 0.622296121514180789,
--0.170792976311007899,
- 0.063232870546293687,
--0.010720286031718308,
--0.017990662560858503,
- 0.031776095760559758,
--0.035120434578160220,
- 0.031441372818989677,
--0.023755580034778335,
- 0.014659150255493822,
--0.006156455313021720,
--466.7626569695900680E-6,
- 0.004654709846338252,
--0.006472731205884527,
- 0.006413537425933360,
--0.005171865011484901,
- 0.003440388897049947,
--0.001765071979170106,
- 476.3212758864665380E-6,
- 309.3480302449689250E-6,
--638.1198881550581060E-6,
- 645.8040165558306850E-6,
--488.3180342813371910E-6,
- 292.7121266034897080E-6,
+/** Transmit decimate-by-2, 24k -> 12k, 48 tap Kaiser windowed sinc */
+float32_t coeffs12K_8K_LPF_FIR[48] = {0};
 
-};
+/** Transmit interpolate-by-2, 12k -> 24k. This is the stage that sets the
+ *  transmit audio bandwidth, so it is anchored in Hz rather than left to scale
+ *  with the sample rate. 48 tap Kaiser windowed sinc. */
+float32_t FIR_int3_12ksps_48tap_2k7[48] = {0};
 
-// Interpolate by 2 again, 12K to 24K SPS
-float32_t FIR_int3_12ksps_48tap_2k7[48] = {
- -2.285169471669272310E-6,
--33.85457593285185850E-6,
--90.05495214272963270E-6,
--102.5104398169568180E-6,
- 58.41569034528380660E-6,
- 454.7904191315104190E-6,
- 871.4162433760077420E-6,
- 749.7881965886456330E-6,
--468.4956850258753320E-6,
--0.002616105921239791,
--0.004246098300098818,
--0.003078738032270572,
- 0.002226282725246520,
- 0.009889569653623405,
- 0.014414561535852018,
- 0.009226938890949424,
--0.007959807904613685,
--0.030336057178768423,
--0.042078062750789499,
--0.025361321875102511,
- 0.028447546456669172,
- 0.110201064956298028,
- 0.193569812629121624,
- 0.246261318040085941,
- 0.246261318040085941,
- 0.193569812629121624,
- 0.110201064956298028,
- 0.028447546456669172,
--0.025361321875102511,
--0.042078062750789499,
--0.030336057178768423,
--0.007959807904613685,
- 0.009226938890949424,
- 0.014414561535852018,
- 0.009889569653623405,
- 0.002226282725246520,
--0.003078738032270572,
--0.004246098300098818,
--0.002616105921239791,
--468.4956850258753320E-6,
- 749.7881965886456330E-6,
- 871.4162433760077420E-6,
- 454.7904191315104190E-6,
- 58.41569034528380660E-6,
--102.5104398169568180E-6,
--90.05495214272963270E-6,
--33.85457593285185850E-6,
--2.285169471669272310E-6,
-};
-
-//4 pole Butterworth IIR biQuad RXfilters for EQ  Band 1 thru 14
-float32_t EQ_Band1Coeffs[20] = {      //  fc=198.425 BW=60.4, 4 pole Gaussian 1/3 octave
-  -0.010740354324803263, 0.000000000000000000, 0.010740354324803263, 1.977760288071182870, -0.980176703912204905,
-  -0.010717730957944621, 0.000000000000000000, 0.010717730957944621, 1.975162619174023470, -0.978112070242933007,
-  -0.012264037490550410, 0.000000000000000000, 0.012264037490550410, 1.982731279215446560, -0.984673419072692013,
-  -0.012192623012836674, 0.000000000000000000, 0.012192623012836674, 1.975260232124987250, -0.978939586475078283
-};
-float32_t EQ_Band2Coeffs[20] = {      //  fc=250 BW=72, 4 pole Gaussian 1/3 octave
-  -0.012933654120114928, 0.000000000000000000, 0.012933654120114928, 1.972230388754230070, -0.976074773963381825,
-  -0.012902245256420676, 0.000000000000000000, 0.012902245256420676, 1.969054007796797960, -0.973704415266133827,
-  -0.014776626826402213, 0.000000000000000000, 0.014776626826402213, 1.978267317735213690, -0.981387851708867331,
-  -0.014677312538120893, 0.000000000000000000, 0.014677312538120893, 1.969044730844959010, -0.974791905478009535
-};
-float32_t EQ_Band3Coeffs[20] = {      //  fc=314.98 BW=91.6, 4 pole Gaussian 1/3 octave
-  -0.016447315569307643, 0.000000000000000000, 0.016447315569307643, 1.963525244582037700, -0.969599143160199128,
-  -0.016395762539476878, 0.000000000000000000, 0.016395762539476878, 1.959197203291359160, -0.966559998362339301,
-  -0.018810466262295416, 0.000000000000000000, 0.018810466262295416, 1.971448267819779780, -0.976369169522296243,
-  -0.018647471180391263, 0.000000000000000000, 0.018647471180391263, 1.958784738577257430, -0.967908806523534615
-};
-float32_t EQ_Band4Coeffs[20] = {      //  fc=400 BW=117, 4 pole Gaussian 1/3 octave
-  -0.021107226123143540, 0.000000000000000000, 0.021107226123143540, 1.951288180543548690, -0.961023369255779913,
-  -0.021020814241623810, 0.000000000000000000, 0.021020814241623810, 1.945259100240296800, -0.957088989767100218,
-  -0.024173376764279130, 0.000000000000000000, 0.024173376764279130, 1.961858154037972480, -0.969728310529273663,
-  -0.023900201823886549, 0.000000000000000000, 0.023900201823886549, 1.944062548127177160, -0.958769747478319112
-};
-float32_t EQ_Band5Coeffs[20] = {      //  fc=500 BW=140, 4 pole Gaussian 1/3 octave
-  -0.025434986078352932, 0.000000000000000000, 0.025434986078352932, 1.937763026417761440, -0.952954919636953890,
-  -0.025313478543573947, 0.000000000000000000, 0.025313478543573947, 1.930070471504943040, -0.948402481405460684,
-  -0.029161895846570862, 0.000000000000000000, 0.029161895846570862, 1.950890858299041410, -0.963270463464314108,
-  -0.028777241258184545, 0.000000000000000000, 0.028777241258184545, 1.927932418232654040, -0.950564622747441468
-};
-float32_t EQ_Band6Coeffs[20] = {      //  fc=630 BW=185, 4 pole Gaussian 1/3 octave
-  -0.034013087998603600, 0.000000000000000000, 0.034013087998603600, 1.913595532476039860, -0.937338704287993485,
-  -0.033779293097819303, 0.000000000000000000, 0.033779293097819303, 1.901882114205436290, -0.930895742996760700,
-  -0.039105400046163162, 0.000000000000000000, 0.039105400046163162, 1.932301402855366890, -0.951404949215225448,
-  -0.038366657914332684, 0.000000000000000000, 0.038366657914332684, 1.897086382739862300, -0.933431909185264641
-};
-
-float32_t EQ_Band7Coeffs[20] = {      //  fc=793 BW=215, 4 pole Gaussian 1/3 octave
-  -0.040044359954689926, 0.000000000000000000, 0.040044359954689926, 1.888394203397243400, -0.925981923711014732,
-  -0.039740115320392844, 0.000000000000000000, 0.039740115320392844, 1.873614715169800600, -0.918946600083319409,
-  -0.046099397613266917, 0.000000000000000000, 0.046099397613266917, 1.911355633900693180, -0.942046227315978979,
-  -0.045135819293132796, 0.000000000000000000, 0.045135819293132796, 1.866325392810697090, -0.922355399057854686
-};
-
-float32_t EQ_Band8Coeffs[20] = {      //  fc=1000 BW=270, 4 pole Gaussian 1/3 octave
-  -0.050982851195012183, 0.000000000000000000, 0.050982851195012183, 1.846967337210932980, -0.905880344373915625,
-  -0.050478998559837972, 0.000000000000000000, 0.050478998559837972, 1.825700576400176360, -0.896927722306557262,
-  -0.058875166968515282, 0.000000000000000000, 0.058875166968515282, 1.878257463261961750, -0.926279459225752610,
-  -0.057280286665948199, 0.000000000000000000, 0.057280286665948199, 1.812808299361427180, -0.901187303394047512
-};
-
-float32_t EQ_Band9Coeffs[20] = {      //1259 326 4 pole Gaussian 1/3 octave
-  -0.062436305349349887, 0.000000000000000000, 0.062436305349349887, 1.792407090214479080, -0.884627616406695516,
-  -0.061695827132588178, 0.000000000000000000, 0.061695827132588178, 1.763182364434806800, -0.874136164738794852,
-  -0.072306422223616690, 0.000000000000000000, 0.072306422223616690, 1.833501777433602210, -0.909146391672414067,
-  -0.069961857687408896, 0.000000000000000000, 0.069961857687408896, 1.742557606724184360, -0.879666957860237075
-};
-
-float32_t EQ_Band10Coeffs[20] = {     // Band3  //1587 380  4 pole Gaussian 1/3 octave
-  -0.074363508404526421, 0.000000000000000000, 0.074363508404526421, 1.717508353369523010, -0.862211252084035151,
-  -0.073370934748750075, 0.000000000000000000, 0.073370934748750075, 1.678381089046226960, -0.850702809396297943,
-  -0.086324197408935752, 0.000000000000000000, 0.086324197408935752, 1.770356988912942690, -0.890495750927825402,
-  -0.0831792956517105050, .000000000000000000, 0.083179295651710505, 1.647225955992196010, -0.858053843143523842
-};
-
-float32_t EQ_Band11Coeffs[20] = {     // 2000 480 4 pole 4 pole Gaussian 1/3 octave
-  -0.095836703240171059, 0.000000000000000000, 0.095836703240171059, 1.600465210710192880, -0.822735930728153764,
-  -0.094139069783896759, 0.000000000000000000, 0.094139069783896759, 1.542179833257436350, -0.808162140160850195,
-  -0.111862031820526620, 0.000000000000000000, 0.111862031820526620, 1.675022371378555920, -0.858900156431318784,
-  -0.106503914399111971, 0.000000000000000000, 0.106503914399111971, 1.490054957243781340, -0.817759406379379050
-};
-
-float32_t EQ_Band12Coeffs[20] = {     // 2500 579  4 pole Gaussian  1/3 octave
-  -0.117879553771682077, 0.000000000000000000, 0.117879553771682077, 1.446475829403250920, -0.781724147199137853,
-  -0.115383310539578524, 0.000000000000000000, 0.115383310539578524, 1.364990025835680850, -0.765170185554548188,
-  -0.138197674814651450, 0.000000000000000000, 0.138197674814651450, 1.546474742602351290, -0.825007082271826175,
-  -0.130355600849362346, 0.000000000000000000, 0.130355600849362346, 1.285783233479567580, -0.778191775359172500
-};
-
-float32_t EQ_Band13Coeffs[20] = {     //3150 730  4 pole Gaussian  1/3 octave
-  -0.150762354328435849, 0.000000000000000000, 0.150762354328435849, 1.219119807012296160, -0.720763563050070721,
-  -0.146749880416786549, 0.000000000000000000, 0.146749880416786549, 1.100462092025051410, -0.701580757063202998,
-  -0.177820152149393451, 0.000000000000000000, 0.177820152149393451, 1.358721947950491950, -0.774654638713877741,
-  -0.165372194155001706, 0.000000000000000000, 0.165372194155001706, 0.976661905865581326, -0.720426429558091441
-};
-
-float32_t EQ_Band14Coeffs[20] = { //4000 919  4 pole Gaussian  1/3 octave
-  -0.191002547843707293, 0.000000000000000000, 0.191002547843707293, 0.899547452783356571, -0.644594993669154070,
-  -0.185284629488361025, 0.000000000000000000, 0.185284629488361025, 0.731207869008696054, -0.625298174921578354,
-  -0.226011710394339427, 0.000000000000000000, 0.226011710394339427, 1.091251019040685220, -0.709544302434661267,
-  -0.208696039181478332, 0.000000000000000000, 0.208696039181478332, 0.546857223443984242, -0.655183243751105593
-};
+// Audio equaliser cells: 4 stagger-tuned bandpass biquads each, peak normalised
+// to unity. Centres run 198.425 Hz to 4000 Hz, roughly 1/3 octave apart.
+float32_t EQ_Band1Coeffs[20] = {0};
+float32_t EQ_Band2Coeffs[20] = {0};
+float32_t EQ_Band3Coeffs[20] = {0};
+float32_t EQ_Band4Coeffs[20] = {0};
+float32_t EQ_Band5Coeffs[20] = {0};
+float32_t EQ_Band6Coeffs[20] = {0};
+float32_t EQ_Band7Coeffs[20] = {0};
+float32_t EQ_Band8Coeffs[20] = {0};
+float32_t EQ_Band9Coeffs[20] = {0};
+float32_t EQ_Band10Coeffs[20] = {0};
+float32_t EQ_Band11Coeffs[20] = {0};
+float32_t EQ_Band12Coeffs[20] = {0};
+float32_t EQ_Band13Coeffs[20] = {0};
+float32_t EQ_Band14Coeffs[20] = {0};
 // Concatenate all the EQ band filter coefficients so we can loop over them
 float32_t (*EQ_Coeffs[14])[20] = { &EQ_Band1Coeffs, &EQ_Band2Coeffs, &EQ_Band3Coeffs, &EQ_Band4Coeffs,
                                &EQ_Band5Coeffs, &EQ_Band6Coeffs, &EQ_Band7Coeffs, &EQ_Band8Coeffs,
@@ -996,40 +705,6 @@ float32_t* mag_coeffs[11] =
 };
 
 
-const float32_t nuttallWindow256[] = {
-  0.0000001, 0.0000073, 0.0000292, 0.0000663, 0.0001192, 0.0001891, 0.0002771, 0.0003851,
-  0.0005147, 0.0006684, 0.0008485, 0.0010580, 0.0012998, 0.0015775, 0.0018947, 0.0022554,
-  0.0026639, 0.0031248, 0.0036429, 0.0042235, 0.0048719, 0.0055940, 0.0063956, 0.0072832,
-  0.0082631, 0.0093423, 0.0105278, 0.0118269, 0.0132470, 0.0147960, 0.0164817, 0.0183122,
-  0.0202960, 0.0224414, 0.0247569, 0.0272514, 0.0299336, 0.0328123, 0.0358966, 0.0391953,
-  0.0427173, 0.0464717, 0.0504671, 0.0547124, 0.0592163, 0.0639871, 0.0690332, 0.0743626,
-  0.0799832, 0.0859024, 0.0921274, 0.0986651, 0.1055218, 0.1127036, 0.1202159, 0.1280637,
-  0.1362515, 0.1447831, 0.1536618, 0.1628900, 0.1724698, 0.1824023, 0.1926880, 0.2033264,
-  0.2143164, 0.2256560, 0.2373424, 0.2493718, 0.2617397, 0.2744405, 0.2874677, 0.3008139,
-  0.3144707, 0.3284289, 0.3426782, 0.3572073, 0.3720040, 0.3870552, 0.4023469, 0.4178639,
-  0.4335904, 0.4495095, 0.4656036, 0.4818541, 0.4982416, 0.5147460, 0.5313464, 0.5480212,
-  0.5647480, 0.5815041, 0.5982659, 0.6150094, 0.6317101, 0.6483431, 0.6648832, 0.6813048,
-  0.6975821, 0.7136890, 0.7295995, 0.7452874, 0.7607267, 0.7758911, 0.7907549, 0.8052924,
-  0.8194782, 0.8332872, 0.8466949, 0.8596772, 0.8722106, 0.8842721, 0.8958396, 0.9068915,
-  0.9174074, 0.9273674, 0.9367527, 0.9455454, 0.9537289, 0.9612875, 0.9682065, 0.9744726,
-  0.9800736, 0.9849988, 0.9892383, 0.9927841, 0.9956291, 0.9977678, 0.9991959, 0.9999106,
-  0.9999106, 0.9991959, 0.9977678, 0.9956291, 0.9927841, 0.9892383, 0.9849988, 0.9800736,
-  0.9744726, 0.9682065, 0.9612875, 0.9537289, 0.9455454, 0.9367527, 0.9273674, 0.9174074,
-  0.9068915, 0.8958396, 0.8842721, 0.8722106, 0.8596772, 0.8466949, 0.8332872, 0.8194782,
-  0.8052924, 0.7907549, 0.7758911, 0.7607267, 0.7452874, 0.7295995, 0.7136890, 0.6975821,
-  0.6813048, 0.6648832, 0.6483431, 0.6317101, 0.6150094, 0.5982659, 0.5815041, 0.5647480,
-  0.5480212, 0.5313464, 0.5147460, 0.4982416, 0.4818541, 0.4656036, 0.4495095, 0.4335904,
-  0.4178639, 0.4023469, 0.3870552, 0.3720040, 0.3572073, 0.3426782, 0.3284289, 0.3144707,
-  0.3008139, 0.2874677, 0.2744405, 0.2617397, 0.2493718, 0.2373424, 0.2256560, 0.2143164,
-  0.2033264, 0.1926880, 0.1824023, 0.1724698, 0.1628900, 0.1536618, 0.1447831, 0.1362515,
-  0.1280637, 0.1202159, 0.1127036, 0.1055218, 0.0986651, 0.0921274, 0.0859024, 0.0799832,
-  0.0743626, 0.0690332, 0.0639871, 0.0592163, 0.0547124, 0.0504671, 0.0464717, 0.0427173,
-  0.0391953, 0.0358966, 0.0328123, 0.0299336, 0.0272514, 0.0247569, 0.0224414, 0.0202960,
-  0.0183122, 0.0164817, 0.0147960, 0.0132470, 0.0118269, 0.0105278, 0.0093423, 0.0082631,
-  0.0072832, 0.0063956, 0.0055940, 0.0048719, 0.0042235, 0.0036429, 0.0031248, 0.0026639,
-  0.0022554, 0.0018947, 0.0015775, 0.0012998, 0.0010580, 0.0008485, 0.0006684, 0.0005147,
-  0.0003851, 0.0002771, 0.0001891, 0.0001192, 0.0000663, 0.0000292, 0.0000073, 0.0000001
-};
 
 
 /**
@@ -1272,6 +947,158 @@ void SetIIRCoeffs(float32_t *coefficient_set, float32_t f0, float32_t Q, float32
 }
 
 /**
+ * Bilinear transform of one second-order analog section into an ARM biquad.
+ *
+ * Maps a section with resonance wn (rad/s) and quality factor Q into the five
+ * coefficients arm_biquad_cascade_df2T_f32 expects, {b0, b1, b2, -a1, -a2}.
+ * The caller supplies the analog numerator; the denominator is always
+ * s^2 + (wn/Q)s + wn^2.
+ *
+ * Substituting s = 2*Fs*(z-1)/(z+1) and clearing denominators gives a common
+ * divisor of d = K^2 + K*wn/Q + wn^2 with K = 2*Fs, which is factored out here.
+ *
+ * @param coeffs Destination, 5 floats
+ * @param b_s2 Analog numerator coefficient of s^2
+ * @param b_s1 Analog numerator coefficient of s
+ * @param b_s0 Analog numerator constant term
+ * @param wn Section resonant frequency in rad/s
+ * @param Q Section quality factor
+ * @param Fs_Hz Sample rate the digital filter will run at
+ */
+static void BilinearBiquad(float32_t *coeffs, float32_t b_s2, float32_t b_s1, float32_t b_s0,
+                           float32_t wn, float32_t Q, float32_t Fs_Hz) {
+    const float32_t K = 2.0f * Fs_Hz;
+    const float32_t K2 = K * K;
+    const float32_t wn2 = wn * wn;
+    const float32_t damping = K * wn / Q;
+    const float32_t d = K2 + damping + wn2;
+
+    coeffs[0] = (b_s2 * K2 + b_s1 * K + b_s0) / d;              /* b0 */
+    coeffs[1] = (2.0f * b_s0 - 2.0f * b_s2 * K2) / d;           /* b1 */
+    coeffs[2] = (b_s2 * K2 - b_s1 * K + b_s0) / d;              /* b2 */
+    // The ARM biquad adds the feedback terms rather than subtracting them, so
+    // a1 and a2 are stored negated.
+    coeffs[3] = -(2.0f * (wn2 - K2)) / d;                       // negated a1
+    coeffs[4] = -(K2 - damping + wn2) / d;                      // negated a2
+}
+
+/**
+ * Prewarp a frequency for the bilinear transform.
+ *
+ * The bilinear transform compresses the analog frequency axis as it wraps it
+ * onto the unit circle, so an analog section placed at f lands slightly below f
+ * once discretised. Designing at the prewarped frequency instead cancels that,
+ * putting the digital feature exactly on f at whatever sample rate is in use.
+ * This is what makes the generated filters sample-rate independent.
+ *
+ * @param f_Hz Frequency the digital filter should land on
+ * @param Fs_Hz Sample rate
+ * @return Equivalent analog frequency in rad/s
+ */
+static float32_t PrewarpRadians(float32_t f_Hz, float32_t Fs_Hz) {
+    return 2.0f * Fs_Hz * tanf(PI * f_Hz / Fs_Hz);
+}
+
+/**
+ * Design a Chebyshev type I lowpass as a cascade of ARM biquads.
+ *
+ * The poles of a Chebyshev type I filter lie on an ellipse in the s-plane, at
+ * positions given in closed form by the ripple and the order, so no iterative
+ * design is needed. Each conjugate pair becomes one biquad section.
+ *
+ * The cascade is normalised to unity gain at DC. An even-order Chebyshev sits
+ * at -ripple at DC and rises to 0 dB across the passband; the frozen tables
+ * this replaces were normalised the same way, with DC at 0 dB and the ripple
+ * above it.
+ *
+ * Note fRippleEdge_Hz is the edge of the equiripple region, which is the
+ * natural parameter for this family - not the -3 dB or -6 dB corner. It sits a
+ * few percent below the nominal cutoff the filter is labelled with.
+ *
+ * @param coeffs Destination, order/2 sections of 5 floats
+ * @param order Filter order, must be even
+ * @param ripple_dB Peak-to-peak passband ripple
+ * @param fRippleEdge_Hz Frequency at which the passband ripple ends
+ * @param Fs_Hz Sample rate the filter will run at
+ */
+void CalcChebyshevILowpassCoeffs(float32_t *coeffs, uint32_t order, float32_t ripple_dB,
+                                 float32_t fRippleEdge_Hz, float32_t Fs_Hz) {
+    const uint32_t nSections = order / 2;
+    if (nSections == 0) return;
+    // Nothing sensible to design if the corner has run past Nyquist.
+    if (fRippleEdge_Hz >= Fs_Hz / 2.0f) fRippleEdge_Hz = Fs_Hz / 2.0f * 0.999f;
+
+    // Ellipse shape: eps sets how much ripple, v0 how eccentric the pole locus.
+    const float32_t eps = sqrtf(powf(10.0f, ripple_dB / 10.0f) - 1.0f);
+    const float32_t v0 = asinhf(1.0f / eps) / (float32_t)order;
+    const float32_t sinhV0 = sinhf(v0);
+    const float32_t coshV0 = coshf(v0);
+    const float32_t wc = PrewarpRadians(fRippleEdge_Hz, Fs_Hz);
+
+    for (uint32_t k = 0; k < nSections; k++) {
+        const float32_t theta = PI * (float32_t)(2 * k + 1) / (float32_t)(2 * order);
+        const float32_t sigma = -sinhV0 * arm_sin_f32(theta) * wc;   // pole real part
+        const float32_t omega = coshV0 * arm_cos_f32(theta) * wc;    // pole imaginary part
+        const float32_t wn = sqrtf(sigma * sigma + omega * omega);
+        const float32_t Q = wn / (2.0f * fabsf(sigma));
+        // Lowpass numerator: wn^2, i.e. unity gain at DC for this section.
+        BilinearBiquad(&coeffs[k * 5], 0.0f, 0.0f, wn * wn, wn, Q, Fs_Hz);
+    }
+
+    // Normalise the cascade to unity at DC. Evaluating H(z) at z = 1 reduces to
+    // summing the numerator over the summed denominator for each section.
+    float32_t dcGain = 1.0f;
+    for (uint32_t k = 0; k < nSections; k++) {
+        const float32_t *s = &coeffs[k * 5];
+        dcGain *= (s[0] + s[1] + s[2]) / (1.0f - s[3] - s[4]);
+    }
+    if (dcGain > 0.0f) {
+        // Spread the correction evenly so no single section carries a large gain.
+        const float32_t perSection = powf(dcGain, -1.0f / (float32_t)nSections);
+        for (uint32_t k = 0; k < nSections; k++) {
+            coeffs[k * 5 + 0] *= perSection;
+            coeffs[k * 5 + 1] *= perSection;
+            coeffs[k * 5 + 2] *= perSection;
+        }
+    }
+}
+
+/**
+ * Design a stagger-tuned bandpass cascade as ARM biquads.
+ *
+ * The prototype describes a set of second-order analog bandpass sections whose
+ * resonances straddle the centre frequency, each given as a fraction of that
+ * centre. Scaling those fractions to the wanted centre and running them through
+ * the bilinear transform reproduces the same response shape at any centre
+ * frequency and any sample rate.
+ *
+ * Sections are emitted with b0 negative and b2 positive, matching the sign
+ * convention of the equaliser tables this replaces. ApplyEQBandFilter() sums
+ * adjacent bands with alternating sign, and that reconstruction depends on it.
+ *
+ * @param coeffs Destination, nSections sections of 5 floats
+ * @param proto Prototype sections, normalised to the centre frequency
+ * @param nSections Number of sections in the cascade
+ * @param fc_Hz Centre frequency the cascade should peak at
+ * @param gain Per-section gain, used to normalise the cascade peak
+ * @param Fs_Hz Sample rate the filter will run at
+ */
+void CalcBandpassCascadeCoeffs(float32_t *coeffs, const BandpassProtoSection *proto,
+                               uint32_t nSections, float32_t fc_Hz, float32_t gain,
+                               float32_t Fs_Hz) {
+    // Keep the whole cascade below Nyquist; the outermost section sits above fc.
+    if (fc_Hz >= Fs_Hz / 2.0f) fc_Hz = Fs_Hz / 2.0f * 0.999f;
+    const float32_t wc = PrewarpRadians(fc_Hz, Fs_Hz);
+
+    for (uint32_t k = 0; k < nSections; k++) {
+        const float32_t wn = proto[k].wnRatio * wc;
+        const float32_t Q = proto[k].Q;
+        // Bandpass numerator: (wn/Q)s, negated to match the table convention.
+        BilinearBiquad(&coeffs[k * 5], 0.0f, -gain * wn / Q, 0.0f, wn, Q, Fs_Hz);
+    }
+}
+
+/**
  * Initialize a FIR decimation filter
  * 
  * @param *filter Pointer to the DecimationFilter struct
@@ -1291,6 +1118,13 @@ void InitializeDecimationFilter(DecimationFilter *filter, float32_t DF, float32_
   filter->n_fpass = filter->n_desired_BW_Hz / filter->n_samplerate_Hz;
   filter->n_fstop = ((filter->n_samplerate_Hz / filter->M) - filter->n_desired_BW_Hz) / filter->n_samplerate_Hz;
   filter->n_dec_taps = (1 + (uint16_t)(filter->n_att_dB / (22.0 * (filter->n_fstop - filter->n_fpass))));
+
+  // Free any buffers from a previous initialization so that re-initializing at
+  // run time (e.g. a sample-rate change) does not leak memory. The pointers are
+  // nullptr on first use, and free(nullptr) is a no-op.
+  free(filter->FIR_dec_I_state);
+  free(filter->FIR_dec_Q_state);
+  free(filter->FIR_dec_coeffs);
 
   filter->FIR_dec_I_state = (float32_t*)malloc(sizeof(float32_t) * (filter->n_dec_taps + blockSize - 1));
   filter->FIR_dec_Q_state = (float32_t*)malloc(sizeof(float32_t) * (filter->n_dec_taps + blockSize - 1));
@@ -1383,4 +1217,161 @@ void InitFilterMask(float32_t *FIR_filter_mask, ReceiveFilterConfig *RXfilters) 
  */
 void setdspfirfilename(char *fnm){
     dspfirfilename = fnm; // "FIR_filter_samples.txt"
+}
+
+// ============================================================================
+//  Run-time filter generation
+//
+//  The design constants below were recovered from the coefficient tables the
+//  radio used to ship, by code/tools/extract_filter_prototypes.py. They are the
+//  design spec, not derived values: re-run that script against
+//  code/test/reference_filters.cpp if they ever need to be checked.
+// ============================================================================
+
+/** CW audio lowpass filters share an order and a ripple; only the corner differs. */
+#define CW_AUDIO_FILTER_COUNT   5
+#define CW_AUDIO_FILTER_ORDER   12
+#define CW_AUDIO_FILTER_RIPPLE_DB 0.02f
+
+/** Number of biquad sections in each equaliser cell. Matches ReceiveFilterConfig::eqNumStages. */
+#define EQ_PROTO_SECTIONS 4
+
+/** Edge of the equiripple region of each CW audio filter, at the labelled
+ *  cutoffs 840, 1080, 1320, 1800 and 2000 Hz. A Chebyshev is specified by its
+ *  ripple edge, which sits a few percent below the nominal cutoff. */
+static const float32_t CW_AUDIO_RIPPLE_EDGE_HZ[CW_AUDIO_FILTER_COUNT] = {
+    807.1f, 1038.0f, 1269.0f, 1731.5f, 1963.2f
+};
+
+/** Centre frequency of each equaliser cell. */
+static const float32_t EQ_BAND_FC_HZ[EQUALIZER_CELL_COUNT] = {
+    198.425f, 250.000f, 314.980f, 400.000f, 500.000f,
+    630.000f, 793.000f, 1000.000f, 1259.000f, 1587.000f,
+    2000.000f, 2500.000f, 3150.000f, 4000.000f
+};
+
+/** Per-section gain that puts each equaliser cell's peak at unity. */
+static const float32_t EQ_BAND_GAIN[EQUALIZER_CELL_COUNT] = {
+    1.184185753f, 1.183486381f, 1.183688167f, 1.183936689f,
+    1.183431106f, 1.184571413f, 1.183589930f, 1.183974027f,
+    1.183805406f, 1.183267466f, 1.184229387f, 1.184796361f,
+    1.186649928f, 1.189574151f
+};
+
+/** Analog prototype of each equaliser cell: four bandpass sections whose
+ *  resonances straddle the centre frequency, given as fractions of it. */
+static const BandpassProtoSection EQ_BAND_PROTO[EQUALIZER_CELL_COUNT][EQ_PROTO_SECTIONS] = {
+    {{0.951083615f, 2.466689083f}, {1.051379253f, 2.466689084f}, {0.851636566f, 2.863638706f}, {1.174150596f, 2.863638705f}},
+    {{0.953178819f, 2.574736321f}, {1.049087493f, 2.574736321f}, {0.857535414f, 2.986184529f}, {1.166095255f, 2.986184529f}},
+    {{0.952570489f, 2.542065805f}, {1.049764384f, 2.542065806f}, {0.855807346f, 2.949116270f}, {1.168457571f, 2.949116270f}},
+    {{0.951830713f, 2.503540450f}, {1.050585940f, 2.503540450f}, {0.853713229f, 2.905420150f}, {1.171330056f, 2.905420150f}},
+    {{0.953370464f, 2.583905422f}, {1.048927026f, 2.583905422f}, {0.858034309f, 2.996589913f}, {1.165473263f, 2.996589913f}},
+    {{0.949994428f, 2.412809599f}, {1.052637753f, 2.412809599f}, {0.848532629f, 2.802580881f}, {1.178505064f, 2.802580881f}},
+    {{0.952874313f, 2.557802231f}, {1.049445688f, 2.557802231f}, {0.856652873f, 2.966969526f}, {1.167322110f, 2.966969526f}},
+    {{0.951691136f, 2.497903978f}, {1.050676047f, 2.497903978f}, {0.853375360f, 2.899028582f}, {1.171722464f, 2.899028582f}},
+    {{0.952233947f, 2.523659752f}, {1.050168894f, 2.523659752f}, {0.854827001f, 2.928237726f}, {1.169834914f, 2.928237726f}},
+    {{0.953866388f, 2.611676440f}, {1.048364858f, 2.611676440f}, {0.859456463f, 3.028110638f}, {1.163526070f, 3.028110638f}},
+    {{0.950982372f, 2.460405147f}, {1.051548607f, 2.460405147f}, {0.851302026f, 2.856515705f}, {1.174676152f, 2.856515705f}},
+    {{0.949340102f, 2.383020780f}, {1.053327036f, 2.383020780f}, {0.846732326f, 2.768839341f}, {1.180970143f, 2.768839341f}},
+    {{0.944376056f, 2.174506313f}, {1.058900206f, 2.174506313f}, {0.832947335f, 2.533023428f}, {1.200556094f, 2.533023428f}},
+    {{0.937307103f, 1.936908781f}, {1.066883605f, 1.936908781f}, {0.813799101f, 2.265312153f}, {1.228801532f, 2.265312153f}}
+};
+
+/** -6 dB corner of the CW decoder input filter. CalcFIRCoeffs takes its fc
+ *  argument as the -6 dB point, so this is not the 1560 Hz the filter is
+ *  nominally described by - that is its -3 dB point. */
+#define CW_DECODE_FIR_FC_HZ 1749.1f
+
+/** -6 dB corner of the transmit interpolate-by-2 filter, which is what limits
+ *  the transmit audio bandwidth (-3 dB at 2759 Hz). */
+#define TX_AUDIO_LPF_FC_HZ 3039.6f
+
+/** -6 dB corner of the transmit decimate-by-2 filter feeding the Hilbert stage.
+ *
+ *  This one is not a reproduction of the table it replaces. That table was flat
+ *  to 0.425 * Fs, far past the 0.25 * Fs a decimate-by-2 stage needs, so
+ *  everything between 6 and 9.5 kHz folded back into the transmit audio. A real
+ *  lowpass here removes that aliasing. 3.5 kHz sits above the 2.76 kHz the
+ *  audio bandwidth filter allows through, so it costs no wanted signal. */
+#define TX_DECIMATE3_FC_HZ 3500.0f
+
+/** Stopband attenuation asked of the generated FIR stages. */
+#define GENERATED_FIR_ATTENUATION_DB 90.0f
+
+/**
+ * Scale a set of FIR taps to unity gain at DC.
+ *
+ * CalcFIRCoeffs does not normalise its output, and the CW decoder compares the
+ * filtered magnitude against a fixed threshold, so the gain has to be pinned.
+ *
+ * @param taps Coefficient array, modified in place
+ * @param nTaps Number of taps
+ */
+static void NormalizeFIRDCGain(float32_t *taps, uint32_t nTaps) {
+    float32_t sum = 0.0f;
+    for (uint32_t i = 0; i < nTaps; i++) sum += taps[i];
+    if (sum == 0.0f) return;
+    for (uint32_t i = 0; i < nTaps; i++) taps[i] /= sum;
+}
+
+/**
+ * Regenerate the receive audio filter tables for the current sample rate.
+ *
+ * Called from the top of InitializeFilters(), so it runs at startup and again
+ * on every sample rate change, before the ARM instances are bound.
+ *
+ * Filters that specify their corner as a fraction of the sample rate - the
+ * decimation and interpolation anti-alias stages, the zoom FFT filters - are
+ * deliberately not regenerated. Those are already correct at any rate, because
+ * scaling with Fs is exactly what an anti-alias filter should do.
+ *
+ * @param audioFs_Hz Sample rate of the decimated audio stream
+ */
+void InitializeReceiveAudioFilterCoeffs(float32_t audioFs_Hz) {
+    // CW audio lowpass filters, 12 pole Chebyshev type I.
+    float32_t *cwAudio[CW_AUDIO_FILTER_COUNT] = {
+        CW_AudioFilterCoeffs1, CW_AudioFilterCoeffs2, CW_AudioFilterCoeffs3,
+        CW_AudioFilterCoeffs4, CW_AudioFilterCoeffs5
+    };
+    for (uint32_t i = 0; i < CW_AUDIO_FILTER_COUNT; i++) {
+        CalcChebyshevILowpassCoeffs(cwAudio[i], CW_AUDIO_FILTER_ORDER,
+                                    CW_AUDIO_FILTER_RIPPLE_DB,
+                                    CW_AUDIO_RIPPLE_EDGE_HZ[i], audioFs_Hz);
+    }
+
+    // Audio equaliser cells. The receive and transmit chains share these tables
+    // and both run at the audio rate, so one set serves both.
+    for (uint32_t i = 0; i < EQUALIZER_CELL_COUNT; i++) {
+        CalcBandpassCascadeCoeffs(*EQ_Coeffs[i], EQ_BAND_PROTO[i], EQ_PROTO_SECTIONS,
+                                  EQ_BAND_FC_HZ[i], EQ_BAND_GAIN[i], audioFs_Hz);
+    }
+
+    // CW decoder input filter.
+    CalcFIRCoeffs(CW_Filter_Coeffs2, 64, CW_DECODE_FIR_FC_HZ, GENERATED_FIR_ATTENUATION_DB,
+                  Lowpass, 0.0f, audioFs_Hz);
+    NormalizeFIRDCGain(CW_Filter_Coeffs2, 64);
+}
+
+/**
+ * Regenerate the transmit filter tables for the current sample rate.
+ *
+ * Called from the top of InitializeTransmitFilters(). Only the two stages
+ * either side of the Hilbert transform are generated: the rest of the transmit
+ * chain is anti-alias and anti-image filtering specified as a fraction of Fs,
+ * which needs no adjustment.
+ *
+ * A decimating FIR filters at its input rate and an interpolating one at its
+ * output rate. For both of these stages that rate is the audio rate, not the
+ * 12 ksps the Hilbert transform between them runs at.
+ *
+ * @param audioFs_Hz Sample rate of the decimated audio stream
+ */
+void InitializeTransmitFilterCoeffs(float32_t audioFs_Hz) {
+    CalcFIRCoeffs(coeffs12K_8K_LPF_FIR, 48, TX_DECIMATE3_FC_HZ, GENERATED_FIR_ATTENUATION_DB,
+                  Lowpass, 0.0f, audioFs_Hz);
+    NormalizeFIRDCGain(coeffs12K_8K_LPF_FIR, 48);
+
+    CalcFIRCoeffs(FIR_int3_12ksps_48tap_2k7, 48, TX_AUDIO_LPF_FC_HZ, GENERATED_FIR_ATTENUATION_DB,
+                  Lowpass, 0.0f, audioFs_Hz);
+    NormalizeFIRDCGain(FIR_int3_12ksps_48tap_2k7, 48);
 }

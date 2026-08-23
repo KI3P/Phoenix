@@ -34,9 +34,35 @@ void UpdateHardwareState(void);
 void ModeCWTransmitSpaceEnter(void);
 
 /**
- * @brief Checks if transmit is allowed for the current band 
+ * @brief Checks if transmit is allowed for the current band
  * @note Used as guard for transitions to transmit states
  */
 bool IsTxAllowed(void);
+
+/**
+ * @brief Checks if the radio is transmitting through the SSB transmit path
+ * @return true in SSB_TRANSMIT or DIGITAL_TRANSMIT
+ * @note Digital mode transmits an SSB signal with the audio sourced from USB, so
+ *       the two states behave identically for the display and the DSP chain
+ */
+bool IsSSBTransmit(void);
+
+// Digital (USB audio) mode
+
+/**
+ * @brief Enter digital mode: force 176.4 ksps and start the USB audio transport
+ * @note Called by ModeSm state machine when entering the DIGITAL_STATES composite
+ * @note Saves the previous sample rate for ExitDigitalMode() to restore
+ * @note 176.4 ksps is required: it puts the receive chain's Fs/4 tap at exactly
+ *       44,100 Hz, so the USB audio endpoint needs no resampling
+ */
+void EnterDigitalMode(void);
+
+/**
+ * @brief Leave digital mode: stop USB audio and restore the previous sample rate
+ * @note Called by ModeSm state machine when exiting the DIGITAL_STATES composite,
+ *       including via a calibration event dispatched at the NORMAL_STATES level
+ */
+void ExitDigitalMode(void);
 
 #endif // MODE_H

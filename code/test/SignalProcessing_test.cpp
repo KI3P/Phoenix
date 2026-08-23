@@ -2013,3 +2013,282 @@ TEST(SignalProcessing, ReceiveProcessing){
         if (data->I[i] > amp) amp = data->I[i];
     }
 }*/
+
+// ============================================================================
+// 176.4 kHz receive-chain stage-response measurement
+// ----------------------------------------------------------------------------
+// The receive DSP is designed for, and normally run at, Fs = 192 kHz (audio
+// rate Fs/DF = 24 kHz after the decimate-by-8). This block measures how the
+// receive stages behave when the radio is run at Fs = 176.4 kHz (audio rate
+// 176400/8 = 22.05 kHz) WITHOUT changing any DSP stage, by flipping the global
+// SampleRate selector and re-running the existing per-stage sweep helpers.
+//
+// Every stage measured here is now Fs-derived: its coefficients are recomputed
+// from SR[SampleRate].rate at InitializeFilters() time, so its corner and centre
+// frequencies stay fixed in Hz when the sample rate changes.
+//
+// This was not always so. The CW audio filters, the CW decode FIR and the EQ
+// cells used to ship frozen tables designed for 24 kHz audio, and running them
+// at 22.05 kHz scaled every characteristic frequency by 176400/192000 = 0.91875.
+// These tests asserted that shift; they now assert its absence. FilterDesign_test.cpp
+// covers the generated filters in more detail, including a direct comparison
+// against the frozen tables in reference_filters.cpp.
+//
+// These tests are non-destructive: each saves and restores the global
+// SampleRate (and rebuilds the global RXfilters at the original rate) so the
+// rest of the suite is unaffected. They use EXPECT_* (non-fatal) so the
+// restore at the end always runs.
+// ============================================================================
+
+// The rate ratio the frozen tables used to shift by. Kept as documentation of
+// what these tests are guarding against.
+static const float32_t RATE_RATIO_176_192 = 176400.0f / 192000.0f; // 0.91875
+
+// Sweep a lowpass-style stage-response helper and return the frequency (Hz)
+// at which its gain first falls to `frac` of the passband (fstart) value, using
+// linear interpolation between sweep points. Returns -1 if the crossing is
+// never reached within [fstart, fstop].
+static float32_t Find176kGainCrossing(void (*resp)(float32_t, DataBlock *, float32_t *),
+                                      float32_t fstart, float32_t fstop,
+                                      float32_t fstep, float32_t frac){
+    DataBlock *dummy = nullptr;
+    float32_t g0;
+    resp(fstart, dummy, &g0);          // passband reference gain
+    float32_t target = frac * g0;
+    float32_t prev_f = fstart, prev_g = g0;
+    for (float32_t f = fstart + fstep; f <= fstop; f += fstep){
+        float32_t g;
+        resp(f, dummy, &g);
+        if (g <= target){
+            return prev_f + (target - prev_g) * (f - prev_f) / (g - prev_g);
+        }
+        prev_f = f;
+        prev_g = g;
+    }
+    return -1.0f;
+}
+
+// -6 dB (half-amplitude) upper cutoff of a CW audio filter.
+static float32_t CW176kUpperCutoffHz(int bf){
+    ED.CWFilterIndex = bf;
+    return Find176kGainCrossing(CW_filter_tone, 200.0f, 3600.0f, 10.0f, 0.5f);
+}
+
+// -6 dB (half-amplitude) corner of the AM audio lowpass IIR (Fs-derived).
+static float32_t AM176kCornerHz(){
+    return Find176kGainCrossing(AM_IIR_filter_tone, 200.0f, 6000.0f, 20.0f, 0.5f);
+}
+
+// Peak (center) frequency of an EQ band, found by argmax of a fine sweep
+// generated for the current sample rate.
+static float32_t EQ176kPeakHz(int bf, float32_t fmin, float32_t fmax, float32_t fstep){
+    DataBlock *dummy = nullptr;
+    float32_t best_f = fmin, best_g = -1.0f;
+    for (float32_t f = fmin; f <= fmax; f += fstep){
+        float32_t g;
+        EQ_filter_tone(f, (uint16_t)bf, dummy, &g);
+        if (g > best_g){ best_g = g; best_f = f; }
+    }
+    return best_f;
+}
+
+// Measure a characteristic frequency of three representative stages at both
+// 192 kHz and 176.4 kHz and confirm that each one keeps that frequency fixed in
+// Hz. Also writes a summary CSV for the record.
+TEST(ReceiveChain176k, AllStagesHoldTheirFrequencies){
+    uint8_t saved_rate = SampleRate;
+
+    // --- CW audio filter index 4 ("2.0 kHz") ---------------------------------
+    SampleRate = SAMPLE_RATE_192K;
+    float32_t cw_192 = CW176kUpperCutoffHz(4);
+    SampleRate = SAMPLE_RATE_176K;
+    float32_t cw_176 = CW176kUpperCutoffHz(4);
+
+    // --- Receive EQ band 13 (fc = 4000 Hz) -----------------------------------
+    SampleRate = SAMPLE_RATE_192K;
+    float32_t eq_192 = EQ176kPeakHz(13, 3000.0f, 4600.0f, 5.0f);
+    SampleRate = SAMPLE_RATE_176K;
+    float32_t eq_176 = EQ176kPeakHz(13, 3000.0f, 4600.0f, 5.0f);
+
+    // --- AM audio lowpass IIR: the stage that was always Fs-derived ----------
+    SampleRate = SAMPLE_RATE_192K;
+    float32_t am_192 = AM176kCornerHz();
+    SampleRate = SAMPLE_RATE_176K;
+    float32_t am_176 = AM176kCornerHz();
+
+    // Restore global state before any assertion can abort the test.
+    SampleRate = saved_rate;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
+
+    // Record the measurements.
+    FILE *f = fopen("176k_stage_shift_summary.txt", "w");
+    if (f != nullptr){
+        fprintf(f, "stage,type,f_192k_Hz,f_176k_Hz,measured_ratio,expected_ratio\n");
+        fprintf(f, "CW_audio_filter_2k0_upper_cutoff,fs_derived,%.1f,%.1f,%.4f,%.4f\n",
+                cw_192, cw_176, cw_176 / cw_192, 1.0f);
+        fprintf(f, "EQ_band13_4000_peak,fs_derived,%.1f,%.1f,%.4f,%.4f\n",
+                eq_192, eq_176, eq_176 / eq_192, 1.0f);
+        fprintf(f, "AM_audio_lowpass_corner,fs_derived,%.1f,%.1f,%.4f,%.4f\n",
+                am_192, am_176, am_176 / am_192, 1.0f);
+        fclose(f);
+    }
+
+    // Sanity: every sweep found its crossing/peak.
+    ASSERT_GT(cw_192, 0.0f); ASSERT_GT(cw_176, 0.0f);
+    ASSERT_GT(eq_192, 0.0f); ASSERT_GT(eq_176, 0.0f);
+    ASSERT_GT(am_192, 0.0f); ASSERT_GT(am_176, 0.0f);
+
+    // All three stages are generated from Fs, so their characteristic
+    // frequencies stay put. Each of these used to read RATE_RATIO_176_192.
+    EXPECT_NEAR(cw_176 / cw_192, 1.0f, 0.03)
+        << "CW audio filter cutoff moved from " << cw_192 << " Hz to " << cw_176
+        << " Hz; the Chebyshev design should be regenerated for the new rate";
+    EXPECT_NEAR(eq_176 / eq_192, 1.0f, 0.03)
+        << "EQ band centre moved from " << eq_192 << " Hz to " << eq_176
+        << " Hz; the cell prototype should be rebilineared for the new rate";
+    EXPECT_NEAR(am_176 / am_192, 1.0f, 0.03)
+        << "AM audio lowpass corner should stay constant in Hz (recomputed from Fs)";
+
+    // Guard against a regression to the old behaviour specifically.
+    EXPECT_GT(cw_176 / cw_192, RATE_RATIO_176_192 + 0.03)
+        << "CW audio filter is still tracking the sample rate ratio";
+    EXPECT_GT(eq_176 / eq_192, RATE_RATIO_176_192 + 0.03)
+        << "EQ band is still tracking the sample rate ratio";
+}
+
+// Dump full stage-response sweeps at 176.4 kHz to "176k_*.txt" files, in the
+// same format the existing analysis notebook reads for the 192 kHz case. Load
+// these alongside the 192 kHz files (build/CWFilter_band_*.txt,
+// ReceiveEQ_band_*.txt, AudioIIRPassband.txt) to overlay the two rates.
+TEST(ReceiveChain176k, StageResponseDump){
+    uint8_t saved_rate = SampleRate;
+    SampleRate = SAMPLE_RATE_176K;
+
+    DataBlock *dout = nullptr;
+    char strbuf[64];
+
+    // CW audio filters: 5 selectable bandwidths.
+    {
+        float32_t fmin = 100.0f, fmax = 6000.0f;
+        uint32_t Npoints = 201;
+        float32_t fstep = (fmax - fmin) / (float32_t)Npoints;
+        float32_t gain[Npoints], freq[Npoints];
+        for (uint16_t bf = 0; bf < 5; bf++){
+            ED.CWFilterIndex = bf;
+            for (uint32_t i = 0; i < Npoints; i++){
+                freq[i] = fmin + (float32_t)i * fstep;
+                CW_filter_tone(freq[i], dout, &gain[i]);
+            }
+            sprintf(strbuf, "176k_CWFilter_band_%d.txt", bf);
+            WriteIQFile(freq, gain, strbuf, Npoints);
+        }
+    }
+
+    // Receive EQ bands: 14 graphic-EQ cells.
+    {
+        float32_t fmin = 100.0f, fmax = 8000.0f;
+        uint32_t Npoints = 401;
+        float32_t fstep = (fmax - fmin) / (float32_t)Npoints;
+        float32_t gain[Npoints], freq[Npoints];
+        for (uint16_t bf = 0; bf < 14; bf++){
+            for (uint32_t i = 0; i < Npoints; i++){
+                freq[i] = fmin + (float32_t)i * fstep;
+                EQ_filter_tone(freq[i], bf, dout, &gain[i]);
+            }
+            sprintf(strbuf, "176k_ReceiveEQ_band_%d.txt", bf);
+            WriteIQFile(freq, gain, strbuf, Npoints);
+        }
+    }
+
+    // AM audio lowpass IIR (Fs-derived control): should match its 192 kHz shape.
+    {
+        float32_t fmin = 50.0f, fmax = 12000.0f;
+        uint32_t Npoints = 101;
+        float32_t fstep = (fmax - fmin) / (float32_t)Npoints;
+        float32_t gain[Npoints], freq[Npoints];
+        for (uint32_t i = 0; i < Npoints; i++){
+            freq[i] = fmin + (float32_t)i * fstep;
+            AM_IIR_filter_tone(freq[i], dout, &gain[i]);
+        }
+        WriteIQFile(freq, gain, "176k_AudioIIRPassband.txt", Npoints);
+    }
+
+    // Restore global state.
+    SampleRate = saved_rate;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
+}
+
+// Changing the sample rate at run time changes the Fs/4 IF offset, which would
+// move the received (dial) frequency unless ChangeSampleRate() compensates the
+// stored center frequency. Verify the dial frequency is held constant and that
+// the center frequency is shifted by the change in Fs/4.
+TEST(ReceiveChain176k, DialFrequencyPreservedAcrossRateChange){
+    uint8_t saved_rate = SampleRate;
+    int64_t savedA = ED.centerFreq_Hz[0];
+    int64_t savedB = ED.centerFreq_Hz[1];
+    float32_t savedFine = ED.fineTuneFreq_Hz[ED.activeVFO];
+
+    // Start at 192 kHz with a known center frequency (RX VFO / "LO" = 7198 kHz).
+    SampleRate = SAMPLE_RATE_192K;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0.0f;
+    ED.centerFreq_Hz[0] = 7198000;
+    ED.centerFreq_Hz[1] = 7198000;
+    // Dial (received) frequency = centerFreq - fineTune - Fs/4 = 7198000 - 48000
+    int64_t dial_192 = GetTXRXFreq(ED.activeVFO);
+    EXPECT_EQ(dial_192, 7150000);
+
+    // Switch to 176.4 kHz. Fs/4 drops 48000 -> 44100 (delta -3900), so the center
+    // frequency should move by -3900 to keep the dial frequency fixed.
+    ChangeSampleRate(SAMPLE_RATE_176K);
+    EXPECT_EQ((int)SampleRate, (int)SAMPLE_RATE_176K);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], (int64_t)7194100);
+    EXPECT_EQ(GetTXRXFreq(ED.activeVFO), dial_192); // dial frequency preserved
+
+    // Switch back to 192 kHz: center returns to the original value.
+    ChangeSampleRate(SAMPLE_RATE_192K);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], (int64_t)7198000);
+    EXPECT_EQ(GetTXRXFreq(ED.activeVFO), dial_192);
+
+    // Restore global state.
+    ED.centerFreq_Hz[0] = savedA;
+    ED.centerFreq_Hz[1] = savedB;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = savedFine;
+    SampleRate = saved_rate;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
+}
+// The zoom-FFT spectrum trace must place a tone at the same bin the display axis
+// (frequency_to_bin, the test mirror of FreqToBin) predicts, at both sample rates.
+// A tone injected at a known offset from the display center should peak at that bin.
+TEST(ReceiveChain176k, ZoomFFTToneLandsWhereAxisPredicts){
+    uint8_t saved_rate = SampleRate;
+    for (int which = 0; which < 2; which++){
+        SampleRate = (which == 0) ? SAMPLE_RATE_192K : SAMPLE_RATE_176K;
+        uint32_t fs = SR[SampleRate].rate;
+        uint32_t zoom = SPECTRUM_ZOOM_16;   // spectrum_zoom = 4 -> 16x
+        float32_t Delta = 2000.0;            // tone 2 kHz above display center
+        // ADC-baseband tone so that after FreqShiftFs4 (+fs/4) it sits at +Delta
+        float32_t tone_Hz = Delta - (float32_t)fs/4.0;
+
+        uint32_t Nsamples = 2048*4;
+        float I[Nsamples], Q[Nsamples];
+        CreateIQTone(I, Q, Nsamples, fs, tone_Hz);
+
+        ReceiveFilterConfig rf;
+        InitializeFilters(zoom, &rf);
+        ZoomFFTPrep(zoom, &rf);
+
+        DataBlock data; data.N = 2048; data.sampleRate_Hz = fs;
+        bool val = false;
+        for (int b = 0; b < 4; b++){
+            data.I = &I[b*2048]; data.Q = &Q[b*2048]; data.N = 2048;
+            val = ZoomFFTExe(&data, zoom, &rf);
+        }
+        EXPECT_TRUE(val);
+        int peak = 0; float32_t pmax = -1e30;
+        for (int i = 0; i < 512; i++){ if (psdnew[i] > pmax){ pmax = psdnew[i]; peak = i; } }
+        int expected = frequency_to_bin(Delta, 512, fs/(1<<zoom));
+        EXPECT_NEAR(peak, expected, 1) << "fs=" << fs << " peak=" << peak << " expected=" << expected;
+    }
+    SampleRate = saved_rate;
+    InitializeFilters(SPECTRUM_ZOOM_1, &RXfilters);
+}

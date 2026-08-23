@@ -90,8 +90,20 @@ void PrependInterrupt(InterruptType i);
  * @note Packet format: 'T' + 10-digit Unix UTC timestamp + '\n' (or '\r')
  * @note On valid packet, sets the Teensy hardware RTC and TimeLib software clock
  * @note Non-blocking; drains the input buffer each call
+ * @note NOT called when CAT shares this port (AUDIO_INTERFACE); the CAT reader
+ *       recognises the same packet there and hands it to ApplyTimeSyncDigits()
  */
 void CheckForSerialTimeSync(void);
+
+/**
+ * @brief Set both clocks from the digits of a PJRC time-sync packet
+ * @param digits The timestamp digits alone - no 'T' header, no terminator
+ * @param count Number of digits available
+ * @return true if the timestamp was valid and the clocks were set
+ * @note Shared by the two readers that can receive the packet, so a build with
+ *       and a build without a USB audio interface accept exactly the same bytes
+ */
+bool ApplyTimeSyncDigits(const char* digits, uint8_t count);
 
 /**
  * @brief Main program loop executed repeatedly while radio is powered on
@@ -145,5 +157,44 @@ size_t GetInterruptFifoSize(void);
  * @note Must be called during initialization before entering main loop
  */
 void SetupCWKeyInterrupts(void);
+
+/**
+ * @brief Record that a Center Tune or Fine Tune event was just acted upon
+ * @param fineTune true if the event came from the Fine Tune encoder, false for Center Tune
+ * @note Drives rapid-tuning detection: if the gap since the previous tune event is
+ *       below RAPID_TUNE_ENGAGE_MS, the rapid-tuning latch is set. The encoder source
+ *       is remembered so the spectrum can keep tracking during Fine Tune.
+ * @note Call once per consumed center/fine tune interrupt. No-op when
+ *       MUTE_ON_RAPID_TUNE is disabled at compile time.
+ */
+void NoteTuneActivity(bool fineTune);
+
+/**
+ * @brief Query whether the operator is currently spinning a tune encoder fast
+ * @return true while rapid tuning is in effect; false otherwise
+ * @note The latch auto-clears once no tune event has arrived for
+ *       RAPID_TUNE_RELEASE_MS. Used to mute audio during rapid tuning.
+ * @note Always returns false when MUTE_ON_RAPID_TUNE is disabled at compile time.
+ */
+bool IsRapidTuning(void);
+
+/**
+ * @brief Query whether rapid tuning is in effect AND driven by the Center Tune encoder
+ * @return true only while spinning Center Tune fast; false for Fine Tune or when idle
+ * @note Center Tune re-centers the spectrum (reprograms the VFO), so the whole trace
+ *       and waterfall are frozen while it is spun.
+ * @note Always returns false when MUTE_ON_RAPID_TUNE is disabled at compile time.
+ */
+bool IsRapidCenterTuning(void);
+
+/**
+ * @brief Query whether rapid tuning is in effect AND driven by the Fine Tune encoder
+ * @return true only while spinning Fine Tune fast; false for Center Tune or when idle
+ * @note Fine Tune keeps the center fixed and only slides the marker, so the spectrum
+ *       pane holds the trace frozen but keeps redrawing the blue tuning bar at the
+ *       new marker position.
+ * @note Always returns false when MUTE_ON_RAPID_TUNE is disabled at compile time.
+ */
+bool IsRapidFineTuning(void);
 
 #endif // LOOP_H

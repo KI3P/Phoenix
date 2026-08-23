@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 #include "SDT.h"
+#include "RA8875.h"   // for the mock display's print log
 
 #include <thread>
 #include <chrono>
@@ -128,6 +129,83 @@ TEST_F(DisplayTest, MenuRedrawn) {
 
     loop(); MyDelay(10);
 
+}
+
+/**
+ * The VFO panes are the only part of the home screen drawn in a GFX font
+ * (FreeSansBold). The font source is sticky in the RA8875 library - setFontScale()
+ * does not clear it, only setFontDefault() does - so if the VFO panes leave their
+ * font installed, every pane drawn afterwards that only sets a font scale renders
+ * its text in FreeSansBold and overflows its box. That was visible as the
+ * "Decoder:" line, and the decoded CW text, growing huge while the fine tune knob
+ * was turned in CW mode: the fine tune redraws the VFO panes, but the spectrum pane
+ * (which would otherwise have restored the default font) skips its redraw while the
+ * knob is spinning.
+ *
+ * Check the invariant directly: no text outside the two VFO panes is ever drawn in
+ * a GFX font.
+ */
+TEST_F(DisplayTest, HomeScreenFontIsNotLeakedOutOfTheVFOPanes) {
+    // The VFO panes occupy the top left of the screen: {5,5,280,50} and {300,5,220,40}
+    const uint16_t VFO_PANE_MAX_X = 525;
+    const uint16_t VFO_PANE_MAX_Y = 55;
+
+    Q_in_L.setChannel(0);
+    Q_in_R.setChannel(1);
+    Q_in_L.clear();
+    Q_in_R.clear();
+    StartMillis();
+
+    InitializeStorage();
+    InitializeFrontPanel();
+    InitializeSignalProcessing();
+    InitializeAudio();
+    InitializeDisplay();
+    InitializeRFHardware();
+
+    modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+    modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+    ModeSm_start(&modeSM);
+    ED.agc = AGCOff;
+    ED.nrOptionSelect = NROff;
+    uiSM.vars.splashDuration_ms = 1;
+    UISm_start(&uiSM);
+    UpdateAudioIOState();
+    start_timer1ms();
+
+    loop(); MyDelay(10);
+    ASSERT_EQ(uiSM.state_id, UISm_StateId_HOME);
+
+    // Select CW mode
+    SetButton(TOGGLE_MODE);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_CW_RECEIVE);
+
+    RA8875ClearPrintLog();
+
+    // Turn the decoder on and off again, spinning the fine tune knob throughout. The
+    // spins are close enough together to latch the rapid-tuning state, which is what
+    // makes the spectrum pane skip the redraw that would have reset the font.
+    for (int i = 0; i < 6; i++) {
+        SetInterrupt(iFINETUNE_INCREASE);
+        loop(); MyDelay(2);
+        SetInterrupt(iFINETUNE_INCREASE);
+        loop(); MyDelay(2);
+        SetButton(DECODER_TOGGLE);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(2);
+    }
+
+    unsigned nprints = RA8875PrintLogSize();
+    EXPECT_GT(nprints, 0u) << "no text was drawn - the test did not exercise the home screen";
+    for (unsigned i = 0; i < nprints; i++) {
+        RA8875PrintRecord r = RA8875PrintLogEntry(i);
+        if (!r.customFont) continue;
+        EXPECT_TRUE((r.x <= VFO_PANE_MAX_X) && (r.y <= VFO_PANE_MAX_Y))
+            << "text at (" << r.x << "," << r.y << ") was drawn in a GFX font left "
+            << "installed by the VFO panes";
+    }
 }
 
 /**
@@ -1421,13 +1499,14 @@ TEST_F(DisplayTest, CWOptionsMenu_SidetoneVolume_Configuration) {
     EXPECT_EQ(CWOptions[5].action, variableOption);
     EXPECT_EQ(CWOptions[5].varPam, &stv);
     EXPECT_EQ(CWOptions[5].func, nullptr);
-    EXPECT_EQ(CWOptions[5].postUpdateFunc, nullptr);
+    // Changing the volume has to re-apply the gain to the sidetone oscillator
+    EXPECT_EQ(CWOptions[5].postUpdateFunc, (void *)UpdateSidetoneOscillator);
 
     // Verify variable parameter configuration
     EXPECT_EQ(stv.type, TYPE_F32);
     EXPECT_FLOAT_EQ(stv.limits.f32.min, 0.0f);
-    EXPECT_FLOAT_EQ(stv.limits.f32.max, 100.0f);
-    EXPECT_FLOAT_EQ(stv.limits.f32.step, 0.5f);
+    EXPECT_FLOAT_EQ(stv.limits.f32.max, 500.0f);
+    EXPECT_FLOAT_EQ(stv.limits.f32.step, 1.0f);
 }
 
 /**
@@ -1444,21 +1523,21 @@ TEST_F(DisplayTest, CWOptionsMenu_SidetoneVolume_IncrementDecrement) {
 
     // Increment volume
     IncrementVariable(&stv);
-    EXPECT_FLOAT_EQ(ED.sidetoneVolume, 50.5f);
+    EXPECT_FLOAT_EQ(ED.sidetoneVolume, 51.0f);
 
     // Decrement volume
     DecrementVariable(&stv);
     EXPECT_FLOAT_EQ(ED.sidetoneVolume, 50.0f);
 
     // Test max boundary
-    ED.sidetoneVolume = 99.8f;
+    ED.sidetoneVolume = 499.0f;
     IncrementVariable(&stv);
-    EXPECT_FLOAT_EQ(ED.sidetoneVolume, 100.0f);
+    EXPECT_FLOAT_EQ(ED.sidetoneVolume, 500.0f);
     IncrementVariable(&stv);
-    EXPECT_FLOAT_EQ(ED.sidetoneVolume, 100.0f);
+    EXPECT_FLOAT_EQ(ED.sidetoneVolume, 500.0f);
 
     // Test min boundary
-    ED.sidetoneVolume = 0.3f;
+    ED.sidetoneVolume = 1.0f;
     DecrementVariable(&stv);
     EXPECT_FLOAT_EQ(ED.sidetoneVolume, 0.0f);
     DecrementVariable(&stv);

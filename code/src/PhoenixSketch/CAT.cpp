@@ -20,8 +20,11 @@ If not, see <https://www.gnu.org/licenses/>.
 
 // Kenwood TS-480 CAT Interface (partial)
 //
-// Note that this uses SerialUSB1 for the CAT interface at 38400 baud
-// Configure the IDE to set Tools->USB Type to Dual Serial.
+// Note that this uses CATSerial for the CAT interface at 38400 baud.
+// CATSerial is SerialUSB1 normally, or the primary Serial in builds with
+// a USB audio interface, which have only one CDC port (see SDT.h).
+// Configure the IDE's Tools->USB Type to Dual Serial, or to Serial + MIDI +
+// Audio if you want digital (USB audio) mode.
 
 // Uncomment to see CAT messages on the Serial Output
 //#define DEBUG_CAT
@@ -78,6 +81,19 @@ char *VX_write( char* cmd );
 char *VX_read( char* cmd );
 char *ED_read(  char* cmd );
 char *PR_read( char* cmd);
+char *SR_write( char* cmd );
+char *SR_read(  char* cmd );
+char *DG_write( char* cmd );
+char *DG_read(  char* cmd );
+char *DR_write( char* cmd );
+char *DR_read(  char* cmd );
+char *DS_read(  char* cmd );
+char *CF_write( char* cmd );
+char *CF_read(  char* cmd );
+char *EQ_write( char* cmd );
+char *EQ_read(  char* cmd );
+char *FL_write( char* cmd );
+char *FL_read(  char* cmd );
 
 typedef struct  {
     char name[3];   //two chars plus zero terminator
@@ -90,7 +106,15 @@ typedef struct  {
 // The command_parser will compare the CAT command received against the entires in
 // this array. If it matches, then it will call the corresponding write_function
 // or the read_function, depending on the length of the command string.
-#define NUM_SUPPORTED_COMMANDS 25
+// Note on set_len / read_len: command_parser() tests the write form FIRST, so a
+// command whose two lengths are equal can never reach its read function. Keep
+// them distinct for anything that needs to be readable.
+//
+// Note on optional parameters: a command whose parameter the spec allows to be
+// omitted is expressed by putting the *write* function in BOTH slots, with
+// set_len covering the parameterised form and read_len the bare one. TX and RX
+// below are the only such commands. Do not "fix" them by writing a read handler.
+#define NUM_SUPPORTED_COMMANDS 32
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
@@ -102,7 +126,7 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "FB", 3+11,3, FB_write, FB_read },  //VFO B
         { "FR", 3+1, 3, FR_write, FR_read }, // selects or reads the VFO of the receiver
         { "FT", 3+1, 3, FT_write, FT_read }, // selects or reads the VFO of the transmitter
-        { "FW", 3+4,3+4,FW_write, FW_read }, // DSP filter bandwidth
+        { "FW", 3+4,3,  FW_write, FW_read }, // DSP filter bandwidth (high cut)
         { "ID", 0,  3, unsupported_cmd, ID_read }, // RADIO ID#, read-only
         { "IF", 0,  3, unsupported_cmd, IF_read }, //radio status, read-only
         { "KS", 3+1,3, KS_write, KS_read }, // keyer speed
@@ -113,11 +137,26 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "PC", 3+3,3, PC_write, PC_read }, // output power
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
         { "PS", 3+1,3, PS_write, PS_read },  // Rig power on/off
-        { "RX", 3,  0, RX_write, unsupported_cmd },  // Receiver function 0=main 1=sub
-        { "TX", 3,  0, TX_write, unsupported_cmd }, // set transceiver to transmit.
+        // RX; unkeys; RX0;/RX1; (main/sub receiver) are accepted too and behave
+        // identically - Phoenix has one receiver. Both forms are writes.
+        { "RX", 3+1,3, RX_write, RX_write },  // Receiver function 0=main 1=sub
+        // TX; keys, and so do TX0; (normal/MIC), TX1; (DTS via ANI input) and
+        // TX2; (TX Tune): ts_480_pc.pdf p.21 makes P1 optional and defaults it
+        // to 0. Both forms are writes - a bare TX; is a set, not a read - and
+        // TX_write ignores P1, so every form keys identically. Hamlib picks
+        // between them by PTT type (TX; / TX0; / TX1;), so a client that only
+        // sends one of them must not be turned away.
+        { "TX", 3+1,3, TX_write, TX_write }, // set transceiver to transmit.
         { "VX", 3+1, 3, VX_write, VX_read }, // VOX write/read
         { "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
-        { "PR", 0,  3, unsupported_cmd, PR_read } // print out the state of the hardware register -- NOT a Kenwood keyword
+        { "PR", 0,  3, unsupported_cmd, PR_read }, // print out the state of the hardware register -- NOT a Kenwood keyword
+        { "SR", 3+1,3, SR_write, SR_read }, // sample rate 0=176.4k 1=192k -- NOT a Kenwood keyword
+        { "CF", 3+1,3, CF_write, CF_read }, // receive CW audio filter index -- NOT a Kenwood keyword
+        { "EQ", 3+5,3+2, EQ_write, EQ_read }, // receive equalizer cell -- NOT a Kenwood keyword
+        { "FL", 3+4,3, FL_write, FL_read }, // DSP filter low cut -- NOT a Kenwood keyword
+        { "DG", 3+1,3, DG_write, DG_read }, // digital (USB audio) mode 0=off 1=on -- NOT a Kenwood keyword
+        { "DR", 3+3,3, DR_write, DR_read }, // digital receive level 000-100 -- NOT a Kenwood keyword
+        { "DS", 0,  3, unsupported_cmd, DS_read } // digital TX path stats, read-only -- NOT a Kenwood keyword
     };
 
 /**
@@ -412,7 +451,7 @@ char *IF_read(  char* cmd ){
         ){
         mode = 3;
     }else{
-        switch( bands[ ED.currentBand[ED.activeVFO] ].mode ){
+        switch( ED.modulation[ED.activeVFO] ){   // current modulation, not the band default
             case LSB:
                 mode = 1; // LSB
                 break;
@@ -429,7 +468,9 @@ char *IF_read(  char* cmd ){
         }
     }
     uint8_t rxtx;
-    if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) | (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE)){
+    if ((modeSM.state_id == ModeSm_StateId_CW_RECEIVE) |
+        (modeSM.state_id == ModeSm_StateId_DIGITAL_RECEIVE) |
+        (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE)){
         rxtx = 0;
     } else {
         rxtx = 1;
@@ -477,37 +518,71 @@ char *KS_write( char* cmd  ){
 }
 
 /**
- * CAT command MD - Set operating mode (LSB, USB, CW, AM)
- * @param cmd CAT command string with mode number: 1=LSB, 2=USB, 3=CW, 5=AM
+ * Select the demodulator.
+ *
+ * Writes ED.modulation[] and nothing else. bands[].mode is the band's *default*
+ * modulation and must stay put: InitFilterMask() mirrors the band's stored
+ * passband whenever the current modulation differs from that default, and that
+ * mirroring is the only thing that produces the opposite sideband.
+ *
+ * Writing bands[].mode here used to look like "keeping the two copies in step",
+ * but it is what selected the wrong sideband. Setting the default equal to the
+ * newly requested modulation removes the disagreement, so the mirroring stops and
+ * the band-default passband comes back. On 40 m (default LSB) `MD2;` - select USB
+ * - therefore switched the radio to LSB, while the display, which reads
+ * ED.modulation[], went on saying USB. This now matches the front panel's
+ * DEMODULATION button, which has always written ED.modulation[] alone.
+ *
+ * Also leaves CW receive if that is where we are: the mode state machine has no
+ * other CAT-reachable path back to SSB.
+ *
+ * Digital mode is deliberately NOT left here. WSJT-X and similar clients send
+ * `MD2;` to force USB on startup and before every transmission, so treating a
+ * modulation change as a request to leave digital mode would make the mode
+ * impossible to hold. Use `DG0;` or the front panel MODE button to leave it.
+ *
+ * @param mode The modulation to select
+ */
+static void SetModulation(ModulationType mode){
+    if (modeSM.state_id == ModeSm_StateId_CW_RECEIVE){
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    }
+    ED.modulation[ED.activeVFO] = mode;
+    SetInterrupt(iMODE);
+}
+
+/**
+ * CAT command MD - Set operating mode
+ * @param cmd CAT command string with mode number: 1=LSB, 2=USB, 3=CW, 4=AM, 5=SAM
  * @return Empty string
  */
 char *MD_write( char* cmd  ){
     int p1 = atoi( &cmd[2] );
     switch( p1 ){
         case 1: // LSB
-            bands[ ED.currentBand[ED.activeVFO] ].mode = LSB;
-            SetInterrupt(iMODE);
+            SetModulation(LSB);
             break;
         case 2: // USB
-            bands[ ED.currentBand[ED.activeVFO] ].mode = USB;
-            SetInterrupt(iMODE);
+            SetModulation(USB);
             break;
 
         case 3: // CW
-            // Change to CW mode if in SSB receive mode, otherwise ignore:
-            if (modeSM.state_id == ModeSm_StateId_SSB_RECEIVE){
+            // Change to CW mode if in a non-CW receive mode, otherwise ignore:
+            if ((modeSM.state_id == ModeSm_StateId_SSB_RECEIVE) ||
+                (modeSM.state_id == ModeSm_StateId_DIGITAL_RECEIVE)){
                 if( ED.currentBand[ED.activeVFO] < BAND_30M ){
-                    bands[ ED.currentBand[ED.activeVFO] ].mode = LSB;
+                    SetModulation(LSB);
                 }else{
-                    bands[ ED.currentBand[ED.activeVFO] ].mode = USB;
+                    SetModulation(USB);
                 }
                 ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_CW_MODE);
-                SetInterrupt(iMODE);
             }
             break;
-        case 5: // AM
-            bands[ ED.currentBand[ED.activeVFO] ].mode = SAM; // default to SAM rather than AM
-            SetInterrupt(iMODE);
+        case 4: // AM
+            SetModulation(AM);
+            break;
+        case 5: // SAM
+            SetModulation(SAM);
             break;
         default:
             break;
@@ -528,10 +603,13 @@ char *MD_read( char* cmd ){
         ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT ) |
         ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_MARK ) |
         ( modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_SPACE ) ){ sprintf( obuf, "MD3;" ); return obuf; }
-    if( bands[ ED.currentBand[ED.activeVFO] ].mode == LSB ){ sprintf( obuf, "MD1;" ); return obuf; }
-    if( bands[ ED.currentBand[ED.activeVFO] ].mode == USB ){ sprintf( obuf, "MD2;" ); return obuf; }
-    if( bands[ ED.currentBand[ED.activeVFO] ].mode == AM  ){ sprintf( obuf, "MD5;" ); return obuf; }
-    if( bands[ ED.currentBand[ED.activeVFO] ].mode == SAM ){ sprintf( obuf, "MD5;" ); return obuf; }
+    // ED.modulation[] is the current modulation; bands[].mode is only the band
+    // default, and reporting that told CAT clients the wrong sideband whenever
+    // the operator had selected the non-default one.
+    if( ED.modulation[ED.activeVFO] == LSB ){ sprintf( obuf, "MD1;" ); return obuf; }
+    if( ED.modulation[ED.activeVFO] == USB ){ sprintf( obuf, "MD2;" ); return obuf; }
+    if( ED.modulation[ED.activeVFO] == AM  ){ sprintf( obuf, "MD4;" ); return obuf; }
+    if( ED.modulation[ED.activeVFO] == SAM ){ sprintf( obuf, "MD5;" ); return obuf; }
     sprintf( obuf, "?;");
     return obuf;  //Huh? How'd we get here?
 }
@@ -689,6 +767,7 @@ char *PS_read(  char* cmd ){
  */
 char *RX_write( char* cmd ){
     switch (modeSM.state_id){
+        case (ModeSm_StateId_DIGITAL_TRANSMIT):
         case (ModeSm_StateId_SSB_TRANSMIT):{
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
             break;
@@ -710,6 +789,7 @@ char *RX_write( char* cmd ){
  */
 char *TX_write( char* cmd ){
     switch (modeSM.state_id){
+        case (ModeSm_StateId_DIGITAL_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
             break;
@@ -758,19 +838,313 @@ char *PR_read(  char* cmd  ){
     return obuf;
 }
 
+/** Sample rates reachable over CAT, in the order the SR parameter selects them.
+ *  These are the two rates the front panel menu offers. */
+static const uint8_t SR_CAT_RATES[2] = { SAMPLE_RATE_176K, SAMPLE_RATE_192K };
+#define SR_CAT_RATE_COUNT 2
 
 /**
- * Poll SerialUSB1 for incoming CAT commands and process them
+ * CAT command SR - set the sample rate (non-standard Kenwood command)
+ *
+ * `SR0;` selects 176.4 ksps, `SR1;` selects 192 ksps. Rejected while transmitting,
+ * because ChangeSampleRate() reconfigures the I2S clock and rebuilds the whole
+ * DSP chain.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the rate is out of range or the radio is not receiving
+ */
+char *SR_write( char* cmd ){
+    int p1 = cmd[2] - '0';
+    if( p1 < 0 || p1 >= SR_CAT_RATE_COUNT ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    // Only while receiving, and never in digital mode: that mode pins the radio
+    // at 176.4 ksps so the USB audio endpoint's 44.1 kHz needs no resampling.
+    if( modeSM.state_id != ModeSm_StateId_SSB_RECEIVE &&
+        modeSM.state_id != ModeSm_StateId_CW_RECEIVE ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ChangeSampleRate( SR_CAT_RATES[ p1 ] );
+    return empty_string_p;
+}
+
+/**
+ * CAT command SR - read the sample rate (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "SRn;" where n indexes SR_CAT_RATES, or "?;" if the radio is at some other rate
+ */
+char *SR_read( char* cmd ){
+    for( int i = 0; i < SR_CAT_RATE_COUNT; i++ ){
+        if( SampleRate == SR_CAT_RATES[ i ] ){
+            sprintf( obuf, "SR%d;", i);
+            return obuf;
+        }
+    }
+    sprintf( obuf, "?;");
+    return obuf;
+}
+
+/**
+ * CAT command DG - enter or leave digital (USB audio) mode (non-standard Kenwood command)
+ *
+ * `DG1;` enters digital mode, `DG0;` returns to SSB. Entering forces the radio to
+ * 176.4 ksps and starts the USB audio link; leaving restores the previous rate.
+ *
+ * Only accepted from a receive state, because the mode change reconfigures the
+ * I2S clock and rebuilds the DSP chain. Rejected outright in builds without a
+ * USB audio interface, where digital mode has no transport.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the parameter is out of range, the
+ *         radio is not receiving, or USB audio is not compiled in
+ */
+char *DG_write( char* cmd ){
+    int p1 = cmd[2] - '0';
+    if( p1 < 0 || p1 > 1 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+#ifndef AUDIO_INTERFACE
+    sprintf( obuf, "?;");
+    return obuf;
+#else
+    if( p1 == 1 ){
+        if( modeSM.state_id != ModeSm_StateId_SSB_RECEIVE &&
+            modeSM.state_id != ModeSm_StateId_CW_RECEIVE &&
+            modeSM.state_id != ModeSm_StateId_DIGITAL_RECEIVE ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_DIGITAL_MODE);
+    } else {
+        if( modeSM.state_id != ModeSm_StateId_DIGITAL_RECEIVE ){
+            // Already out of digital mode, or transmitting - nothing to do
+            if( modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT ){
+                sprintf( obuf, "?;");
+                return obuf;
+            }
+            return empty_string_p;
+        }
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
+    }
+    UpdateRFHardwareState();
+    return empty_string_p;
+#endif
+}
+
+/**
+ * CAT command DG - read whether digital (USB audio) mode is active
+ * @param cmd CAT command string
+ * @return Response "DG1;" in digital mode, "DG0;" otherwise
+ */
+char *DG_read( char* cmd ){
+    if( modeSM.state_id == ModeSm_StateId_DIGITAL_RECEIVE ||
+        modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT ){
+        sprintf( obuf, "DG1;");
+    } else {
+        sprintf( obuf, "DG0;");
+    }
+    return obuf;
+}
+
+/**
+ * CAT command DR - set the digital-mode receive level (non-standard Kenwood command)
+ *
+ * `DR000;` to `DR100;` scale the audio sent to the host over USB. The receive
+ * chain does not regulate this level for us - with AGC off the AGC stage applies
+ * a fixed gain of 20 - so a strong signal will otherwise reach full scale and
+ * clip. The default of 25 is -12 dB.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the level is out of range
+ */
+char *DR_write( char* cmd ){
+    int32_t level = atoi( &cmd[2] );
+    if( level < 0 || level > 100 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.digitalRxLevel = level;
+    return empty_string_p;
+}
+
+/**
+ * CAT command DR - read the digital-mode receive level (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "DRnnn;" with the level from 000 to 100
+ */
+char *DR_read( char* cmd ){
+    sprintf( obuf, "DR%03ld;", (long)ED.digitalRxLevel);
+    return obuf;
+}
+
+/**
+ * CAT command DS - read the digital transmit path health counters (non-standard)
+ *
+ * Returns "DS<calls>,<underruns>,<trimmed>,<depthMin>,<depthMax>;". The counters
+ * reset when digital mode is entered. Both an underrun and a trim splice
+ * discontinuous audio into the transmit stream, which lands on the air as
+ * sidebands at the 128-sample block rate.
+ *
+ * @param cmd CAT command string
+ * @return Response with the five counters
+ */
+char *DS_read( char* cmd ){
+    uint32_t calls=0, under=0, trim=0;
+    uint8_t dmin=0, dmax=0;
+    USBAudioGetTxStats(&calls, &under, &trim, &dmin, &dmax);
+    sprintf( obuf, "DS%lu,%lu,%lu,%u,%u;", (unsigned long)calls, (unsigned long)under,
+             (unsigned long)trim, (unsigned)dmin, (unsigned)dmax);
+    return obuf;
+}
+
+/**
+ * CAT command CF - select the receive CW audio filter (non-standard Kenwood command)
+ *
+ * `CF0;` through `CF4;` select the five CW bandwidths (840, 1080, 1320, 1800 and
+ * 2000 Hz); `CF5;` bypasses the filter.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the index is out of range
+ */
+char *CF_write( char* cmd ){
+    int p1 = cmd[2] - '0';
+    if( p1 < 0 || p1 > 5 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.CWFilterIndex = p1;
+    return empty_string_p;
+}
+
+/**
+ * CAT command CF - read the receive CW audio filter index (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "CFn;"
+ */
+char *CF_read( char* cmd ){
+    sprintf( obuf, "CF%ld;", (long)ED.CWFilterIndex);
+    return obuf;
+}
+
+/**
+ * CAT command EQ - set one receive equalizer cell (non-standard Kenwood command)
+ *
+ * `EQbbvvv;` where bb is the cell index 00..13 and vvv is the level 000..100.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the cell index or level is out of range
+ */
+char *EQ_write( char* cmd ){
+    char idxbuf[3] = { cmd[2], cmd[3], '\0' };
+    int band = atoi( idxbuf );
+    int value = atoi( &cmd[4] );
+    if( band < 0 || band >= EQUALIZER_CELL_COUNT || value < 0 || value > 100 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.equalizerRec[ band ] = value;
+    return empty_string_p;
+}
+
+/**
+ * CAT command EQ - read one receive equalizer cell (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "EQbbvvv;", or "?;" if the cell index is out of range
+ */
+char *EQ_read( char* cmd ){
+    char idxbuf[3] = { cmd[2], cmd[3], '\0' };
+    int band = atoi( idxbuf );
+    if( band < 0 || band >= EQUALIZER_CELL_COUNT ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    sprintf( obuf, "EQ%02d%03ld;", band, (long)ED.equalizerRec[ band ]);
+    return obuf;
+}
+
+/**
+ * CAT command FL - set the DSP filter low cut (non-standard Kenwood command)
+ *
+ * The mirror of FW, which moves the other edge: on USB/AM/SAM this moves
+ * FLoCut_Hz, on LSB it moves FHiCut_Hz. The value is always the magnitude of the
+ * edge frequency, as it is for FW.
+ *
+ * @param cmd CAT command string
+ * @return Empty string
+ */
+char *FL_write( char* cmd ){
+    int32_t g = atoi( &cmd[2] );
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            // On LSB the passband is negative, so the low cut is the high edge.
+            if (g < -bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz)
+                bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz = -g;
+            break;
+        }
+        case AM:
+        case SAM:
+        case USB:{
+            if (g < bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz)
+                bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz = g;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    UpdateFIRFilterMask(&RXfilters);
+    return empty_string_p;
+}
+
+/**
+ * CAT command FL - read the DSP filter low cut (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "FLnnnn;"
+ */
+char *FL_read( char* cmd ){
+    int32_t flow = 0;
+    switch (bands[ED.currentBand[ED.activeVFO]].mode) {
+        case LSB:{
+            flow = -bands[ED.currentBand[ED.activeVFO]].FHiCut_Hz;
+            break;
+        }
+        case AM:
+        case SAM:
+        case USB:{
+            flow = bands[ED.currentBand[ED.activeVFO]].FLoCut_Hz;
+            break;
+        }
+        case IQ:
+        case DCF77:
+            break;
+    }
+    sprintf( obuf, "FL%04ld;", (long)flow);
+    return obuf;
+}
+
+
+/**
+ * Poll the CAT serial port for incoming CAT commands and process them
  *
  * Reads characters from the CAT serial port, buffers them until a semicolon
  * terminator is received, then parses and executes the command via command_parser().
- * Sends response back over SerialUSB1. Handles buffer overflow by clearing the buffer.
+ * Sends response back over the same port. Handles buffer overflow by clearing the buffer.
+ *
+ * A newline terminator instead means the buffered bytes are not CAT traffic, since
+ * no Kenwood command contains one. In a build with a USB audio interface this port
+ * is also the only CDC port, so that is how a PJRC time-sync packet arrives; it is
+ * handed to ApplyTimeSyncDigits(). Any other newline-terminated run of bytes is
+ * dropped. Both cases exist to keep foreign bytes from being prepended to the next
+ * real command, which would turn it into "?;".
  */
 void CheckForCATSerialEvents(void){
     int i;
     char c;
-    while( ( i = SerialUSB1.available() ) > 0 ){
-        c = ( char )SerialUSB1.read();
+    while( ( i = CATSerial.available() ) > 0 ){
+        c = ( char )CATSerial.read();
         i--;
         catCommand[ catCommandIndex ] = c;
         #ifdef DEBUG_CAT
@@ -795,21 +1169,33 @@ void CheckForCATSerialEvents(void){
                 #endif // DEBUG_CAT
                 int i = 0;
                 while( parser_output[i] != '\0' ){
-                    if( SerialUSB1.availableForWrite() > 0 ){
-                        SerialUSB1.print( parser_output[i] );
+                    if( CATSerial.availableForWrite() > 0 ){
+                        CATSerial.print( parser_output[i] );
                         #ifdef DEBUG_CAT
                         Serial.print( parser_output[i] );
                         #endif
                         i++;
                     }else{
-                        SerialUSB1.flush();
+                        CATSerial.flush();
                     }
                 }
-                SerialUSB1.flush();
+                CATSerial.flush();
                 #ifdef DEBUG_CAT
                 Serial.println();
                 #endif // DEBUG_CAT
             }
+        }else if( c == '\n' || c == '\r' ){
+            // Not CAT: no Kenwood command contains a newline. On a single-port
+            // build (USB audio, where CATSerial is Serial) this is how a PJRC
+            // time-sync packet arrives - 'T' + 10 digits + '\n' - because this
+            // reader drains the port before CheckForSerialTimeSync() could see
+            // it. Hand the digits over; anything else newline-terminated is
+            // discarded rather than left to corrupt the next real command.
+            if( catCommand[0] == 'T' && catCommandIndex > 0 ){
+                ApplyTimeSyncDigits( &catCommand[1], (uint8_t)(catCommandIndex - 1) );
+            }
+            catCommandIndex = 0;
+            memset( catCommand, 0, sizeof( catCommand ));
         }else{
             catCommandIndex++;
             if( catCommandIndex >= 128 ){
@@ -848,8 +1234,13 @@ char *command_parser( char* command ){
             char* (*read_function)(char*);
             read_function = valid_commands[i].read_function;
 
-            if( command[ write_params_len - 1 ] == ';' ) return ( *write_function )( command );
-            if( command[ read_params_len - 1  ] == ';' ) return ( *read_function  )( command );
+            // A zero length means the command has no form of that kind (a
+            // read-only command has set_len 0, a write-only one read_len 0).
+            // Skip the test rather than indexing command[-1], which reads off
+            // the front of catCommand and makes dispatch depend on whatever
+            // static happens to precede it.
+            if( write_params_len > 0 && command[ write_params_len - 1 ] == ';' ) return ( *write_function )( command );
+            if( read_params_len  > 0 && command[ read_params_len - 1  ] == ';' ) return ( *read_function  )( command );
             // Wrong length for read OR write.  No semicolon in the right places
             sprintf( obuf, "?;");
             return obuf;
