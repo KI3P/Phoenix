@@ -920,7 +920,7 @@ DataBlock * ReceiveProcessing(const char *fname){
         }
     }
     float32_t shift = ED.fineTuneFreq_Hz[ED.activeVFO] + sideToneShift_Hz;
-    FreqShiftF(&data,shift);
+    FreqShiftPhasor(&data,shift);
     SaveData(&data, 2); // used by the unit tests
 
     // Decimate by 8. Reduce the sampled band to -12,000 Hz to +12,000 Hz.
