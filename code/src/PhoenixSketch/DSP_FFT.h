@@ -80,6 +80,31 @@ void FreqShiftMFs4(DataBlock *data);
 void FreqShiftF(DataBlock *data, float32_t freqShift_Hz);
 
 /**
+ * @brief Reset the FreqShiftF() oscillator to zero phase
+ * @note The oscillator phase is persistent by design; call this when a
+ *       deterministic starting phase is required (e.g. in unit tests).
+ */
+void FreqShiftFReset(void);
+
+/**
+ * @brief Shift frequency by arbitrary amount using a rotating phasor NCO
+ * @param data Pointer to DataBlock containing I/Q samples
+ * @param freqShift_Hz Frequency shift in Hz (positive or negative)
+ * @note Drop-in replacement for FreqShiftF(). Same result, but the oscillator
+ *       costs one cosf()/sinf() pair per block instead of one per sample, and
+ *       its phase is continuous across blocks, across changes of freqShift_Hz,
+ *       and for non-integer shifts.
+ */
+void FreqShiftPhasor(DataBlock *data, float32_t freqShift_Hz);
+
+/**
+ * @brief Reset the FreqShiftPhasor() oscillator to zero phase
+ * @note The oscillator phase is persistent by design; call this when a
+ *       deterministic starting phase is required (e.g. in unit tests).
+ */
+void FreqShiftPhasorReset(void);
+
+/**
  * @brief Shift frequency with explicit sample rate parameter
  * @param I Pointer to in-phase component array
  * @param Q Pointer to quadrature component array
