@@ -867,7 +867,6 @@ DataBlock * ReceiveProcessing(const char *fname){
         // There is no data available, skip the rest
         return NULL;
     }
-    //Flag(1);
     // Clear overfull buffers is not needed
     //ClearAudioBuffers();
 
@@ -979,7 +978,6 @@ DataBlock * ReceiveProcessing(const char *fname){
 
     elapsed_micros_sum = elapsed_micros_sum + usec;
     elapsed_micros_idx_t++;
-    //Flag(0);
 
     return &data;
 }
@@ -1202,7 +1200,6 @@ DataBlock * TransmitProcessing(const char *fname){
             // There is no data available, skip the rest
             return NULL;
         }
-        //Flag(2);
         TXDecimateBy4(&data,&TXfilters);// 2048 in, 512 out
     }
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
@@ -1222,6 +1219,5 @@ DataBlock * TransmitProcessing(const char *fname){
 
     // Play the data on the output buffer
     PlayIQData(&data);
-    //Flag(0);
     return &data;
 }

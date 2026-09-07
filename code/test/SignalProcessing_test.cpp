@@ -753,23 +753,12 @@ TEST(SignalProcessing, FineTuneProcessingTime){
     unsigned long after_us = 1000000 * tv.tv_sec + tv.tv_usec;
     fprintf(file, "FreqShiftF: %ld us\n", after_us-before_us);
 
-    CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
-    gettimeofday(&tv,NULL);
-    before_us = 1000000 * tv.tv_sec + tv.tv_usec;
-    for (size_t i =0; i<1; i++){
-        FreqShiftF2(I,Q,Nsamples,offset_Hz,sampleRate_Hz);
-    }
-    gettimeofday(&tv,NULL);
-    after_us = 1000000 * tv.tv_sec + tv.tv_usec;
-    fprintf(file, "FreqShiftF2: %ld us\n", after_us-before_us);
-
     fclose(file);
 }
 
 // ---------------------------------------------------------------------------
 // Fine tune NCO: FreqShiftF() (cosf/sinf per sample) versus FreqShiftPhasor()
-// (one cosf/sinf pair per block, rotating phasor), with the deprecated
-// FreqShiftF2() included as a reference for what a broken mixer looks like.
+// (one cosf/sinf pair per block, rotating phasor).
 // The analysis of the files written here lives in
 // analyze_receive_filter_chain.ipynb, section "Fine tune NCO comparison".
 // ---------------------------------------------------------------------------
@@ -837,8 +826,9 @@ TEST(SignalProcessing, FreqShiftPhasorTranslate){
 }
 
 // The wanted output is one tone and nothing else. Measure the wanted component
-// and the three places a mis-formed complex multiply puts its images, for all
-// three implementations.
+// and the three places a mis-formed complex multiply puts its images: a mixer
+// that scales I and Q separately instead of rotating the pair splits the input
+// across all four.
 TEST(SignalProcessing, FreqShiftSpuriousResponses){
     const uint32_t Nblocks = 4;
     const uint32_t blockSize = 2048;
@@ -858,10 +848,10 @@ TEST(SignalProcessing, FreqShiftSpuriousResponses){
                                  -tone_Hz+offset_Hz, -tone_Hz-offset_Hz };
     const char *probeName[4] = { "wanted", "tone-shift", "-tone+shift", "-tone-shift" };
 
-    double mag[3][4];
-    const char *methodName[3] = { "FreqShiftF", "FreqShiftF2", "FreqShiftPhasor" };
+    double mag[2][4];
+    const char *methodName[2] = { "FreqShiftF", "FreqShiftPhasor" };
 
-    for (int method = 0; method < 3; method++){
+    for (int method = 0; method < 2; method++){
         CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
         FreqShiftFReset();
         FreqShiftPhasorReset();
@@ -869,9 +859,7 @@ TEST(SignalProcessing, FreqShiftSpuriousResponses){
             data.I = &I[b*blockSize];
             data.Q = &Q[b*blockSize];
             if (method == 0) FreqShiftF(&data, offset_Hz);
-            if (method == 1) FreqShiftF2(&I[b*blockSize], &Q[b*blockSize],
-                                         blockSize, offset_Hz, sampleRate_Hz);
-            if (method == 2) FreqShiftPhasor(&data, offset_Hz);
+            if (method == 1) FreqShiftPhasor(&data, offset_Hz);
         }
         for (int p = 0; p < 4; p++)
             mag[method][p] = dft_magnitude(I, Q, Nsamples, probe_Hz[p], sampleRate_Hz);
@@ -883,7 +871,7 @@ TEST(SignalProcessing, FreqShiftSpuriousResponses){
 
     FILE *file = fopen("freqShiftSpurs.csv", "w");
     fprintf(file, "method,probe,frequency_Hz,magnitude,dB_below_wanted\n");
-    for (int m = 0; m < 3; m++)
+    for (int m = 0; m < 2; m++)
         for (int p = 0; p < 4; p++)
             fprintf(file, "%s,%s,%2.1f,%9.8f,%6.2f\n", methodName[m], probeName[p],
                     probe_Hz[p], mag[m][p], 20*log10(mag[m][p]/mag[m][0]));
@@ -891,20 +879,13 @@ TEST(SignalProcessing, FreqShiftSpuriousResponses){
 
     // The input tone has amplitude 0.5 and translation preserves amplitude
     EXPECT_NEAR(mag[0][0], 0.5, 0.01);   // FreqShiftF
-    EXPECT_NEAR(mag[2][0], 0.5, 0.01);   // FreqShiftPhasor
+    EXPECT_NEAR(mag[1][0], 0.5, 0.01);   // FreqShiftPhasor
 
-    // Neither working method should leave an image above -40 dBc
+    // Neither method should leave an image above -40 dBc
     for (int p = 1; p < 4; p++){
         EXPECT_LT(mag[0][p], mag[0][0]*0.01) << "FreqShiftF image at " << probeName[p];
-        EXPECT_LT(mag[2][p], mag[2][0]*0.01) << "FreqShiftPhasor image at " << probeName[p];
+        EXPECT_LT(mag[1][p], mag[1][0]*0.01) << "FreqShiftPhasor image at " << probeName[p];
     }
-
-    // FreqShiftF2 scales I and Q separately rather than rotating the pair, so
-    // it splits the input four ways. This pins the defect: if someone repairs
-    // FreqShiftF2 they should delete this expectation along with the warning
-    // in its doc comment.
-    EXPECT_GT(mag[1][3], mag[1][0]*0.5)
-        << "FreqShiftF2 is expected to emit a mirror image of comparable size";
 }
 
 // Phase must run on across block boundaries. Mirror of
@@ -1074,12 +1055,11 @@ TEST(SignalProcessing, FreqShiftTimingComparison){
     data.N = blockSize;
     data.sampleRate_Hz = sampleRate_Hz;
 
-    const char *methodName[4] = { "FreqShiftFs4", "FreqShiftF", "FreqShiftF2",
-                                  "FreqShiftPhasor" };
-    unsigned long elapsed_us[4] = {0,0,0,0};
+    const char *methodName[3] = { "FreqShiftFs4", "FreqShiftF", "FreqShiftPhasor" };
+    unsigned long elapsed_us[3] = {0,0,0};
     struct timeval tv;
 
-    for (int method = 0; method < 4; method++){
+    for (int method = 0; method < 3; method++){
         FreqShiftFReset();
         FreqShiftPhasorReset();
         for (uint32_t r = 0; r < Nreps; r++){
@@ -1091,8 +1071,7 @@ TEST(SignalProcessing, FreqShiftTimingComparison){
             unsigned long before_us = 1000000*tv.tv_sec + tv.tv_usec;
             if (method == 0) FreqShiftFs4(&data);
             if (method == 1) FreqShiftF(&data, offset_Hz);
-            if (method == 2) FreqShiftF2(I, Q, blockSize, offset_Hz, sampleRate_Hz);
-            if (method == 3) FreqShiftPhasor(&data, offset_Hz);
+            if (method == 2) FreqShiftPhasor(&data, offset_Hz);
             gettimeofday(&tv,NULL);
             elapsed_us[method] += 1000000*tv.tv_sec + tv.tv_usec - before_us;
         }
@@ -1100,7 +1079,7 @@ TEST(SignalProcessing, FreqShiftTimingComparison){
 
     FILE *file = fopen("freqShiftTiming.csv", "w");
     fprintf(file, "method,blocks,block_size,total_us,us_per_block,ns_per_sample\n");
-    for (int m = 0; m < 4; m++)
+    for (int m = 0; m < 3; m++)
         fprintf(file, "%s,%u,%u,%lu,%8.3f,%8.3f\n", methodName[m], Nreps, blockSize,
                 elapsed_us[m],
                 (double)elapsed_us[m]/Nreps,
@@ -1110,7 +1089,7 @@ TEST(SignalProcessing, FreqShiftTimingComparison){
     // Not a performance gate, just a guard against the timing loop being
     // optimised away entirely
     EXPECT_GT(elapsed_us[1], 0u);
-    EXPECT_GT(elapsed_us[3], 0u);
+    EXPECT_GT(elapsed_us[2], 0u);
 }
 
 TEST(SignalProcessing, DecimateBy4){

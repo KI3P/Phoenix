@@ -93,7 +93,8 @@ void FreqShiftFReset(void);
  * @note Drop-in replacement for FreqShiftF(). Same result, but the oscillator
  *       costs one cosf()/sinf() pair per block instead of one per sample, and
  *       its phase is continuous across blocks, across changes of freqShift_Hz,
- *       and for non-integer shifts.
+ *       and for non-integer shifts. The phasor magnitude is renormalised once
+ *       per block, which holds it within 6e-5 of unity.
  */
 void FreqShiftPhasor(DataBlock *data, float32_t freqShift_Hz);
 
@@ -103,18 +104,6 @@ void FreqShiftPhasor(DataBlock *data, float32_t freqShift_Hz);
  *       deterministic starting phase is required (e.g. in unit tests).
  */
 void FreqShiftPhasorReset(void);
-
-/**
- * @brief Shift frequency with explicit sample rate parameter
- * @param I Pointer to in-phase component array
- * @param Q Pointer to quadrature component array
- * @param blocksize Number of samples to process
- * @param freqShift_Hz Frequency shift in Hz
- * @param sampleRate_Hz Sample rate in Hz
- * @note Allows frequency shifting at different sample rates than main processing
- */
-void FreqShiftF2(float32_t *I, float32_t *Q, uint32_t blocksize,
-                float32_t freqShift_Hz, uint32_t sampleRate_Hz);
 
 // FFT and Zoom Functions
 
