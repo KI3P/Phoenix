@@ -23,7 +23,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.4.0"
+#define VERSION "Phx V1.4.1"
 
 #include "BuildInfo.h"
 

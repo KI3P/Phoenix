@@ -61,6 +61,18 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 # Version History
 
+## V1.4.1 Release Notes
+
+### Improvements
+
+**Faster, Glitch-Free Fine Tune Oscillator**
+The fine tune frequency shift in the receive chain now uses `FreqShiftPhasor`, a rotating-phasor oscillator that needs one `cosf`/`sinf` pair per block instead of one per sample. On a Teensy 4.1 at 600 MHz it takes about 125 µs per block, against about 1300 µs for `FreqShiftF` at any non-zero shift. Because its phase carries on continuously, it also removes two artifacts of the old oscillator: a 180° phase jump once per second at fractional-Hz shifts, and a phase jump every time the fine tune frequency changed. The phasor's magnitude is corrected once per block, which keeps its spurious sidebands below -105 dBc *(the benchmarking method and the once-per-block correction were suggested by Terrance Robertson, KN6ZDE)*.
+
+### Under-the-Hood Changes
+
+- The deprecated `FreqShiftF2` has been removed.
+- New unit tests cover the oscillator's frequency translation, image rejection, phase continuity across blocks, and the old oscillator's once-per-second glitch. The results feed a new "Fine tune NCO comparison" section in `analyze_receive_filter_chain.ipynb`.
+
 ## V1.4.0 Release Notes
 
 ### Major New Features
