@@ -16,3 +16,4 @@ Known contributors to the code:
 * Joerg Uthoff, DB2OO
 * Harry Brash, GM3RVL
 * Tom Metty, AJ8X
+* Terrance Robertson, KN6ZDE

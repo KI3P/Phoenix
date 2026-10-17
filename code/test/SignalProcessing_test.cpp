@@ -753,17 +753,343 @@ TEST(SignalProcessing, FineTuneProcessingTime){
     unsigned long after_us = 1000000 * tv.tv_sec + tv.tv_usec;
     fprintf(file, "FreqShiftF: %ld us\n", after_us-before_us);
 
-    CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
-    gettimeofday(&tv,NULL);
-    before_us = 1000000 * tv.tv_sec + tv.tv_usec;
-    for (size_t i =0; i<1; i++){
-        FreqShiftF2(I,Q,Nsamples,offset_Hz,sampleRate_Hz);
-    }
-    gettimeofday(&tv,NULL);
-    after_us = 1000000 * tv.tv_sec + tv.tv_usec;
-    fprintf(file, "FreqShiftF2: %ld us\n", after_us-before_us);
-
     fclose(file);
+}
+
+// ---------------------------------------------------------------------------
+// Fine tune NCO: FreqShiftF() (cosf/sinf per sample) versus FreqShiftPhasor()
+// (one cosf/sinf pair per block, rotating phasor).
+// The analysis of the files written here lives in
+// analyze_receive_filter_chain.ipynb, section "Fine tune NCO comparison".
+// ---------------------------------------------------------------------------
+
+// Magnitude of the complex sequence I+jQ at frequency freq_Hz, by direct
+// evaluation of the DFT sum at that one frequency. Normalised by Nsamples, so
+// a tone of amplitude A sitting exactly on freq_Hz returns A.
+double dft_magnitude(const float *I, const float *Q, int Nsamples,
+                     double freq_Hz, double sampleRate_Hz){
+    double re = 0, im = 0;
+    for (int i = 0; i < Nsamples; i++){
+        double theta = -2.0*M_PI*freq_Hz*(double)i/sampleRate_Hz;
+        double c = cos(theta), s = sin(theta);
+        re += I[i]*c - Q[i]*s;
+        im += Q[i]*c + I[i]*s;
+    }
+    return sqrt(re*re + im*im)/(double)Nsamples;
+}
+
+// Phase of the sample at index i relative to an ideal tone at freq_Hz, in
+// radians and wrapped to +/-pi. A clean translation holds this constant.
+double phase_error(const float *I, const float *Q, int i,
+                   double freq_Hz, double sampleRate_Hz){
+    double theta = 2.0*M_PI*freq_Hz*(double)i/sampleRate_Hz;
+    return atan2((double)Q[i], (double)I[i]) - theta;
+}
+
+double wrap_pi(double a){
+    while (a >  M_PI) a -= 2.0*M_PI;
+    while (a < -M_PI) a += 2.0*M_PI;
+    return a;
+}
+
+// Does the phasor NCO put the tone where FreqShiftF() puts it, at the same
+// amplitude? Mirror of SignalProcessing.FineTuneTranslate.
+TEST(SignalProcessing, FreqShiftPhasorTranslate){
+    uint32_t Nsamples = 2048;
+    uint32_t sampleRate_Hz = 192000;
+    float I[Nsamples];
+    float Q[Nsamples];
+    float tone_Hz = -48000-20*96000/512;
+    CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
+    WriteIQFile(I,Q,"freqShiftPhasorTranslate_pretranslate_IQ.txt",Nsamples);
+
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = Nsamples;
+    data.sampleRate_Hz = sampleRate_Hz;
+
+    float offset_Hz = 40*96000/512;
+    FreqShiftPhasorReset();
+    FreqShiftPhasor(&data, offset_Hz);
+    WriteIQFile(I,Q,"freqShiftPhasorTranslate_posttranslate_IQ.txt",Nsamples);
+
+    int32_t bin = frequency_to_bin(tone_Hz+offset_Hz,512,sampleRate_Hz);
+
+    ReceiveFilterConfig receiveFilters;
+    uint32_t spectrum_zoom = SPECTRUM_ZOOM_1;
+    InitializeFilters(spectrum_zoom, &receiveFilters);
+    ZoomFFTPrep(spectrum_zoom, &receiveFilters);
+    ZoomFFTExe(&data,spectrum_zoom,&receiveFilters);
+    // Same peak, in the same bin, as FineTuneTranslate gets from FreqShiftF
+    EXPECT_NEAR(psdnew[bin],4.0595,0.001);
+}
+
+// The wanted output is one tone and nothing else. Measure the wanted component
+// and the three places a mis-formed complex multiply puts its images: a mixer
+// that scales I and Q separately instead of rotating the pair splits the input
+// across all four.
+TEST(SignalProcessing, FreqShiftSpuriousResponses){
+    const uint32_t Nblocks = 4;
+    const uint32_t blockSize = 2048;
+    const uint32_t Nsamples = Nblocks*blockSize;
+    const uint32_t sampleRate_Hz = 192000;
+    const float tone_Hz = -6000;
+    const float offset_Hz = 15000;
+
+    static float I[Nsamples], Q[Nsamples];
+    DataBlock data;
+    data.N = blockSize;
+    data.sampleRate_Hz = sampleRate_Hz;
+
+    // The four frequencies of interest: the wanted translation, and the three
+    // images that appear if I and Q are scaled instead of rotated
+    const double probe_Hz[4]  = { tone_Hz+offset_Hz, tone_Hz-offset_Hz,
+                                 -tone_Hz+offset_Hz, -tone_Hz-offset_Hz };
+    const char *probeName[4] = { "wanted", "tone-shift", "-tone+shift", "-tone-shift" };
+
+    double mag[2][4];
+    const char *methodName[2] = { "FreqShiftF", "FreqShiftPhasor" };
+
+    for (int method = 0; method < 2; method++){
+        CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
+        FreqShiftFReset();
+        FreqShiftPhasorReset();
+        for (uint32_t b = 0; b < Nblocks; b++){
+            data.I = &I[b*blockSize];
+            data.Q = &Q[b*blockSize];
+            if (method == 0) FreqShiftF(&data, offset_Hz);
+            if (method == 1) FreqShiftPhasor(&data, offset_Hz);
+        }
+        for (int p = 0; p < 4; p++)
+            mag[method][p] = dft_magnitude(I, Q, Nsamples, probe_Hz[p], sampleRate_Hz);
+
+        char fname[64];
+        snprintf(fname, sizeof(fname), "freqShiftSpurs_%s_IQ.txt", methodName[method]);
+        WriteIQFile(I, Q, fname, Nsamples);
+    }
+
+    FILE *file = fopen("freqShiftSpurs.csv", "w");
+    fprintf(file, "method,probe,frequency_Hz,magnitude,dB_below_wanted\n");
+    for (int m = 0; m < 2; m++)
+        for (int p = 0; p < 4; p++)
+            fprintf(file, "%s,%s,%2.1f,%9.8f,%6.2f\n", methodName[m], probeName[p],
+                    probe_Hz[p], mag[m][p], 20*log10(mag[m][p]/mag[m][0]));
+    fclose(file);
+
+    // The input tone has amplitude 0.5 and translation preserves amplitude
+    EXPECT_NEAR(mag[0][0], 0.5, 0.01);   // FreqShiftF
+    EXPECT_NEAR(mag[1][0], 0.5, 0.01);   // FreqShiftPhasor
+
+    // Neither method should leave an image above -40 dBc
+    for (int p = 1; p < 4; p++){
+        EXPECT_LT(mag[0][p], mag[0][0]*0.01) << "FreqShiftF image at " << probeName[p];
+        EXPECT_LT(mag[1][p], mag[1][0]*0.01) << "FreqShiftPhasor image at " << probeName[p];
+    }
+}
+
+// Phase must run on across block boundaries. Mirror of
+// SignalProcessing.FineTunePhaseDiscontinuity, which does this for FreqShiftF.
+TEST(SignalProcessing, FreqShiftPhasorPhaseDiscontinuity){
+    uint32_t Nsamples = 2048*4;
+    uint32_t sampleRate_Hz = 192000;
+    static float I[2048*4];
+    static float Q[2048*4];
+    float tone_Hz = -48000-1*96000/512;
+    CreateIQTone(I, Q, Nsamples, sampleRate_Hz, tone_Hz);
+
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = Nsamples;
+    data.sampleRate_Hz = sampleRate_Hz;
+
+    FreqShiftFs4(&data);
+    WriteIQFile(I,Q,"freqShiftPhasorPhase_pretranslate_IQ.txt",Nsamples);
+
+    // A deliberately non-integer offset: this is the case FreqShiftF's counter
+    // wrap cannot represent
+    float offset_Hz = +2200.5;
+    data.N = 2048;
+    FreqShiftPhasorReset();
+    for (uint16_t i=0; i<4; i++){
+        data.I = &I[2048*i];
+        data.Q = &Q[2048*i];
+        FreqShiftPhasor(&data,offset_Hz);
+    }
+    WriteIQFile(I,Q,"freqShiftPhasorPhase_posttranslate_IQ.txt",Nsamples);
+
+    int32_t bin = frequency_to_bin(tone_Hz+offset_Hz+48000,512,sampleRate_Hz);
+
+    uint32_t spectrum_zoom = SPECTRUM_ZOOM_8;
+    ReceiveFilterConfig receiveFilters;
+    InitializeFilters(spectrum_zoom, &receiveFilters);
+    ZoomFFTPrep(spectrum_zoom, &receiveFilters);
+
+    data.I = &I[2048*0];
+    data.Q = &Q[2048*0];
+    ZoomFFTExe(&data,spectrum_zoom,&receiveFilters);
+    data.I = &I[2048*1];
+    data.Q = &Q[2048*1];
+    ZoomFFTExe(&data,spectrum_zoom,&receiveFilters);
+    WriteFile(psdnew,"freqShiftPhasorPhase_psd.txt",512);
+    EXPECT_LT(psdnew[bin-50],4.0595-8.0); // expect noise to be 80 dB below peak
+}
+
+// FreqShiftF zeroes its sample counter once per second on the assumption that
+// the accumulated phase is then a multiple of 2*pi. That only holds for a whole
+// number of Hz. Run a full second of samples through both NCOs at a half-Hz
+// offset and record the phase error either side of the wrap.
+TEST(SignalProcessing, FreqShiftCounterWrapGlitch){
+    const uint32_t sampleRate_Hz = 192000;
+    const uint32_t blockSize = 2048;
+    const uint32_t Nblocks = 94;                    // 192512 samples, one wrap
+    const uint32_t Nsamples = Nblocks*blockSize;
+    const float tone_Hz = -6000;
+    const float offset_Hz = 2200.5;                 // NOT a whole number of Hz
+    const double out_Hz = tone_Hz + offset_Hz;
+
+    static float If[192*1024], Qf[192*1024];        // FreqShiftF
+    static float Ip[192*1024], Qp[192*1024];        // FreqShiftPhasor
+
+    CreateIQTone(If, Qf, Nsamples, sampleRate_Hz, tone_Hz);
+    CreateIQTone(Ip, Qp, Nsamples, sampleRate_Hz, tone_Hz);
+
+    DataBlock data;
+    data.N = blockSize;
+    data.sampleRate_Hz = sampleRate_Hz;
+
+    FreqShiftFReset();
+    FreqShiftPhasorReset();
+    for (uint32_t b = 0; b < Nblocks; b++){
+        data.I = &If[b*blockSize];
+        data.Q = &Qf[b*blockSize];
+        FreqShiftF(&data, offset_Hz);
+        data.I = &Ip[b*blockSize];
+        data.Q = &Qp[b*blockSize];
+        FreqShiftPhasor(&data, offset_Hz);
+    }
+
+    // Phase error relative to the ideal translated tone, sampled across the
+    // whole second so the notebook can show where each NCO slips
+    FILE *file = fopen("freqShiftWrap_phase.csv", "w");
+    fprintf(file, "sample,phase_error_F_rad,phase_error_phasor_rad\n");
+    double ref_F = phase_error(If, Qf, 0, out_Hz, sampleRate_Hz);
+    double ref_P = phase_error(Ip, Qp, 0, out_Hz, sampleRate_Hz);
+    for (uint32_t i = 0; i < Nsamples; i += 16)
+        fprintf(file, "%u,%9.6f,%9.6f\n", i,
+                wrap_pi(phase_error(If, Qf, i, out_Hz, sampleRate_Hz) - ref_F),
+                wrap_pi(phase_error(Ip, Qp, i, out_Hz, sampleRate_Hz) - ref_P));
+    fclose(file);
+
+    // The raw samples either side of the wrap point, for a close-up plot
+    const uint32_t w = 64;
+    WriteIQFile(&If[sampleRate_Hz-w], &Qf[sampleRate_Hz-w],
+                "freqShiftWrap_F_IQ.txt", 2*w);
+    WriteIQFile(&Ip[sampleRate_Hz-w], &Qp[sampleRate_Hz-w],
+                "freqShiftWrap_phasor_IQ.txt", 2*w);
+
+    // Largest single-sample phase step, measured against the step the offset
+    // should produce. A clean NCO never deviates by more than a rounding error.
+    const double expected_step = 2.0*M_PI*out_Hz/(double)sampleRate_Hz;
+    double worst_F = 0, worst_P = 0;
+    for (uint32_t i = 1; i < Nsamples; i++){
+        double dF = fabs(wrap_pi(atan2((double)Qf[i],(double)If[i])
+                               - atan2((double)Qf[i-1],(double)If[i-1])
+                               - expected_step));
+        double dP = fabs(wrap_pi(atan2((double)Qp[i],(double)Ip[i])
+                               - atan2((double)Qp[i-1],(double)Ip[i-1])
+                               - expected_step));
+        if (dF > worst_F) worst_F = dF;
+        if (dP > worst_P) worst_P = dP;
+    }
+    // Amplitude must hold up too: repeated rotation of the phasor would
+    // otherwise let the oscillator magnitude wander over a run this long
+    double worst_ampl_F = 0, worst_ampl_P = 0;
+    for (uint32_t i = 0; i < Nsamples; i++){
+        double aF = fabs(sqrt((double)If[i]*If[i] + (double)Qf[i]*Qf[i]) - 0.5);
+        double aP = fabs(sqrt((double)Ip[i]*Ip[i] + (double)Qp[i]*Qp[i]) - 0.5);
+        if (aF > worst_ampl_F) worst_ampl_F = aF;
+        if (aP > worst_ampl_P) worst_ampl_P = aP;
+    }
+
+    FILE *sfile = fopen("freqShiftWrap_summary.csv", "w");
+    fprintf(sfile, "method,worst_phase_step_error_rad,worst_phase_step_error_deg,"
+                   "worst_amplitude_error\n");
+    fprintf(sfile, "FreqShiftF,%9.6f,%7.2f,%9.8f\n",
+            worst_F, worst_F*180/M_PI, worst_ampl_F);
+    fprintf(sfile, "FreqShiftPhasor,%9.6f,%7.2f,%9.8f\n",
+            worst_P, worst_P*180/M_PI, worst_ampl_P);
+    fclose(sfile);
+
+    // The phasor NCO is continuous everywhere. The residual is set by the
+    // float32 tone generation rather than by the NCO - FreqShiftF shows the
+    // same few milliradians away from its wrap point.
+    EXPECT_LT(worst_P, 0.05);
+    // ...whereas FreqShiftF jumps by half a cycle at the counter wrap, because
+    // 2200.5 Hz of accumulated phase over one second is not a multiple of 2*pi.
+    // Documents the defect.
+    EXPECT_GT(worst_F, 1.0);
+
+    // Renormalising the phasor every sample keeps its amplitude on 1.0 over a
+    // full second of continuous rotation
+    EXPECT_LT(worst_ampl_P, 1e-4);
+}
+
+// Relative cost of the two NCOs, with the multiplication-free FreqShiftFs4 as a
+// floor. Host timings, so they do not predict Teensy microseconds; the ratio
+// between the methods is the useful part.
+TEST(SignalProcessing, FreqShiftTimingComparison){
+    const uint32_t blockSize = 2048;
+    const uint32_t sampleRate_Hz = 192000;
+    const uint32_t Nreps = 500;
+    const float tone_Hz = -6000;
+    const float offset_Hz = 15000;
+
+    static float I[2048], Q[2048], I0[2048], Q0[2048];
+    CreateIQTone(I0, Q0, blockSize, sampleRate_Hz, tone_Hz);
+
+    DataBlock data;
+    data.I = I;
+    data.Q = Q;
+    data.N = blockSize;
+    data.sampleRate_Hz = sampleRate_Hz;
+
+    const char *methodName[3] = { "FreqShiftFs4", "FreqShiftF", "FreqShiftPhasor" };
+    unsigned long elapsed_us[3] = {0,0,0};
+    struct timeval tv;
+
+    for (int method = 0; method < 3; method++){
+        FreqShiftFReset();
+        FreqShiftPhasorReset();
+        for (uint32_t r = 0; r < Nreps; r++){
+            // Restore the input outside the timed region so every repetition
+            // starts from the same data
+            memcpy(I, I0, sizeof(I0));
+            memcpy(Q, Q0, sizeof(Q0));
+            gettimeofday(&tv,NULL);
+            unsigned long before_us = 1000000*tv.tv_sec + tv.tv_usec;
+            if (method == 0) FreqShiftFs4(&data);
+            if (method == 1) FreqShiftF(&data, offset_Hz);
+            if (method == 2) FreqShiftPhasor(&data, offset_Hz);
+            gettimeofday(&tv,NULL);
+            elapsed_us[method] += 1000000*tv.tv_sec + tv.tv_usec - before_us;
+        }
+    }
+
+    FILE *file = fopen("freqShiftTiming.csv", "w");
+    fprintf(file, "method,blocks,block_size,total_us,us_per_block,ns_per_sample\n");
+    for (int m = 0; m < 3; m++)
+        fprintf(file, "%s,%u,%u,%lu,%8.3f,%8.3f\n", methodName[m], Nreps, blockSize,
+                elapsed_us[m],
+                (double)elapsed_us[m]/Nreps,
+                1000.0*(double)elapsed_us[m]/Nreps/blockSize);
+    fclose(file);
+
+    // Not a performance gate, just a guard against the timing loop being
+    // optimised away entirely
+    EXPECT_GT(elapsed_us[1], 0u);
+    EXPECT_GT(elapsed_us[2], 0u);
 }
 
 TEST(SignalProcessing, DecimateBy4){
