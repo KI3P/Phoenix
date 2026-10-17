@@ -90,8 +90,20 @@ void PrependInterrupt(InterruptType i);
  * @note Packet format: 'T' + 10-digit Unix UTC timestamp + '\n' (or '\r')
  * @note On valid packet, sets the Teensy hardware RTC and TimeLib software clock
  * @note Non-blocking; drains the input buffer each call
+ * @note NOT called when CAT shares this port (AUDIO_INTERFACE); the CAT reader
+ *       recognises the same packet there and hands it to ApplyTimeSyncDigits()
  */
 void CheckForSerialTimeSync(void);
+
+/**
+ * @brief Set both clocks from the digits of a PJRC time-sync packet
+ * @param digits The timestamp digits alone - no 'T' header, no terminator
+ * @param count Number of digits available
+ * @return true if the timestamp was valid and the clocks were set
+ * @note Shared by the two readers that can receive the packet, so a build with
+ *       and a build without a USB audio interface accept exactly the same bytes
+ */
+bool ApplyTimeSyncDigits(const char* digits, uint8_t count);
 
 /**
  * @brief Main program loop executed repeatedly while radio is powered on

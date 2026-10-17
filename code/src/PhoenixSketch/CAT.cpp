@@ -1132,6 +1132,13 @@ char *FL_read( char* cmd ){
  * Reads characters from the CAT serial port, buffers them until a semicolon
  * terminator is received, then parses and executes the command via command_parser().
  * Sends response back over the same port. Handles buffer overflow by clearing the buffer.
+ *
+ * A newline terminator instead means the buffered bytes are not CAT traffic, since
+ * no Kenwood command contains one. In a build with a USB audio interface this port
+ * is also the only CDC port, so that is how a PJRC time-sync packet arrives; it is
+ * handed to ApplyTimeSyncDigits(). Any other newline-terminated run of bytes is
+ * dropped. Both cases exist to keep foreign bytes from being prepended to the next
+ * real command, which would turn it into "?;".
  */
 void CheckForCATSerialEvents(void){
     int i;
@@ -1177,6 +1184,18 @@ void CheckForCATSerialEvents(void){
                 Serial.println();
                 #endif // DEBUG_CAT
             }
+        }else if( c == '\n' || c == '\r' ){
+            // Not CAT: no Kenwood command contains a newline. On a single-port
+            // build (USB audio, where CATSerial is Serial) this is how a PJRC
+            // time-sync packet arrives - 'T' + 10 digits + '\n' - because this
+            // reader drains the port before CheckForSerialTimeSync() could see
+            // it. Hand the digits over; anything else newline-terminated is
+            // discarded rather than left to corrupt the next real command.
+            if( catCommand[0] == 'T' && catCommandIndex > 0 ){
+                ApplyTimeSyncDigits( &catCommand[1], (uint8_t)(catCommandIndex - 1) );
+            }
+            catCommandIndex = 0;
+            memset( catCommand, 0, sizeof( catCommand ));
         }else{
             catCommandIndex++;
             if( catCommandIndex >= 128 ){

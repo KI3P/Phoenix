@@ -292,6 +292,12 @@ void DrawVFOPanes(void) {
         tft.print(freqBuffer);
         PaneVFOB.stale = false;
     }
+
+    // The font source is sticky in the RA8875 library: setFontScale() does not clear a
+    // GFX font, only setFontDefault() does. These are the only panes that install one, so
+    // put the shared font state back before any other pane draws, otherwise those panes
+    // render their text in FreeSansBold and overflow their boxes.
+    tft.setFontDefault();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1732,9 +1738,11 @@ void UpdateAntennaSetting(void){
 }
 
 void DrawSettingsPane(void) {
+    // The individual settings only set the font scale, so select the built-in font here
+    // for all of them rather than inheriting whatever font was last installed.
+    tft.setFontDefault();
     if (PaneSettings.stale){
         tft.fillRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_BLACK);
-        tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)1);
         column1x = 5.5*tft.getFontWidth();
         column2x = 13.5*tft.getFontWidth();
@@ -1769,6 +1777,7 @@ void MorseCharacterDisplay() {
     if (!IsMorseCharacterBufferUpdated())
         return;
     tft.fillRect(PaneStateOfHealth.x0, PaneStateOfHealth.y0, PaneStateOfHealth.width, PaneStateOfHealth.height+2, RA8875_BLACK);
+    tft.setFontDefault();
     tft.setFontScale((enum RA8875tsize)1);
     tft.setTextColor(RA8875_WHITE);
     tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);

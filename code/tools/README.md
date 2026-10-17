@@ -12,6 +12,8 @@ read it back through test instruments on the bench.
 | [`../test/transmit/transmit_test.py`](#transmit_testpy) | Check the exciter I/Q outputs across repeated PTT cycles | AD2 + radio |
 | [`flag_timing.py`](#flag_timingpy) | Measure firmware execution timing from `Flag()` pin transitions | AD2 + radio |
 | [`plot_flag_timing.py`](#plot_flag_timingpy) | Plot distributions from a `flag_timing.py` capture | none |
+| [`set_radio_time.py`](#set_radio_timepy) | Set the radio's clock from the PC | radio |
+| [`Set-RadioTime.ps1`](#set-radiotimeps1) | The same, for Windows without Python | radio |
 | [`serial_diag.py`](#serial_diagpy) | Interactive CAT control + live diagnostic monitor | radio |
 | [`usb_audio_test.py`](#usb_audio_testpy) | Send a test tone into the radio's USB audio input | radio |
 | [`siglent_capture.py`](#siglent_capturepy) | Bare two-channel capture from a networked SIGLENT scope | SIGLENT scope |
@@ -238,6 +240,80 @@ capture coloured by flag.
 Options: `--out-dir` (defaults to beside the JSON), `--prefix`, `--flag-labels`,
 `--min-count` (skip flags with fewer events, default 2), `--no-timeline`,
 `--quiet`. PNG paths are printed to stdout.
+
+---
+
+## `set_radio_time.py`
+
+Sets the radio's clock from the PC's. Sends a PJRC-standard time packet — `'T'`
++ 10-digit timestamp + newline — which the firmware uses to set both the
+coin-cell-backed hardware RTC and the software clock behind the display.
+
+```bash
+./venv/bin/python set_radio_time.py                 # display reads local time
+./venv/bin/python set_radio_time.py --utc           # display reads UTC
+./venv/bin/python set_radio_time.py --list          # show candidate ports
+./venv/bin/python set_radio_time.py --port COM5     # choose the port yourself
+./venv/bin/python set_radio_time.py --offset -08:00 # override the local offset
+```
+
+It needs only `pyserial`, so it also runs against a bare
+`python3 -m pip install pyserial` on Windows and macOS — the venv above is a
+convenience, not a requirement. The port is found by USB vendor ID (0x16C0,
+PJRC); with Dual Serial both ports work and it picks the lower-numbered one.
+
+### Why there is a `--utc` switch
+
+The radio applies **no time-zone offset of its own**. The timestamp goes
+straight into TimeLib and the display reads `hour()`/`minute()`/`second()` back
+out of it, so the radio shows the *UTC decomposition of whatever number it is
+given*. `MY_TIMEZONE` in `Config.h` is only a label — `"EST: "` is pasted in
+front of the digits as a string and shifts nothing.
+
+So the timestamp has to be pre-shifted by whatever the display is meant to read:
+
+| `MY_TIMEZONE` is | Run | Sends |
+|---|---|---|
+| a local zone, e.g. `"EST: "` | `set_radio_time.py` | epoch + local UTC offset |
+| `"UTC: "` | `set_radio_time.py --utc` | a true UTC epoch |
+
+This clock is cosmetic — the display is its only consumer. FT8 timing comes from
+the PC's clock, so WSJT-X is unaffected by what is set here.
+
+### Confirmation, and the lack of it
+
+On **Dual Serial** the radio echoes `Time set: <stamp>` and the script prints it.
+On **serial+midi+audio** there is one CDC port shared with CAT, so the firmware
+suppresses that echo rather than injecting it into a CAT client's response
+stream; the script says so and the display is the check. On that USB type,
+WSJT-X or rigctld holding the only port will also block the script from opening
+it — close them first.
+
+---
+
+## `Set-RadioTime.ps1`
+
+The Windows counterpart of `set_radio_time.py`, for operators who would rather
+not install Python. Same packet, same behaviour, no modules beyond what ships
+with Windows PowerShell 5.1.
+
+```powershell
+.\Set-RadioTime.ps1                  # display reads local time
+.\Set-RadioTime.ps1 -Utc             # display reads UTC
+.\Set-RadioTime.ps1 -List            # show candidate ports
+.\Set-RadioTime.ps1 -Port COM5       # choose the port yourself
+.\Set-RadioTime.ps1 -Offset -08:00   # override the local offset
+```
+
+If PowerShell refuses to run it because of the execution policy:
+
+```powershell
+Unblock-File .\Set-RadioTime.ps1
+# or, for this session only:
+powershell -ExecutionPolicy Bypass -File .\Set-RadioTime.ps1
+```
+
+Read the `--utc` discussion above — it applies identically.
 
 ---
 

@@ -3154,3 +3154,106 @@ TEST(CAT, DR_ParserReachesBothForms) {
 
     ED.digitalRxLevel = saved;
 }
+
+// ============================================================================
+// Time-sync packets on the CAT port
+//
+// In a build with a USB audio interface there is one CDC port, CATSerial is
+// Serial, and CheckForCATSerialEvents() drains it before CheckForSerialTimeSync()
+// could run. The CAT reader therefore has to recognise the PJRC packet itself -
+// 'T' + 10 digits + '\n', unchanged on the wire - and everything else that
+// arrives newline-terminated has to be discarded rather than prepended to the
+// next command. These tests drive CATSerial directly, so they exercise that path
+// in either build.
+// ============================================================================
+
+// Helper: feed bytes to the CAT port and process them in one call.
+static void runCATSerial(const char* bytes) {
+    Teensy3Clock.wasSet = false;
+    Teensy3Clock.lastSet = 0;
+    CATSerial.clearBuffer();
+    CATSerial.feedData(bytes);
+    CheckForCATSerialEvents();
+}
+
+TEST(CAT, TimeSyncPacketOnCATPortSetsClock) {
+    runCATSerial("T1748476800\n");
+    EXPECT_TRUE(Teensy3Clock.wasSet)
+        << "the CAT reader owns the port on a USB-audio build and must honour "
+           "the time packet itself";
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(CAT, TimeSyncPacketOnCATPortAcceptsCarriageReturn) {
+    runCATSerial("T1748476800\r");
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
+}
+
+TEST(CAT, TimeSyncPacketDoesNotCorruptTheNextCATCommand) {
+    // The bug this fixes: the packet's bytes stayed in catCommand, so the next
+    // command parsed as "T1748476800\nFA00014200000;" and came back "?;".
+    int64_t savedFreq = ED.centerFreq_Hz[VFO_A];
+    int32_t savedBand = ED.currentBand[VFO_A];
+
+    runCATSerial("T1748476800\nFA00014200000;");
+    ConsumeInterrupt();
+    EXPECT_TRUE(Teensy3Clock.wasSet);
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 14200000L + SR[SampleRate].rate/4)
+        << "a command arriving straight after a time packet must still execute";
+
+    ED.centerFreq_Hz[VFO_A] = savedFreq;
+    ED.currentBand[VFO_A] = savedBand;
+}
+
+TEST(CAT, TimeSyncPacketRejectsMalformedTimestamps) {
+    runCATSerial("T12345\n");            // too few digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("T17484768000\n");      // too many digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("T0000000001\n");       // parses, but fails the ~2001 sanity check
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("Tabcdefghij\n");       // right length, not digits
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("T -174847680\n");      // atoll() would stop at the space
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+
+    runCATSerial("1748476800\n");        // no 'T' header
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(CAT, TCommandsAreStillCATCommands) {
+    // "TX;" and "TX0;" start with 'T' too. They are semicolon-terminated, so the
+    // newline branch must never see them.
+    ModeSm_start(&modeSM);
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+
+    runCATSerial("TX;");
+    ConsumeInterrupt();
+    EXPECT_FALSE(Teensy3Clock.wasSet)
+        << "TX; must not be mistaken for a time packet";
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
+
+    runCATSerial("RX;");
+    ConsumeInterrupt();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+
+TEST(CAT, StrayNewlineTerminatedBytesAreDiscarded) {
+    // A client that ends its commands with CRLF used to leave the line ending in
+    // catCommand, which then prefixed - and broke - the following command.
+    int64_t savedFreq = ED.centerFreq_Hz[VFO_A];
+    int32_t savedBand = ED.currentBand[VFO_A];
+
+    runCATSerial("FA00014200000;\r\nFA00007100000;");
+    ConsumeInterrupt();
+    EXPECT_EQ(ED.centerFreq_Hz[VFO_A], 7100000L + SR[SampleRate].rate/4)
+        << "a CRLF between commands must not break the command after it";
+
+    ED.centerFreq_Hz[VFO_A] = savedFreq;
+    ED.currentBand[VFO_A] = savedBand;
+}

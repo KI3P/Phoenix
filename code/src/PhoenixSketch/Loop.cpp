@@ -1525,8 +1525,56 @@ void ShutdownTeensy(void){
 // PC-side one-liner (Python 3):
 //   python -c "import serial,time; s=serial.Serial('COMx',115200); s.write(('T'+str(int(time.time()))+'\n').encode()); s.close()"
 // Replace COMx with the Teensy USB serial port (e.g. COM6).
+//
+// Which routine reads the packet depends on the USB type. Without a USB audio
+// interface there are two CDC ports and CheckForSerialTimeSync() below has
+// Serial to itself. With AUDIO_INTERFACE there is only one, CATSerial is Serial,
+// and CheckForCATSerialEvents() drains everything available before this could
+// run - so there the CAT reader recognises the packet by its newline terminator
+// and calls ApplyTimeSyncDigits() directly. The bytes on the wire are identical
+// either way; only the reader that sees them differs.
 #define TIME_SYNC_HEADER 'T'
 #define TIME_SYNC_LEN    10    // digits in a Unix timestamp until ~year 2286
+
+/**
+ * Set both clocks from the digit field of a PJRC time-sync packet.
+ *
+ * Shared by the two readers that can receive the packet so that a build with a
+ * USB audio interface and a build without accept exactly the same bytes.
+ *
+ * @param digits Timestamp digits alone - no 'T' header, no terminator
+ * @param count  Number of digits available
+ * @return true if the timestamp was valid and the clocks were set
+ */
+bool ApplyTimeSyncDigits(const char* digits, uint8_t count) {
+    if (count != TIME_SYNC_LEN) return false;
+
+    // atoll() would accept a leading sign or embedded spaces and quietly stop at
+    // the first non-digit, so vet every character before trusting the value. The
+    // CAT reader hands over whatever arrived newline-terminated, which is not
+    // necessarily a timestamp.
+    for (uint8_t i = 0; i < count; i++) {
+        if (digits[i] < '0' || digits[i] > '9') return false;
+    }
+
+    char tsbuf[TIME_SYNC_LEN + 1];
+    memcpy(tsbuf, digits, count);
+    tsbuf[count] = '\0';
+
+    time_t t = (time_t)atoll(tsbuf);
+    if (t <= 1000000000UL) return false;   // sanity: after ~2001
+
+    Teensy3Clock.set(t);
+    setTime(t);
+#ifndef AUDIO_INTERFACE
+    // Only safe on a two-port build. Where CAT shares this port the confirmation
+    // would land in the middle of the CAT client's response stream - the same
+    // reason Debug() is stubbed out in those builds (see SDT.h).
+    Serial.print("Time set: ");
+    Serial.println((int64_t)t);
+#endif
+    return true;
+}
 
 void CheckForSerialTimeSync(void) {
     static char tsbuf[TIME_SYNC_LEN + 2];
@@ -1541,15 +1589,7 @@ void CheckForSerialTimeSync(void) {
             memset(tsbuf, 0, sizeof(tsbuf));
         } else if (collecting) {
             if (c == '\n' || c == '\r') {
-                if (tsidx == TIME_SYNC_LEN) {
-                    time_t t = (time_t)atoll(tsbuf);
-                    if (t > 1000000000UL) {   // sanity: after ~2001
-                        Teensy3Clock.set(t);
-                        setTime(t);
-                        Serial.print("Time set: ");
-                        Serial.println((int64_t)t);
-                    }
-                }
+                ApplyTimeSyncDigits(tsbuf, tsidx);
                 collecting = false;
                 tsidx = 0;
             } else if (tsidx < TIME_SYNC_LEN) {
@@ -1573,7 +1613,12 @@ FASTRUN void loop(void){
     // Front-panel encoders/buttons are now drained by fpServiceTimer (1 ms, below
     // audio priority) instead of being polled here once per loop iteration.
     CheckForCATSerialEvents();
+#ifndef AUDIO_INTERFACE
+    // Only on a two-port build. With a USB audio interface CAT owns this port
+    // and has already drained it, so calling this could only steal the tail of a
+    // packet the CAT reader is handling; it recognises time packets itself.
     CheckForSerialTimeSync();
+#endif
     ConsumeInterrupt();
 
     // Step 2: Perform signal processing
