@@ -351,7 +351,9 @@ static void DrawPowerAdjustPane(void){
     tft.setCursor(x0,y0+delta);
     tft.print("Transmit:");
     tft.setCursor(x0+160,y0+delta);
-    if (modeSM.state_id == ModeSm_StateId_CALIBRATE_TX_IQ_MARK){
+    // Steps 1-3 transmit a CW carrier, step 4 transmits the SSB test tone
+    if ((modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK)){
         tft.setTextColor(RA8875_RED);
         tft.print("On");
     } else {
