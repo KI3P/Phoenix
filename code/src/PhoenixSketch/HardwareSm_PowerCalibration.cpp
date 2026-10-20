@@ -38,6 +38,7 @@ uint32_t Npoints = 0;
 float32_t measuredPower = 0.0;
 float32_t targetPower = 0.0;
 static float32_t powr_W; // SSB power point
+extern float32_t TXgainDSP; // DSP gain applied to the last transmitted block (DSP.cpp)
 uint8_t powerUnit = 1; // 1=W, 0=dBm
 
 /**
@@ -480,7 +481,8 @@ void CalculateSSBPoint(void){
     }
 
     Debug("SSB power ratio = " + String(factor));
-    float32_t corr = 10*log10f(factor);
+    // The measurement was made with TXgainDSP applied, so the correction is relative to it
+    float32_t corr = TXgainDSP + 10*log10f(factor);
     Debug("Therefore gain correction is [dB] = " + String(corr));
     if (ED.PA100Wactive)
         ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
