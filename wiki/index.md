@@ -3,9 +3,10 @@ title: Phoenix Wiki Index
 type: index
 status: stub
 created: 2026-06-08
-updated: 2026-07-31
+updated: 2026-10-23
 ---
 
+<!-- updated 2026-10-23: ingested raw/AD8307.pdf → sources/ad8307-datasheet + new theory/log-amp-power-detection; detector front end of filter-board-electronics rewritten from a net trace (pad values and unfitted diode option owner-confirmed). 50 content pages + 2 sources. -->
 <!-- updated 2026-07-29 (2nd pass): 48 content pages (firmware 26, theory 12, hardware 4, roadmap 6) + 1 source (7 schematics). Added firmware/tx-filter-hil-test for the new transmit HIL suite; recorded the finding that the 48-tap FIR transmit stages are only rate-independent to ~1.2 % (vs 0.3 % for the IIR receive stages) in runtime-filter-design + multirate-decimation + filter-hil-test, since it bounds any rate-invariance tolerance. Also: TX;/RX; parameterless-write trap and the missing equalizerXmt command in cat-control; Hilbert-not-regenerated rationale + bench suppression measurement in ssb-phasing-method; TransmitProcessing ordering notes in dsp-chain; TX EQ testability corollary in audio-equalizer. -->
 <!-- updated 2026-07-31 (2nd pass): pre-release consistency lint. No new pages. Integrated digital mode into the pages whose code it changed but which had not mentioned it — hardware-state-machine (DIGITAL_STATES in both switch tables), persistent-config (the two new ED fields), overview (USBAudio.cpp, ModeSm role) — and closed out development-backlog #13. See log. -->
 <!-- updated 2026-07-31: 48 content pages; digital-mode verified on hardware both directions (RX and TX); three bugs found and fixed on the bench (CAT sideband selection, play-queue prefill, unbounded record queue). Earlier, 2026-07-30: added firmware/digital-mode (USB audio mode); roadmap/usb-audio superseded by it. Earlier, 2026-07-29: 47 content pages; V1.4RC merge brought the rx-dsp-176k-stage-test work in. Added firmware/sample-rate-switching, firmware/runtime-filter-design, firmware/filter-hil-test. Corrected the now-false "SampleRate is never reassigned / rate-independence is dormant" claim in theory/multirate-decimation (+ documentation-todos). Earlier: added firmware/rapid-tune-mute-freeze; split board *electronics* into hardware/rf-board-electronics + hardware/filter-board-electronics; deci→centi-Hz; added firmware/audio-io. -->
@@ -76,6 +77,7 @@ fundamentals (no copy of the Purdum & Peter book). Code claims cited `file:line`
 - [[audio-equalizer]] — 14-band parallel filterbank (RX + TX audio); centre-frequency table; cells generated per rate. *(draft)*
 - [[tx-carrier-null]] — LO-leakage suppression via per-band DC offset (distinct from image). *(draft)*
 - [[zoom-fft]] — spectrum-display zoom via IIR decimation (raw 192 kHz → 375 Hz base bin; rate-dependent). *(draft)*
+- [[log-amp-power-detection]] — how the AD8307 bridge measures power: what the slope and offset absorb, why 160 m and the top end are exceptions, and why modulated signals read low (mean of log). *(draft)*
 
 ## Hardware
 _The physical T41-EP platform the firmware drives: boards, chips, buses, power. Distinct from
@@ -88,7 +90,8 @@ the firmware/ module pages (which describe the code). Derived from `Config.h` + 
 - [[rf-board-electronics]] — RF board silicon: dual/single Si5351 LO + revisions, PE4312
   attenuators (GPIO-bit→pin table, designators), ADT/PSA/MAR mixer front end, I/Q amps. *(draft)*
 - [[filter-board-electronics]] — BPF/LPF/PA back-end chips: MASWSS switches, CD74HC4514/74HC237
-  decoders + ULN2803/HF41F relays, external per-band LPF board, AD8307/AD7991 SWR sensing. *(draft)*
+  decoders + ULN2803/HF41F relays, external per-band LPF board, AD8307/AD7991 SWR sensing
+  (detector front end, compensated pad modelled against the VNA, unfitted diode option). *(draft)*
 
 ## Roadmap
 _Plans for future development, proposals, open questions._
@@ -106,3 +109,4 @@ _One summary page per ingested raw source._
 
 - [[t41-ep-schematics]] — the seven KiCad board schematics (main/RF/attenuator/dual-clock/BPF/
   LPF-control/LPF-filter); the first physical-hardware source. *(draft)*
+- [[ad8307-datasheet]] — Analog Devices AD8307 log amp, Rev. F: slope/intercept spread, conformance, the 1.5 MHz offset-loop corner, output ripple, power-meter application. *(draft)*

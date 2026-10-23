@@ -1102,3 +1102,69 @@ first port. Also missing from the bug list: the `bands[].mode` sideband inversio
 Verified while checking: both firmware configurations compile clean (`usb=serial2` and
 `usb=serialmidiaudio`, 600 MHz, o1lto), and 779/779 unit tests pass — 776 committed plus 3
 uncommitted transmit-chain tests in the working tree.
+
+## [2026-10-22] query | SWR coupler placement and forward-path flatness
+Owner confirmed the directional coupler sits after the band LPF, so harmonics do not reach the
+AD8307s. Recorded in [[filter-board-electronics]] together with the forward-path frequency
+response from the owner's VNA files: coupler flat within 0.15 dB across HF, but the as-built
+J23 → forward-detector path rises 2.6 dB from 160 m to 10 m. Context: planning a calibration in
+which the bridge, once calibrated on one band, measures every band's PA curve automatically
+(`code/tools/swr_calibration_50_open_short.ipynb`, Section 10). The per-band forward offset
+would then be carried across bands with this VNA table. Its board-to-board spread is the open
+question, along with the AD8307's log conformance above the range where its slope is fitted.
+
+## [2026-10-23] query | AD8307 slope and offset versus frequency
+Asked whether the bridge's slope error term should be constant with frequency and the offset
+term frequency-dependent. Mostly yes. Everything ahead of each AD8307 is linear, and a linear
+gain is a pure offset in the log domain. Nothing loads the detector output, so the slope is
+the chip's own. The AD8307 datasheet (Rev. B, external, not ingested) shows the 10 MHz and
+100 MHz transfer curves overlapping. Above 100 MHz the line moves down but stays nearly
+parallel, and the datasheet gives no frequency condition for slope or intercept. Caveat: the
+conformance error depends on the detector input level, and the path loss differs by 6 dB
+across the bands. Top-end readings on 10 m and 6 m therefore reach the detector's +10 dBm
+conformance bump, so a slope fitted over a range that includes that top end will look
+band-dependent. Recorded in [[filter-board-electronics]].
+
+## [2026-10-23] query | Correction: AD8307 front end, OFS loop, diode option
+The owner put the AD8307 datasheet (Rev. F) into `raw/`, and the control-board schematic was
+net-traced around the detectors. Yesterday's note in [[filter-board-electronics]] had three
+errors, all corrected:
+- The 0.1 µF is on INM, not OUT.
+- OUT also carries a diode-detector stuffing option (D1/D2 peak detectors, RV19/RV27, R26/R29),
+  which appears to be the `USE_ANALOG_SWR` hardware.
+- The claim that the chip adds no frequency dependence across 1.8–54 MHz was wrong. OFS is
+  open, which puts the offset loop's high-pass corner at about 1.5 MHz, just below 160 m.
+
+The pad is frequency-compensated (10 pF across the series arm, 22 nH in the shunt arms), which
+likely explains the rise in the VNA path response. Full ingest of the datasheet (source page,
+index) is pending the owner's go-ahead, per the ingest procedure.
+
+## [2026-10-23] ingest | AD8307 datasheet (Analog Devices, Rev. F)
+Ingested `raw/AD8307.pdf` → [[ad8307-datasheet]]. Its spec table is identical to Rev. B.
+
+Owner confirmations:
+- Only the AD8307s are fitted. The D1/D2 diode-detector option is not.
+- Pad values (blank in the schematic): R17/R22 = 499 Ω, R16/R18/R24/R25 = 56.2 Ω.
+
+Pages:
+- **New [[log-amp-power-detection]].** The log law and the firmware's inverse; which error
+  term absorbs what; why the fitted slope can look band-dependent (conformance error vs
+  detector input level; the 1.5 MHz offset loop near 160 m); SWR needing only the slope
+  ratio and the offset difference; modulated signals reading low by the mean of the log
+  (two-tone ≈ 3 dB below average power, derived); 2f output ripple.
+- **[[filter-board-electronics]].** Rewrote the detector front end with the confirmed values.
+  A π-pad model plus the in-circuit coupler matches the J23 → forward-detector VNA sweep to
+  0.1 dB on every band (160 m −45.90 vs −45.89 dB; 6 m −39.96 vs −39.93 dB). The rise comes
+  from the 10 pF across the 499 Ω (zero at 32 MHz); the 22 nH barely matters. Board spread
+  is modelled as 0.38 dB/pF on 10 m and 0.59 dB/pF on 6 m, but negligible from 160 m to
+  20 m. The `…after_attenuator` VNA file does not fit this build, so it is probably an
+  earlier one.
+- **[[filter-boards]].** Calibration-term notes; corrected the `USE_ANALOG_SWR` paragraph,
+  because the diodes are a stuffing option on the same board.
+- **Cross-links:** [[t41-ep-schematics]], [[hardware-platform]],
+  [[calibration-state-machines]], and the index.
+
+Open questions:
+- Whether 160 m differs because of the open OFS pin. Test: compare the gain-step slope on
+  160 m with 40 m.
+- The 10 m / 6 m path spread across boards.

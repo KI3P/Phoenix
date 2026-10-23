@@ -3,10 +3,10 @@ title: Filter Boards (BPF / LPF), RF Back-End & Power Sensing
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-06-08
+updated: 2026-10-23
 tags: [filters, bpf, lpf, relays, ad7991, swr, power-sensing, mcp23017, antenna, pa]
-source_refs: [sources/t41-ep-schematics]
-related: ["[[overview]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[hardware-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]"]
+source_refs: [sources/t41-ep-schematics, sources/ad8307-datasheet]
+related: ["[[overview]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[hardware-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]"]
 ---
 
 # Filter Boards (BPF / LPF), RF Back-End & Power Sensing
@@ -96,10 +96,25 @@ P_W   = 10^(P_dBm/10) / 1000
 |Γ|   = sqrt(Pr/Pf);   SWR = (1+|Γ|)/(1−|Γ|)
 ```
 
-**Analog (`#ifdef USE_ANALOG_SWR`, `LPFBoard.cpp:591-621`).** A *different* board option: **linear
-diode detectors** on Teensy ADC pins 26 (FWD) / 27 (REV). Being linear, this path uses the
-square-law `P = (V·10)² / 50` (20 dB coupler ⇒ ×10 V; P = V²/50 Ω). This is **not** used with
-the AD8307 hardware and is disabled by default (`USE_ANALOG_SWR` commented out in `Config.h`).
+**Calibration terms and their limits.** `SlopeAdj` and `Offset` are stored per band.
+- **Slope:** in principle one value per detector chip covers every band. The exceptions are
+  160 m, which sits near the AD8307's open-OFS loop corner, and slopes fitted into the
+  detector's top-end conformance bump.
+- **Offset:** genuinely per band. It absorbs the pad's 2.6 dB rise from 160 m to 10 m (about
+  6 dB to 6 m) on top of the fixed 46 dB.
+
+The running average works on ADC counts, which are linear in dB. Readings of a modulated
+signal therefore average as the mean of the log and read low: a two-tone reads about 3 dB
+below its average power, while CW is exact. → [[log-amp-power-detection]],
+[[filter-board-electronics]], [[ad8307-datasheet]]
+
+**Analog (`#ifdef USE_ANALOG_SWR`, `LPFBoard.cpp:591-621`).** **Linear diode detectors** on
+Teensy ADC pins 26 (FWD) / 27 (REV). Being linear, this path uses the square-law
+`P = (V·10)² / 50` (20 dB coupler ⇒ ×10 V; P = V²/50 Ω). The diodes are a stuffing option on
+the *same* control board: BAS70H D1/D2 peak detectors whose trimmer wipers share the AD8307
+OUT nodes and leave via `FWD_V`/`REF_V` on J21 ([[filter-board-electronics]]). They are an
+alternative to the AD8307s and are not fitted on the owner's board. The path is disabled by
+default (`USE_ANALOG_SWR` commented out in `Config.h`).
 
 Guard rails (both): no forward power ⇒ SWR = 1; `|Γ|` clamped < 0.999. Forward/reflected use
 **different smoothing constants**. Results cached and read via

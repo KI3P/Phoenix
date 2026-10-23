@@ -3,10 +3,10 @@ title: Calibration Sub-State-Machines (the 4 generated cal SMs)
 type: module
 status: draft
 created: 2026-06-09
-updated: 2026-06-09
+updated: 2026-10-23
 tags: [state-machine, calibration, statesmith, iq, carrier, power, sweep]
 source_refs: []
-related: ["[[overview]]", "[[hardware-state-machine]]", "[[state-machine-architecture]]", "[[iq-imbalance-correction]]", "[[tx-carrier-null]]", "[[tune-frequency-control]]", "[[persistent-config]]"]
+related: ["[[overview]]", "[[hardware-state-machine]]", "[[state-machine-architecture]]", "[[iq-imbalance-correction]]", "[[tx-carrier-null]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[log-amp-power-detection]]"]
 ---
 
 # Calibration Sub-State-Machines (the 4 generated cal SMs)
@@ -70,6 +70,10 @@ MEASUREMENTCOMPLETE · READ_AND_ADJUST · POWERCOMPLETE` (+ `ROOT`).
 - `READ_AND_ADJUST` / `POWERCOMPLETE` finish a band; `CURVE_COMPLETE` triggers the
   Gauss-Newton tanh fit (`FitPowerCurve` in [[tune-frequency-control]]) yielding the per-band
   `Psat`/`k`.
+- The "measured output power" comes from an external wattmeter typed in by the operator. The
+  same session can also calibrate the bridge's per-band `SWR_*_SlopeAdj`/`SWR_*_Offset`. For
+  which of those terms really varies by band, and why every calibration point must be a
+  steady carrier rather than a modulated signal, see [[log-amp-power-detection]].
 
 ## Generated-code rule
 All four are StateSmith output — edit the `.drawio` and regenerate, never the `.cpp`
