@@ -88,6 +88,12 @@ char *DG_read(  char* cmd );
 char *DR_write( char* cmd );
 char *DR_read(  char* cmd );
 char *DS_read(  char* cmd );
+char *DD_write( char* cmd );
+char *DD_read(  char* cmd );
+char *BR_write( char* cmd );
+char *BR_read(  char* cmd );
+char *XA_write( char* cmd );
+char *XA_read(  char* cmd );
 char *CF_write( char* cmd );
 char *CF_read(  char* cmd );
 char *EQ_write( char* cmd );
@@ -114,7 +120,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 32
+#define NUM_SUPPORTED_COMMANDS 35
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
@@ -156,7 +162,10 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "FL", 3+4,3, FL_write, FL_read }, // DSP filter low cut -- NOT a Kenwood keyword
         { "DG", 3+1,3, DG_write, DG_read }, // digital (USB audio) mode 0=off 1=on -- NOT a Kenwood keyword
         { "DR", 3+3,3, DR_write, DR_read }, // digital receive level 000-100 -- NOT a Kenwood keyword
-        { "DS", 0,  3, unsupported_cmd, DS_read } // digital TX path stats, read-only -- NOT a Kenwood keyword
+        { "DS", 0,  3, unsupported_cmd, DS_read }, // digital TX path stats, read-only -- NOT a Kenwood keyword
+        { "DD", 3+3,3, DD_write, DD_read }, // digital transmit drive level 000-100 -- NOT a Kenwood keyword
+        { "BR", 3+1,3, BR_write, BR_read }, // raw SWR bridge readings: clear, sample, statistics -- NOT a Kenwood keyword
+        { "XA", 3+3,3, XA_write, XA_read }  // CW transmit attenuation override -- NOT a Kenwood keyword
     };
 
 /**
@@ -690,14 +699,25 @@ char *NT_read(  char* cmd ){
 }
 
 /**
+ * True in the modes whose transmit power is ED.powerOutSSB. Digital mode
+ * transmits through the SSB chain, and TXGain() sets its level from the SSB
+ * power, so PC has to read and write that one there too.
+ */
+static bool UsesSSBPower(void){
+    return ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) ||
+           ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ||
+           ( modeSM.state_id == ModeSm_StateId_DIGITAL_RECEIVE ) ||
+           ( modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT );
+}
+
+/**
  * CAT command PC - Set output power level
- * @param cmd CAT command string with power value (mode-specific: SSB or CW)
+ * @param cmd CAT command string with power value (mode-specific: SSB and digital, or CW)
  * @return Response string with set power value
  */
 char *PC_write( char* cmd ){
-    int requested_power = atoi( &cmd[ 3 ]);
-    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) |
-        ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
+    int requested_power = atoi( &cmd[ 2 ]);   // all three digits: PC100; is 100 W
+    if( UsesSSBPower() ){
         ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = requested_power;
     } else {
         ED.powerOutCW[ED.currentBand[ED.activeVFO]] = requested_power;
@@ -710,12 +730,11 @@ char *PC_write( char* cmd ){
 /**
  * CAT command PC - Read output power level
  * @param cmd CAT command string
- * @return Response string with current power value (mode-specific: SSB or CW)
+ * @return Response string with current power value (mode-specific: SSB and digital, or CW)
  */
 char *PC_read(  char* cmd ){
     unsigned int o_param;
-    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) |
-        ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
+    if( UsesSSBPower() ){
         o_param = round( ED.powerOutSSB[ED.currentBand[ED.activeVFO]] );
     } else {
         o_param = round( ED.powerOutCW[ED.currentBand[ED.activeVFO]] );
@@ -997,6 +1016,125 @@ char *DS_read( char* cmd ){
     USBAudioGetTxStats(&calls, &under, &trim, &dmin, &dmax);
     sprintf( obuf, "DS%lu,%lu,%lu,%u,%u;", (unsigned long)calls, (unsigned long)under,
              (unsigned long)trim, (unsigned)dmin, (unsigned)dmax);
+    return obuf;
+}
+
+/**
+ * CAT command DD - set the digital-mode transmit drive level (non-standard Kenwood command)
+ *
+ * `DD000;` to `DD100;` scale the USB transmit audio before the transmit chain,
+ * like microphone gain does for SSB. This is the "USB drive" menu setting.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the level is out of range
+ */
+char *DD_write( char* cmd ){
+    int32_t level = atoi( &cmd[2] );
+    if( level < 0 || level > 100 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.digitalDriveLevel = level;
+    return empty_string_p;
+}
+
+/**
+ * CAT command DD - read the digital-mode transmit drive level (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "DDnnn;" with the level from 000 to 100
+ */
+char *DD_read( char* cmd ){
+    sprintf( obuf, "DD%03ld;", (long)ED.digitalDriveLevel);
+    return obuf;
+}
+
+/**
+ * CAT command BR - raw SWR bridge readings (non-standard Kenwood command)
+ *
+ * The radio reads both bridge detectors about every 10 ms while transmitting.
+ * Each raw reading, before the display's 0.1/0.9 running average, is also added
+ * to a set of statistics, so a mean over a steady carrier carries none of the
+ * average's lag.
+ *
+ * `BR0;` discards the readings collected so far. `BR1;` reads both detectors
+ * once, now, and adds the result; use it for readings while receiving, when the
+ * radio does not read the bridge by itself.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the parameter is not 0 or 1
+ */
+char *BR_write( char* cmd ){
+    switch( cmd[2] ){
+        case '0':
+            ClearSWRBridgeStats();
+            return empty_string_p;
+        case '1':
+            SampleSWRBridge();
+            return empty_string_p;
+        default:
+            sprintf( obuf, "?;");
+            return obuf;
+    }
+}
+
+/**
+ * CAT command BR - read the raw SWR bridge statistics (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "BR<n>,<fwd mean>,<fwd sd>,<ref mean>,<ref sd>;": the number of
+ *         readings since the last BR0, then the mean and standard deviation of each
+ *         detector in mV, to 0.1 mV. The means are 0.0 when n is 0.
+ */
+char *BR_read( char* cmd ){
+    SWRBridgeStats st;
+    GetSWRBridgeStats(&st);
+    sprintf( obuf, "BR%lu,%.1f,%.1f,%.1f,%.1f;", (unsigned long)st.n,
+             st.fwdMean_mV, st.fwdSD_mV, st.refMean_mV, st.refSD_mV);
+    return obuf;
+}
+
+/**
+ * CAT command XA - force the CW transmit attenuation (non-standard Kenwood command)
+ *
+ * `XAnnn;` sets the attenuation to nnn tenths of a dB, 000 to 315, in place of
+ * the value the CW power setting would give. The attenuator works in 0.5 dB
+ * steps. It takes effect at the next key-down, and the PA selection still
+ * follows the CW power setting. `XA999;` returns to the power setting. The
+ * override is not saved.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the value is out of range
+ */
+char *XA_write( char* cmd ){
+    for( int i = 2; i < 5; i++ ){
+        if( cmd[i] < '0' || cmd[i] > '9' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    int32_t tenths = atoi( &cmd[2] );
+    if( tenths == 999 ){
+        SetCWAttenuationOverride( -1 );
+        return empty_string_p;
+    }
+    if( tenths > 315 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    SetCWAttenuationOverride( tenths / 10.0f );
+    return empty_string_p;
+}
+
+/**
+ * CAT command XA - read the transmit attenuation (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "XAnnn,o;": nnn is the transmit attenuator's present setting in
+ *         tenths of a dB and o is 1 if an override is set. While receiving the
+ *         attenuator sits at 31.5 dB, so read it while keyed to see what the
+ *         transmitter is using.
+ */
+char *XA_read( char* cmd ){
+    sprintf( obuf, "XA%03ld,%d;", (long)lroundf( GetTXAttenuation() * 10.0f ),
+             GetCWAttenuationOverride() >= 0 ? 1 : 0 );
     return obuf;
 }
 

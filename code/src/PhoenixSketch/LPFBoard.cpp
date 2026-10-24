@@ -626,6 +626,7 @@ void PerformSWRBridgeReading(void) {
     // Step 1. Measure the peak forward and Reverse voltages
     adcF_sRaw = (float32_t)swrADC.readADCsingle(0);
     adcR_sRaw = (float32_t)swrADC.readADCsingle(1);
+    AccumulateSWRBridgeStats(adcF_sRaw * VREF_MV / 4096., adcR_sRaw * VREF_MV / 4096.);
 
     adcF_sRaw = 0.1 * adcF_sRaw + 0.9 * adcF_sRawOld;  //Running average
     adcR_sRaw = 0.1 * adcR_sRaw + 0.9 * adcR_sRawOld;
@@ -665,6 +666,56 @@ float32_t ReadADCRefRaw(void){
     return 0.0f;
 }
 #endif
+
+// ---------- Raw bridge statistics, for the CAT BR command ----------
+// Sums are kept in double: a long key-down collects thousands of readings of
+// about 2000 mV, and the variance is a small difference of large sums.
+static uint32_t bridgeN = 0;
+static double bridgeSum[2] = {0, 0};
+static double bridgeSumSq[2] = {0, 0};
+
+void ClearSWRBridgeStats(void){
+    bridgeN = 0;
+    bridgeSum[0] = bridgeSum[1] = 0;
+    bridgeSumSq[0] = bridgeSumSq[1] = 0;
+}
+
+void AccumulateSWRBridgeStats(float32_t fwd_mV, float32_t ref_mV){
+    // readADCsingle() reports a failed I2C read as 65535 or 65534, far above
+    // the 4096 mV full scale. Leave those out rather than average them in.
+    if (fwd_mV < 0 || fwd_mV > VREF_MV || ref_mV < 0 || ref_mV > VREF_MV)
+        return;
+    bridgeN++;
+    bridgeSum[0] += fwd_mV;
+    bridgeSum[1] += ref_mV;
+    bridgeSumSq[0] += (double)fwd_mV * fwd_mV;
+    bridgeSumSq[1] += (double)ref_mV * ref_mV;
+}
+
+void SampleSWRBridge(void){
+#ifndef USE_ANALOG_SWR
+    float32_t fwd = (float32_t)swrADC.readADCsingle(0);
+    float32_t ref = (float32_t)swrADC.readADCsingle(1);
+    AccumulateSWRBridgeStats(fwd * VREF_MV / 4096., ref * VREF_MV / 4096.);
+#endif
+}
+
+void GetSWRBridgeStats(SWRBridgeStats *stats){
+    float32_t mean[2] = {0, 0}, sd[2] = {0, 0};
+    if (bridgeN > 0){
+        for (int c = 0; c < 2; c++){
+            double m = bridgeSum[c] / bridgeN;
+            double var = bridgeSumSq[c] / bridgeN - m * m;
+            mean[c] = (float32_t)m;
+            sd[c] = (var > 0) ? (float32_t)sqrt(var) : 0.0f;
+        }
+    }
+    stats->n = bridgeN;
+    stats->fwdMean_mV = mean[0];
+    stats->fwdSD_mV = sd[0];
+    stats->refMean_mV = mean[1];
+    stats->refSD_mV = sd[1];
+}
 
 
 /**

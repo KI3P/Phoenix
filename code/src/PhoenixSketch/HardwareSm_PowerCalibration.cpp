@@ -264,8 +264,8 @@ void InitializePowerCalibration(void){
         ED.XAttenCW[k] = 0.0;
         ED.SWR_F_SlopeAdj[k] = 0.0;
         ED.SWR_R_SlopeAdj[k] = 0.0;
-        ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
-        ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
+        ED.SWR_F_Offset[k] = 0.0;
+        ED.SWR_R_Offset[k] = 0.0;
     }
     SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
     UpdateRFHardwareState();

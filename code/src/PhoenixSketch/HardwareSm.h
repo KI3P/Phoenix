@@ -49,6 +49,19 @@ errno_t InitializeRFHardware(void);
 void UpdateTuneState(void);
 RFHardwareState GetRFHardwareState(void);
 
+/**
+ * @brief Force the CW transmit attenuation, bypassing the power-curve model
+ * @param att_dB 0 to 31.5 dB, or a negative value to return to the model
+ * @note Takes effect at the next key-down. The PA selection still follows the
+ *       CW power setting. Not saved; set by the CAT XA command for bench work.
+ */
+void SetCWAttenuationOverride(float32_t att_dB);
+
+/**
+ * @brief The forced CW transmit attenuation, or a negative value if none is set
+ */
+float32_t GetCWAttenuationOverride(void);
+
 // Power calibration routines
 float32_t GetPowDataSum(void);
 uint32_t GetNpoints(void);

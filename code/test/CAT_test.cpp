@@ -45,6 +45,12 @@ char *DG_write(char* cmd);
 char *DG_read(char* cmd);
 char *DR_write(char* cmd);
 char *DR_read(char* cmd);
+char *DD_write(char* cmd);
+char *DD_read(char* cmd);
+char *BR_write(char* cmd);
+char *BR_read(char* cmd);
+char *XA_write(char* cmd);
+char *XA_read(char* cmd);
 char *CF_write(char* cmd);
 char *CF_read(char* cmd);
 char *EQ_write(char* cmd);
@@ -3153,6 +3159,206 @@ TEST(CAT, DR_ParserReachesBothForms) {
     EXPECT_STREQ(command_parser(read_cmd), "DR030;");
 
     ED.digitalRxLevel = saved;
+}
+
+// ============================================================================
+// PC in digital mode
+//
+// Digital mode transmits through the SSB chain, and TXGain() sets its level from
+// ED.powerOutSSB. PC used to write the CW power there, so a client setting power
+// in digital mode changed nothing it could hear.
+// ============================================================================
+
+TEST(CAT, PC_write_SetsSSBPowerInDigitalMode) {
+    ModeSm_start(&modeSM);
+    int32_t band = ED.currentBand[ED.activeVFO];
+    float32_t savedSSB = ED.powerOutSSB[band], savedCW = ED.powerOutCW[band];
+    ED.powerOutSSB[band] = 5;
+    ED.powerOutCW[band] = 5;
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+    char cmd[] = "PC003;";
+    EXPECT_STREQ(PC_write(cmd), "PC003;");
+    EXPECT_FLOAT_EQ(ED.powerOutSSB[band], 3.0f);
+    EXPECT_FLOAT_EQ(ED.powerOutCW[band], 5.0f) << "the CW power must not change in digital mode";
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_TRANSMIT;
+    char cmd2[] = "PC004;";
+    PC_write(cmd2);
+    EXPECT_FLOAT_EQ(ED.powerOutSSB[band], 4.0f);
+
+    char read[] = "PC;";
+    EXPECT_STREQ(PC_read(read), "PC004;") << "PC; must report the power digital mode uses";
+
+    ED.powerOutSSB[band] = savedSSB;
+    ED.powerOutCW[band] = savedCW;
+}
+
+TEST(CAT, PC_write_ReadsAllThreeDigits) {
+    ModeSm_start(&modeSM);
+    int32_t band = ED.currentBand[ED.activeVFO];
+    float32_t saved = ED.powerOutCW[band];
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+    char cmd[] = "PC100;";
+    EXPECT_STREQ(PC_write(cmd), "PC100;");
+    EXPECT_FLOAT_EQ(ED.powerOutCW[band], 100.0f) << "the hundreds digit was being dropped";
+
+    ED.powerOutCW[band] = saved;
+}
+
+// ============================================================================
+// DD - digital-mode transmit drive level
+// ============================================================================
+
+TEST(CAT, DD_write_SetsDriveLevel) {
+    int32_t saved = ED.digitalDriveLevel;
+
+    char cmd[] = "DD057;";
+    EXPECT_STREQ(DD_write(cmd), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 57);
+
+    char zero[] = "DD000;";
+    EXPECT_STREQ(DD_write(zero), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 0);
+
+    char full[] = "DD100;";
+    EXPECT_STREQ(DD_write(full), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 100);
+
+    ED.digitalDriveLevel = saved;
+}
+
+TEST(CAT, DD_write_RejectsOutOfRange) {
+    int32_t saved = ED.digitalDriveLevel;
+    ED.digitalDriveLevel = 50;
+
+    char cmd[] = "DD101;";
+    EXPECT_STREQ(DD_write(cmd), "?;");
+    EXPECT_EQ(ED.digitalDriveLevel, 50) << "a rejected level must not change anything";
+
+    ED.digitalDriveLevel = saved;
+}
+
+TEST(CAT, DD_ParserReachesBothForms) {
+    int32_t saved = ED.digitalDriveLevel;
+
+    char write_cmd[] = "DD042;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 42);
+
+    char read_cmd[] = "DD;";
+    EXPECT_STREQ(command_parser(read_cmd), "DD042;");
+
+    ED.digitalDriveLevel = saved;
+}
+
+// ============================================================================
+// BR - raw SWR bridge statistics
+// ============================================================================
+
+TEST(CAT, BR_read_ReportsNothingAfterClear) {
+    char clear[] = "BR0;";
+    EXPECT_STREQ(BR_write(clear), "");
+    char read[] = "BR;";
+    EXPECT_STREQ(BR_read(read), "BR0,0.0,0.0,0.0,0.0;");
+}
+
+TEST(CAT, BR_read_ReportsMeanAndDeviation) {
+    char clear[] = "BR0;";
+    BR_write(clear);
+    // Forward 1000 and 1002 mV: mean 1001, population SD 1. Reflected constant.
+    AccumulateSWRBridgeStats(1000.0f, 500.0f);
+    AccumulateSWRBridgeStats(1002.0f, 500.0f);
+    char read[] = "BR;";
+    EXPECT_STREQ(BR_read(read), "BR2,1001.0,1.0,500.0,0.0;");
+
+    BR_write(clear);
+    EXPECT_STREQ(BR_read(read), "BR0,0.0,0.0,0.0,0.0;") << "BR0 must discard the readings";
+}
+
+TEST(CAT, BR_IgnoresFailedADCReads) {
+    char clear[] = "BR0;";
+    BR_write(clear);
+    // readADCsingle() returns 65535 or 65534 when the I2C read fails
+    AccumulateSWRBridgeStats(65535.0f, 500.0f);
+    AccumulateSWRBridgeStats(1200.0f, 65534.0f);
+    AccumulateSWRBridgeStats(1200.0f, 800.0f);
+    char read[] = "BR;";
+    EXPECT_STREQ(BR_read(read), "BR1,1200.0,0.0,800.0,0.0;");
+}
+
+TEST(CAT, BR_write_RejectsUnknownParameter) {
+    char cmd[] = "BR2;";
+    EXPECT_STREQ(BR_write(cmd), "?;");
+}
+
+TEST(CAT, BR_ParserReachesBothForms) {
+    char clear[] = "BR0;";
+    EXPECT_STREQ(command_parser(clear), "");
+    AccumulateSWRBridgeStats(1500.0f, 700.0f);
+    char read[] = "BR;";
+    EXPECT_STREQ(command_parser(read), "BR1,1500.0,0.0,700.0,0.0;");
+    BR_write(clear);
+}
+
+// ============================================================================
+// XA - CW transmit attenuation override
+// ============================================================================
+
+TEST(CAT, XA_write_SetsAndClearsOverride) {
+    char set[] = "XA125;";
+    EXPECT_STREQ(XA_write(set), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 12.5f);
+
+    char max[] = "XA315;";
+    EXPECT_STREQ(XA_write(max), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 31.5f);
+
+    char zero[] = "XA000;";
+    EXPECT_STREQ(XA_write(zero), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 0.0f);
+
+    char clear[] = "XA999;";
+    EXPECT_STREQ(XA_write(clear), "");
+    EXPECT_LT(GetCWAttenuationOverride(), 0.0f);
+}
+
+TEST(CAT, XA_write_RejectsOutOfRange) {
+    char clear[] = "XA999;";
+    XA_write(clear);
+
+    char high[] = "XA316;";
+    EXPECT_STREQ(XA_write(high), "?;");
+    char junk[] = "XA1x5;";
+    EXPECT_STREQ(XA_write(junk), "?;");
+    EXPECT_LT(GetCWAttenuationOverride(), 0.0f) << "a rejected value must not set an override";
+}
+
+TEST(CAT, XA_read_ReportsAttenuatorAndOverride) {
+    char clear[] = "XA999;";
+    XA_write(clear);
+    SetTXAttenuation(12.5);
+    char read[] = "XA;";
+    EXPECT_STREQ(XA_read(read), "XA125,0;");
+
+    char set[] = "XA200;";
+    XA_write(set);
+    EXPECT_STREQ(XA_read(read), "XA125,1;") << "the attenuator only changes at the next key-down";
+
+    XA_write(clear);
+}
+
+TEST(CAT, XA_ParserReachesBothForms) {
+    char set[] = "XA050;";
+    EXPECT_STREQ(command_parser(set), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 5.0f);
+    char read[] = "XA;";
+    std::string reply = command_parser(read);
+    EXPECT_EQ(reply.substr(0, 2), "XA");
+    EXPECT_EQ(reply.substr(reply.size() - 3), ",1;");
+    char clear[] = "XA999;";
+    command_parser(clear);
 }
 
 // ============================================================================

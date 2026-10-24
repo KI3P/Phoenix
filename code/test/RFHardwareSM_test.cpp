@@ -113,6 +113,53 @@ TEST(RFHardwareState, StateTransitionToCWMark){
     EXPECT_EQ(GET_BIT(hardwareRegister, PA100WBIT), 0); // 100W PA bypassed
 }
 
+TEST(RFHardwareState, CWAttenuationOverrideReplacesPowerModel){
+    InitializeRFHardware();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+
+    SetCWAttenuationOverride(12.5);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+    EXPECT_FLOAT_EQ(GetTXAttenuation(), 12.5);
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+    SetCWAttenuationOverride(0);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+    EXPECT_FLOAT_EQ(GetTXAttenuation(), 0.0) << "0 dB is a valid override, not 'off'";
+
+    // Cleared: the power setting decides again
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+    SetCWAttenuationOverride(-1);
+    bool pa;
+    float32_t model = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]], &pa);
+    float32_t expected = ((model >= 0) && (model < 32)) ? model : ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+    EXPECT_NEAR(GetTXAttenuation(), expected, 0.26);
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+}
+
+TEST(RFHardwareState, CWAttenuationOverrideAppliesFromSpaceToo){
+    InitializeRFHardware();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+
+    SetCWAttenuationOverride(31.5);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateRFHardwareState();
+    EXPECT_FLOAT_EQ(GetTXAttenuation(), 31.5);
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+    SetCWAttenuationOverride(-1);
+}
+
 TEST(RFHardwareState, FrequenciesSetUponStateChange){
     // Set up the arrays
     ED.centerFreq_Hz[ED.activeVFO] = 7100000L;

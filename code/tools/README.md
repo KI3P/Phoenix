@@ -16,6 +16,7 @@ read it back through test instruments on the bench.
 | [`Set-RadioTime.ps1`](#set-radiotimeps1) | The same, for Windows without Python | radio |
 | [`serial_diag.py`](#serial_diagpy) | Interactive CAT control + live diagnostic monitor | radio |
 | [`usb_audio_test.py`](#usb_audio_testpy) | Send a test tone into the radio's USB audio input | radio |
+| [`swr/`](swr/README.md) | SWR bridge calibration: the measurement script, sheets and analysis notebooks | radio + CMU-200 on a 60 dB coupler + test loads |
 | [`siglent_capture.py`](#siglent_capturepy) | Bare two-channel capture from a networked SIGLENT scope | SIGLENT scope |
 | [`extract_filter_prototypes.py`](#extract_filter_prototypespy) | Recover analog specs from the old frozen filter tables | none |
 

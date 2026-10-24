@@ -144,6 +144,47 @@ float32_t ReadReflectedPower(void);
 uint32_t ReadSWRLastUpdateMs(void);
 
 /**
+ * @brief Statistics of the raw SWR bridge readings collected since the last clear
+ * @note Raw means before the 0.1/0.9 running average, so a mean over a steady
+ *       carrier is free of the average's lag. Used by the CAT BR command.
+ */
+typedef struct {
+    uint32_t n;            // number of readings
+    float32_t fwdMean_mV;  // forward detector, mean
+    float32_t fwdSD_mV;    // forward detector, standard deviation
+    float32_t refMean_mV;  // reflected detector, mean
+    float32_t refSD_mV;    // reflected detector, standard deviation
+} SWRBridgeStats;
+
+/**
+ * @brief Discard the raw bridge readings collected so far
+ */
+void ClearSWRBridgeStats(void);
+
+/**
+ * @brief Add one pair of raw bridge readings to the statistics
+ * @param fwd_mV Forward detector reading in mV
+ * @param ref_mV Reflected detector reading in mV
+ * @note PerformSWRBridgeReading() calls this for every reading it takes. A pair
+ *       with either value outside 0 to 4096 mV, which is how a failed I2C read
+ *       shows up, is ignored.
+ */
+void AccumulateSWRBridgeStats(float32_t fwd_mV, float32_t ref_mV);
+
+/**
+ * @brief Read both detectors once, now, and add the readings to the statistics
+ * @note For readings while receiving, when PerformSWRBridgeReading() does not run.
+ *       Does not touch the running average or the power and SWR values.
+ */
+void SampleSWRBridge(void);
+
+/**
+ * @brief Get the statistics of the raw bridge readings collected since the last clear
+ * @param stats Filled in; the means and deviations are 0 when n is 0
+ */
+void GetSWRBridgeStats(SWRBridgeStats *stats);
+
+/**
  * @brief Initialize the SWR measurement hardware (AD7991 ADC)
  * @return ESUCCESS on success, ENOI2C if I2C communication fails
  */

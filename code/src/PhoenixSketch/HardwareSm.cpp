@@ -94,6 +94,7 @@ static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
 static RFHardwareState rfHardwareState = RFReceive;
 static RFHardwareState oldrfHardwareState = RFInvalid;
 static TuneState tuneState = TuneReceive;
+static float32_t cwAttenOverride_dB = -1;  // negative: CW attenuation follows the power setting
 
 /**
  * @brief Initialize the RF board by calling the initialization functions for each
@@ -158,6 +159,14 @@ errno_t InitializeRFHardware(void){
  */
 ModeSm_StateId GetRFHardwarePreviousState(void){
     return previousRadioState;
+}
+
+void SetCWAttenuationOverride(float32_t att_dB){
+    cwAttenOverride_dB = (att_dB > 31.5f) ? 31.5f : att_dB;
+}
+
+float32_t GetCWAttenuationOverride(void){
+    return cwAttenOverride_dB;
 }
 
 /**
@@ -373,6 +382,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                    if (cwAttenOverride_dB >= 0)
+                        att_dB = cwAttenOverride_dB;
                 }
 
                 RXBypassBPF(); // BPF out of RX path
@@ -422,6 +433,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                    if (cwAttenOverride_dB >= 0)
+                        att_dB = cwAttenOverride_dB;
                 }
 
                 RXBypassBPF(); // BPF out of RX path
