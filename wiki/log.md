@@ -1168,3 +1168,16 @@ Open questions:
 - Whether 160 m differs because of the open OFS pin. Test: compare the gain-step slope on
   160 m with 40 m.
 - The 10 m / 6 m path spread across boards.
+
+## [2026-10-24] decision | CAT commands for the SWR bridge bench series
+Added three non-Kenwood CAT commands so `code/tools/swr/swr_bench_measure.py` can take the SWR
+bridge calibration series (`swr_bench_measurements.csv`, notebook Section 11) under CAT control:
+- `BR`: raw bridge statistics, accumulated from the unsmoothed AD7991 readings;
+- `XA`: CW attenuation override, for the attenuator-limit rows that `PC`'s whole watts cannot
+  reach;
+- `DD`: the digital transmit drive.
+
+Fixed two `PC` bugs found on the way: in digital mode it set the CW power, which that mode does
+not use, and it dropped the hundreds digit. Recorded in [[cat-control]]. 16 new unit tests, all
+passing. Committed in 583c4b5 without the owner's local KI3P prototype LPF remapping, which
+stays out of the repository; all 812 unit tests pass on that commit.

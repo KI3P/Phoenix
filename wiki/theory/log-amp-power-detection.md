@@ -93,7 +93,7 @@ error in both offsets cancels. What matters is:
 - the slope of each channel;
 - the reflected offset *relative* to the forward one, which the open and short sweeps set.
 
-This is why the open/short procedure (`code/tools/swr_calibration_50_open_short.ipynb`)
+This is why the open/short procedure (`code/tools/swr/swr_calibration_50_open_short.ipynb`)
 can calibrate SWR without a wattmeter. A wattmeter is needed only for absolute forward
 power. The coupler's directivity leakage adds as a vector and depends on the load, so it fits
 neither the slope term nor the offset term. The notebook models it separately.
