@@ -73,7 +73,9 @@ MEASUREMENTCOMPLETE · READ_AND_ADJUST · POWERCOMPLETE` (+ `ROOT`).
 - The "measured output power" comes from an external wattmeter typed in by the operator. The
   same session can also calibrate the bridge's per-band `SWR_*_SlopeAdj`/`SWR_*_Offset`. For
   which of those terms really varies by band, and why every calibration point must be a
-  steady carrier rather than a modulated signal, see [[log-amp-power-detection]].
+  steady carrier rather than a modulated signal, see [[log-amp-power-detection]]. Bench tests
+  found the forward calibration good to ±0.25–0.5 dB but the SWR reading not correctable by
+  calibration ([[swr-bridge-measured-behaviour]]).
 
 ## Generated-code rule
 All four are StateSmith output — edit the `.drawio` and regenerate, never the `.cpp`

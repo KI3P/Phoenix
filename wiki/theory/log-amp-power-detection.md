@@ -3,10 +3,10 @@ title: Log-Amp Power Detection (how the SWR bridge measures power)
 type: concept
 status: draft
 created: 2026-10-23
-updated: 2026-10-23
+updated: 2026-10-24
 tags: [ad8307, log-amp, detector, swr, power-sensing, calibration, theory]
 source_refs: [sources/ad8307-datasheet, sources/t41-ep-schematics]
-related: ["[[ad8307-datasheet]]", "[[filter-board-electronics]]", "[[filter-boards]]", "[[calibration-state-machines]]", "[[theory-overview]]"]
+related: ["[[ad8307-datasheet]]", "[[swr-bridge-measured-behaviour]]", "[[filter-board-electronics]]", "[[filter-boards]]", "[[calibration-state-machines]]", "[[theory-overview]]"]
 ---
 
 # Log-Amp Power Detection
@@ -112,6 +112,12 @@ the datasheet.)*
   Forward-power and SWR readings during speech are indicative only. The SWR survives better,
   because the forward and reflected readings share the same envelope, so the bias cancels in
   the ratio, as long as both detectors stay inside their log range.
+
+**Measured (2026-10-24, [[swr-bridge-measured-behaviour]]).** Radio 2's detector shows the
+conformance error as a smooth ±0.4–0.5 dB curve across a 30 dB fit, which a slope and offset
+cannot remove; radio 1's is about half that. Radio 2's 160 m slope is 5–7 % low, consistent
+with the offset loop above. Both radios read SWR far too high, from a bridge leak rather than
+from any term on this page.
 
 The datasheet's waveform note is a different, RF-scale effect: a square wave reads +6 dB and
 Gaussian noise +0.5 dB against a sine. The T41's carrier is sinusoidal, so the envelope effect

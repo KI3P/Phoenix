@@ -3,7 +3,7 @@ title: T41-EP Schematics (KiCad, V012-era)
 type: source
 status: draft
 created: 2026-06-14
-updated: 2026-10-23
+updated: 2026-10-25
 tags: [hardware, schematic, kicad, t41-ep, source, bom]
 source_refs: []
 related: ["[[hardware-platform]]", "[[i2c-bus-map]]", "[[rf-board]]", "[[filter-boards]]", "[[front-panel]]", "[[display-subsystem]]"]
@@ -107,14 +107,14 @@ comments, the schematic wins (and the discrepancy is logged).
   (`LPFBoard.cpp:640-643`); the linear `(V·10)²/50` formula is the separate `USE_ANALOG_SWR`
   diode-detector path. → [[filter-boards]]
 - **Detector front end** (net-traced 2026-10-23; pad values and fitting owner-confirmed):
-  - The coupler secondary is terminated in 52.3 Ω (R20/R28).
-  - It feeds a π-pad: 499 Ω series R17/R22, bridged by 10 pF; 56.2 Ω shunts R16/R18 and
+  - The coupler L44 is a current and a voltage transformer on one binocular core (winding
+    owner-described 2026-10-25, not on the schematic). Each coupled port feeds a π-pad: 499 Ω series R17/R22, bridged by 10 pF; 56.2 Ω shunts R16/R18 and
     R24/R25, each through 22 nH. The resistor values are blank in the schematic.
   - The pad output is terminated in 52.3 Ω (R13/R21) and drives INP through 10 nF. INM is
     decoupled to ground by 0.1 µF. **OFS and INT are open.**
-  - The diode peak detectors D1/D2 (BAS70H), with their trimmers RV19/RV27 and resistors
-    R26/R29, share the OUT nodes. They are the `USE_ANALOG_SWR` stuffing option and are
-    **not fitted** on the owner's board.
+  - The diode peak detectors (R20/R28, D1/D2, C149/C156, RV19/RV27, R26/R29) are the
+    `USE_ANALOG_SWR` stuffing option and are **not populated**, so the coupled ports see
+    only the pads (owner-confirmed 2026-10-25).
 
   → [[filter-board-electronics]], [[ad8307-datasheet]]
 - PA control: **Q1 IRF630, L7808, TC4428**. Back-end connectors: **ANT-1…ANT-4**, **FROM

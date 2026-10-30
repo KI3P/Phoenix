@@ -1181,3 +1181,38 @@ Fixed two `PC` bugs found on the way: in digital mode it set the CW power, which
 not use, and it dropped the hundreds digit. Recorded in [[cat-control]]. 16 new unit tests, all
 passing. Committed in 583c4b5 without the owner's local KI3P prototype LPF remapping, which
 stays out of the repository; all 812 unit tests pass on that commit.
+
+## [2026-10-24] query | SWR bridge bench tests on two radios
+Measured radio 1 once and radio 2 twice with `code/tools/swr/swr_bench_measure.py`. Radio 2's
+second session is the "radio 3" sheet, with the loads moved from the external coupler's output
+to the radio's own connector. Findings are filed in [[swr-bridge-measured-behaviour]]:
+- **Forward power:** a per-band wattmeter calibration gives ±0.25 dB on radio 1 and ±0.5 dB on
+  radio 2, which shows AD8307 conformance curvature. It drifts 0.3–0.5 dB between sessions.
+- **Shortcuts fail.** Gain-step slopes read 2–7 % low, because the transmitter is not
+  dB-linear. VNA offset transfer between bands is off by up to 3.3 dB. This contradicts
+  [[filter-board-electronics]]; both claims are annotated there.
+- **SWR reads 30–90 % high on both radios.** The bridge leaks 10–20 dB more in the radio than on
+  the VNA bench, and magnitude-only detectors cannot calibrate that out. A same-radio A/B
+  showed the external coupler was not the cause on 40 m and 20 m. The shifted-balance-impedance
+  explanation (from radio 1) was rejected.
+- **Faults:**
+  - radio 2's PA oscillates into a short on 10 m;
+  - a stuck-DIGITAL-transmit fault (keyed, no tone) needed a power cycle;
+  - radio 1 rebooted on a static discharge.
+
+Script changes made along the way: rows grouped by the load on the connector, a tone check on
+every DIGITAL row, DIGITAL left before band changes, and oscillation detection that skips the
+load. Open: the source of the in-radio leak.
+
+## [2026-10-25] query | L44 coupler modelled from its winding
+The owner described L44's winding: a 1:10 current transformer and a 10:1 voltage transformer
+on one BN-43-202 binocular. They also confirmed that the diode-detector option is not
+populated (R20/R28, D1/D2, C149/C156, RV19/RV27, R26/R29), so each coupled port sees only its
+pad. Corrected [[filter-board-electronics]] and [[t41-ep-schematics]], which had both ports
+terminated in 52.3 Ω. Added `code/tools/swr/l44_coupler_model.py`, a nodal circuit model of the
+coupler. Findings are in [[swr-bridge-measured-behaviour]]:
+- each port's null depends on the other port's load and the turns ratio;
+- a correctly built L44 should leak −30 to −37 dB;
+- the radios' leak needs about 15 pF or 300 nH of stray coupling;
+- the out-of-circuit bench sweep of L44 leaks at radio 2's level, so the surroundings matter
+  more than the windings.
