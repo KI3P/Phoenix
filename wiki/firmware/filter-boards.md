@@ -3,7 +3,7 @@ title: Filter Boards (BPF / LPF), RF Back-End & Power Sensing
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-10-23
+updated: 2026-11-01
 tags: [filters, bpf, lpf, relays, ad7991, swr, power-sensing, mcp23017, antenna, pa]
 source_refs: [sources/t41-ep-schematics, sources/ad8307-datasheet]
 related: ["[[overview]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[hardware-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]"]
@@ -96,6 +96,30 @@ P_W   = 10^(P_dBm/10) / 1000
 |Γ|   = sqrt(Pr/Pf);   SWR = (1+|Γ|)/(1−|Γ|)
 ```
 
+**Reading the AD7991: two discarded conversions per channel switch (2026-11-01).**
+`AD7991::readADCsingle(ch)` writes the channel nibble and reads the result in one
+`write_then_read`. The AD8307 outputs feed the ADC through their 12.5 kΩ output resistance, so
+a conversion taken in the same transaction as the switch carried part of the other
+channel's voltage.
+- **Measured on radio 1:** forward read 14 % of reflected and reflected 18 % of forward,
+  which compressed SWR return loss to 0.65 ([[swr-bridge-measured-behaviour]],
+  [[filter-board-electronics]]).
+- **The driver now** remembers the last channel converted. On a switch it converts the new
+  channel `getDiscardCount()` times (default 2, `AD7991_DEFAULT_DISCARDS`, at most 4),
+  discards those results and returns the next conversion. `setDiscardCount(0)` restores
+  the old single read.
+- **Why two:** one discard left cross terms of 0.022/0.042, about the square of the original
+  0.144/0.186; two left 0.007/−0.008.
+- **Cost:** the bridge alternates CH0/CH1, so each `UpdateSWR()`/`SampleSWRBridge()` call now
+  makes six I²C transactions instead of two. That is about 3 ms instead of 1 ms on Wire2 at
+  its default 100 kHz, while transmitting only.
+- **Error handling:** a failed transaction or wrong channel ID returns the usual 65535/65534
+  and marks the selection unknown, so the next read counts as a switch.
+- **Tests:** `AD7991Test` in `code/test/LPFBoard_test.cpp`. The I²C mock now counts
+  transactions and can inject failures.
+- **Status:** verified on radio 1 on 2026-11-01. Its ADC reads 100 Ω as 2.01–2.09 and
+  200 Ω as 3.9–4.3 on 160–20 m, matching the pins ([[swr-bridge-measured-behaviour]]).
+
 **Calibration terms and their limits.** `SlopeAdj` and `Offset` are stored per band.
 - **Slope:** in principle one value per detector chip covers every band. The exceptions are
   160 m, which sits near the AD8307's open-OFS loop corner, and slopes fitted into the
@@ -150,5 +174,6 @@ front end — are documented in **[[filter-board-electronics]]** (schematic-trac
   is off by default. The earlier flag came from a **wiki error** that attributed the analog-path
   formula to the digital path; now corrected. AD8307 OUT (U14 fwd / U19 rev) → AD7991 CH0/CH1;
   REF3440 → Vin3/Vref reference (see [[filter-board-electronics]]). → [[t41-ep-schematics]]
-- The AD7991 `REGISTER_SETUP` channel-select bits vs. the "CH0+CH1" comment (the setup byte
-  has the channel nibble = 0; confirm how per-channel reads are configured).
+- ~~The AD7991 `REGISTER_SETUP` channel-select bits vs. the "CH0+CH1" comment.~~ Resolved
+  (2026-11-01, code read): `REGISTER_SETUP` holds only the reference bit, and each read ORs in
+  its own one-hot channel nibble, so every conversion selects exactly one channel.

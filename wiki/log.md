@@ -1216,3 +1216,67 @@ coupler. Findings are in [[swr-bridge-measured-behaviour]]:
 - the radios' leak needs about 15 pF or 300 nH of stray coupling;
 - the out-of-circuit bench sweep of L44 leaks at radio 2's level, so the surroundings matter
   more than the windings.
+
+## [2026-10-31] decision | L44 fixture re-measured; coupler wiring model
+Re-measured L44 alone in its perfboard fixture with the S-A-A-2 VNA (four paths, other ports on
+50 Ω; files in `023_SAAV2-VNA_MCP/data/fixture_2026-10-31_*`). It leaks −29.8/−25.0/−19.5 dB on
+40/20/10 m, 13–14 dB less than the original `RF_in_to_*.s2p` sweep, which is withdrawn with the
+results built on it (the 31 nH mutual fit, the 2.8 dB rms load fit). The owner gave L44's
+construction: radio 2 has 20 turns per core (explaining its 6 dB lower forward offset), radio 1
+10 turns with its core 20 mm up. Added `code/tools/swr/l44_peec_model.py` (core by turns, air by
+Neumann, capacitance per turn): it matches the fixture both ways and explains radio 2's leak and
+load readings as capacitance between its crowded windings and the thick wires. Radio 1 stays
+unexplained. Updated [[swr-bridge-measured-behaviour]]; the SWR technical report (Claude Doc,
+revision 77) and its local copy were updated to match.
+
+
+## [2026-11-01] decision | SWR error traced to AD7991 readout crosstalk; discarded-conversion fix
+Radio 1 re-measured after the owner rebuilt its L44 (flush, screened through lines grounded at
+one end): `code/tools/swr/swr_bench_measurements_radio1_l44_flush.csv`, loads on the connector
+(100/200 Ω re-taken after a first take on the external coupler). The bare 50 Ω load improved
+(40 m 1.35 → 1.10), but 100/200 Ω read as before. One return-loss factor, 0.666, fits all bands.
+- **AD2 test:** probes on U20 pins 3/4 (`code/tools/swr/detector_readout/`) showed the
+  detector voltages give correct SWR (100 Ω 1.94–2.02, 200 Ω 3.9–4.3 on 160–20 m). The radio's
+  ADC mixes the channels: ADC_F = 0.83 Vf + 0.14 Vr, ADC_R = 0.18 Vf + 0.80 Vr, so the
+  differential gain is 0.65. Bridge leaks at the pins are −42/−40/−31/−22 dB (160/40/20/10 m).
+- **Withdrawn:** the October "in-radio leak", radio 2's winding-capacitance fit and radio 1's
+  −9 dB extra leak. All were fitted to compressed readings.
+- **Fix:** `AD7991::readADCsingle()` discards the first conversion after a channel switch (9
+  new tests, 821/821 pass). Flashed to radio 1 (serialmidiaudio + the local KI3P patch);
+  verification at the pins is pending.
+- **Updated:** [[swr-bridge-measured-behaviour]], [[filter-board-electronics]], [[filter-boards]],
+  index. The SWR technical report (Claude Doc, revision 84) and its local copy were updated.
+
+## [2026-11-01] decision | AD7991 fix verified: two discarded conversions per channel switch
+Re-probed U20's pins on radio 1 with the new firmware.
+- **One discard:** the cross terms fell from 0.144/0.186 to 0.022/0.042, about their squares.
+- **Two discards** (now the default, `AD7991_DEFAULT_DISCARDS`): they fell to 0.007/−0.008, and
+  the Vf−Vr gain (0.972) equals the common-mode gain (0.971).
+- **Loads:** with the open/short reference, radio 1's ADC reads 100 Ω as 2.01–2.09 and 200 Ω
+  as 3.9–4.3 on 160–20 m, as the pins do. 10 m reads 2.17–2.26 / 4.07–4.22 from the bridge's
+  own −22 dB leak.
+- **Cost:** a bridge update now takes about 3 ms (Wire2 at 100 kHz), while transmitting only.
+- **Updated:** [[swr-bridge-measured-behaviour]], [[filter-board-electronics]], [[filter-boards]].
+  The SWR technical report (Claude Doc, revision 91) and its local copy were updated.
+
+## [2026-11-01] decision | Bench series on the fixed firmware: SWR calibrates
+Repeated radio 1's 144-row series with two discarded AD7991 conversions per channel switch
+(`code/tools/swr/swr_bench_measurements_radio1_adcfix.csv`).
+- **Loads:** with the wattmeter forward calibration and the open/short reflected calibration,
+  100 Ω reads 1.97–2.04 and 200 Ω 3.96–4.22 on 160–20 m, against 2.8–3.0 and 5.9–7.0 before
+  the fix. 10 m reads 2.26–2.42 / 4.29–4.73, within the bench-VNA range.
+- **Calibration:** the open and short agree within 0.04 dB on 160–20 m, and the drift checks
+  repeat within 0.08 dB.
+- **Open:** the 10 m forward fit stays poor (0.69 dB rms).
+- **Updated:** [[swr-bridge-measured-behaviour]]. The SWR technical report (Claude Doc,
+  revision 93) and its local copy were updated.
+
+## [2026-11-01] lint | Restructured swr-bridge-measured-behaviour around the current state
+Rewrote [[swr-bridge-measured-behaviour]] to match the restructured SWR technical report
+(Claude Doc revision 101).
+- **Current state first:** summary, the readout error and its fix, the calibration on the
+  fixed firmware with a pointer to `code/docs/swr_calibration_approach.md`, open issues (now
+  including the 10 m ceiling over-read) and implications.
+- **History:** the October measurement sections are kept verbatim under "History: the October
+  2026 investigation", with a note on what still holds.
+- **Index:** the entry was updated to match.

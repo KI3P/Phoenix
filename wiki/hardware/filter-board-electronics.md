@@ -3,7 +3,7 @@ title: Filter Boards — Electronics (BPF / LPF / PA back-end, decoders, SWR sen
 type: hardware
 status: draft
 created: 2026-06-16
-updated: 2026-10-25
+updated: 2026-11-01
 tags: [hardware, bpf, lpf, relays, decoders, ad8307, ad7991, swr, mcp23017, pa, antenna]
 source_refs: [sources/t41-ep-schematics, sources/ad8307-datasheet]
 related: ["[[hardware-platform]]", "[[i2c-bus-map]]", "[[filter-boards]]", "[[rf-board-electronics]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]"]
@@ -85,7 +85,10 @@ channel's follow in brackets.
   current transformer and a voltage transformer on one BN-43-202 binocular core. Hole 1 carries
   the line (pin 1 from J23 to pin 2 toward the T/R relays) and 10 turns from pin 3 to pin 5.
   Hole 2 carries 10 turns from pin 1 to pin 5 and a straight wire from pin 3 to pin 4. Pin 5
-  is grounded. Pin 3 is the forward port and pin 4 the reflected port.
+  is grounded. Pin 3 is the forward port and pin 4 the reflected port. The couplers are hand
+  wound and differ (owner, 2026-10-31): radio 1's has 10 turns with the core 20 mm above the
+  board, radio 2's 20 turns flush (coupling −26 dB). Thick wires 0.55 mm insulated, windings
+  0.3 mm enamelled. See [[swr-bridge-measured-behaviour]].
 - **Coupler output.** Each port is loaded only by its pad's input, 50.8 Ω. The schematic's
   52.3 Ω R20 [R28] belong to the diode-detector option below and are not fitted. That load
   matters: the reflected port nulls a forward wave only when the *forward* port is loaded
@@ -100,7 +103,19 @@ channel's follow in brackets.
   single-ended. **OFS (pin 3) and INT (pin 5) are not connected.** ENB is tied to VPS (+5 V
   via a ferrite bead).
 - **OUT.** OUT goes to the AD7991 (CH0 [CH1]) and, through a 0 Ω link (R30 [R23]), to
-  `FWD_V` [`REF_V`] on J21 Bands.
+  `FWD_V` [`REF_V`] on J21 Bands. There is no buffer or capacitor between OUT and the ADC,
+  so the ADC sees the AD8307's 12.5 kΩ output resistance ([[ad8307-datasheet]]).
+- **Readout crosstalk (measured 2026-11-01, radio 1).** With an AD2 on U20 pins 3 and 4, the
+  radio's ADC readings fit ADC_F = 0.83·Vf + 0.14·Vr + 31 mV and ADC_R = 0.18·Vf + 0.80·Vr
+  + 22 mV over 40 keyed points. Each reading is pulled toward the other channel, so Vf − Vr
+  passes with a gain of 0.65 while common changes pass at 0.98. That compressed SWR on both
+  radios and was mistaken for a bridge leak ([[swr-bridge-measured-behaviour]]).
+  - Cause: each read selects the channel and converts it in the same I²C transaction, so the
+    sampling capacitor still holds about 15–19 % of the previous channel's voltage. Each
+    discarded conversion cuts the crosstalk by that factor again.
+  - Firmware fix, verified 2026-11-01: two discarded conversions after each channel switch.
+    The cross terms fall to 0.007/−0.008 ([[filter-boards]]).
+  - Hardware fallback: about 10 nF from each OUT to ground at U20, or a buffer.
 - **Diode-detector stuffing option, not populated (owner-confirmed 2026-10-25).** The
   schematic also places a diode peak detector on each coupled port and OUT node: R20 [R28],
   D1 [D2], C149 [C156], RV19 [RV27] and R26 [R29]. It is the hardware for the
@@ -184,8 +199,10 @@ not traced.)*
 - Does the AD8307's open-OFS offset loop (corner about 1.5 MHz) change the slope or offset on
   160 m? *Partly answered:* radio 2's wattmeter slope on 160 m is 5–7 % below 40 m in two
   sessions; radio 1's is not ([[swr-bridge-measured-behaviour]]). A capacitor on OFS would test it.
-- Why does the bridge leak 10–20 dB more in the radio than on the VNA bench
-  ([[swr-bridge-measured-behaviour]])?
+- ~~Why does the bridge leak 10–20 dB more in the radio than on the VNA bench?~~ Answered
+  2026-11-01: mostly not a leak, but the AD7991 readout crosstalk above. At the pins, radio
+  1's rebuilt bridge leaks −40 to −42 dB on 160/40 m, −31 dB on 20 m and −22 dB on 10 m
+  ([[swr-bridge-measured-behaviour]]).
 - Board-to-board spread of the 10 m and 6 m path, set mainly by C147 [C154] and the layout
   parasitics. A second board's VNA sweep would bound it.
 - Per-band exact L/C → cutoff frequency table for the external LPF board.

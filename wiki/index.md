@@ -92,9 +92,11 @@ the firmware/ module pages (which describe the code). Derived from `Config.h` + 
 - [[filter-board-electronics]] — BPF/LPF/PA back-end chips: MASWSS switches, CD74HC4514/74HC237
   decoders + ULN2803/HF41F relays, external per-band LPF board, AD8307/AD7991 SWR sensing
   (detector front end, compensated pad modelled against the VNA, unfitted diode option). *(draft)*
-- [[swr-bridge-measured-behaviour]] — bench tests of two radios (Oct 2026): forward power
-  calibrates to ±0.25–0.5 dB per band; SWR reads 30–90 % high from an in-radio bridge leak no
-  calibration can fix; gain-step and VNA shortcuts fail; PA oscillation into a 10 m short. *(draft)*
+- [[swr-bridge-measured-behaviour]] — bench tests of two radios (Oct–Nov 2026): the SWR error
+  was AD7991 readout crosstalk, fixed by discarding two conversions per channel switch; radio 1
+  then calibrates (100 Ω 1.97–2.04, 200 Ω 3.96–4.22 on 160–20 m) and its bridge leaks
+  −42/−40/−31/−22 dB; forward power to 0.1–0.2 dB per band; open: 10 m over-reads at the PA
+  ceiling, radio 2 unprobed. October leak investigation kept as history. *(draft)*
 
 ## Roadmap
 _Plans for future development, proposals, open questions._
