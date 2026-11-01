@@ -7,6 +7,8 @@
 bool Adafruit_I2CDevice::mock_device_present = true;
 uint8_t Adafruit_I2CDevice::mock_read_data[16] = {0};
 size_t Adafruit_I2CDevice::mock_read_length = 0;
+int Adafruit_I2CDevice::mock_write_then_read_count = 0;
+int Adafruit_I2CDevice::mock_fail_after = -1;
 
 Adafruit_I2CDevice::Adafruit_I2CDevice(uint8_t addr, TwoWire *theWire)
     : _addr(addr), _wire(theWire), _begun(false) {
@@ -51,6 +53,12 @@ bool Adafruit_I2CDevice::write_then_read(const uint8_t *write_buffer, size_t wri
     if (!_begun || !mock_device_present) {
         return false;
     }
+
+    if (mock_fail_after >= 0 && mock_write_then_read_count >= mock_fail_after) {
+        mock_write_then_read_count++;
+        return false;
+    }
+    mock_write_then_read_count++;
 
     // Special handling for AD7991 ADC - extract channel from command byte
     // and include it in the response
@@ -116,5 +124,15 @@ void Adafruit_I2CDevice::setMockReadData(const uint8_t* data, size_t length) {
 void Adafruit_I2CDevice::resetMockState() {
     mock_device_present = true;
     mock_read_length = 0;
+    mock_write_then_read_count = 0;
+    mock_fail_after = -1;
     memset(mock_read_data, 0, sizeof(mock_read_data));
+}
+
+int Adafruit_I2CDevice::getWriteThenReadCount() {
+    return mock_write_then_read_count;
+}
+
+void Adafruit_I2CDevice::setFailAfter(int transactions) {
+    mock_fail_after = transactions;
 }

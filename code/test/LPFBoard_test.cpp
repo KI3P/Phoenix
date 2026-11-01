@@ -1578,3 +1578,97 @@ TEST_F(LPFBoardTest, SelectLPFBandOutOfBandSequentialTest) {
             << "Failed for frequency " << testCases[i].freq << " Hz";
     }
 }
+
+// ================== AD7991: DISCARDED CONVERSIONS AFTER A CHANNEL SWITCH ==================
+// A conversion after a channel switch carries part of the previous channel's
+// voltage (radio 1, 2026-11-01), so readADCsingle() converts a newly selected
+// channel getDiscardCount() times (default 2), throws those away, and returns
+// the next conversion.
+
+#include "../src/PhoenixSketch/LPFBoard_AD7991.h"
+#include "Adafruit_I2CDevice.h"
+
+class AD7991Test : public ::testing::Test {
+protected:
+    AD7991 adc;
+    void SetUp() override {
+        Adafruit_I2CDevice::resetMockState();
+        const uint8_t value[2] = {0x07, 0xD0};      // 2000 counts
+        Adafruit_I2CDevice::setMockReadData(value, 2);
+        ASSERT_TRUE(adc.begin(0x28));
+    }
+    void TearDown() override {
+        Adafruit_I2CDevice::resetMockState();
+    }
+};
+
+TEST_F(AD7991Test, TwoDiscardsByDefault) {
+    EXPECT_EQ(adc.getDiscardCount(), 2);
+}
+
+TEST_F(AD7991Test, FirstReadConvertsThreeTimes) {
+    EXPECT_EQ(adc.readADCsingle(0), 2000);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 3);
+}
+
+TEST_F(AD7991Test, SameChannelAgainConvertsOnce) {
+    adc.readADCsingle(0);
+    EXPECT_EQ(adc.readADCsingle(0), 2000);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 4);
+}
+
+TEST_F(AD7991Test, AlternatingChannelsConvertThreeTimesEach) {
+    // The SWR bridge reads CH0 then CH1 every time: six transactions per pair
+    for (int i = 0; i < 3; i++) {
+        EXPECT_EQ(adc.readADCsingle(0), 2000);
+        EXPECT_EQ(adc.readADCsingle(1), 2000);
+    }
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 18);
+}
+
+TEST_F(AD7991Test, OneDiscardConvertsTwice) {
+    adc.setDiscardCount(1);
+    adc.readADCsingle(0);
+    adc.readADCsingle(1);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 4);
+}
+
+TEST_F(AD7991Test, NoDiscardConvertsOnce) {
+    adc.setDiscardCount(0);
+    EXPECT_EQ(adc.getDiscardCount(), 0);
+    adc.readADCsingle(0);
+    adc.readADCsingle(1);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 2);
+}
+
+TEST_F(AD7991Test, DiscardCountIsCapped) {
+    adc.setDiscardCount(200);
+    EXPECT_EQ(adc.getDiscardCount(), AD7991_MAX_DISCARDS);
+}
+
+TEST_F(AD7991Test, FailedDiscardReadReturnsError) {
+    Adafruit_I2CDevice::setFailAfter(1);              // the second transaction fails
+    EXPECT_EQ(adc.readADCsingle(0), (uint16_t)-1);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 2);   // stops there
+}
+
+TEST_F(AD7991Test, FailureMakesNextReadASwitch) {
+    adc.readADCsingle(0);                             // 3 transactions
+    Adafruit_I2CDevice::setFailAfter(3);
+    EXPECT_EQ(adc.readADCsingle(0), (uint16_t)-1);    // same channel: 1 transaction, fails
+    Adafruit_I2CDevice::setFailAfter(-1);
+    EXPECT_EQ(adc.readADCsingle(0), 2000);            // selection unknown: converts 3 times
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 7);
+}
+
+TEST_F(AD7991Test, InvalidChannelDoesNoTransaction) {
+    EXPECT_EQ(adc.readADCsingle(3), 0);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 0);
+}
+
+TEST_F(AD7991Test, BeginForgetsTheLastChannel) {
+    adc.readADCsingle(0);
+    ASSERT_TRUE(adc.begin(0x28));
+    adc.readADCsingle(0);
+    EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 6);
+}
