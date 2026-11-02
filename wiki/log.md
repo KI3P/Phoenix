@@ -1280,3 +1280,19 @@ Rewrote [[swr-bridge-measured-behaviour]] to match the restructured SWR technica
 - **History:** the October measurement sections are kept verbatim under "History: the October
   2026 investigation", with a note on what still holds.
 - **Index:** the entry was updated to match.
+
+## [2026-11-02] decision | Radio 2's L44 leak confirmed and removed by the rebuild
+Three bench series on radio 2 with the fixed firmware: original build, after removing
+C147/C154 and adding 100 pF across the detector inputs, and after rebuilding L44 with
+screened through lines (`code/tools/swr/swr_bench_measurements_radio2_{adcfix,c154_out,l44_shielded}.csv`).
+- **The leak was in L44:** the 50 Ω load read SWR 1.11/1.23/1.48 on 40/20/10 m, unchanged by
+  the capacitor step, and 1.02/1.03/1.07 after the L44 rebuild.
+- **The capacitor step moved the forward offsets** (+3.1 dB on 10 m), bringing the two
+  radios to an almost constant 1 dB apart; the L44 rebuild moved them by 0.4 dB at most.
+- **Radio 2's PA oscillates into a 10 m short** in every build.
+- **Partly reinstated:** the October explanation of radio 2's leak (capacitance from the
+  through line to its windings) fits the fix, though the leak was smaller than claimed then.
+- **Updated:** [[swr-bridge-measured-behaviour]] (new section "Radio 2's rework"),
+  [[filter-board-electronics]] (open questions), `code/docs/swr_calibration_approach.md`
+  (three calibration levels, defaults and accuracy recomputed from both rebuilt radios), and
+  the SWR technical report.

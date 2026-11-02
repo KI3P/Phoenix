@@ -3,7 +3,7 @@ title: SWR Bridge — Measured Behaviour (bench tests, Oct–Nov 2026)
 type: hardware
 status: draft
 created: 2026-10-24
-updated: 2026-11-01
+updated: 2026-11-02
 tags: [swr, ad8307, ad7991, bridge, directivity, calibration, power-sensing, pa, measurement]
 source_refs: [sources/ad8307-datasheet, sources/t41-ep-schematics]
 related: ["[[filter-board-electronics]]", "[[log-amp-power-detection]]", "[[filter-boards]]", "[[calibration-state-machines]]", "[[cat-control]]"]
@@ -16,7 +16,8 @@ pulled each detector reading about 15 % toward the other, which made SWR read 30
 on both radios. Since 2026-11-01 the firmware discards two conversions after each channel
 switch ([[filter-boards]]). With that fix and a calibration against a wattmeter, an open and
 a short, radio 1 reads a 2:1 load as 1.97–2.04 and a 4:1 load as 3.96–4.22 on 160 m to
-20 m. The October 2026 investigation, which blamed a leak in the bridge, is kept at the end
+20 m. Radio 2 had a real leak as well, which its L44 rebuild removed on 2026-11-02; it now
+reads 1.97–2.08 and 3.87–4.31. The October 2026 investigation, which blamed a leak in the bridge, is kept at the end
 as history. The full write-up is the SWR technical report
 (`code/tools/swr/swr_bridge_technical_report.md`, the local copy of the Claude Doc).
 
@@ -32,15 +33,24 @@ as history. The full write-up is the SWR technical report
 - **SWR calibrates:** with the 50 Ω/open/short calibration, every 100 Ω and 200 Ω reading on
   radio 1 falls inside the bench-VNA range on all four bands tested. The firmware procedure
   is `code/docs/swr_calibration_approach.md`.
-- **The bridge's own leak is small:** −42/−40/−31/−22 dB on 160/40/20/10 m at the pins, against
-  −35/−37/−27/−17 dB for the bench board. Radio 1's L44 was rebuilt flush, with screened
-  through lines grounded at one end, on 2026-11-01.
-- **Forward power** calibrates to 0.1–0.2 dB rms per band against a wattmeter, per band and
-  per radio. Drive-step slopes read 2–7 % low, and offsets cannot be carried between bands.
-- **Open:** 10 m reads about 2 dB high at the PA's ceiling on radio 1 since the rebuild.
-  Radio 2 has not been probed at its pins.
-- **Withdrawn:** the October in-radio leak, radio 2's winding-capacitance explanation and
-  radio 1's −9 dB extra leak. All were fitted to compressed readings (History).
+- **The bridge's own leak is small once L44 is rebuilt:** radio 1 −42/−40/−31/−22 dB on
+  160/40/20/10 m at the pins, radio 2 −40/−41/−37/−30 dB from its fixed-firmware readings,
+  against −35/−37/−27/−17 dB for the bench board. Both L44s are now flush with screened
+  through lines grounded at one end (radio 1 on 2026-11-01, radio 2 on 2026-11-02).
+- **Radio 2's original L44 did leak:** its 50 Ω load read SWR 1.11/1.23/1.48 on 40/20/10 m
+  on the fixed firmware. Removing C147/C154 did not help; the L44 rebuild did (Radio 2's
+  rework).
+- **Forward power** calibrates to 0.1–0.2 dB rms per band against a wattmeter. Drive-step
+  slopes read 2–6 % low. With both radios in the same build, their forward offsets differ by
+  an almost constant 1 dB, so per-band defaults work to about ±1.5 dB without a wattmeter
+  (`code/docs/swr_calibration_approach.md`, Section 2).
+- **Open:** 10 m reads about 2 dB high at the PA's ceiling on radio 1 since its rebuild, and
+  about 0.55 dB low on radio 2 since its capacitor change. Radio 2's PA oscillates into a
+  short on 10 m in every build.
+- **Withdrawn:** the October in-radio leak and radio 1's −9 dB extra leak, both fitted to
+  compressed readings (History). Radio 2's leak, put down then to capacitance from the through
+  line to its windings, was real but smaller; screening the through line removed it, which
+  fits that explanation.
 
 ## The readout error and its fix
 
@@ -79,7 +89,8 @@ relative to each band's open/short, pins / radio ADC, original firmware:
   sheet within 1–2 mV.
 - **Radio 2** fits the same compression with a factor of 0.53–0.60, leaving leaks of about
   −27 to −30 dB on 40 m and −20 dB on 20 m *(from `readout_compression_fit.py`; its pins have
-  not been probed)*.
+  not been probed)*. Its fixed-firmware readings later confirmed a leak of that size before
+  its L44 rebuild (Radio 2's rework).
 
 **Mechanism** (supported by the fix). The firmware selects a channel and converts it in one
 I²C transaction ([[filter-boards]]). The AD8307 output (12.5 kΩ source) feeds the AD7991
@@ -123,7 +134,53 @@ falls inside the bench-VNA range:
 - **Stored values:** the notebook's Section 11.7 gives the per-band values from this sheet;
   they have not been loaded into radio 1 yet.
 - **Procedure:** `code/docs/swr_calibration_approach.md` sets out how the firmware should run
-  this calibration on every band with three connector changes, and what it should store.
+  this calibration on every band with three connector changes at most, and what it should
+  store. It defines three levels: open and short only (power within about ±1.5 dB), one
+  wattmeter reading per band (±0.8 dB), and the full sweep above (0.1–0.2 dB rms). The SWR is
+  almost the same at all three, because the reflected line is fitted against the forward one.
+
+## Radio 2's rework (2026-11-01 and 11-02)
+Radio 2 got radio 1's changes in two steps, with the full 144-row series on the fixed
+firmware before and after each (`code/tools/swr/swr_bench_measurements_radio2_adcfix.csv`,
+`_radio2_c154_out.csv`, `_radio2_l44_shielded.csv`):
+1. **Detector inputs:** C147 and C154 removed, and 100 pF across pins 1 and 8 of U14 and U19.
+2. **L44:** screened through lines, grounded at one end. Still 20 turns per core, flush.
+
+Loads directly on ANT1, read against each band's open (uncalibrated, nominal 25 mV/dB):
+
+| Build | 50 Ω on 40 / 20 / 10 m | 100 Ω (true 2.03) on 20 / 10 m | Key-up floor, FWD / REF |
+|---|---|---|---|
+| Original | SWR 1.11 / 1.23 / 1.48 (return loss 25 / 19.5 / 14.2 dB) | 2.38–2.42 / 2.93–3.12 | 395 / 705 mV |
+| Detector inputs changed | 1.13 / 1.30 / 1.58 (24 / 17.7 / 12.9 dB) | 2.41–2.50 / 3.06–3.14 | 327 / 370 mV |
+| L44 rebuilt as well | 1.02 / 1.03 / 1.07 (41 / 37 / 30 dB) | 2.00–2.03 / 2.00–2.03 | 315 / 369 mV |
+
+- **The leak was in L44.** The detector-input step lowered the floors and flattened the open
+  across bands (10 m had read 11 mV apart from the other bands), but left the leak as it was,
+  1–2 dB worse above 20 m. The L44 rebuild removed it: radio 2 now reads the 50 Ω load
+  better than radio 1 above 20 m (31 and 22 dB on 20 and 10 m).
+- **The forward offsets moved with the detector inputs, not with L44.** On 10 m the offset
+  rose 3.1 dB and on 20 m 0.9 dB at the capacitor step, consistent with C147's zero at
+  32 MHz ([[filter-board-electronics]]); the L44 rebuild moved them by 0.4 dB at most. With
+  the turns allowed for (radio 2 has 20, radio 1 has 10), radio 2's offsets are now 0.9–1.2 dB
+  above radio 1's on 160–20 m and 0.4 dB above on 10 m. Before, the gap swung from +1.0 dB
+  on 160 m to −2.2 dB on 10 m.
+- **Calibrated** (wattmeter forward fit, open/short reflected fit), the final build reads:
+
+  | Band | 50 Ω | 100 Ω (true 2.03) | 200 Ω (true 4.04–4.08) | Forward fit rms |
+  |---|---|---|---|---|
+  | 160 m | 1.02 | 1.97–2.06 | 3.95–4.23 | 0.12 dB |
+  | 40 m | 1.02 | 2.01–2.08 | 3.87–4.31 | 0.13 dB |
+  | 20 m | 1.03 | 2.03–2.06 | 4.16–4.25 | 0.13 dB |
+  | 10 m (open only) | 1.06 | 1.98–2.00 | 3.74–4.01 | 0.14 dB |
+
+  The forward rms leaves out the ceiling points and the closing checks (below). 10 m has no
+  short (the PA oscillates into it), so its reflected line comes from the open alone.
+- **Open–short gap:** 0.12, 0.18 and 0.38 dB on 160, 40 and 20 m, larger than radio 1's
+  0.04 dB, although the loads read correctly. Not explained.
+- **Closing checks:** in the last run the CMU-200 read 0.2–1.0 dB lower at the end than at
+  the start of each band, while the radio's forward detector moved 0.3 dB at most. Most likely
+  the 60 dB coupler or its coupled-port cable reseated differently; those four rows are left
+  out of the fits above.
 
 ## Open issues
 - **10 m reads about 2 dB high at the PA's ceiling** (radio 1, since the L44 rebuild).
@@ -141,18 +198,26 @@ falls inside the bench-VNA range:
     the rebuild changed near the PA and the 10 m LPF. Data: `code/tools/swr/ten_m_ceiling/`.
 - **200 Ω reads higher at the higher drive** at the pins on 40 m and 20 m: 4.26–4.28 at
   −11 dBFS against 3.88–3.90 at −20 dBFS. 100 Ω does not change with level.
-- **Radio 2's pins have not been probed.** It needs the new firmware and a fresh calibration.
+- **Radio 2's 10 m ceiling reads about 0.55 dB low** since its capacitor change; before, it
+  sat on the line. Radio 1's reads 2 dB high.
+- **Radio 2's open–short gap** (0.12–0.38 dB on 160–20 m) is larger than radio 1's, although
+  its loads read correctly.
+- **Radio 2's pins have not been probed.** It has the new firmware; its stored calibration
+  is out of date, like radio 1's.
 - **Radio 1's stored calibration is out of date.** The fix moved the forward readings by up to
   about 110 mV at the same power.
-- **The 60 dB external coupler** has never been swept from 1.8 to 30 MHz.
+- **The 60 dB external coupler** has never been swept from 1.8 to 30 MHz, and its readings
+  moved 0.2–1.0 dB on reconnection in radio 2's last run.
 - **What triggers the stuck-DIGITAL fault** (radio 2), and is it firmware?
 - **Is radio 2's 10 m oscillation into a short** a PA stability problem common to the design?
+  It persisted through both bridge changes, so it is in the PA, not the bridge.
 - **Does the calibration hold with the 100 W PA?** Readings above about 16 W are extrapolated.
 
 ## Transmitter behaviour seen during the tests
 - **PA oscillation into a short on 10 m (radio 2).** Keyed into a short directly on the
-  connector, the forward detector reads about 2100 mV whatever the tone level, with or
-  without the tone. That is well above the 1848 mV of full 10 m output into 50 Ω, which
+  connector, the forward detector reads 1700–2100 mV whatever the tone level, with or
+  without the tone. It happened in October and in all three runs of 2026-11-01/02, whatever
+  the bridge build. That is well above the 1848 mV of full 10 m output into 50 Ω, which
   suggests a VHF oscillation, where the coupler and detector respond more. Through the
   external coupler's line, the PA oscillated only at tones of −17 dBFS and below. A
   mismatched 10 m antenna could trigger it in normal use.
@@ -177,8 +242,10 @@ falls inside the bench-VNA range:
 
 ## Implications
 - **Firmware calibration:** follow `code/docs/swr_calibration_approach.md`.
-  - Use a slope and offset per band and per radio, from wattmeter readings, then an open and a
-    short.
+  - Always calibrate the reflected line from an open and a short (or the open alone where the
+    PA oscillates into the short).
+  - For power, a wattmeter sweep per band is best; one reading per band gives ±0.8 dB; per-band
+    defaults alone give about ±1.5 dB, but only on radios with the same bridge build.
   - Never take the slope from drive steps or the offset from the VNA path model.
   - Drop a ceiling point that sits off the line.
   - Re-check between sessions, or accept about 0.5 dB of drift.
@@ -198,8 +265,10 @@ values.
 
 What still holds:
 - **The forward-channel conclusions.** Log conformance limits the accuracy. Gain-step slopes
-  read low: still 0.5–0.8 mV/dB low on 160–20 m after the fix. Offsets cannot be carried
-  between bands, and calibrations drift 0.3–0.5 dB between sessions.
+  read low: still 0.5–1.0 mV/dB low on 160–20 m after the fix. Offsets cannot be carried
+  between bands by the VNA path model, and calibrations drift 0.3–0.5 dB between sessions.
+  (Carrying them by another radio's measured offsets works once the builds match: Radio 2's
+  rework.)
 - **The bench measurements and models of L44:** the VNA sweeps, the coupler models and the
   re-measured fixture.
 

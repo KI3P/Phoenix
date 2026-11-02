@@ -3,7 +3,7 @@ title: Filter Boards — Electronics (BPF / LPF / PA back-end, decoders, SWR sen
 type: hardware
 status: draft
 created: 2026-06-16
-updated: 2026-11-01
+updated: 2026-11-02
 tags: [hardware, bpf, lpf, relays, decoders, ad8307, ad7991, swr, mcp23017, pa, antenna]
 source_refs: [sources/t41-ep-schematics, sources/ad8307-datasheet]
 related: ["[[hardware-platform]]", "[[i2c-bus-map]]", "[[filter-boards]]", "[[rf-board-electronics]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]"]
@@ -204,7 +204,15 @@ not traced.)*
   1's rebuilt bridge leaks −40 to −42 dB on 160/40 m, −31 dB on 20 m and −22 dB on 10 m
   ([[swr-bridge-measured-behaviour]]).
 - Board-to-board spread of the 10 m and 6 m path, set mainly by C147 [C154] and the layout
-  parasitics. A second board's VNA sweep would bound it.
+  parasitics. A second board's VNA sweep would bound it. *Partly answered 2026-11-02:* on
+  radio 2, removing C147/C154 (and adding 100 pF across each detector's inputs) raised the
+  forward offset by 3.1 dB on 10 m and 0.9 dB on 20 m, about what C147's 32 MHz zero
+  predicts. With both radios in that build, their forward offsets differ by an almost
+  constant 1 dB across 160–10 m once the L44 turns are allowed for
+  ([[swr-bridge-measured-behaviour]]).
+- ~~Does radio 2's bridge leak?~~ Answered 2026-11-02: yes, its original L44 did (50 Ω read
+  SWR 1.48 on 10 m on the fixed firmware). Rebuilt with screened through lines, it reads
+  1.07 on 10 m, better than radio 1 ([[swr-bridge-measured-behaviour]]).
 - Per-band exact L/C → cutoff frequency table for the external LPF board.
 - AD7991 `REGISTER_SETUP` channel-select bits vs. the "CH0+CH1" comment (a firmware detail —
   see [[filter-boards]]).

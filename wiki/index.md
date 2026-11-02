@@ -95,8 +95,10 @@ the firmware/ module pages (which describe the code). Derived from `Config.h` + 
 - [[swr-bridge-measured-behaviour]] — bench tests of two radios (Oct–Nov 2026): the SWR error
   was AD7991 readout crosstalk, fixed by discarding two conversions per channel switch; radio 1
   then calibrates (100 Ω 1.97–2.04, 200 Ω 3.96–4.22 on 160–20 m) and its bridge leaks
-  −42/−40/−31/−22 dB; forward power to 0.1–0.2 dB per band; open: 10 m over-reads at the PA
-  ceiling, radio 2 unprobed. October leak investigation kept as history. *(draft)*
+  −42/−40/−31/−22 dB; radio 2's original L44 leaked, and its rebuild (2026-11-02) brought it
+  to −41/−37/−30 dB on 40/20/10 m; forward power to 0.1–0.2 dB per band, and to about
+  ±1.5 dB from per-band defaults once builds match; open: the 10 m ceiling readings, radio 2's
+  10 m PA oscillation. October leak investigation kept as history. *(draft)*
 
 ## Roadmap
 _Plans for future development, proposals, open questions._
