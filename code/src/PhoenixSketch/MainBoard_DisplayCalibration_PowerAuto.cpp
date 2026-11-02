@@ -37,7 +37,9 @@ static void DrawAutoPromptPane(void);
 static Pane PaneAutoStatus =   {10,45,510,75,DrawAutoStatusPane,1};
 static Pane PaneAutoReadings = {10,125,510,40,DrawAutoReadingsPane,1};
 static Pane PaneAutoTable =    {10,170,515,305,DrawAutoTablePane,1};
-static Pane PaneAutoPrompt =   {530,7,265,470,DrawAutoPromptPane,1};
+// Out to the screen's edge, so nothing is left beyond it. Prompt lines are at
+// most 33 characters in the small font (8 px each)
+static Pane PaneAutoPrompt =   {530,7,270,470,DrawAutoPromptPane,1};
 
 static Pane* AutoWindowPanes[NUMBER_OF_AUTO_PANES] = {&PaneAutoStatus, &PaneAutoReadings,
                                                       &PaneAutoTable, &PaneAutoPrompt};
@@ -61,6 +63,43 @@ static void PrintAt(int16_t x, int16_t y, const char *text, uint16_t color = RA8
     tft.setTextColor(RA8875_WHITE);
 }
 
+// Names of the AUTO_FAIL_* bits, short for the table and long for the review
+static const char *failShort[] = {"few rdg", "fwd fit", "fwd slp", "drift", "L2 offs", "open",
+                                  "ref fit", "ref slp", "gap", "S50", "PA fit"};
+static const char *failLong[] = {"too few readings", "forward fit", "forward slope", "drift",
+                                 "level 2 offset", "open sweep abandoned", "reflected fit",
+                                 "reflected slope", "open/short gap", "load SWR too high",
+                                 "PA curve fit"};
+static const uint32_t NUMBER_OF_FAIL_BITS = sizeof(failShort) / sizeof(failShort[0]);
+
+static uint32_t FirstFailBit(uint32_t failBits){
+    for (uint32_t k = 0; k < NUMBER_OF_FAIL_BITS; k++)
+        if (failBits & (1u << k)) return k;
+    return 0;
+}
+
+/**
+ * @brief True in the states that measure a band, where the band, point and
+ *        drive mean something
+ */
+static bool Measuring(void){
+    switch (powerSM.state_id){
+        case PowerCalSm_StateId_BAND:
+        case PowerCalSm_StateId_POINT:
+        case PowerCalSm_StateId_KEYDOWN:
+        case PowerCalSm_StateId_METER_ENTRY:
+        case PowerCalSm_StateId_METER_PAUSED:
+        case PowerCalSm_StateId_COLLECT:
+        case PowerCalSm_StateId_STORE:
+        case PowerCalSm_StateId_REST:
+        case PowerCalSm_StateId_FIT_FORWARD:
+        case PowerCalSm_StateId_BAND_DONE:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static const char *StandardName(void){
     switch (autoCal.stage){
         case AUTO_STAGE_LOAD:  return autoCal.level > 1 ? "wattmeter + 50 Ohm load" : "50 Ohm load";
@@ -76,6 +115,7 @@ static uint32_t oldStatusKey = 0;
 static void DrawAutoStatusPane(void){
     uint32_t key = powerSM.state_id + 31u * (autoCal.stage + 7u * (autoCal.band + 17u * (autoCal.point
                    + 19u * (autoCal.keyed + 2u * (autoCal.level + 5u * (uint32_t)(autoCal.drive_dB * 4.0f + 200.0f))))));
+    key += 0x9E3779B9u * autoCal.resultsVersion;
     if (key != oldStatusKey)
         PaneAutoStatus.stale = true;
     oldStatusKey = key;
@@ -85,20 +125,30 @@ static void DrawAutoStatusPane(void){
 
     sprintf(buff, "Level %u   Standard: %s", autoCal.level, StandardName());
     PrintAt(p->x0, p->y0, buff);
-    if (powerSM.state_id == PowerCalSm_StateId_SETUP){
-        PrintAt(p->x0, p->y0 + 20, "Setup");
-    } else {
+    if (Measuring()){
+        // The load has the SSB tone after its CW points
+        uint32_t total = (autoCal.stage == AUTO_STAGE_LOAD) ? autoCal.nPoints + 1 : autoCal.nPoints;
         uint32_t shown = autoCal.ssbPoint ? autoCal.nPoints + 1 : autoCal.point + 1;
-        if (shown > autoCal.nPoints + 1) shown = autoCal.nPoints + 1;
+        if (shown > total) shown = total;
         sprintf(buff, "Band %s   point %lu of %lu%s", bands[autoCal.band <= LAST_BAND ? autoCal.band : LAST_BAND].name,
-                (unsigned long)shown, (unsigned long)(autoCal.stage == AUTO_STAGE_LOAD ? autoCal.nPoints + 1 : autoCal.nPoints),
-                autoCal.ssbPoint ? " (SSB tone)" : "");
+                (unsigned long)shown, (unsigned long)total, autoCal.ssbPoint ? " (SSB tone)" : "");
         PrintAt(p->x0, p->y0 + 20, buff);
         if (autoCal.ssbMode)
             sprintf(buff, "Drive: DSP gain %.1f dB", autoCal.drive_dB);
         else
             sprintf(buff, "Drive: attenuation %.1f dB", autoCal.drive_dB);
         PrintAt(p->x0, p->y0 + 40, buff);
+    } else if ((powerSM.state_id == PowerCalSm_StateId_REVIEW) || (powerSM.state_id == PowerCalSm_StateId_DONE)){
+        uint32_t passed = 0, failed = 0;
+        for (int32_t band = BAND_160M; band <= BAND_6M; band++){
+            const AutoCalBandResult *r = GetAutoCalResult(band);
+            if (!r->inSession || !r->checked) continue;
+            if (r->failBits) failed++; else passed++;
+        }
+        sprintf(buff, "%lu bands passed, %lu failed", (unsigned long)passed, (unsigned long)failed);
+        PrintAt(p->x0, p->y0 + 20, buff);
+    } else if (powerSM.state_id == PowerCalSm_StateId_SETUP){
+        PrintAt(p->x0, p->y0 + 20, "Setup");
     }
     sprintf(buff, "State: %s", PowerCalSm_state_id_to_string((PowerCalSm_StateId)powerSM.state_id));
     PrintAt(p->x0 + 300, p->y0 + 20, buff, RA8875_LIGHT_GREY);
@@ -109,18 +159,22 @@ static void DrawAutoStatusPane(void){
 
 static uint32_t oldReadingsN = 0xFFFFFFFF;
 static float32_t oldReadingsVf = -1;
+static bool oldReadingsShown = false;
 /**
  * @brief The last point's bridge readings
  */
 static void DrawAutoReadingsPane(void){
-    if ((oldReadingsN != autoCal.lastN) || (oldReadingsVf != autoCal.lastVf_mV))
+    // Only while measuring: elsewhere the last point belongs to a finished stage
+    bool shown = Measuring() && (autoCal.lastN > 0);
+    if ((oldReadingsN != autoCal.lastN) || (oldReadingsVf != autoCal.lastVf_mV) || (oldReadingsShown != shown))
         PaneAutoReadings.stale = true;
     oldReadingsN = autoCal.lastN;
     oldReadingsVf = autoCal.lastVf_mV;
+    oldReadingsShown = shown;
     if (!PaneAutoReadings.stale) return;
     const Pane *p = &PaneAutoReadings;
     StartPane(p);
-    if (autoCal.lastN > 0){
+    if (shown){
         sprintf(buff, "Last point: Vf %.1f +/- %.1f mV   Vr %.1f +/- %.1f mV   n %lu",
                 autoCal.lastVf_mV, autoCal.lastVfSD_mV, autoCal.lastVr_mV, autoCal.lastVrSD_mV,
                 (unsigned long)autoCal.lastN);
@@ -177,13 +231,14 @@ static void DrawAutoTablePane(void){
             PrintAt(p->x0 + 392, y, buff);
         }
         if (r->checked && r->failBits){
-            sprintf(buff, "%03lx", (unsigned long)r->failBits);
+            // The first reason, and a + when there are more
+            uint32_t k = FirstFailBit(r->failBits);
+            sprintf(buff, "%s%s", failShort[k], (r->failBits & ~(1u << k)) ? "+" : "");
             PrintAt(p->x0 + 448, y, buff, RA8875_RED);
         }
         y += 22;
     }
-    PrintAt(p->x0, y + 4, "o: offset dB, s: slope mV/dB; failure bits: AUTO_FAIL_* in HardwareSm.h",
-            RA8875_LIGHT_GREY);
+    PrintAt(p->x0, y + 4, "o: offset dB, s: slope adjustment mV/dB", RA8875_LIGHT_GREY);
     PaneAutoTable.stale = false;
 }
 
@@ -195,6 +250,7 @@ static float32_t oldPromptPower = -1;
 static void DrawAutoPromptPane(void){
     uint32_t key = powerSM.state_id + 31u * (autoCal.stage + 7u * (autoCal.level + 5u * (ED.SWR_CouplerTurns
                    + 64u * (autoCal.failedMask != 0))));
+    key += 0x9E3779B9u * autoCal.resultsVersion;
     if ((key != oldPromptKey) || (oldPromptPower != GetMeasuredPower()))
         PaneAutoPrompt.stale = true;
     oldPromptKey = key;
@@ -219,11 +275,11 @@ static void DrawAutoPromptPane(void){
                 PrintAt(x, y, "1: no wattmeter. Needs a 50 Ohm"); y += line;
                 PrintAt(x, y, "   load, an open and a short."); y += line;
             } else if (autoCal.level == 2){
-                PrintAt(x, y, "2: two wattmeter readings per band,"); y += line;
+                PrintAt(x, y, "2: two wattmeter readings a band,"); y += line;
                 PrintAt(x, y, "   near 2 W and at full power,"); y += line;
                 PrintAt(x, y, "   then open and short."); y += line;
             } else {
-                PrintAt(x, y, "3: 8 wattmeter readings per band,"); y += line;
+                PrintAt(x, y, "3: 8 wattmeter readings a band,"); y += line;
                 PrintAt(x, y, "   then open and short."); y += line;
             }
             y += line;
@@ -246,19 +302,23 @@ static void DrawAutoPromptPane(void){
             PrintAt(x, y, "Read the wattmeter. Turn the"); y += line;
             PrintAt(x, y, "filter encoder until this shows"); y += line;
             PrintAt(x, y, "the same, then press SELECT."); y += 2*line;
+            PrintAt(x, y, "Measured:"); y += line;
+            // The large font is 16 px a character: at most 16 of them
             if (GetPowerUnit())
-                sprintf(buff, "Measured: %.2f W", GetMeasuredPower());
+                sprintf(buff, "%.2f W", GetMeasuredPower());
             else
-                sprintf(buff, "Measured: %.1f dBm", GetMeasuredPower());
+                sprintf(buff, "%.1f dBm", GetMeasuredPower());
             tft.setFontScale((enum RA8875tsize)1);
             PrintAt(x, y, buff, RA8875_YELLOW); y += 2*line;
             tft.setFontScale((enum RA8875tsize)0);
             PrintAt(x, y, "Button 14: W/dBm  15: increment"); y += line;
-            PrintAt(x, y, "Unkeys after 30 s."); y += line;
+            sprintf(buff, "Unkeys after %lu s.", (unsigned long)(powerSM.vars.meterTimeout_ms / 1000));
+            PrintAt(x, y, buff); y += line;
             break;
         }
         case PowerCalSm_StateId_METER_PAUSED:{
-            PrintAt(x, y, "No reading for 30 s: unkeyed.", RA8875_YELLOW); y += 2*line;
+            sprintf(buff, "No reading for %lu s: unkeyed.", (unsigned long)(powerSM.vars.meterTimeout_ms / 1000));
+            PrintAt(x, y, buff, RA8875_YELLOW); y += 2*line;
             PrintAt(x, y, "Press SELECT to key again."); y += line;
             break;
         }
@@ -274,7 +334,19 @@ static void DrawAutoPromptPane(void){
                 PrintAt(x, y, "Button 14 repeats the session", RA8875_YELLOW); y += line;
                 PrintAt(x, y, "for the failed bands.", RA8875_YELLOW); y += 2*line;
             }
-            PrintAt(x, y, "ZOOM discards everything."); y += line;
+            PrintAt(x, y, "ZOOM discards everything."); y += 2*line;
+            // Why each band failed, as far as the pane goes
+            const int16_t last = p->y0 + p->height - line;
+            for (int32_t band = BAND_160M; band <= BAND_6M; band++){
+                const AutoCalBandResult *r = GetAutoCalResult(band);
+                if (!r->inSession || !r->checked || !r->failBits) continue;
+                for (uint32_t k = 0; k < NUMBER_OF_FAIL_BITS; k++){
+                    if (!(r->failBits & (1u << k))) continue;
+                    if (y > last) break;
+                    sprintf(buff, "%-4s %s", bands[band].name, failLong[k]);
+                    PrintAt(x, y, buff, RA8875_RED); y += line;
+                }
+            }
             break;
         }
         case PowerCalSm_StateId_DONE:{

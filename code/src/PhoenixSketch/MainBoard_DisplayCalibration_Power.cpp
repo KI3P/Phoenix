@@ -548,7 +548,7 @@ static void DrawPowerInstructionsPane(void){
     tft.print("by pressing SELECT(0) button.");
     
 
-    delta += 2*lineD;
+    delta += lineD + lineD/2;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("After step 3, press button 12 to");
@@ -562,7 +562,7 @@ static void DrawPowerInstructionsPane(void){
     tft.print("to re-measure data points.");
 
 
-    delta += 2*lineD;
+    delta += lineD + lineD/2;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("* Volume encoder adjusts atten.");
@@ -600,6 +600,11 @@ static void DrawPowerInstructionsPane(void){
     delta += lineD;
     tft.setCursor(x0, y0+delta);
     tft.print("* Press Home to save and exit.");
+
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("* Button 1: automatic power+SWR.");
 
     PanePowerInstructions.stale = false;
 }
