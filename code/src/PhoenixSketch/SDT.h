@@ -281,6 +281,7 @@ enum MorseStates { state0,
 #define SSB_100W_CAL_POWER_POINT_W 15.0f
 #define CW_20W_CAL_POWER_POINT_W  10.0f
 #define CW_100W_CAL_POWER_POINT_W 75.0f
+#define SWR_CAL_OPEN_ONLY 0x10 // ED.SWR_CalLevel flag: reflected line from the open alone
 
 
 /** Radio configuration parameters that are kept in persistent storage */
@@ -362,6 +363,9 @@ extern struct config_t {
     float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
     float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
     float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
+    uint8_t SWR_CalLevel[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration level: 0 uncalibrated, else 1 to 3; SWR_CAL_OPEN_ONLY set if the reflected line is from the open alone */
+    uint32_t SWR_CalDate[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Time of the SWR calibration (seconds since 1970) */
+    uint8_t SWR_CouplerTurns = 10; /** L44 turns per core; selects the level 1 forward offsets */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine
@@ -722,6 +726,7 @@ struct AGCConfig {
 #include "ParamSave.h"
 #include "Loop.h"
 #include "Tune.h"
+#include "SWRCalibration.h"
 #include "MainBoard_Display.h"
 #include "DSP_FFT.h"
 #include "DSP_Noise.h"

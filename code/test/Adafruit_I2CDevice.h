@@ -31,6 +31,7 @@ private:
     static size_t mock_read_length;
     static int mock_write_then_read_count;     // transactions since the last reset
     static int mock_fail_after;                // fail the transaction after this many (-1: never)
+    static uint16_t (*mock_adc_provider)(uint8_t channel); // AD7991 conversions, if set
 
 public:
     // Test helper functions
@@ -39,6 +40,9 @@ public:
     static void resetMockState();
     static int getWriteThenReadCount();
     static void setFailAfter(int transactions);
+    // Answer each AD7991 conversion with provider(channel) instead of the fixed
+    // read data; nullptr returns to the fixed data
+    static void setMockADCProvider(uint16_t (*provider)(uint8_t channel));
 };
 
 #endif // ADAFRUIT_I2CDEVICE_H

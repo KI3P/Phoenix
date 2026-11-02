@@ -43,18 +43,19 @@ typedef enum PowerCalSm_StateId
     PowerCalSm_StateId_REST = 13,
     PowerCalSm_StateId_REVIEW = 14,
     PowerCalSm_StateId_SETUP = 15,
-    PowerCalSm_StateId_MANUAL = 16,
-    PowerCalSm_StateId_MEASUREMENTCOMPLETE = 17,
-    PowerCalSm_StateId_POWERCOMPLETE = 18,
-    PowerCalSm_StateId_POWERPOINT1 = 19,
-    PowerCalSm_StateId_POWERPOINT2 = 20,
-    PowerCalSm_StateId_POWERPOINT3 = 21,
-    PowerCalSm_StateId_SSBPOINT = 22
+    PowerCalSm_StateId_STORE = 16,
+    PowerCalSm_StateId_MANUAL = 17,
+    PowerCalSm_StateId_MEASUREMENTCOMPLETE = 18,
+    PowerCalSm_StateId_POWERCOMPLETE = 19,
+    PowerCalSm_StateId_POWERPOINT1 = 20,
+    PowerCalSm_StateId_POWERPOINT2 = 21,
+    PowerCalSm_StateId_POWERPOINT3 = 22,
+    PowerCalSm_StateId_SSBPOINT = 23
 } PowerCalSm_StateId;
 
 enum
 {
-    PowerCalSm_StateIdCount = 23
+    PowerCalSm_StateIdCount = 24
 };
 
 

@@ -115,6 +115,12 @@ bool ApplyTimeSyncDigits(const char* digits, uint8_t count);
 void loop(void);
 
 /**
+ * @brief Change band during power calibration (mid-band, default mode)
+ * @param band Band to tune to, FIRST_BAND to LAST_BAND
+ */
+void SetCalibrationBand(int32_t band);
+
+/**
  * @brief Configure CW key type for straight key or iambic keyer operation
  * @param key Key type: KeyTypeId_Straight for straight key, KeyTypeId_Keyer for iambic keyer
  * @note Changes how KEY1/KEY2 inputs are interpreted by the mode state machine

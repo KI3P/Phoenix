@@ -56,6 +56,7 @@ void SaveDataToStorage(bool savetosd){
     // Assign the elements of ED to doc
     doc["agc"] = ED.agc;
     doc["audioVolume"] = ED.audioVolume;
+    doc["SWR_CouplerTurns"] = ED.SWR_CouplerTurns;
     doc["rfGainAllBands_dB"] = ED.rfGainAllBands_dB;
     doc["stepFineTune"] = ED.stepFineTune;
     doc["nrOptionSelect"] = ED.nrOptionSelect;
@@ -115,6 +116,8 @@ void SaveDataToStorage(bool savetosd){
         doc["SWR_R_SlopeAdj"][i] = ED.SWR_R_SlopeAdj[i];
         doc["SWR_R_Offset"][i] = ED.SWR_R_Offset[i];
         doc["SWR_F_Offset"][i] = ED.SWR_F_Offset[i];
+        doc["SWR_CalLevel"][i] = ED.SWR_CalLevel[i];
+        doc["SWR_CalDate"][i] = ED.SWR_CalDate[i];
 
         // Last frequencies array (3 values per band)
         for(int j = 0; j < 3; j++) {
@@ -265,6 +268,7 @@ void RestoreDataFromStorage(void){
     // Restore scalar values with defaults if not present
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
+    ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -402,6 +406,16 @@ void RestoreDataFromStorage(void){
     if (doc["SWR_F_Offset"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.SWR_F_Offset[i] = doc["SWR_F_Offset"][i] | ED.SWR_F_Offset[i];
+        }
+    }
+    if (doc["SWR_CalLevel"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalLevel[i] = doc["SWR_CalLevel"][i] | ED.SWR_CalLevel[i];
+        }
+    }
+    if (doc["SWR_CalDate"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalDate[i] = doc["SWR_CalDate"][i] | ED.SWR_CalDate[i];
         }
     }
 
@@ -493,6 +507,7 @@ void RestoreDataFromSDCard(void){
     // Restore scalar values with defaults if not present
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
+    ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -630,6 +645,16 @@ void RestoreDataFromSDCard(void){
     if (doc["SWR_F_Offset"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.SWR_F_Offset[i] = doc["SWR_F_Offset"][i] | ED.SWR_F_Offset[i];
+        }
+    }
+    if (doc["SWR_CalLevel"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalLevel[i] = doc["SWR_CalLevel"][i] | ED.SWR_CalLevel[i];
+        }
+    }
+    if (doc["SWR_CalDate"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalDate[i] = doc["SWR_CalDate"][i] | ED.SWR_CalDate[i];
         }
     }
 
@@ -909,6 +934,23 @@ void PrintEDToSerial(void){
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
+
+    Serial.print("SWR_CalLevel: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.SWR_CalLevel[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("SWR_CalDate: ");
+    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+        Serial.print(ED.SWR_CalDate[i]);
+        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    }
+    Serial.println();
+
+    Serial.print("SWR_CouplerTurns: ");
+    Serial.println(ED.SWR_CouplerTurns);
 
     Serial.println("=== End ED Struct ===");
 }

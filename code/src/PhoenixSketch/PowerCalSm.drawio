@@ -94,14 +94,14 @@
         <mxCell id="COLLECT" parent="POINT" style="shape=swimlane;rotatable=0;align=center;verticalAlign=top;fontFamily=Lucida Console;startSize=30;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=#fa6800;swimlaneFillColor=default;rounded=1;arcSize=15;absoluteArcSize=1;strokeColor=#C73500;" value="COLLECT" vertex="1">
           <mxGeometry height="90" width="300" x="40" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="COLLECT-b" connectable="0" parent="COLLECT" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="enter / { ClearSWRBridgeStats(); count_ms = 0; }" vertex="1">
+        <mxCell id="COLLECT-b" connectable="0" parent="COLLECT" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="enter / { AutoStartCollect(); count_ms = 0; }" vertex="1">
           <mxGeometry height="26" width="290" y="30" as="geometry" />
         </mxCell>
         <mxCell id="CH-NEXT" parent="AUTO" style="fontFamily=Lucida Console;align=center;verticalAlign=middle;shape=rhombus;rotatable=0;labelPosition=center;verticalLabelPosition=top;strokeWidth=1;fillColor=#FFFFFF;gradientColor=#d4d4d4cc;noLabel=1;" value="$choice" vertex="1">
-          <mxGeometry height="40" width="40" x="590" y="990" as="geometry" />
+          <mxGeometry height="40" width="40" x="590" y="1060" as="geometry" />
         </mxCell>
         <mxCell id="REST" parent="AUTO" style="shape=swimlane;rotatable=0;align=center;verticalAlign=top;fontFamily=Lucida Console;startSize=30;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=#60a917;swimlaneFillColor=default;rounded=1;arcSize=15;absoluteArcSize=1;strokeColor=#2D7600;" value="REST" vertex="1">
-          <mxGeometry height="90" width="300" x="460" y="1160" as="geometry" />
+          <mxGeometry height="70" width="300" x="460" y="1160" as="geometry" />
         </mxCell>
         <mxCell id="REST-b" connectable="0" parent="REST" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="enter / { AutoUnkey(); count_ms = 0; }" vertex="1">
           <mxGeometry height="26" width="290" y="30" as="geometry" />
@@ -113,7 +113,7 @@
           <mxGeometry height="26" width="270" y="30" as="geometry" />
         </mxCell>
         <mxCell id="BAND_DONE" parent="AUTO" style="shape=swimlane;rotatable=0;align=center;verticalAlign=top;fontFamily=Lucida Console;startSize=30;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=#60a917;swimlaneFillColor=default;rounded=1;arcSize=15;absoluteArcSize=1;strokeColor=#2D7600;" value="BAND_DONE" vertex="1">
-          <mxGeometry height="90" width="280" x="860" y="1120" as="geometry" />
+          <mxGeometry height="70" width="280" x="860" y="1160" as="geometry" />
         </mxCell>
         <mxCell id="BAND_DONE-b" connectable="0" parent="BAND_DONE" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="enter / { AutoUnkey(); AutoFinishBand(); }" vertex="1">
           <mxGeometry height="26" width="270" y="30" as="geometry" />
@@ -152,6 +152,18 @@
         </mxCell>
         <mxCell id="BAND-b" connectable="0" parent="BAND" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="enter / { AutoSelectBand(); count_ms = 0; }" vertex="1">
           <mxGeometry height="26" width="270" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="STORE" parent="AUTO" style="shape=swimlane;rotatable=0;align=center;verticalAlign=top;fontFamily=Lucida Console;startSize=30;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=#60a917;swimlaneFillColor=default;rounded=1;arcSize=15;absoluteArcSize=1;strokeColor=#2D7600;" value="STORE" vertex="1">
+          <mxGeometry height="70" width="260" x="480" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="STORE-b" connectable="0" parent="STORE" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="enter / AutoStorePoint();" vertex="1">
+          <mxGeometry height="26" width="250" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e-collect" edge="1" parent="AUTO" source="COLLECT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="STORE" value="do [AutoServiceIdle() &amp;&amp; count_ms &gt;= collect_ms]">
+          <mxGeometry relative="1" x="-0.6571" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="610" y="890" as="sourcePoint" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="e-root" edge="1" parent="1" source="ROOT-init" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;" target="MAN" value="">
           <mxGeometry relative="1" as="geometry" />
@@ -243,21 +255,17 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e-collect" edge="1" parent="1" source="COLLECT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;" target="CH-NEXT" value="do [count_ms &gt;= collect_ms] / AutoStorePoint();">
-          <mxGeometry relative="1" x="-0.8182" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
         <mxCell id="e-next-osc" edge="1" parent="1" source="CH-NEXT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="BAND_DONE" value="1. [AutoOscillationDetected()] / AutoAbortBandStage();">
-          <mxGeometry relative="1" x="0.625" as="geometry">
+          <mxGeometry relative="1" x="0.7333" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
         <mxCell id="e-next-keyed" edge="1" parent="1" source="CH-NEXT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;" target="POINT" value="2. [AutoMorePoints() &amp;&amp; AutoKeepKeyed()]">
-          <mxGeometry relative="1" x="0.5" as="geometry">
+          <mxGeometry relative="1" x="-0.7179" as="geometry">
             <mxPoint as="offset" />
             <Array as="points">
-              <mxPoint x="950" y="1180" />
+              <mxPoint x="810" y="1250" />
+              <mxPoint x="810" y="700" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -272,12 +280,12 @@
         <mxCell id="e-next-done" edge="1" parent="1" source="CH-NEXT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="BAND_DONE" value="else">
           <mxGeometry relative="1" x="0.1707" as="geometry">
             <Array as="points">
-              <mxPoint x="1030" y="1240" />
-              <mxPoint x="1350" y="1240" />
+              <mxPoint x="1030" y="1280" />
+              <mxPoint x="1350" y="1280" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e-rest" edge="1" parent="1" source="REST" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" target="POINT" value="do [count_ms &gt;= rest_ms]">
+        <mxCell id="e-rest" edge="1" parent="1" source="REST" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" target="POINT" value="do [AutoServiceIdle() &amp;&amp; count_ms &gt;= rest_ms]">
           <mxGeometry relative="1" x="-0.6196" as="geometry">
             <mxPoint as="offset" />
             <Array as="points">
@@ -334,6 +342,9 @@
             </Array>
           </mxGeometry>
         </mxCell>
+        <mxCell id="e-store" edge="1" parent="1" source="STORE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;fontFamily=Lucida Console;fontSize=11;labelBackgroundColor=default;" target="CH-NEXT" value="do [AutoServiceIdle()]">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
@@ -347,7 +358,7 @@
             <mxRectangle height="70" width="170" x="40" y="40" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="AQYHgrLb52N4u3SG62Hm-2" connectable="0" parent="AQYHgrLb52N4u3SG62Hm-1" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="[RenderConfig]&#xa;FileTop = &quot;&quot;&quot;&#xa;    // Whatever you put in this `FileTop` section will end up&#xa;    // being printed at the top of every generated code file.&#xa;    &quot;&quot;&quot;&#xa;AutoExpandedVars = &quot;&quot;&quot;&#xa;    uint32_t count_ms; // this var can be referenced in diagram&#xa;    uint32_t bandSettle_ms;   // AUTO: wait after a band change&#xa;    uint32_t settle_ms;       // AUTO: wait after keying before the reading&#xa;    uint32_t collect_ms;      // AUTO: length of the averaged reading&#xa;    uint32_t rest_ms;         // AUTO: receive time between open/short points&#xa;    uint32_t meterTimeout_ms; // AUTO: unkey if no wattmeter entry by then&#xa;    &quot;&quot;&quot;&#xa;&#xa;[RenderConfig.C]&#xa;# CFileExtension = &quot;.inc&quot; # if you want to include sm in another file&#xa;CFileExtension = &quot;.cpp&quot;&#xa;HFileExtension = &quot;.h&quot;&#xa;HFileIncludes = &quot;&quot;&quot;&#xa;    #include &lt;stdint.h&gt; // for count var&#xa;    &quot;&quot;&quot;&#xa;CFileIncludes = &quot;&quot;&quot;&#xa;    // #include &quot;your_header_here.h&quot;&#xa;    // Forward declarations&#xa;    #include &lt;stdint.h&gt; // for count var&#xa;    #include &lt;stdbool.h&gt;&#xa;    typedef float float32_t;&#xa;    // Manual flow (HardwareSm_PowerCalibration.cpp)&#xa;    void ResetPowerCalibration(void);&#xa;    void StartPowerPoint(void);&#xa;    void StartSSBPoint(void);&#xa;    void RecordPowerDataPoint(void);&#xa;    void CalculatePowerCurveFit(void);&#xa;    void CalculateSSBPoint(void);&#xa;    // Automatic flow (HardwareSm_PowerCalibration.cpp)&#xa;    bool AutoCalAllowed(void);&#xa;    void AutoCalEnter(void);&#xa;    void AutoCalExit(void);&#xa;    void AutoBeginSession(void);&#xa;    void AutoPromptStandard(void);&#xa;    bool AutoCanSkipStage(void);&#xa;    void AutoSkipStage(void);&#xa;    void AutoFirstBand(void);&#xa;    void AutoSelectBand(void);&#xa;    void AutoSetupPoint(void);&#xa;    void AutoKey(void);&#xa;    void AutoUnkey(void);&#xa;    bool AutoNeedsMeterEntry(void);&#xa;    void AutoStartMeterEntry(void);&#xa;    void ClearSWRBridgeStats(void);&#xa;    void AutoStorePoint(void);&#xa;    bool AutoOscillationDetected(void);&#xa;    void AutoAbortBandStage(void);&#xa;    bool AutoMorePoints(void);&#xa;    bool AutoKeepKeyed(void);&#xa;    bool AutoForwardFitDue(void);&#xa;    void AutoFitForwardLine(void);&#xa;    void AutoFinishBand(void);&#xa;    bool AutoMoreBands(void);&#xa;    void AutoNextBand(void);&#xa;    bool AutoMoreStages(void);&#xa;    void AutoNextStage(void);&#xa;    void AutoFitAndCheckAll(void);&#xa;    void AutoCommitResults(void);&#xa;    bool AutoAnyFailed(void);&#xa;    void AutoRetryFailed(void);&#xa;    bool AutoServiceIdle(void);&#xa;&quot;&quot;&quot;&#xa;# IncludeGuardLabel = &quot;{FILENAME}_H&quot;&#xa;&#xa;# More C settings are available. See docs.&#xa;&#xa;[SmRunnerSettings]&#xa;transpilerId = &quot;C99&quot;" vertex="1">
+        <mxCell id="AQYHgrLb52N4u3SG62Hm-2" connectable="0" parent="AQYHgrLb52N4u3SG62Hm-1" style="fontFamily=Lucida Console;align=left;verticalAlign=top;fillColor=none;gradientColor=none;strokeColor=none;rounded=0;spacingLeft=4;resizable=0;movable=0;deletable=0;rotatable=0;autosize=1;" value="[RenderConfig]&#xa;FileTop = &quot;&quot;&quot;&#xa;    // Whatever you put in this `FileTop` section will end up&#xa;    // being printed at the top of every generated code file.&#xa;    &quot;&quot;&quot;&#xa;AutoExpandedVars = &quot;&quot;&quot;&#xa;    uint32_t count_ms; // this var can be referenced in diagram&#xa;    uint32_t bandSettle_ms;   // AUTO: wait after a band change&#xa;    uint32_t settle_ms;       // AUTO: wait after keying before the reading&#xa;    uint32_t collect_ms;      // AUTO: length of the averaged reading&#xa;    uint32_t rest_ms;         // AUTO: receive time between open/short points&#xa;    uint32_t meterTimeout_ms; // AUTO: unkey if no wattmeter entry by then&#xa;    &quot;&quot;&quot;&#xa;&#xa;[RenderConfig.C]&#xa;# CFileExtension = &quot;.inc&quot; # if you want to include sm in another file&#xa;CFileExtension = &quot;.cpp&quot;&#xa;HFileExtension = &quot;.h&quot;&#xa;HFileIncludes = &quot;&quot;&quot;&#xa;    #include &lt;stdint.h&gt; // for count var&#xa;    &quot;&quot;&quot;&#xa;CFileIncludes = &quot;&quot;&quot;&#xa;    // #include &quot;your_header_here.h&quot;&#xa;    // Forward declarations&#xa;    #include &lt;stdint.h&gt; // for count var&#xa;    #include &lt;stdbool.h&gt;&#xa;    typedef float float32_t;&#xa;    // Manual flow (HardwareSm_PowerCalibration.cpp)&#xa;    void ResetPowerCalibration(void);&#xa;    void StartPowerPoint(void);&#xa;    void StartSSBPoint(void);&#xa;    void RecordPowerDataPoint(void);&#xa;    void CalculatePowerCurveFit(void);&#xa;    void CalculateSSBPoint(void);&#xa;    // Automatic flow (HardwareSm_PowerCalibration.cpp)&#xa;    bool AutoCalAllowed(void);&#xa;    void AutoCalEnter(void);&#xa;    void AutoCalExit(void);&#xa;    void AutoBeginSession(void);&#xa;    void AutoPromptStandard(void);&#xa;    bool AutoCanSkipStage(void);&#xa;    void AutoSkipStage(void);&#xa;    void AutoFirstBand(void);&#xa;    void AutoSelectBand(void);&#xa;    void AutoSetupPoint(void);&#xa;    void AutoKey(void);&#xa;    void AutoUnkey(void);&#xa;    bool AutoNeedsMeterEntry(void);&#xa;    void AutoStartMeterEntry(void);&#xa;    void AutoStartCollect(void);&#xa;    void AutoStorePoint(void);&#xa;    bool AutoOscillationDetected(void);&#xa;    void AutoAbortBandStage(void);&#xa;    bool AutoMorePoints(void);&#xa;    bool AutoKeepKeyed(void);&#xa;    bool AutoForwardFitDue(void);&#xa;    void AutoFitForwardLine(void);&#xa;    void AutoFinishBand(void);&#xa;    bool AutoMoreBands(void);&#xa;    void AutoNextBand(void);&#xa;    bool AutoMoreStages(void);&#xa;    void AutoNextStage(void);&#xa;    void AutoFitAndCheckAll(void);&#xa;    void AutoCommitResults(void);&#xa;    bool AutoAnyFailed(void);&#xa;    void AutoRetryFailed(void);&#xa;    bool AutoServiceIdle(void);&#xa;&quot;&quot;&quot;&#xa;# IncludeGuardLabel = &quot;{FILENAME}_H&quot;&#xa;&#xa;# More C settings are available. See docs.&#xa;&#xa;[SmRunnerSettings]&#xa;transpilerId = &quot;C99&quot;" vertex="1">
           <mxGeometry height="1050" width="520" y="30" as="geometry" />
         </mxCell>
         <mxCell id="Rtzr6oL3nyDmr5cCv5HC-1" parent="1" style="shape=note;strokeWidth=2;fontSize=14;size=20;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#2B2B00;align=left;spacingLeft=6;" value="&lt;span style=&quot;color: rgb(0, 0, 0); font-size: 12px;&quot;&gt;Feel free to delete the `$CONFIG : toml` node if you don&#39;t want it.&lt;/span&gt;&lt;br style=&quot;color: rgb(0, 0, 0); font-size: 12px;&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0); font-size: 12px;&quot;&gt;Details here:&amp;nbsp;&lt;/span&gt;&lt;a style=&quot;font-size: 12px;&quot; href=&quot;https://github.com/StateSmith/StateSmith/issues/335&quot;&gt;https://github.com/StateSmith/StateSmith/issues/335&lt;/a&gt;" vertex="1">

@@ -150,6 +150,7 @@ uint32_t ReadSWRLastUpdateMs(void);
  */
 typedef struct {
     uint32_t n;            // number of readings
+    uint32_t rejected;     // readings left out: outside 0 to 4096 mV, a failed I2C read
     float32_t fwdMean_mV;  // forward detector, mean
     float32_t fwdSD_mV;    // forward detector, standard deviation
     float32_t refMean_mV;  // reflected detector, mean

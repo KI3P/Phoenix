@@ -7,6 +7,8 @@
 #include <chrono>
 #include <atomic>
 #include <mutex>
+#include <sstream>
+#include <iostream>
 
 // External declarations for power calibration internal state
 // These are static variables in MainBoard_DisplayCalibration_Power.cpp
@@ -29,7 +31,8 @@ static std::thread timer_thread;
 void timer1ms(void) {
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
-    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    if (!PowerCalSmBusy()) // not while the main loop is dispatching
+        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
 }
 
 /**
@@ -2193,6 +2196,8 @@ TEST_F(PowerCalibrationWalkthroughTest, StateTransitions_ResetBehavior) {
  * wattmeter entries, the timeouts and the aborts.
  */
 void ResetPowerCal(void);   // HardwareSm_PowerCalibration.cpp
+void HandleButtonPress(int32_t button); // Loop.cpp
+char *BR_write(char* cmd);  // CAT.cpp
 bool AutoAnyFailed(void);   // HardwareSm_PowerCalibration.cpp
 
 class PowerCalAutoTest : public ::testing::Test {
@@ -2206,15 +2211,87 @@ protected:
         ModeSm_start(&modeSM);
         ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
         ED.PA100Wactive = false;
+        ED.SWR_CouplerTurns = 10;
+        for (int32_t band = FIRST_BAND; band <= LAST_BAND; band++){
+            ED.PowerCal_20W_DSP_Gain_correction_dB[band] = 0;
+            ED.SWR_CalLevel[band] = 0;
+        }
         autoCal.level = 1;
-        autoCal.bandMask = (1u << BAND_40M) | (1u << BAND_20M);
         InitializePowerCalibration();
     }
 
-    /** One 1 ms tick: the timer's DO event, then the main loop's service */
+    /**
+     * A simulated radio: the bridge's true forward and reflected lines, the PA
+     * curve and the SSB gain. It answers the bridge readings and the wattmeter.
+     */
+    struct SimRadio {
+        float32_t m_f = 24.6f;          // true forward slope, mV/dB
+        float32_t o_f_excess = 0.5f;    // how far the level 1 default reads low at 1700 mV, dB
+        float32_t m_r = 25.3f;          // true reflected slope, mV/dB
+        float32_t o_r = -2.7f;          // true reflected offset, dB
+        float32_t Psat_mW = 15000.0f;   // PA curve
+        float32_t k = 6.0f;
+        float32_t ssbGainFor3W_dB = 1.0f; // DSP gain that gives 3 W
+        float32_t gamma50 = 0.03f;      // the load's reflection
+        float32_t leak_dB = 0.15f;      // adds on the open, subtracts on the short
+        int32_t oscillateBand = -1;     // this band oscillates...
+        AutoCalStage oscillateStage = AUTO_STAGE_SHORT; // ...on this standard
+        float32_t meterFactor = 1.0f;   // wattmeter entries are this times the truth
+        bool saturationOverRead = false; // the forward detector over-reads in saturation (radio 1, 10 m)
+
+        /** True forward intercept. Like the Section 2 defaults, defined at mid-range,
+         *  1700 mV: there the defaults read o_f_excess low */
+        float32_t b_f(int32_t band) const {
+            return SWRCalLevel1ForwardOffset(band, 10) - SWRCAL_OFFSET_CONSTANT_DB + o_f_excess
+                   + 1700.0f / 25.0f - 1700.0f / m_f;
+        }
+        float32_t b_r(void) const { return o_r - SWRCAL_OFFSET_CONSTANT_DB; }
+        /** Forward power on the line now, in dBm */
+        float32_t ForwardPower_dBm(void) const {
+            if (autoCal.ssbMode)
+                return 10.0f * log10f(3000.0f) + autoCal.drive_dB - ssbGainFor3W_dB;
+            return 10.0f * log10f(Psat_mW * tanhf(k * powf(10.0f, -autoCal.drive_dB / 10.0f)));
+        }
+        float32_t Vf(void) const {
+            if ((autoCal.band == oscillateBand) && (autoCal.stage == oscillateStage))
+                return 1950.0f; // stuck whatever the drive
+            return m_f * (ForwardPower_dBm() + OverRead_dB() - b_f(autoCal.band));
+        }
+        /** Radio 1's 10 m: the forward detector keeps rising through saturation,
+         *  2.28 dB high at 0 dB (bench sheet radio1_adcfix, ten_m_ceiling/ceil10m.json) */
+        float32_t OverRead_dB(void) const {
+            if (!saturationOverRead || autoCal.ssbMode)
+                return 0.0f;
+            static const float32_t att[5] = {0, 1, 3, 6, 12};
+            static const float32_t over[5] = {2.28f, 1.92f, 1.54f, 0.94f, 0.0f};
+            float32_t a = autoCal.drive_dB;
+            if (a >= att[4]) return 0.0f;
+            int i = 0;
+            while (a > att[i + 1]) i++;
+            return over[i] + (over[i + 1] - over[i]) * (a - att[i]) / (att[i + 1] - att[i]);
+        }
+        float32_t Vr(void) const {
+            float32_t Pr = ForwardPower_dBm();
+            if (autoCal.stage == AUTO_STAGE_LOAD)
+                Pr += 20.0f * log10f(gamma50);
+            else
+                Pr += (autoCal.stage == AUTO_STAGE_OPEN) ? leak_dB : -leak_dB;
+            return m_r * (Pr - b_r());
+        }
+    } radio;
+
+    /** One 1 ms tick: the timer's DO event, then the main loop's service and bridge */
     void Tick(void) {
         PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
         PowerCalAutoService();
+        // While collecting, the main loop reads the bridge about every 16 ms; here
+        // every tick adds enough readings for a point
+        if (!bridgeSilent && (powerSM.state_id == PowerCalSm_StateId_COLLECT) && !autoCal.servicePending){
+            for (int k = 0; k < 10; k++)
+                AccumulateSWRBridgeStats(radio.Vf(), radio.Vr());
+            if (failedReads)
+                AccumulateSWRBridgeStats(65535.0f, 65535.0f); // how a failed I2C read arrives
+        }
     }
 
     /** Enter AUTO and shorten its timing so a session takes a few hundred ticks */
@@ -2226,11 +2303,49 @@ protected:
         powerSM.vars.collect_ms = 4;
         powerSM.vars.rest_ms = 2;
         powerSM.vars.meterTimeout_ms = 50;
+        autoCal.collectLoad_ms = 4;
+        autoCal.collectReflection_ms = 4;
         autoCal.level = level;
+        autoCal.bandMask = (1u << BAND_40M) | (1u << BAND_20M);
+    }
+
+    /** From SETUP through the three standards to REVIEW */
+    void RunToReviewForLog(void) {
+        Select();
+        Select();
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        Select();
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        Select();
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+    }
+
+    /** Run a whole session from SETUP to REVIEW */
+    void RunSession(bool skipLoad = false) {
+        Select(); // SETUP -> PROMPT
+        if (skipLoad)
+            SkipPowerCalStage();
+        else {
+            Select(); // load fitted
+            ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        }
+        Select(); // open fitted
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        Select(); // short fitted
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+    }
+
+    /** SWR the stored calibration reads for a load with the given |Gamma| at 5 W */
+    float32_t StoredSWR(int32_t band, float32_t gamma) {
+        float32_t Pf = 10.0f * log10f(5000.0f);
+        float32_t Vf = radio.m_f * (Pf - radio.b_f(band));
+        float32_t Vr = radio.m_r * (Pf + 20.0f * log10f(gamma) - radio.b_r());
+        return SWRCalSWR(Vf, Vr, 25.0f + ED.SWR_F_SlopeAdj[band], ED.SWR_F_Offset[band] - SWRCAL_OFFSET_CONSTANT_DB,
+                         25.0f + ED.SWR_R_SlopeAdj[band], ED.SWR_R_Offset[band] - SWRCAL_OFFSET_CONSTANT_DB);
     }
 
     void Select(void) {
-        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RECORD_DATA_POINT);
+        PowerCalDispatch(PowerCalSm_EventId_RECORD_DATA_POINT);
     }
 
     /**
@@ -2245,6 +2360,8 @@ protected:
                 return true;
             if (powerSM.state_id == PowerCalSm_StateId_METER_ENTRY) {
                 meterEntries++;
+                // The operator reads the wattmeter and dials it in
+                SetMeasuredPower(radio.meterFactor * powf(10.0f, radio.ForwardPower_dBm() / 10.0f) / 1000.0f);
                 Select();
             } else {
                 Tick();
@@ -2262,6 +2379,8 @@ protected:
         return powerSM.state_id == target;
     }
 
+    bool bridgeSilent = false;  // the bridge readout gives no readings
+    bool failedReads = false;   // some bridge readings are failed I2C reads
     uint32_t meterEntries = 0;
     uint32_t collects[3] = {0, 0, 0};
     uint32_t forwardFits = 0;
@@ -2273,7 +2392,7 @@ TEST_F(PowerCalAutoTest, AutoEntersSetupAndResetReturnsToManual) {
     EnterAuto(1);
     EXPECT_TRUE(PowerCalAutoActive());
 
-    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RESET);
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
     EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
     EXPECT_FALSE(PowerCalAutoActive());
 }
@@ -2328,22 +2447,22 @@ TEST_F(PowerCalAutoTest, Level1SessionVisitsLoadOpenShortWithoutOperatorReadings
     EXPECT_EQ(meterEntries, 0u) << "Level 1 needs no wattmeter";
     EXPECT_FALSE(autoCal.keyed);
 
-    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RETRY);
+    PowerCalDispatch(PowerCalSm_EventId_RETRY);
     EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_REVIEW) << "Nothing failed, so nothing to retry";
 
     Select(); // accept
     EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
-    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RESET);
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
     EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
 }
 
-TEST_F(PowerCalAutoTest, Level2TakesOneWattmeterReadingPerBand) {
+TEST_F(PowerCalAutoTest, Level2TakesTwoWattmeterReadingsPerBand) {
     EnterAuto(2);
     Select();
     Select();
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
-    EXPECT_EQ(meterEntries, 2u);
-    EXPECT_EQ(collects[AUTO_STAGE_LOAD], 2u * 14u) << "Sweep, wattmeter point and SSB point per band";
+    EXPECT_EQ(meterEntries, 2u * 2u) << "Near 2 W and at the ceiling";
+    EXPECT_EQ(collects[AUTO_STAGE_LOAD], 2u * 15u) << "Sweep, two wattmeter points and SSB point per band";
 }
 
 TEST_F(PowerCalAutoTest, Level3TakesAWattmeterReadingAtEveryCWPoint) {
@@ -2361,7 +2480,7 @@ TEST_F(PowerCalAutoTest, OnlyTheLevel1LoadStageCanBeSkipped) {
     SkipPowerCalStage();
     EXPECT_EQ(autoCal.stage, AUTO_STAGE_LOAD) << "Level 2 needs the wattmeter stage";
 
-    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RESET);
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
     EnterAuto(1);
     Select();
     SkipPowerCalStage();
@@ -2408,23 +2527,29 @@ TEST_F(PowerCalAutoTest, ResetDuringAPointUnkeys) {
     Select();
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
     EXPECT_TRUE(autoCal.keyed);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK);
 
     ResetPowerCal();
     EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
     EXPECT_FALSE(autoCal.keyed);
     EXPECT_FALSE(PowerCalAutoActive());
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE)
+        << "Unkeyed at once, without waiting for the service";
 }
 
 TEST_F(PowerCalAutoTest, OscillationAbandonsThatBandsSweepOnly) {
     EnterAuto(1);
+    radio.oscillateBand = BAND_40M;
+    radio.oscillateStage = AUTO_STAGE_OPEN;
     Select();
     SkipPowerCalStage(); // straight to the open
     Select();
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
     EXPECT_EQ(autoCal.band, BAND_40M);
 
-    autoCal.oscillation = true; // the check in AutoStorePoint() would set this
-    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND_DONE, 20));
+    // The second point shows V_f not falling with the drive
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND_DONE, 200));
+    EXPECT_EQ(autoCal.point, 2u) << "Abandoned at the second point";
     EXPECT_FALSE(autoCal.keyed);
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND));
     EXPECT_EQ(autoCal.band, BAND_20M) << "Moves on to the next band";
@@ -2441,11 +2566,11 @@ TEST_F(PowerCalAutoTest, OscillationAbandonsThatBandsSweepOnly) {
 
 TEST_F(PowerCalAutoTest, RetryRunsTheSessionAgainForTheFailedBandsOnly) {
     EnterAuto(1);
+    radio.oscillateBand = BAND_40M;
+    radio.oscillateStage = AUTO_STAGE_OPEN;
     Select();
     SkipPowerCalStage();
     Select();
-    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
-    autoCal.oscillation = true;
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
     Select();
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
@@ -2454,4 +2579,487 @@ TEST_F(PowerCalAutoTest, RetryRunsTheSessionAgainForTheFailedBandsOnly) {
     EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_SETUP);
     EXPECT_EQ(autoCal.bandMask, 1u << BAND_40M);
     EXPECT_EQ(autoCal.level, 1) << "Same level";
+}
+
+TEST_F(PowerCalAutoTest, LoadUsesCWThenSSBAndTheOpenUsesTheSSBToneWithReceiveBetweenPoints) {
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_40M;
+    Select();
+    Select(); // load fitted
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK) << "CW sweep on the load";
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_40M) << "The service tuned to the band";
+
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_FIT_FORWARD));
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_TRUE(autoCal.ssbPoint);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_MARK) << "SSB tone point on the load";
+
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE)
+        << "Receive while the operator changes the connector";
+    Select(); // open fitted
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_MARK) << "SSB tone on the open";
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REST));
+    Tick(); // the service unkeys
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE)
+        << "True receive between open points";
+    EXPECT_EQ(GetRFHardwareState(), RFReceive);
+}
+
+TEST_F(PowerCalAutoTest, StoreWaitsForTheMainLoop) {
+    EnterAuto(1);
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    uint32_t point = autoCal.point;
+    // Timer ticks only, no service: COLLECT's statistics clear is done in the
+    // first Tick(), then the collect time runs out into STORE
+    Tick();
+    for (int k = 0; k < 100 && powerSM.state_id != PowerCalSm_StateId_STORE; k++)
+        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_STORE);
+    for (int k = 0; k < 10; k++)
+        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_STORE);
+    EXPECT_EQ(autoCal.point, point) << "The readings are kept by the service";
+
+    Tick(); // the service runs, then the choice
+    Tick();
+    EXPECT_NE(powerSM.state_id, PowerCalSm_StateId_STORE);
+    EXPECT_EQ(autoCal.point, point + 1);
+}
+
+TEST_F(PowerCalAutoTest, SelectAndZoomWorkWhileKeyed) {
+    uiSM.state_id = UISm_StateId_CALIBRATE_POWER;
+    EnterAuto(3);
+    Select();
+    Select();
+    for (int k = 0; k < 100 && powerSM.state_id != PowerCalSm_StateId_METER_ENTRY; k++)
+        Tick();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_METER_ENTRY);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK);
+
+    HandleButtonPress(MENU_OPTION_SELECT); // wattmeter reading entered
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_COLLECT);
+
+    HandleButtonPress(BAND_UP); // other buttons stay disabled while keyed
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_40M);
+
+    HandleButtonPress(ZOOM); // abort
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
+}
+
+TEST_F(PowerCalAutoTest, OperatorPTTIsIgnored) {
+    EnterAuto(1);
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK);
+
+    SetInterrupt(iPTT_RELEASED);
+    ConsumeInterrupt();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK) << "Release does not cut the point short";
+
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE);
+    SetInterrupt(iPTT_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_OFFSET_SPACE) << "Press does not key the radio";
+}
+
+TEST_F(PowerCalAutoTest, CATBridgeStatisticsAreRefusedDuringAuto) {
+    char clear[] = "BR0;";
+    EnterAuto(1);
+    EXPECT_STREQ(BR_write(clear), "?;");
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
+    EXPECT_STREQ(BR_write(clear), "");
+}
+
+TEST_F(PowerCalAutoTest, Level3StoresTheTrueCalibration) {
+    EnterAuto(3);
+    RunSession();
+    for (int32_t band : {BAND_40M, BAND_20M}) {
+        const AutoCalBandResult *r = GetAutoCalResult(band);
+        EXPECT_TRUE(r->checked);
+        EXPECT_EQ(r->failBits, 0u) << bands[band].name;
+        EXPECT_FALSE(r->openOnly);
+    }
+    EXPECT_FALSE(AutoAnyFailed());
+    Select(); // store
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    for (int32_t band : {BAND_40M, BAND_20M}) {
+        SCOPED_TRACE(bands[band].name);
+        EXPECT_NEAR(ED.SWR_F_SlopeAdj[band], radio.m_f - 25.0f, 0.01);
+        EXPECT_NEAR(ED.SWR_F_Offset[band], radio.b_f(band) + SWRCAL_OFFSET_CONSTANT_DB, 0.01);
+        EXPECT_NEAR(ED.SWR_R_SlopeAdj[band], radio.m_r - 25.0f, 0.01);
+        EXPECT_NEAR(ED.SWR_R_Offset[band], radio.o_r, 0.01) << "The leak cancels";
+        EXPECT_EQ(ED.SWR_CalLevel[band], 3);
+        EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[band], radio.Psat_mW, 0.02f * radio.Psat_mW);
+        EXPECT_NEAR(ED.PowerCal_20W_kindex[band], radio.k, 0.05f * radio.k);
+        EXPECT_NEAR(ED.PowerCal_20W_DSP_Gain_correction_dB[band], radio.ssbGainFor3W_dB, 0.01);
+        EXPECT_NEAR(StoredSWR(band, 1.0f / 3.0f), 2.0f, 0.01) << "A 100 Ohm load";
+        EXPECT_NEAR(GetAutoCalResult(band)->S50, (1 + radio.gamma50) / (1 - radio.gamma50), 0.01);
+    }
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_80M], 0) << "Bands outside the session are untouched";
+}
+
+TEST_F(PowerCalAutoTest, Level1StoresTheDefaultsAndReadsSWRWell) {
+    EnterAuto(1);
+    RunSession();
+    EXPECT_FALSE(AutoAnyFailed());
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    for (int32_t band : {BAND_40M, BAND_20M}) {
+        SCOPED_TRACE(bands[band].name);
+        EXPECT_FLOAT_EQ(ED.SWR_F_SlopeAdj[band], 0.0f) << "Nominal slope";
+        EXPECT_NEAR(ED.SWR_F_Offset[band], SWRCalLevel1ForwardOffset(band, 10), 1e-4) << "The default";
+        EXPECT_EQ(ED.SWR_CalLevel[band], 1);
+        EXPECT_NEAR(StoredSWR(band, 1.0f / 3.0f), 2.0f, 0.05) << "The SWR barely depends on the level";
+        EXPECT_GT(ED.PowerCal_20W_Psat_mW[band], 0.0f) << "Level 1 stores the PA curve too";
+        EXPECT_NEAR(ED.PowerCal_20W_DSP_Gain_correction_dB[band], radio.ssbGainFor3W_dB, 1.5);
+    }
+}
+
+TEST_F(PowerCalAutoTest, Level2ReadsTwoWattsCorrectly) {
+    EnterAuto(2);
+    RunSession();
+    EXPECT_FALSE(AutoAnyFailed());
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    for (int32_t band : {BAND_40M, BAND_20M}) {
+        SCOPED_TRACE(bands[band].name);
+        EXPECT_FLOAT_EQ(ED.SWR_F_SlopeAdj[band], 0.0f);
+        // The stored line reads the wattmeter point's power exactly
+        float32_t P2 = 10.0f * log10f(2000.0f);
+        float32_t Vf2 = radio.m_f * (P2 - radio.b_f(band));
+        float32_t read = SWRCalPower_dBm(Vf2, 25.0f, ED.SWR_F_Offset[band] - SWRCAL_OFFSET_CONSTANT_DB);
+        EXPECT_NEAR(read, P2, 0.5) << "Near 2 W";
+        EXPECT_EQ(ED.SWR_CalLevel[band], 2);
+    }
+}
+
+TEST_F(PowerCalAutoTest, Level2WattmeterEntryErrorFailsTheBand) {
+    EnterAuto(2);
+    radio.meterFactor = 10.0f; // 20 W entered for 2 W
+    float32_t before = ED.SWR_F_Offset[BAND_40M] = 1.25f;
+    RunSession();
+    EXPECT_TRUE(GetAutoCalResult(BAND_40M)->failBits & AUTO_FAIL_LEVEL2_OFFSET);
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    EXPECT_FLOAT_EQ(ED.SWR_F_Offset[BAND_40M], before) << "A failed band keeps its calibration";
+}
+
+TEST_F(PowerCalAutoTest, OscillationIntoTheShortLeavesTheOpenAlone) {
+    EnterAuto(3);
+    radio.oscillateBand = BAND_20M;
+    radio.oscillateStage = AUTO_STAGE_SHORT;
+    RunSession();
+    const AutoCalBandResult *r = GetAutoCalResult(BAND_20M);
+    EXPECT_EQ(r->failBits, 0u);
+    EXPECT_TRUE(r->openOnly);
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_20M], 3 | SWR_CAL_OPEN_ONLY);
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 3);
+    // From the open alone the leak is not cancelled: the open reads it high, so
+    // the line's offset comes out low by the leak
+    EXPECT_NEAR(ED.SWR_R_Offset[BAND_20M], radio.o_r - radio.leak_dB, 0.01);
+    EXPECT_NEAR(StoredSWR(BAND_20M, 1.0f / 3.0f), 2.0f, 0.1);
+}
+
+TEST_F(PowerCalAutoTest, OscillationIntoTheOpenFailsOnlyThatBand) {
+    EnterAuto(1);
+    radio.oscillateBand = BAND_40M;
+    radio.oscillateStage = AUTO_STAGE_OPEN;
+    float32_t before = ED.SWR_R_Offset[BAND_40M] = -7.5f;
+    RunSession();
+    EXPECT_TRUE(GetAutoCalResult(BAND_40M)->failBits & AUTO_FAIL_OPEN);
+    EXPECT_EQ(GetAutoCalResult(BAND_20M)->failBits, 0u);
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    EXPECT_FLOAT_EQ(ED.SWR_R_Offset[BAND_40M], before);
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 0);
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_20M], 1);
+}
+
+TEST_F(PowerCalAutoTest, SkippingTheLoadKeepsThePowerCalibration) {
+    EnterAuto(1);
+    ED.PowerCal_20W_Psat_mW[BAND_40M] = 12345.0f;
+    RunSession(true);
+    EXPECT_FALSE(AutoAnyFailed());
+    EXPECT_FALSE(GetAutoCalResult(BAND_40M)->hasS50) << "No load, no S50";
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    EXPECT_FLOAT_EQ(ED.PowerCal_20W_Psat_mW[BAND_40M], 12345.0f);
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 1);
+}
+
+TEST_F(PowerCalAutoTest, LeavingAutoRestoresTheOperatorsBand) {
+    SetCalibrationBand(BAND_15M);
+    int64_t freq = ED.centerFreq_Hz[ED.activeVFO];
+    EnterAuto(1);
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_40M);
+    ResetPowerCal();
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], BAND_15M);
+    EXPECT_EQ(ED.centerFreq_Hz[ED.activeVFO], freq);
+}
+
+TEST_F(PowerCalAutoTest, EnteringPowerCalibrationKeepsTheSWRCalibration) {
+    ED.SWR_F_Offset[BAND_20M] = -5.2f;
+    ED.SWR_R_SlopeAdj[BAND_20M] = 0.3f;
+    InitializePowerCalibration();
+    EXPECT_FLOAT_EQ(ED.SWR_F_Offset[BAND_20M], -5.2f);
+    EXPECT_FLOAT_EQ(ED.SWR_R_SlopeAdj[BAND_20M], 0.3f);
+}
+
+TEST_F(PowerCalAutoTest, MeterEntryStartsAtTheExpectedPower) {
+    EnterAuto(3);
+    Select();
+    Select();
+    for (int k = 0; k < 100 && powerSM.state_id != PowerCalSm_StateId_METER_ENTRY; k++)
+        Tick();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_METER_ENTRY);
+    EXPECT_NEAR(GetMeasuredPower(), CalculateCWPowerLevel(autoCal.drive_dB, 0) / 1000.0f, 1e-4);
+}
+
+TEST_F(PowerCalAutoTest, SetupEncodersChooseLevelAndTurns) {
+    EnterAuto(1);
+    ChangeAutoCalTurns(+10);
+    EXPECT_EQ(ED.SWR_CouplerTurns, 20);
+    ChangeAutoCalTurns(-100);
+    EXPECT_EQ(ED.SWR_CouplerTurns, 5);
+    Select(); // no longer on SETUP
+    ChangeAutoCalTurns(+1);
+    EXPECT_EQ(ED.SWR_CouplerTurns, 5);
+    ED.SWR_CouplerTurns = 10;
+}
+
+TEST_F(PowerCalAutoTest, TheScreenDrawsInEveryState) {
+    uiSM.state_id = UISm_StateId_CALIBRATE_POWER;
+    EnterAuto(3);
+    DrawCalibratePower();
+    Select();
+    DrawCalibratePower();
+    Select();
+    for (int k = 0; k < 3000 && powerSM.state_id != PowerCalSm_StateId_REVIEW; k++){
+        if (powerSM.state_id == PowerCalSm_StateId_METER_ENTRY){
+            SetMeasuredPower(powf(10.0f, radio.ForwardPower_dBm() / 10.0f) / 1000.0f);
+            Select();
+        } else if (powerSM.state_id == PowerCalSm_StateId_PROMPT){
+            Select();
+        } else {
+            Tick();
+        }
+        DrawCalibratePower();
+    }
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_REVIEW);
+    DrawCalibratePower();
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
+    DrawCalibratePower(); // back to the manual screen
+}
+
+/**
+ * A dead bridge readout on the load must not set the open and short's drive:
+ * fitted to no readings, the SSB correction came out near +77 dB and the tone
+ * was keyed into the open at +72 dB DSP gain.
+ */
+TEST_F(PowerCalAutoTest, NoBridgeReadingsKeepsTheStoredSSBDrive) {
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_40M;
+    ED.PowerCal_20W_DSP_Gain_correction_dB[BAND_40M] = 0.5f;
+    bridgeSilent = true;
+    Select();
+    Select(); // load
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_FALSE(GetAutoCalResult(BAND_40M)->hasPACurve);
+    Select(); // open
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_NEAR(autoCal.drive_dB, 0.5f + 10.0f * log10f(1.2f / 3.0f), 1e-4)
+        << "the first open point starts from the stored correction";
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    Select(); // short
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+    EXPECT_TRUE(GetAutoCalResult(BAND_40M)->failBits & AUTO_FAIL_FEW_READINGS);
+    EXPECT_TRUE(GetAutoCalResult(BAND_40M)->failBits & AUTO_FAIL_PA_CURVE);
+}
+
+/**
+ * Radio 1's 10 m: the forward detector over-reads by up to 2.3 dB in saturation.
+ * Level 2's wattmeter reading at 0 dB puts the PA ceiling right; level 1 cannot.
+ */
+TEST_F(PowerCalAutoTest, Level2TakesThePACeilingFromTheWattmeter) {
+    float32_t trueCeiling_mW = radio.Psat_mW * tanhf(radio.k);
+    for (uint8_t level : {1, 2}) {
+        SCOPED_TRACE(level);
+        PowerCalDispatch(PowerCalSm_EventId_RESET);
+        EnterAuto(level);
+        autoCal.bandMask = 1u << BAND_10M;
+        radio.saturationOverRead = true;
+        Select();
+        Select(); // load
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        const AutoCalBandResult *r = GetAutoCalResult(BAND_10M);
+        ASSERT_TRUE(r->hasPACurve);
+        float32_t ceilingError_dB = 10.0f * log10f(r->Psat_mW * tanhf(r->kindex) / trueCeiling_mW);
+        if (level == 2) {
+            // Relative to level 2's line, which is set at the 2 W point
+            EXPECT_GT(r->ceilingOverRead_dB, 1.5f) << "the detector's over-read, logged";
+            EXPECT_NEAR(ceilingError_dB, 0.0f, 0.2f) << "the ceiling from the wattmeter";
+        } else {
+            EXPECT_GT(ceilingError_dB, 1.0f) << "level 1 cannot see the over-read (documented limit)";
+        }
+    }
+}
+
+/** Collects what the firmware prints with Debug() (the Serial mock writes to std::cout) */
+class LogCapture {
+public:
+    LogCapture() : old(std::cout.rdbuf(buffer.rdbuf())) {}
+    ~LogCapture() { std::cout.rdbuf(old); }
+    /** Number of lines that contain every one of the given pieces */
+    int Count(std::initializer_list<const char *> pieces) {
+        std::istringstream in(buffer.str());
+        std::string line;
+        int n = 0;
+        while (std::getline(in, line)) {
+            bool all = true;
+            for (const char *p : pieces)
+                all = all && (line.find(p) != std::string::npos);
+            n += all;
+        }
+        return n;
+    }
+    std::string Text(void) { return buffer.str(); }
+private:
+    std::stringstream buffer;
+    std::streambuf *old;
+};
+
+TEST_F(PowerCalAutoTest, LogsTheOpenOscillationAndItsConsequences) {
+    EnterAuto(1);
+    radio.oscillateBand = BAND_40M;
+    radio.oscillateStage = AUTO_STAGE_OPEN;
+    LogCapture log;
+    Select();
+    SkipPowerCalStage();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+    Select();
+    Tick();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,tone", "oscillation: V_f fell too little"}), 1) << log.Text();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,sweep,abandoned: no reflected line"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,band fails,no reflected line: open sweep abandoned"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,not stored"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M"}), 0) << "nothing left out on 20 m";
+}
+
+TEST_F(PowerCalAutoTest, LogsTheShortOscillationAsOpenOnly) {
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_20M;
+    radio.oscillateBand = BAND_20M;
+    radio.oscillateStage = AUTO_STAGE_SHORT;
+    LogCapture log;
+    RunToReviewForLog();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,tone", "oscillation:"}), 1) << log.Text();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,sweep,abandoned: reflected line from the open alone"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,short sweep,abandoned"}), 1);
+    EXPECT_EQ(log.Count({"band fails"}), 0) << "open alone is not a failure";
+}
+
+TEST_F(PowerCalAutoTest, LogsPointsWithTooFewOrRejectedReadings) {
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_40M;
+    failedReads = true;
+    autoCal.minReadings = 1000; // every point is short of readings
+    LogCapture log;
+    RunToReviewForLog();
+    // The fixture adds 10 good readings and one failed read per tick of the collect
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,load,cw 0.00 dB,readings rejected", ",5.000,"}), 1) << log.Text();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,load,cw 0.00 dB,too few bridge readings", ",50.000,1000.000"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,load,PA curve and SSB gain,SSB point missing or too few readings"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,band fails,no PA curve or SSB gain"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,band fails,a point had too few bridge readings"}), 1);
+}
+
+TEST_F(PowerCalAutoTest, LogsTheCeilingDecisions) {
+    // Level 3: the over-reading 10 m ceiling points are left out of the forward fit
+    {
+        EnterAuto(3);
+        autoCal.bandMask = 1u << BAND_10M;
+        radio.saturationOverRead = true;
+        LogCapture log;
+        Select();
+        Select();
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        EXPECT_EQ(log.Count({"AUTOCAL-SKIP,10M,load,meter 0.00 dB,ceiling point off the line"}), 1) << log.Text();
+    }
+    // Level 2: the PA curve takes its ceiling from the wattmeter
+    {
+        PowerCalDispatch(PowerCalSm_EventId_RESET);
+        EnterAuto(2);
+        autoCal.bandMask = 1u << BAND_10M;
+        LogCapture log;
+        Select();
+        Select();
+        ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+        EXPECT_EQ(log.Count({"AUTOCAL-SKIP,10M,load,cw 0.00 dB,PA curve uses the wattmeter's ceiling instead"}), 1)
+            << log.Text();
+        EXPECT_GT(log.Count({"AUTOCAL-SKIP,10M,load,cw", "above the wattmeter ceiling"}), 0);
+    }
+}
+
+TEST_F(PowerCalAutoTest, LogsTheWeakPointsLeftOutOfS50) {
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_40M;
+    LogCapture log;
+    RunToReviewForLog();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,load,S50,load points below 0.1 W left out"}), 1) << log.Text();
+}
+
+void TXGain(DataBlock *data); // DSP.cpp
+extern float32_t TXgainDSP;   // DSP.cpp
+
+TEST(PowerCalSSBGainOverride, TXGainUsesTheOverride) {
+    InitializeStorage();
+    ED.PA100Wactive = false;
+    float32_t I[4] = {1, 1, 1, 1}, Q[4] = {0, 0, 0, 0};
+    DataBlock data = {4, 48000, I, Q};
+
+    ClearSSBGainOverride();
+    TXGain(&data);
+    float32_t normal_dB = TXgainDSP;
+
+    SetSSBGainOverride(-12.0f);
+    I[0] = 1;
+    TXGain(&data);
+    EXPECT_FLOAT_EQ(TXgainDSP, -12.0f);
+    EXPECT_NEAR(I[0], powf(10.0f, -12.0f/20.0f), 1e-5);
+
+    ClearSSBGainOverride();
+    TXGain(&data);
+    EXPECT_FLOAT_EQ(TXgainDSP, normal_dB);
+}
+
+TEST_F(PowerCalAutoTest, LeavingRightAfterAcceptingStillStores) {
+    EnterAuto(1);
+    RunSession();
+    Select(); // store...
+    PowerCalDispatch(PowerCalSm_EventId_RESET); // ...and leave before the main loop runs
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 1);
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_20M], 1);
 }

@@ -199,16 +199,17 @@ means the operator then fits the antenna, which is the natural next step.
 
 **By level (Section 2):**
 - **Level 3:** the table as it stands.
-- **Level 2:** stage A takes one wattmeter reading per band (Section 6) plus the key-up floor.
-  The connector changes are the same as level 3; the operator enters 11 readings instead of
-  about 70.
+- **Level 2:** stage A takes two wattmeter readings per band (Section 6), near 2 W and at the
+  PA's ceiling. The connector changes are the same as level 3; the operator enters 22 readings
+  instead of about 88.
 - **Level 1:** stage A on a bare 50 Ω load, with no wattmeter readings. The forward line comes
   from the defaults, and the firmware sweeps the attenuator automatically. The sweep gives the
   PA power curve through the default forward line, the S50 check and the 50 Ω reference for
   the oscillation check. The connector order is the same as at levels 2 and 3: two changes and
   no operator readings. The operator may skip stage A for a quick SWR-only recalibration. The
-  stored PA curve then sets the open and short drive, and there is no S50 check. The firmware
-  does not take the key-up floor (it is only needed for the optional subtraction in Section 7). (Decided 2026-11-02, replacing the earlier open, short, optional
+  stored SSB gain correction then sets the open and short drive, and there is no S50 check.
+  The firmware does not take the key-up floor (it is only needed for the optional
+  subtraction in Section 7). (Decided 2026-11-02, replacing the earlier open, short, optional
   load order. See `code/docs/PowerCalibration/AutoCalibration.md`.)
 
 **The existing power calibration belongs inside stage A.**
@@ -267,34 +268,44 @@ CW carrier, set by the TX attenuator (`ED.XAttenCW`, `SetTXAttenuation()`):
 - **Drift check:** repeat the first level below the ceiling at the end of the band.
 - **Settling:** the operator holds the key while the wattmeter settles. The firmware takes
   its reading (Section 5) when the operator enters the value.
-- **Level 2:** one reading per band, at the attenuation that gives about 2 W (1–3 W will
-  do). That is well below the 10 m ceiling, where radio 1 reads high, and far above the
-  detector floor. Choose the attenuation from the PA curve, or with the level 1 defaults
-  (Section 2), which are close enough for this.
+- **Level 2:** one reading at the attenuation that gives about 2 W (1–3 W will do). That is
+  well below the 10 m ceiling, where radio 1 reads high, and far above the detector floor.
+  Choose the attenuation from the PA curve, or with the level 1 defaults (Section 2), which are
+  close enough for this. Then a second reading at 0 dB, for the PA curve's ceiling.
+  - **Why (2026-11-02):** the firmware's level 2 PA curve otherwise comes from the forward
+    detector, which reads radio 1's 10 m ceiling about 2 dB high. The 0 dB reading puts the
+    ceiling right, and no sweep point may read above it.
 
 ### Stages B and C: open and short sweeps
 
-Automatic. Use the same CW drive levels on the open and the short, so the two sweeps can be
-compared level by level:
+Automatic. Use the same drive levels on the open and the short, so the two sweeps can be
+compared level by level. The firmware drives them with the SSB tone and sets its level with DSP
+gain, because the CW carrier's only level control is the 31.5 dB attenuator, and that may not
+give the 8 dB span below (`code/docs/PowerCalibration/AutoCalibration.md`). The tone also leaves
+the radio in true receive between points:
 
-- **Levels:** 5–6 of them, from about 1.2 W of forward power down to the lowest the
-  attenuator gives. Choose the attenuations from the band's PA curve (stage A) for 50 Ω. The
-  PA delivers a different power into an open or a short, but V_f measures what it actually
-  delivers, so the drive need not be exact. At level 1 stage A's automatic sweep gives the
-  PA curve. If stage A was skipped, use the stored PA curve, or step the attenuator on the
-  open until V_f, read with the level 1 defaults, shows about 1.2 W.
-- **Span:** at least 8 dB. Where the attenuator cannot reach 8 dB below 1.2 W, reduce the
-  carrier's DSP gain as well. Its accuracy does not matter, for the same reason.
+- **Levels:** 5–6 of them, from about 1.2 W of forward power down in DSP-gain steps. Choose
+  the first gain from the band's SSB point (stage A) for 50 Ω. The PA delivers a different
+  power into an open or a short, but V_f measures what it actually delivers, so the drive need
+  not be exact. If stage A was skipped, use the stored SSB gain correction, or step the gain
+  on the open until V_f, read with the level 1 defaults, shows about 1.2 W.
+- **Span:** at least 8 dB. DSP gain has no limit here, unlike the CW attenuator. Its accuracy
+  does not matter, for the same reason.
 - **Protecting the PA:** key each point for no more than 2 s, and leave at least 1 s in
   receive between points. The whole short sweep on one band then puts about 12 s of full
   reflection into the PA.
 - **Oscillation check (abort rule).** Radio 2's PA oscillates into a short on 10 m: in
   October, and in all three runs of 2026-11-01 and 11-02, whatever the bridge build. The
   forward reading sat at 1700–2100 mV whatever the drive. After each point, compare V_f with the previous point. When the drive drops by
-  Δ dB, V_f must fall by at least 0.5 × Δ × 25 mV. Also, V_f must not exceed the stage A V_f
-  (at level 1, the open sweep's V_f) at the same attenuation by more than 3 dB × 25 mV. If
+  Δ dB, V_f must fall by at least 0.5 × Δ × 25 mV. The sweep's first point has no previous
+  point: its V_f must not exceed the 50 Ω V_f at the same drive by more than 6 dB × 25 mV. If
   either test fails: unkey, discard that band's short (or open) sweep, and move on to the
   next band.
+  - **Why only the first point, and why 6 dB (2026-11-02):** on the bench sheets the PA puts
+    −3.3 to +4.9 dB into an open or short against 50 Ω at the same drive, and the short reads
+    up to 7 dB above the open (radio 2, 160 m). A 3 dB margin against 50 Ω, or against the
+    open, would have failed radio 2's 20 m open and abandoned five real short sweeps.
+  - **The fall test is the dependable one:** real sweeps fall 17–28 mV per dB of drive.
 - **Falling back to the open alone.** If only the short failed, fit the reflected line to
   the open alone (b_r = b_o, Section 7) and log the band as calibrated from the open only.
   The leak is then not cancelled, which costs up to half the open–short gap: about 0.25 dB
@@ -319,8 +330,13 @@ $$
   ceiling (0 dB attenuation, about 6.6 W) sit 2.0–2.3 dB above the line through the other
   points. The cause is not known. With them in, the 10 m fit is 0.69 dB rms; without them,
   0.13 dB.
-- **Rule for every band:** fit once without the 0 dB point and compute that point's residual.
-  If it is within 0.5 dB, refit with it included. If not, leave it out and log it.
+- **Rule for every band:** treat as ceiling points the 0 dB points and every point whose
+  wattmeter reading is within 1 dB of the band's highest. Fit once without them, and compute
+  each one's residual. Refit with those within 0.5 dB; leave the others out and log it.
+  - **Why more than the 0 dB point (2026-11-02):** with the measured PA curves (tanh k =
+    16–36), the firmware's 5 dB point is saturated too. On radio 1's 10 m the forward detector
+    over-reads all through saturation, by about 0.9 dB at 6 dB and 2.3 dB at 0 dB
+    (`code/tools/swr/ten_m_ceiling/`).
 
 The stored values:
 
@@ -420,14 +436,14 @@ report the failure. The thresholds come from the 2026-10/11 bench sessions.
 | `ED.SWR_R_Offset[band]` | yes | o_r = b_r + 38 |
 | `ED.PowerCal_20W_Psat_mW[band]`, `ED.PowerCal_20W_kindex[band]` | yes | PA curve, from stage A as now |
 | `ED.SWR_F_Floor_mW[band]`, `ED.SWR_R_Floor_mW[band]` | new, optional | P_floor,f and P_floor,r on the line (Section 7) |
-| `ED.SWR_CalLevel[band]` | new, recommended | 0 if the band is uncalibrated, otherwise the level it passed (1, 2 or 3, Section 2), with a flag for a reflected line from the open alone. Lets the display mark the SWR as uncalibrated and show the power display's expected accuracy |
-| `ED.SWR_CalDate[band]` | new, recommended | Time stamp of the calibration (the radio keeps time from the PJRC sync) |
+| `ED.SWR_CalLevel[band]` | yes (2026-11-02) | 0 if the band is uncalibrated, otherwise the level it passed (1, 2 or 3, Section 2), with a flag for a reflected line from the open alone. Lets the display mark the SWR as uncalibrated and show the power display's expected accuracy |
+| `ED.SWR_CalDate[band]` | yes (2026-11-02) | Time stamp of the calibration (the radio keeps time from the PJRC sync) |
 
 Per radio, not per band:
 
 | Field | Exists | Content |
 |---|---|---|
-| `ED.SWR_CouplerTurns` | new, needed for level 1 | L44 turns per core (10 on radio 1, 20 on radio 2). Selects the level 1 defaults (Section 2). Could instead be a build constant beside `COUPLER_ATTENUATION_DB` |
+| `ED.SWR_CouplerTurns` | yes (2026-11-02), set on the AUTO setup screen | L44 turns per core (10 on radio 1, 20 on radio 2). Selects the level 1 defaults (Section 2). Could instead be a build constant beside `COUPLER_ATTENUATION_DB` |
 
 For radio 1 on 40 m, the 2026-11-01 sheet gives s_f = −0.44 mV/dB, o_f = −5.51 dB,
 s_r = +0.13 mV/dB and o_r = −2.71 dB (notebook Section 11.7). The offsets are negative

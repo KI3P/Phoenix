@@ -610,7 +610,17 @@ static void DrawPowerInstructionsPane(void){
  * @note Calibrates power adjustment and measurement circuitry
  */
 void DrawCalibratePower(void){
-        
+    // The automatic calibration has its own screen; redraw when switching
+    static bool autoScreen = false;
+    if (PowerCalAutoActive() != autoScreen){
+        autoScreen = PowerCalAutoActive();
+        uiSM.vars.clearScreen = true;
+    }
+    if (autoScreen){
+        DrawCalibratePowerAuto();
+        return;
+    }
+
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_POWER state");
         tft.writeTo(L2);

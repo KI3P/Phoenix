@@ -1064,6 +1064,11 @@ char *DD_read( char* cmd ){
  * @return Empty string on success, "?;" if the parameter is not 0 or 1
  */
 char *BR_write( char* cmd ){
+    // The automatic power calibration uses the same statistics
+    if (PowerCalAutoActive()){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
     switch( cmd[2] ){
         case '0':
             ClearSWRBridgeStats();

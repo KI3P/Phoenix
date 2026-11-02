@@ -34,7 +34,7 @@ void AutoKey(void);
 void AutoUnkey(void);
 bool AutoNeedsMeterEntry(void);
 void AutoStartMeterEntry(void);
-void ClearSWRBridgeStats(void);
+void AutoStartCollect(void);
 void AutoStorePoint(void);
 bool AutoOscillationDetected(void);
 void AutoAbortBandStage(void);
@@ -155,6 +155,12 @@ static void SETUP_enter(PowerCalSm* sm);
 static void SETUP_exit(PowerCalSm* sm);
 
 static void SETUP_record_data_point(PowerCalSm* sm);
+
+static void STORE_enter(PowerCalSm* sm);
+
+static void STORE_exit(PowerCalSm* sm);
+
+static void STORE_do(PowerCalSm* sm);
 
 static void MANUAL_enter(PowerCalSm* sm);
 
@@ -421,6 +427,17 @@ void PowerCalSm_dispatch_event(PowerCalSm* sm, PowerCalSm_EventId event_id)
             }
             break;
         
+        // STATE: STORE
+        case PowerCalSm_StateId_STORE:
+            switch (event_id)
+            {
+                case PowerCalSm_EventId_DO: STORE_do(sm); break;
+                case PowerCalSm_EventId_RESET: AUTO_reset(sm); break; // First ancestor handler for this event
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
         // STATE: MANUAL
         case PowerCalSm_StateId_MANUAL:
             switch (event_id)
@@ -543,6 +560,8 @@ static void exit_up_to_state_handler(PowerCalSm* sm, PowerCalSm_StateId desired_
             case PowerCalSm_StateId_REVIEW: REVIEW_exit(sm); break;
             
             case PowerCalSm_StateId_SETUP: SETUP_exit(sm); break;
+            
+            case PowerCalSm_StateId_STORE: STORE_exit(sm); break;
             
             case PowerCalSm_StateId_MANUAL: MANUAL_exit(sm); break;
             
@@ -940,10 +959,10 @@ static void COLLECT_enter(PowerCalSm* sm)
     sm->state_id = PowerCalSm_StateId_COLLECT;
     
     // COLLECT behavior
-    // uml: enter / { ClearSWRBridgeStats(); count_ms = 0; }
+    // uml: enter / { AutoStartCollect(); count_ms = 0; }
     {
-        // Step 1: execute action `ClearSWRBridgeStats(); count_ms = 0;`
-        ClearSWRBridgeStats(); sm->vars.count_ms = 0;
+        // Step 1: execute action `AutoStartCollect(); count_ms = 0;`
+        AutoStartCollect(); sm->vars.count_ms = 0;
     } // end of behavior for COLLECT
 }
 
@@ -957,93 +976,19 @@ static void COLLECT_do(PowerCalSm* sm)
     bool consume_event = false;
     
     // COLLECT behavior
-    // uml: do [count_ms >= collect_ms] / { AutoStorePoint(); } TransitionTo(AUTO.<ChoicePoint>())
-    if (sm->vars.count_ms >= sm->vars.collect_ms)
+    // uml: do [AutoServiceIdle() && count_ms >= collect_ms] TransitionTo(STORE)
+    if (AutoServiceIdle() && sm->vars.count_ms >= sm->vars.collect_ms)
     {
         // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
         exit_up_to_state_handler(sm, PowerCalSm_StateId_AUTO);
         
-        // Step 2: Transition action: `AutoStorePoint();`.
-        AutoStorePoint();
+        // Step 2: Transition action: ``.
         
-        // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
-        // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+        // Step 3: Enter/move towards transition target `STORE`.
+        STORE_enter(sm);
         
-        // AUTO.<ChoicePoint>() behavior
-        // uml: 1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)
-        if (AutoOscillationDetected())
-        {
-            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-            
-            // Step 2: Transition action: `AutoAbortBandStage();`.
-            AutoAbortBandStage();
-            
-            // Step 3: Enter/move towards transition target `BAND_DONE`.
-            BAND_DONE_enter(sm);
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for AUTO.<ChoicePoint>()
-        
-        // AUTO.<ChoicePoint>() behavior
-        // uml: 2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)
-        if (AutoMorePoints() && AutoKeepKeyed())
-        {
-            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-            
-            // Step 2: Transition action: ``.
-            
-            // Step 3: Enter/move towards transition target `POINT`.
-            POINT_enter(sm);
-            
-            // Finish transition by calling pseudo state transition function.
-            POINT_InitialState_transition(sm);
-            return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
-        } // end of behavior for AUTO.<ChoicePoint>()
-        
-        // AUTO.<ChoicePoint>() behavior
-        // uml: 3. [AutoMorePoints()] TransitionTo(REST)
-        if (AutoMorePoints())
-        {
-            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-            
-            // Step 2: Transition action: ``.
-            
-            // Step 3: Enter/move towards transition target `REST`.
-            REST_enter(sm);
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for AUTO.<ChoicePoint>()
-        
-        // AUTO.<ChoicePoint>() behavior
-        // uml: 4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)
-        if (AutoForwardFitDue())
-        {
-            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-            
-            // Step 2: Transition action: ``.
-            
-            // Step 3: Enter/move towards transition target `FIT_FORWARD`.
-            FIT_FORWARD_enter(sm);
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for AUTO.<ChoicePoint>()
-        
-        // AUTO.<ChoicePoint>() behavior
-        // uml: else TransitionTo(BAND_DONE)
-        {
-            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-            
-            // Step 2: Transition action: ``.
-            
-            // Step 3: Enter/move towards transition target `BAND_DONE`.
-            BAND_DONE_enter(sm);
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for AUTO.<ChoicePoint>()
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
     } // end of behavior for COLLECT
     
     // Check if event has been consumed before calling ancestor handler.
@@ -1331,8 +1276,8 @@ static void REST_do(PowerCalSm* sm)
     bool consume_event = false;
     
     // REST behavior
-    // uml: do [count_ms >= rest_ms] TransitionTo(POINT)
-    if (sm->vars.count_ms >= sm->vars.rest_ms)
+    // uml: do [AutoServiceIdle() && count_ms >= rest_ms] TransitionTo(POINT)
+    if (AutoServiceIdle() && sm->vars.count_ms >= sm->vars.rest_ms)
     {
         // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
         REST_exit(sm);
@@ -1446,6 +1391,128 @@ static void SETUP_record_data_point(PowerCalSm* sm)
     } // end of behavior for SETUP
     
     // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state STORE
+////////////////////////////////////////////////////////////////////////////////
+
+static void STORE_enter(PowerCalSm* sm)
+{
+    sm->state_id = PowerCalSm_StateId_STORE;
+    
+    // STORE behavior
+    // uml: enter / { AutoStorePoint(); }
+    {
+        // Step 1: execute action `AutoStorePoint();`
+        AutoStorePoint();
+    } // end of behavior for STORE
+}
+
+static void STORE_exit(PowerCalSm* sm)
+{
+    sm->state_id = PowerCalSm_StateId_AUTO;
+}
+
+static void STORE_do(PowerCalSm* sm)
+{
+    bool consume_event = false;
+    
+    // STORE behavior
+    // uml: do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())
+    if (AutoServiceIdle())
+    {
+        // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+        STORE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
+        // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+        
+        // AUTO.<ChoicePoint>() behavior
+        // uml: 1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)
+        if (AutoOscillationDetected())
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: `AutoAbortBandStage();`.
+            AutoAbortBandStage();
+            
+            // Step 3: Enter/move towards transition target `BAND_DONE`.
+            BAND_DONE_enter(sm);
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for AUTO.<ChoicePoint>()
+        
+        // AUTO.<ChoicePoint>() behavior
+        // uml: 2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)
+        if (AutoMorePoints() && AutoKeepKeyed())
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: ``.
+            
+            // Step 3: Enter/move towards transition target `POINT`.
+            POINT_enter(sm);
+            
+            // Finish transition by calling pseudo state transition function.
+            POINT_InitialState_transition(sm);
+            return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+        } // end of behavior for AUTO.<ChoicePoint>()
+        
+        // AUTO.<ChoicePoint>() behavior
+        // uml: 3. [AutoMorePoints()] TransitionTo(REST)
+        if (AutoMorePoints())
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: ``.
+            
+            // Step 3: Enter/move towards transition target `REST`.
+            REST_enter(sm);
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for AUTO.<ChoicePoint>()
+        
+        // AUTO.<ChoicePoint>() behavior
+        // uml: 4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)
+        if (AutoForwardFitDue())
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: ``.
+            
+            // Step 3: Enter/move towards transition target `FIT_FORWARD`.
+            FIT_FORWARD_enter(sm);
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for AUTO.<ChoicePoint>()
+        
+        // AUTO.<ChoicePoint>() behavior
+        // uml: else TransitionTo(BAND_DONE)
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: ``.
+            
+            // Step 3: Enter/move towards transition target `BAND_DONE`.
+            BAND_DONE_enter(sm);
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for AUTO.<ChoicePoint>()
+    } // end of behavior for STORE
+    
+    // Check if event has been consumed before calling ancestor handler.
+    if (!consume_event)
+    {
+        AUTO_do(sm);
+    }
 }
 
 
@@ -1789,6 +1856,7 @@ char const * PowerCalSm_state_id_to_string(PowerCalSm_StateId id)
         case PowerCalSm_StateId_REST: return "REST";
         case PowerCalSm_StateId_REVIEW: return "REVIEW";
         case PowerCalSm_StateId_SETUP: return "SETUP";
+        case PowerCalSm_StateId_STORE: return "STORE";
         case PowerCalSm_StateId_MANUAL: return "MANUAL";
         case PowerCalSm_StateId_MEASUREMENTCOMPLETE: return "MEASUREMENTCOMPLETE";
         case PowerCalSm_StateId_POWERCOMPLETE: return "POWERCOMPLETE";

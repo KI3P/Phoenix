@@ -423,6 +423,22 @@ void ChangePowerCalibrationPhase(void); // forward declare from MainBoard_Displa
 void StartPowerAutoCal(void);
 
 /**
+ * @brief Change band during power calibration
+ * @param band Band to tune to, FIRST_BAND to LAST_BAND
+ * @note Tunes to the middle of the band in the band's default mode and
+ *       updates the RF hardware. Used by the band buttons and by the
+ *       automatic power calibration.
+ */
+void SetCalibrationBand(int32_t band){
+    ED.currentBand[ED.activeVFO] = band;
+    ED.centerFreq_Hz[ED.activeVFO] = (bands[band].fBandHigh_Hz+bands[band].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+    ED.modulation[ED.activeVFO] = bands[band].mode;
+    UpdateRFHardwareState();
+    Debug("Band is " + String(bands[band].name));
+}
+
+/**
  * Process button press events from the front panel.
  *
  * Routes button presses to appropriate handlers based on button ID. Handles:
@@ -441,8 +457,15 @@ void StartPowerAutoCal(void);
  * @param button Button ID from the front panel (defined in button constants)
  */
 void HandleButtonPress(int32_t button){
+    // The automatic power calibration keys the transmitter itself, and needs
+    // SELECT (wattmeter entry), ZOOM (abort) and HOME while it is keyed
+    bool autoCalButton = PowerCalAutoActive() &&
+                         (uiSM.state_id == UISm_StateId_CALIBRATE_POWER) &&
+                         ((button == MENU_OPTION_SELECT) || (button == ZOOM) ||
+                          (button == HOME_SCREEN));
     // Disable all buttons when in an active transmit mode
-    if ((modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
+    if (!autoCalButton && (
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT) ||
@@ -451,7 +474,7 @@ void HandleButtonPress(int32_t button){
         (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
-        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK))
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK)))
         return;
 
     switch (uiSM.state_id){
@@ -919,35 +942,25 @@ void HandleButtonPress(int32_t button){
                 case BAND_UP:{
                     if (PowerCalAutoActive())
                         break; // the automatic calibration chooses the bands
-                    if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
-                        ED.currentBand[ED.activeVFO] = FIRST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
-                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    int32_t band = ED.currentBand[ED.activeVFO] + 1;
+                    SetCalibrationBand((band > LAST_BAND) ? FIRST_BAND : band);
                     ResetPowerCal();
-                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
-                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 case BAND_DN:{
                     if (PowerCalAutoActive())
                         break; // the automatic calibration chooses the bands
-                    if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
-                        ED.currentBand[ED.activeVFO] = LAST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
-                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    int32_t band = ED.currentBand[ED.activeVFO] - 1;
+                    SetCalibrationBand((band < FIRST_BAND) ? LAST_BAND : band);
                     ResetPowerCal();
-                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
-                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 default:
@@ -1343,11 +1356,19 @@ void ConsumeInterrupt(void){
         case (UISm_StateId_CALIBRATE_POWER):{
             switch (interrupt){
                 case (iFILTER_INCREASE):{
-                    IncrementCalibrationPower();
+                    // On the automatic calibration's setup screen the filter
+                    // encoder sets the L44 turns; elsewhere the measured power
+                    if (powerSM.state_id == PowerCalSm_StateId_SETUP)
+                        ChangeAutoCalTurns(+1);
+                    else
+                        IncrementCalibrationPower();
                     break;
                 }
                 case (iFILTER_DECREASE):{
-                    DecrementCalibrationPower();
+                    if (powerSM.state_id == PowerCalSm_StateId_SETUP)
+                        ChangeAutoCalTurns(-1);
+                    else
+                        DecrementCalibrationPower();
                     break;
                 }
                 case (iVOLUME_INCREASE):{
@@ -1404,10 +1425,15 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iPTT_PRESSED):{
+            // The automatic power calibration does its own keying; ignore the PTT
+            if (PowerCalAutoActive())
+                break;
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
             break;
         }
         case (iPTT_RELEASED):{
+            if (PowerCalAutoActive())
+                break;
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
             break;
         }

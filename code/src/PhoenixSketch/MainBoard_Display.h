@@ -336,6 +336,7 @@ void DrawCalibrateTXIQ(void);
  * @note Maps power settings to actual RF output levels
  */
 void DrawCalibratePower(void);
+void DrawCalibratePowerAuto(void);
 
 /**
  * @brief Start automatic RX IQ calibration procedure

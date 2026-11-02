@@ -19,6 +19,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #ifndef HARDWARESM_H
 #define HARDWARESM_H
 #include "SDT.h"
+#include "PowerCalSm.h" // PowerCalSm_EventId; SDT.h includes this header first
 
 // RF Board state machine states
 enum RFHardwareState {
@@ -62,6 +63,27 @@ void SetCWAttenuationOverride(float32_t att_dB);
  */
 float32_t GetCWAttenuationOverride(void);
 
+/**
+ * @brief Force the total SSB transmit DSP gain, bypassing the band correction
+ *        and the power setting
+ * @param gain_dB Gain applied by TXGain(), in dB
+ * @note Takes effect with the next transmit block. Not saved; set by the
+ *       automatic power calibration to step the SSB tone's level.
+ */
+void SetSSBGainOverride(float32_t gain_dB);
+
+/**
+ * @brief Return the SSB transmit DSP gain to the band correction and power setting
+ */
+void ClearSSBGainOverride(void);
+
+/**
+ * @brief The forced SSB transmit DSP gain
+ * @param gain_dB Set to the forced gain if there is one
+ * @return true if an override is set
+ */
+bool GetSSBGainOverride(float32_t *gain_dB);
+
 // Power calibration routines
 float32_t GetPowDataSum(void);
 uint32_t GetNpoints(void);
@@ -97,15 +119,79 @@ struct AutoCalSession {
     bool forwardFitDone;      // load stage: forward line fitted for this band
     bool ssbPoint;            // the current point is the SSB tone point
     bool oscillation;         // the last point failed the oscillation check
-    bool keyed;               // the calibration has the transmitter keyed
+    bool keyed;               // the calibration wants the transmitter keyed
+    bool ssbMode;             // the point uses the SSB tone (CALIBRATE_OFFSET), not CW
+    float32_t drive_dB;       // drive of the current point: attenuation (CW) or DSP gain (SSB)
+    uint32_t collectLoad_ms;      // collect time on the load
+    uint32_t collectReflection_ms;// collect time on the open and short (keyed <= 2 s per point)
+    uint32_t minReadings;     // a point with fewer bridge readings fails its band
+    // Work posted by the actions for PowerCalAutoService()
+    bool setDrive;            // set the drive for the current point
+    bool clearStats;          // start a fresh set of bridge statistics
+    bool storePoint;          // keep the readings of the point just collected
+    bool fitForward;          // fit the band's forward line
+    bool finishBand;          // finish the band on this standard
+    bool fitAll;              // fit and check every band
+    bool commit;              // store the bands that passed
     volatile bool servicePending; // work is waiting for PowerCalAutoService()
+    // For the display
+    float32_t lastVf_mV, lastVfSD_mV, lastVr_mV, lastVrSD_mV; // last point's readings
+    uint32_t lastN;           // number of readings in the last point
+    uint32_t resultsVersion;  // changes whenever a band's results change
 };
 extern AutoCalSession autoCal;
 
+// Bits of AutoCalBandResult.failBits: the acceptance checks of
+// swr_calibration_approach.md Section 8 that the band failed
+#define AUTO_FAIL_FEW_READINGS   (1u << 0)  // a point had too few bridge readings
+#define AUTO_FAIL_FORWARD_FIT    (1u << 1)  // no forward line, or level 3 fit rms/worst too large
+#define AUTO_FAIL_FORWARD_SLOPE  (1u << 2)  // level 3 slope outside 22-28 mV/dB or 5 % of the median
+#define AUTO_FAIL_DRIFT          (1u << 3)  // level 3 repeated point moved too far
+#define AUTO_FAIL_LEVEL2_OFFSET  (1u << 4)  // level 2 offset too far from the level 1 default
+#define AUTO_FAIL_OPEN           (1u << 5)  // open sweep abandoned or not fitted
+#define AUTO_FAIL_REFLECTED_FIT  (1u << 6)  // reflected fit rms too large
+#define AUTO_FAIL_REFLECTED_SLOPE (1u << 7) // reflected slope too far from the forward slope
+#define AUTO_FAIL_GAP            (1u << 8)  // open-short intercept gap too large
+#define AUTO_FAIL_S50            (1u << 9)  // the load's SWR too high
+#define AUTO_FAIL_PA_CURVE       (1u << 10) // the PA curve or SSB gain could not be fitted
+
+/** Results of one band in the automatic calibration */
+struct AutoCalBandResult {
+    bool inSession;           // the band is calibrated this session
+    bool hasForward;          // forward line fitted
+    float32_t m_f, b_f;       // forward line: slope (mV/dB) and intercept (dBm)
+    float32_t forwardRms_dB, forwardWorst_dB; // level 3 fit residuals
+    bool ceilingDropped;      // level 3: the 0 dB points were left out
+    float32_t drift_dB;       // level 3: change of the repeated point
+    float32_t level2Delta_dB; // level 2: offset minus the level 1 default
+    bool hasPACurve;          // PA curve and SSB gain measured
+    float32_t Psat_mW, kindex;// PA curve
+    float32_t ceilingOverRead_dB; // level 2: detector at 0 dB minus the wattmeter
+    float32_t ssbCorrection_dB; // SSB DSP gain correction
+    bool hasReflected;        // reflected line fitted
+    bool openOnly;            // reflected line from the open alone
+    float32_t m_r, b_r;       // reflected line
+    float32_t gap_dB;         // open intercept minus short intercept
+    float32_t reflectedRms_dB;
+    bool hasS50;              // S50 measured (needs the load stage)
+    float32_t S50;            // SWR of the load
+    bool checked;             // the acceptance checks have run
+    uint32_t failBits;        // AUTO_FAIL_* bits; 0 means passed
+};
+
+/**
+ * @brief Results of a band in the current automatic calibration session
+ * @param band FIRST_BAND to LAST_BAND
+ */
+const AutoCalBandResult *GetAutoCalResult(int32_t band);
+
+void PowerCalDispatch(PowerCalSm_EventId event);
+bool PowerCalSmBusy(void);
 void StartPowerAutoCal(void);
 bool PowerCalAutoActive(void);
 void PowerCalAutoService(void);
 void ChangeAutoCalLevel(int32_t delta);
+void ChangeAutoCalTurns(int32_t delta);
 void SkipPowerCalStage(void);
 void RetryPowerCal(void);
 

@@ -671,11 +671,13 @@ float32_t ReadADCRefRaw(void){
 // Sums are kept in double: a long key-down collects thousands of readings of
 // about 2000 mV, and the variance is a small difference of large sums.
 static uint32_t bridgeN = 0;
+static uint32_t bridgeRejected = 0;
 static double bridgeSum[2] = {0, 0};
 static double bridgeSumSq[2] = {0, 0};
 
 void ClearSWRBridgeStats(void){
     bridgeN = 0;
+    bridgeRejected = 0;
     bridgeSum[0] = bridgeSum[1] = 0;
     bridgeSumSq[0] = bridgeSumSq[1] = 0;
 }
@@ -683,8 +685,10 @@ void ClearSWRBridgeStats(void){
 void AccumulateSWRBridgeStats(float32_t fwd_mV, float32_t ref_mV){
     // readADCsingle() reports a failed I2C read as 65535 or 65534, far above
     // the 4096 mV full scale. Leave those out rather than average them in.
-    if (fwd_mV < 0 || fwd_mV > VREF_MV || ref_mV < 0 || ref_mV > VREF_MV)
+    if (fwd_mV < 0 || fwd_mV > VREF_MV || ref_mV < 0 || ref_mV > VREF_MV){
+        bridgeRejected++;
         return;
+    }
     bridgeN++;
     bridgeSum[0] += fwd_mV;
     bridgeSum[1] += ref_mV;
@@ -711,6 +715,7 @@ void GetSWRBridgeStats(SWRBridgeStats *stats){
         }
     }
     stats->n = bridgeN;
+    stats->rejected = bridgeRejected;
     stats->fwdMean_mV = mean[0];
     stats->fwdSD_mV = sd[0];
     stats->refMean_mV = mean[1];

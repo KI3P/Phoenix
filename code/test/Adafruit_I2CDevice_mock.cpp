@@ -9,6 +9,7 @@ uint8_t Adafruit_I2CDevice::mock_read_data[16] = {0};
 size_t Adafruit_I2CDevice::mock_read_length = 0;
 int Adafruit_I2CDevice::mock_write_then_read_count = 0;
 int Adafruit_I2CDevice::mock_fail_after = -1;
+uint16_t (*Adafruit_I2CDevice::mock_adc_provider)(uint8_t channel) = nullptr;
 
 Adafruit_I2CDevice::Adafruit_I2CDevice(uint8_t addr, TwoWire *theWire)
     : _addr(addr), _wire(theWire), _begun(false) {
@@ -77,7 +78,9 @@ bool Adafruit_I2CDevice::write_then_read(const uint8_t *write_buffer, size_t wri
         // Construct response with channel ID in bits 5-4 of first byte
         // Use mock_read_data for the actual ADC value (12-bit)
         uint16_t adcValue = 0;
-        if (mock_read_length >= 2) {
+        if (mock_adc_provider != nullptr) {
+            adcValue = mock_adc_provider(channelId) & 0x0FFF;
+        } else if (mock_read_length >= 2) {
             // Extract 12-bit value from mock data
             adcValue = ((mock_read_data[0] & 0x0F) << 8) | mock_read_data[1];
         }
@@ -126,7 +129,12 @@ void Adafruit_I2CDevice::resetMockState() {
     mock_read_length = 0;
     mock_write_then_read_count = 0;
     mock_fail_after = -1;
+    mock_adc_provider = nullptr;
     memset(mock_read_data, 0, sizeof(mock_read_data));
+}
+
+void Adafruit_I2CDevice::setMockADCProvider(uint16_t (*provider)(uint8_t channel)) {
+    mock_adc_provider = provider;
 }
 
 int Adafruit_I2CDevice::getWriteThenReadCount() {

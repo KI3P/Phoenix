@@ -303,22 +303,6 @@ state AUTO {
         %% See https://github.com/StateSmith/StateSmith/issues/404
         state "." as AUTO.(InitialState)
 
-        SETUP
-
-        SETUP : SETUP
-
-        PROMPT
-
-        PROMPT : PROMPT
-
-        PROMPT : enter / #123; AutoPromptStandard()#59; #125;
-
-        BAND
-
-        BAND : BAND
-
-        BAND : enter / #123; AutoSelectBand()#59; count_ms = 0#59; #125;
-
         state POINT {
 
                 %% Initial state name as "." so that it fits in black circle shape.
@@ -349,7 +333,7 @@ state AUTO {
 
                 COLLECT : COLLECT
 
-                COLLECT : enter / #123; ClearSWRBridgeStats()#59; count_ms = 0#59; #125;
+                COLLECT : enter / #123; AutoStartCollect()#59; count_ms = 0#59; #125;
 
         }
 
@@ -389,6 +373,28 @@ state AUTO {
 
         DONE : DONE
 
+        SETUP
+
+        SETUP : SETUP
+
+        PROMPT
+
+        PROMPT : PROMPT
+
+        PROMPT : enter / #123; AutoPromptStandard()#59; #125;
+
+        BAND
+
+        BAND : BAND
+
+        BAND : enter / #123; AutoSelectBand()#59; count_ms = 0#59; #125;
+
+        STORE
+
+        STORE : STORE
+
+        STORE : enter / #123; AutoStorePoint()#59; #125;
+
 }
 
 ROOT.(InitialState) --> MANUAL
@@ -413,14 +419,6 @@ AUTO --> MANUAL : RESET
 
 AUTO.(InitialState) --> SETUP
 
-SETUP --> PROMPT : RECORD_DATA_POINT / #123; AutoBeginSession()#59; #125;
-
-PROMPT --> BAND : RECORD_DATA_POINT / #123; AutoFirstBand()#59; #125;
-
-PROMPT --> PROMPT : SKIP [AutoCanSkipStage()] / #123; AutoSkipStage()#59; #125;
-
-BAND --> POINT : do [AutoServiceIdle() && count_ms >= bandSettle_ms]
-
 POINT.(InitialState) --> KEYDOWN
 
 KEYDOWN --> POINT.(ChoicePoint)() : do [AutoServiceIdle() && count_ms >= settle_ms]
@@ -435,7 +433,7 @@ METER_ENTRY --> METER_PAUSED : do [count_ms >= meterTimeout_ms]
 
 METER_PAUSED --> KEYDOWN : RECORD_DATA_POINT
 
-COLLECT --> AUTO.(ChoicePoint)() : do [count_ms >= collect_ms] / #123; AutoStorePoint()#59; #125;
+COLLECT --> STORE : do [AutoServiceIdle() && count_ms >= collect_ms]
 
 AUTO.(ChoicePoint)() --> BAND_DONE : 1. [AutoOscillationDetected()] / #123; AutoAbortBandStage()#59; #125;
 
@@ -447,7 +445,7 @@ AUTO.(ChoicePoint)() --> FIT_FORWARD : 4. [AutoForwardFitDue()]
 
 AUTO.(ChoicePoint)() --> BAND_DONE : else
 
-REST --> POINT : do [count_ms >= rest_ms]
+REST --> POINT : do [AutoServiceIdle() && count_ms >= rest_ms]
 
 FIT_FORWARD --> POINT : do [AutoServiceIdle()]
 
@@ -464,6 +462,16 @@ FIT_ALL --> REVIEW : do [AutoServiceIdle()]
 REVIEW --> DONE : RECORD_DATA_POINT / #123; AutoCommitResults()#59; #125;
 
 REVIEW --> SETUP : RETRY [AutoAnyFailed()] / #123; AutoRetryFailed()#59; #125;
+
+SETUP --> PROMPT : RECORD_DATA_POINT / #123; AutoBeginSession()#59; #125;
+
+PROMPT --> BAND : RECORD_DATA_POINT / #123; AutoFirstBand()#59; #125;
+
+PROMPT --> PROMPT : SKIP [AutoCanSkipStage()] / #123; AutoSkipStage()#59; #125;
+
+BAND --> POINT : do [AutoServiceIdle() && count_ms >= bandSettle_ms]
+
+STORE --> AUTO.(ChoicePoint)() : do [AutoServiceIdle()]
 
 
 
@@ -545,17 +553,18 @@ evaluateGuard = null;
         REST : 13,
         REVIEW : 14,
         SETUP : 15,
-        MANUAL : 16,
-        MEASUREMENTCOMPLETE : 17,
-        POWERCOMPLETE : 18,
-        POWERPOINT1 : 19,
-        POWERPOINT2 : 20,
-        POWERPOINT3 : 21,
-        SSBPOINT : 22,
+        STORE : 16,
+        MANUAL : 17,
+        MEASUREMENTCOMPLETE : 18,
+        POWERCOMPLETE : 19,
+        POWERPOINT1 : 20,
+        POWERPOINT2 : 21,
+        POWERPOINT3 : 22,
+        SSBPOINT : 23,
     }
     static { Object.freeze(this.StateId); }
     
-    static StateIdCount = 23;
+    static StateIdCount = 24;
     static { Object.freeze(this.StateIdCount); }
     
     // Used internally by state machine. Feel free to inspect, but don't modify.
@@ -746,6 +755,15 @@ evaluateGuard = null;
                 }
                 break;
             
+            // STATE: STORE
+            case PowerCalSm.StateId.STORE:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#STORE_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
             // STATE: MANUAL
             case PowerCalSm.StateId.MANUAL:
                 switch (eventId)
@@ -854,6 +872,8 @@ evaluateGuard = null;
                 case PowerCalSm.StateId.REVIEW: this.#REVIEW_exit(); break;
                 
                 case PowerCalSm.StateId.SETUP: this.#SETUP_exit(); break;
+                
+                case PowerCalSm.StateId.STORE: this.#STORE_exit(); break;
                 
                 case PowerCalSm.StateId.MANUAL: this.#MANUAL_exit(); break;
                 
@@ -1002,14 +1022,14 @@ evaluateGuard = null;
         let consume_event = false;
         
         // BAND behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= bandSettle_ms") || this.evaluateGuard("BAND","do [AutoServiceIdle() && count_ms >= bandSettle_ms] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge14"); } TransitionTo(POINT)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= bandSettle_ms") || this.evaluateGuard("BAND","do [AutoServiceIdle() && count_ms >= bandSettle_ms] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge36"); } TransitionTo(POINT)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= bandSettle_ms") || this.evaluateGuard("BAND","do [AutoServiceIdle() && count_ms >= bandSettle_ms] TransitionTo(POINT)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#BAND_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
-            this.tracer?.edgeTransition("edge14");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge36");`.
+            this.tracer?.edgeTransition("edge36");
             
             // Step 3: Enter/move towards transition target `POINT`.
             this.#POINT_enter();
@@ -1067,26 +1087,26 @@ evaluateGuard = null;
         let consume_event = false;
         
         // BAND_DONE behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("BAND_DONE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge30"); } TransitionTo(AUTO.<ChoicePoint>())
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("BAND_DONE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge26"); } TransitionTo(AUTO.<ChoicePoint>())
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("BAND_DONE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#BAND_DONE_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge30");`.
-            this.tracer?.edgeTransition("edge30");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge26");`.
+            this.tracer?.edgeTransition("edge26");
             
             // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
             // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
             
             // AUTO.<ChoicePoint>() behavior
-            // uml: 1. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreBands()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoMoreBands()] / { AutoNextBand(); } TransitionTo(BAND)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge31"); } TransitionTo(BAND)
+            // uml: 1. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreBands()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoMoreBands()] / { AutoNextBand(); } TransitionTo(BAND)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge27"); } TransitionTo(BAND)
             if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreBands()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoMoreBands()] / { AutoNextBand(); } TransitionTo(BAND)"))
             {
                 // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
-                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge31");`.
-                this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge31");
+                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge27");`.
+                this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge27");
                 
                 // Step 3: Enter/move towards transition target `BAND`.
                 this.#BAND_enter();
@@ -1096,13 +1116,13 @@ evaluateGuard = null;
             } // end of behavior for AUTO.<ChoicePoint>()
             
             // AUTO.<ChoicePoint>() behavior
-            // uml: 2. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreStages()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMoreStages()] / { AutoNextStage(); } TransitionTo(PROMPT)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge32"); } TransitionTo(PROMPT)
+            // uml: 2. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreStages()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMoreStages()] / { AutoNextStage(); } TransitionTo(PROMPT)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge28"); } TransitionTo(PROMPT)
             if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreStages()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMoreStages()] / { AutoNextStage(); } TransitionTo(PROMPT)"))
             {
                 // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
-                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge32");`.
-                this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge32");
+                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge28");`.
+                this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge28");
                 
                 // Step 3: Enter/move towards transition target `PROMPT`.
                 this.#PROMPT_enter();
@@ -1112,12 +1132,12 @@ evaluateGuard = null;
             } // end of behavior for AUTO.<ChoicePoint>()
             
             // AUTO.<ChoicePoint>() behavior
-            // uml: else / { this.tracer?.edgeTransition("edge33"); } TransitionTo(FIT_ALL)
+            // uml: else / { this.tracer?.edgeTransition("edge29"); } TransitionTo(FIT_ALL)
             {
                 // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge33");`.
-                this.tracer?.edgeTransition("edge33");
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge29");`.
+                this.tracer?.edgeTransition("edge29");
                 
                 // Step 3: Enter/move towards transition target `FIT_ALL`.
                 this.#FIT_ALL_enter();
@@ -1204,14 +1224,14 @@ evaluateGuard = null;
         let consume_event = false;
         
         // FIT_ALL behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_ALL","do [AutoServiceIdle()] TransitionTo(REVIEW)")] / { this.tracer?.edgeTransition("edge34"); } TransitionTo(REVIEW)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_ALL","do [AutoServiceIdle()] TransitionTo(REVIEW)")] / { this.tracer?.edgeTransition("edge30"); } TransitionTo(REVIEW)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_ALL","do [AutoServiceIdle()] TransitionTo(REVIEW)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#FIT_ALL_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge34");`.
-            this.tracer?.edgeTransition("edge34");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge30");`.
+            this.tracer?.edgeTransition("edge30");
             
             // Step 3: Enter/move towards transition target `REVIEW`.
             this.#REVIEW_enter();
@@ -1268,14 +1288,14 @@ evaluateGuard = null;
         let consume_event = false;
         
         // FIT_FORWARD behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_FORWARD","do [AutoServiceIdle()] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge29"); } TransitionTo(POINT)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_FORWARD","do [AutoServiceIdle()] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge25"); } TransitionTo(POINT)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_FORWARD","do [AutoServiceIdle()] TransitionTo(POINT)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#FIT_FORWARD_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge29");`.
-            this.tracer?.edgeTransition("edge29");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge25");`.
+            this.tracer?.edgeTransition("edge25");
             
             // Step 3: Enter/move towards transition target `POINT`.
             this.#POINT_enter();
@@ -1331,12 +1351,12 @@ evaluateGuard = null;
     #POINT_InitialState_transition()
     {
         // POINT.<InitialState> behavior
-        // uml: / { this.tracer?.edgeTransition("edge15"); } TransitionTo(KEYDOWN)
+        // uml: / { this.tracer?.edgeTransition("edge11"); } TransitionTo(KEYDOWN)
         {
             // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge15");`.
-            this.tracer?.edgeTransition("edge15");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
+            this.tracer?.edgeTransition("edge11");
             
             // Step 3: Enter/move towards transition target `KEYDOWN`.
             this.#KEYDOWN_enter();
@@ -1363,10 +1383,10 @@ evaluateGuard = null;
         } // end of behavior for COLLECT
         
         // COLLECT behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "ClearSWRBridgeStats(); count_ms = 0;"); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoStartCollect(); count_ms = 0;"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "ClearSWRBridgeStats(); count_ms = 0;");`
-            this.tracer?.log("⚡ FSM would execute action: " + "ClearSWRBridgeStats(); count_ms = 0;");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoStartCollect(); count_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoStartCollect(); count_ms = 0;");
         } // end of behavior for COLLECT
     }
     
@@ -1387,97 +1407,20 @@ evaluateGuard = null;
         let consume_event = false;
         
         // COLLECT behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= collect_ms") || this.evaluateGuard("COLLECT","do [count_ms >= collect_ms] / { AutoStorePoint(); } TransitionTo(AUTO.<ChoicePoint>())")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");this.tracer?.edgeTransition("edge22"); } TransitionTo(AUTO.<ChoicePoint>())
-        if (this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= collect_ms") || this.evaluateGuard("COLLECT","do [count_ms >= collect_ms] / { AutoStorePoint(); } TransitionTo(AUTO.<ChoicePoint>())"))
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= collect_ms") || this.evaluateGuard("COLLECT","do [AutoServiceIdle() && count_ms >= collect_ms] TransitionTo(STORE)")] / { this.tracer?.edgeTransition("edge18"); } TransitionTo(STORE)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= collect_ms") || this.evaluateGuard("COLLECT","do [AutoServiceIdle() && count_ms >= collect_ms] TransitionTo(STORE)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#exitUpToStateHandler(PowerCalSm.StateId.AUTO);
             
-            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");this.tracer?.edgeTransition("edge22");`.
-            this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");this.tracer?.edgeTransition("edge22");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
+            this.tracer?.edgeTransition("edge18");
             
-            // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
-            // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+            // Step 3: Enter/move towards transition target `STORE`.
+            this.#STORE_enter();
             
-            // AUTO.<ChoicePoint>() behavior
-            // uml: 1. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoOscillationDetected()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge23"); } TransitionTo(BAND_DONE)
-            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoOscillationDetected()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)"))
-            {
-                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-                
-                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge23");`.
-                this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge23");
-                
-                // Step 3: Enter/move towards transition target `BAND_DONE`.
-                this.#BAND_DONE_enter();
-                
-                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-                return;
-            } // end of behavior for AUTO.<ChoicePoint>()
-            
-            // AUTO.<ChoicePoint>() behavior
-            // uml: 2. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints() && AutoKeepKeyed()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge24"); } TransitionTo(POINT)
-            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints() && AutoKeepKeyed()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)"))
-            {
-                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-                
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge24");`.
-                this.tracer?.edgeTransition("edge24");
-                
-                // Step 3: Enter/move towards transition target `POINT`.
-                this.#POINT_enter();
-                
-                // Finish transition by calling pseudo state transition function.
-                this.#POINT_InitialState_transition();
-                return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
-            } // end of behavior for AUTO.<ChoicePoint>()
-            
-            // AUTO.<ChoicePoint>() behavior
-            // uml: 3. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints()") || this.evaluateGuard("AUTO.<ChoicePoint>()","3. [AutoMorePoints()] TransitionTo(REST)")] / { this.tracer?.edgeTransition("edge25"); } TransitionTo(REST)
-            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints()") || this.evaluateGuard("AUTO.<ChoicePoint>()","3. [AutoMorePoints()] TransitionTo(REST)"))
-            {
-                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-                
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge25");`.
-                this.tracer?.edgeTransition("edge25");
-                
-                // Step 3: Enter/move towards transition target `REST`.
-                this.#REST_enter();
-                
-                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-                return;
-            } // end of behavior for AUTO.<ChoicePoint>()
-            
-            // AUTO.<ChoicePoint>() behavior
-            // uml: 4. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoForwardFitDue()") || this.evaluateGuard("AUTO.<ChoicePoint>()","4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)")] / { this.tracer?.edgeTransition("edge26"); } TransitionTo(FIT_FORWARD)
-            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoForwardFitDue()") || this.evaluateGuard("AUTO.<ChoicePoint>()","4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)"))
-            {
-                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-                
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge26");`.
-                this.tracer?.edgeTransition("edge26");
-                
-                // Step 3: Enter/move towards transition target `FIT_FORWARD`.
-                this.#FIT_FORWARD_enter();
-                
-                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-                return;
-            } // end of behavior for AUTO.<ChoicePoint>()
-            
-            // AUTO.<ChoicePoint>() behavior
-            // uml: else / { this.tracer?.edgeTransition("edge27"); } TransitionTo(BAND_DONE)
-            {
-                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
-                
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge27");`.
-                this.tracer?.edgeTransition("edge27");
-                
-                // Step 3: Enter/move towards transition target `BAND_DONE`.
-                this.#BAND_DONE_enter();
-                
-                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-                return;
-            } // end of behavior for AUTO.<ChoicePoint>()
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
         } // end of behavior for COLLECT
         
         // Check if event has been consumed before calling ancestor handler.
@@ -1528,26 +1471,26 @@ evaluateGuard = null;
         let consume_event = false;
         
         // KEYDOWN behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= settle_ms") || this.evaluateGuard("KEYDOWN","do [AutoServiceIdle() && count_ms >= settle_ms] TransitionTo(POINT.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge16"); } TransitionTo(POINT.<ChoicePoint>())
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= settle_ms") || this.evaluateGuard("KEYDOWN","do [AutoServiceIdle() && count_ms >= settle_ms] TransitionTo(POINT.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge12"); } TransitionTo(POINT.<ChoicePoint>())
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= settle_ms") || this.evaluateGuard("KEYDOWN","do [AutoServiceIdle() && count_ms >= settle_ms] TransitionTo(POINT.<ChoicePoint>())"))
         {
             // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
             this.#KEYDOWN_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
-            this.tracer?.edgeTransition("edge16");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
+            this.tracer?.edgeTransition("edge12");
             
             // Step 3: Enter/move towards transition target `POINT.<ChoicePoint>()`.
             // POINT.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
             
             // POINT.<ChoicePoint>() behavior
-            // uml: [this.tracer?.log("🛡️ User evaluating guard: " + "AutoNeedsMeterEntry()") || this.evaluateGuard("POINT.<ChoicePoint>()","[AutoNeedsMeterEntry()] TransitionTo(METER_ENTRY)")] / { this.tracer?.edgeTransition("edge17"); } TransitionTo(METER_ENTRY)
+            // uml: [this.tracer?.log("🛡️ User evaluating guard: " + "AutoNeedsMeterEntry()") || this.evaluateGuard("POINT.<ChoicePoint>()","[AutoNeedsMeterEntry()] TransitionTo(METER_ENTRY)")] / { this.tracer?.edgeTransition("edge13"); } TransitionTo(METER_ENTRY)
             if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoNeedsMeterEntry()") || this.evaluateGuard("POINT.<ChoicePoint>()","[AutoNeedsMeterEntry()] TransitionTo(METER_ENTRY)"))
             {
                 // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
-                this.tracer?.edgeTransition("edge17");
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
+                this.tracer?.edgeTransition("edge13");
                 
                 // Step 3: Enter/move towards transition target `METER_ENTRY`.
                 this.#METER_ENTRY_enter();
@@ -1557,12 +1500,12 @@ evaluateGuard = null;
             } // end of behavior for POINT.<ChoicePoint>()
             
             // POINT.<ChoicePoint>() behavior
-            // uml: else / { this.tracer?.edgeTransition("edge18"); } TransitionTo(COLLECT)
+            // uml: else / { this.tracer?.edgeTransition("edge14"); } TransitionTo(COLLECT)
             {
                 // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
-                // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
-                this.tracer?.edgeTransition("edge18");
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
+                this.tracer?.edgeTransition("edge14");
                 
                 // Step 3: Enter/move towards transition target `COLLECT`.
                 this.#COLLECT_enter();
@@ -1620,14 +1563,14 @@ evaluateGuard = null;
         let consume_event = false;
         
         // METER_ENTRY behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= meterTimeout_ms") || this.evaluateGuard("METER_ENTRY","do [count_ms >= meterTimeout_ms] TransitionTo(METER_PAUSED)")] / { this.tracer?.edgeTransition("edge20"); } TransitionTo(METER_PAUSED)
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= meterTimeout_ms") || this.evaluateGuard("METER_ENTRY","do [count_ms >= meterTimeout_ms] TransitionTo(METER_PAUSED)")] / { this.tracer?.edgeTransition("edge16"); } TransitionTo(METER_PAUSED)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= meterTimeout_ms") || this.evaluateGuard("METER_ENTRY","do [count_ms >= meterTimeout_ms] TransitionTo(METER_PAUSED)"))
         {
             // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
             this.#METER_ENTRY_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge20");`.
-            this.tracer?.edgeTransition("edge20");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
+            this.tracer?.edgeTransition("edge16");
             
             // Step 3: Enter/move towards transition target `METER_PAUSED`.
             this.#METER_PAUSED_enter();
@@ -1646,13 +1589,13 @@ evaluateGuard = null;
     #METER_ENTRY_record_data_point()
     {
         // METER_ENTRY behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge19"); } TransitionTo(COLLECT)
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge15"); } TransitionTo(COLLECT)
         {
             // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
             this.#METER_ENTRY_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge19");`.
-            this.tracer?.edgeTransition("edge19");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge15");`.
+            this.tracer?.edgeTransition("edge15");
             
             // Step 3: Enter/move towards transition target `COLLECT`.
             this.#COLLECT_enter();
@@ -1703,13 +1646,13 @@ evaluateGuard = null;
     #METER_PAUSED_record_data_point()
     {
         // METER_PAUSED behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge21"); } TransitionTo(KEYDOWN)
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge17"); } TransitionTo(KEYDOWN)
         {
             // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
             this.#METER_PAUSED_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge21");`.
-            this.tracer?.edgeTransition("edge21");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
+            this.tracer?.edgeTransition("edge17");
             
             // Step 3: Enter/move towards transition target `KEYDOWN`.
             this.#KEYDOWN_enter();
@@ -1760,13 +1703,13 @@ evaluateGuard = null;
     #PROMPT_record_data_point()
     {
         // PROMPT behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge12"); } TransitionTo(BAND)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge34"); } TransitionTo(BAND)
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#PROMPT_exit();
             
-            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge12");`.
-            this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge12");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge34");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge34");
             
             // Step 3: Enter/move towards transition target `BAND`.
             this.#BAND_enter();
@@ -1781,14 +1724,14 @@ evaluateGuard = null;
     #PROMPT_skip()
     {
         // PROMPT behavior
-        // uml: SKIP [this.tracer?.log("🛡️ User evaluating guard: " + "AutoCanSkipStage()") || this.evaluateGuard("PROMPT","SKIP [AutoCanSkipStage()] / { AutoSkipStage(); } TransitionTo(PROMPT)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge13"); } TransitionTo(PROMPT)
+        // uml: SKIP [this.tracer?.log("🛡️ User evaluating guard: " + "AutoCanSkipStage()") || this.evaluateGuard("PROMPT","SKIP [AutoCanSkipStage()] / { AutoSkipStage(); } TransitionTo(PROMPT)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge35"); } TransitionTo(PROMPT)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoCanSkipStage()") || this.evaluateGuard("PROMPT","SKIP [AutoCanSkipStage()] / { AutoSkipStage(); } TransitionTo(PROMPT)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#PROMPT_exit();
             
-            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge13");`.
-            this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge13");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge35");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge35");
             
             // Step 3: Enter/move towards transition target `PROMPT`.
             this.#PROMPT_enter();
@@ -1841,14 +1784,14 @@ evaluateGuard = null;
         let consume_event = false;
         
         // REST behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= rest_ms") || this.evaluateGuard("REST","do [count_ms >= rest_ms] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge28"); } TransitionTo(POINT)
-        if (this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= rest_ms") || this.evaluateGuard("REST","do [count_ms >= rest_ms] TransitionTo(POINT)"))
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= rest_ms") || this.evaluateGuard("REST","do [AutoServiceIdle() && count_ms >= rest_ms] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge24"); } TransitionTo(POINT)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= rest_ms") || this.evaluateGuard("REST","do [AutoServiceIdle() && count_ms >= rest_ms] TransitionTo(POINT)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#REST_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge28");`.
-            this.tracer?.edgeTransition("edge28");
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge24");`.
+            this.tracer?.edgeTransition("edge24");
             
             // Step 3: Enter/move towards transition target `POINT`.
             this.#POINT_enter();
@@ -1897,13 +1840,13 @@ evaluateGuard = null;
     #REVIEW_record_data_point()
     {
         // REVIEW behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge35"); } TransitionTo(DONE)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge31"); } TransitionTo(DONE)
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#REVIEW_exit();
             
-            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge35");`.
-            this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge35");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge31");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge31");
             
             // Step 3: Enter/move towards transition target `DONE`.
             this.#DONE_enter();
@@ -1918,14 +1861,14 @@ evaluateGuard = null;
     #REVIEW_retry()
     {
         // REVIEW behavior
-        // uml: RETRY [this.tracer?.log("🛡️ User evaluating guard: " + "AutoAnyFailed()") || this.evaluateGuard("REVIEW","RETRY [AutoAnyFailed()] / { AutoRetryFailed(); } TransitionTo(SETUP)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge36"); } TransitionTo(SETUP)
+        // uml: RETRY [this.tracer?.log("🛡️ User evaluating guard: " + "AutoAnyFailed()") || this.evaluateGuard("REVIEW","RETRY [AutoAnyFailed()] / { AutoRetryFailed(); } TransitionTo(SETUP)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge32"); } TransitionTo(SETUP)
         if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoAnyFailed()") || this.evaluateGuard("REVIEW","RETRY [AutoAnyFailed()] / { AutoRetryFailed(); } TransitionTo(SETUP)"))
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#REVIEW_exit();
             
-            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge36");`.
-            this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge36");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge32");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge32");
             
             // Step 3: Enter/move towards transition target `SETUP`.
             this.#SETUP_enter();
@@ -1969,13 +1912,13 @@ evaluateGuard = null;
     #SETUP_record_data_point()
     {
         // SETUP behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge11"); } TransitionTo(PROMPT)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge33"); } TransitionTo(PROMPT)
         {
             // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
             this.#SETUP_exit();
             
-            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge11");`.
-            this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge11");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge33");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge33");
             
             // Step 3: Enter/move towards transition target `PROMPT`.
             this.#PROMPT_enter();
@@ -1985,6 +1928,147 @@ evaluateGuard = null;
         } // end of behavior for SETUP
         
         // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state STORE
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #STORE_enter()
+    {
+        this.stateId = PowerCalSm.StateId.STORE;
+        
+        // STORE behavior
+        // uml: enter / { this.tracer?.enterState('STORE'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('STORE');`
+            this.tracer?.enterState('STORE');
+        } // end of behavior for STORE
+        
+        // STORE behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");
+        } // end of behavior for STORE
+    }
+    
+    #STORE_exit()
+    {
+        // STORE behavior
+        // uml: exit / { this.tracer?.exitState('STORE'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('STORE');`
+            this.tracer?.exitState('STORE');
+        } // end of behavior for STORE
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #STORE_do()
+    {
+        let consume_event = false;
+        
+        // STORE behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("STORE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge37"); } TransitionTo(AUTO.<ChoicePoint>())
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("STORE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#STORE_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge37");`.
+            this.tracer?.edgeTransition("edge37");
+            
+            // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
+            // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 1. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoOscillationDetected()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge19"); } TransitionTo(BAND_DONE)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoOscillationDetected()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge19");`.
+                this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge19");
+                
+                // Step 3: Enter/move towards transition target `BAND_DONE`.
+                this.#BAND_DONE_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 2. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints() && AutoKeepKeyed()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge20"); } TransitionTo(POINT)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints() && AutoKeepKeyed()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge20");`.
+                this.tracer?.edgeTransition("edge20");
+                
+                // Step 3: Enter/move towards transition target `POINT`.
+                this.#POINT_enter();
+                
+                // Finish transition by calling pseudo state transition function.
+                this.#POINT_InitialState_transition();
+                return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 3. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints()") || this.evaluateGuard("AUTO.<ChoicePoint>()","3. [AutoMorePoints()] TransitionTo(REST)")] / { this.tracer?.edgeTransition("edge21"); } TransitionTo(REST)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints()") || this.evaluateGuard("AUTO.<ChoicePoint>()","3. [AutoMorePoints()] TransitionTo(REST)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge21");`.
+                this.tracer?.edgeTransition("edge21");
+                
+                // Step 3: Enter/move towards transition target `REST`.
+                this.#REST_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 4. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoForwardFitDue()") || this.evaluateGuard("AUTO.<ChoicePoint>()","4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)")] / { this.tracer?.edgeTransition("edge22"); } TransitionTo(FIT_FORWARD)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoForwardFitDue()") || this.evaluateGuard("AUTO.<ChoicePoint>()","4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge22");`.
+                this.tracer?.edgeTransition("edge22");
+                
+                // Step 3: Enter/move towards transition target `FIT_FORWARD`.
+                this.#FIT_FORWARD_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: else / { this.tracer?.edgeTransition("edge23"); } TransitionTo(BAND_DONE)
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge23");`.
+                this.tracer?.edgeTransition("edge23");
+                
+                // Step 3: Enter/move towards transition target `BAND_DONE`.
+                this.#BAND_DONE_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+        } // end of behavior for STORE
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
     }
     
     
@@ -2431,6 +2515,7 @@ evaluateGuard = null;
             case PowerCalSm.StateId.REST: return "REST";
             case PowerCalSm.StateId.REVIEW: return "REVIEW";
             case PowerCalSm.StateId.SETUP: return "SETUP";
+            case PowerCalSm.StateId.STORE: return "STORE";
             case PowerCalSm.StateId.MANUAL: return "MANUAL";
             case PowerCalSm.StateId.MEASUREMENTCOMPLETE: return "MEASUREMENTCOMPLETE";
             case PowerCalSm.StateId.POWERCOMPLETE: return "POWERCOMPLETE";
@@ -2533,21 +2618,6 @@ evaluateGuard = null;
     "do",
     "RESET"
   ],
-  "SETUP": [
-    "do",
-    "RECORD_DATA_POINT",
-    "RESET"
-  ],
-  "PROMPT": [
-    "do",
-    "RECORD_DATA_POINT",
-    "RESET",
-    "SKIP"
-  ],
-  "BAND": [
-    "do",
-    "RESET"
-  ],
   "POINT": [
     "do",
     "RESET"
@@ -2593,6 +2663,25 @@ evaluateGuard = null;
     "RETRY"
   ],
   "DONE": [
+    "do",
+    "RESET"
+  ],
+  "SETUP": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET"
+  ],
+  "PROMPT": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET",
+    "SKIP"
+  ],
+  "BAND": [
+    "do",
+    "RESET"
+  ],
+  "STORE": [
     "do",
     "RESET"
   ]
