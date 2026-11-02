@@ -74,6 +74,41 @@ float32_t GetTargetPower(void);
 uint8_t GetPowerUnit(void);
 void InitializePowerCalibration(void);
 
+// Automatic power and SWR bridge calibration (the AUTO branch of PowerCalSm).
+// See code/docs/PowerCalibration/AutoCalibration.md
+enum AutoCalStage {
+    AUTO_STAGE_LOAD = 0,   // 50 Ohm load, with the wattmeter at levels 2 and 3
+    AUTO_STAGE_OPEN,       // nothing on the antenna connector
+    AUTO_STAGE_SHORT,      // a short directly on the connector
+};
+
+struct AutoCalSession {
+    bool active;              // the state machine is in AUTO
+    uint8_t level;            // calibration level, 1 to 3
+    uint32_t bandMask;        // bit k set: calibrate band k this session
+    uint32_t failedMask;      // bit k set: band k failed its checks
+    uint32_t openFailMask;    // bit k set: band k's open sweep was abandoned
+    uint32_t shortFailMask;   // bit k set: band k's short sweep was abandoned
+    AutoCalStage stage;       // standard on the connector
+    bool loadSkipped;         // level 1 only: the load stage was skipped
+    int32_t band;             // band being measured
+    uint32_t point;           // index of the next point in this band and stage
+    uint32_t nPoints;         // CW points in this band and stage
+    bool forwardFitDone;      // load stage: forward line fitted for this band
+    bool ssbPoint;            // the current point is the SSB tone point
+    bool oscillation;         // the last point failed the oscillation check
+    bool keyed;               // the calibration has the transmitter keyed
+    volatile bool servicePending; // work is waiting for PowerCalAutoService()
+};
+extern AutoCalSession autoCal;
+
+void StartPowerAutoCal(void);
+bool PowerCalAutoActive(void);
+void PowerCalAutoService(void);
+void ChangeAutoCalLevel(int32_t delta);
+void SkipPowerCalStage(void);
+void RetryPowerCal(void);
+
 // Receive IQ calibration routines
 void InitializeRXIQCalibration(void);
 void ResetRXIQCalBand(void);

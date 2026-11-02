@@ -27,7 +27,6 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "SDT.h"
 
 PowerCalSm powerSM;
-static char buff[100];
 
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
@@ -251,13 +250,16 @@ void CalculatePowerCurveFit(void){
 
 /**
  * @brief Initialize power calibration state machine and reset all calibration parameters
- * @note Starts PowerCalSm state machine with 150ms acquisition duration
+ * @note Starts PowerCalSm state machine in the manual flow
  * @note Resets all band attenuations and SWR adjustments to zero
  * @note Updates hardware state to apply settings
  */
 void InitializePowerCalibration(void){
+    // PowerCalSm_start() does not run AUTO's exit action, so clear it here
+    autoCal.active = false;
+    autoCal.keyed = false;
+    autoCal.servicePending = false;
     PowerCalSm_start(&powerSM);
-    powerSM.vars.acquisitionDuration_ms = 150;
     // Make all the attenuations zero so we start off right
     // Make the SWR offset adjustments zero as well
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++){
@@ -272,43 +274,13 @@ void InitializePowerCalibration(void){
 }
 
 
-static float32_t forwardPowerAtt_dB[40];
-static float32_t forwardPower_W[40];
-static float32_t reflectedPower_W[40];
-static float32_t forwardADC_mV[40];
-static float32_t reflectedADC_mV[40];
-static float32_t scaledForwardPower_mW[40];
-static uint32_t Nswrpoints = 0;
-
 /**
- * @brief Start automatic power calibration sequence
- * @note Only operates if in POWERPOINT1 state
- * @note Resets attenuation to 0dB and initiates PTT for transmit
- * @note Dispatches AUTO event to power calibration state machine
- */
-void StartPowerAutoCal(void){
-    if (powerSM.state_id == PowerCalSm_StateId_POWERPOINT1){
-        // Make sure attenuation is zero
-        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-        SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
-        Nswrpoints = 0;
-
-        // Issue a PTT event
-        SetInterrupt(iPTT_PRESSED);
-
-        // Change the state
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_AUTO);
-    }
-}
-
-/**
- * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement 
+ * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement
  * to CALIBRATE_OFFSET measurement when curve fit is complete. If we are not in the
  * POWERCOMPLETE state, ignore this button press.
  */
 void ChangePowerCalibrationPhase(void){
-    if ((powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE) || 
-        (powerSM.state_id == PowerCalSm_StateId_READ_AND_ADJUST)){
+    if (powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE){
         // Issue the event that causes state to change to SSBPOINT measurement
         PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_CURVE_COMPLETE);
         // Change to offset measurement mode
@@ -317,76 +289,405 @@ void ChangePowerCalibrationPhase(void){
     }
 }
 
-float32_t ReadADCFwdRaw(void);
-float32_t ReadADCRefRaw(void);
+// ---------- Automatic power and SWR bridge calibration ----------
+//
+// The AUTO branch of PowerCalSm calibrates the PA power curve, the SSB gain and
+// the SWR bridge on every band in one session. The operator fits each standard
+// once: the 50 Ohm load (with the wattmeter at levels 2 and 3), then the open,
+// then the short. See code/docs/PowerCalibration/AutoCalibration.md and
+// code/docs/swr_calibration_approach.md.
+//
+// The functions below are the state machine's actions and guards. They run in
+// the 1 ms timer interrupt, so anything that needs I2C, a long calculation or
+// the storage is posted as a request (RequestAutoService) and done by
+// PowerCalAutoService() from the main loop. The state machine waits for it
+// with the AutoServiceIdle() guard.
+//
+// For now these only step through the session. Keying, the measurements, the
+// fits, the checks and the storage are still to be written (marked TODO).
+
+#define AUTO_DEFAULT_BAND_MASK  (((1u << (BAND_6M + 1)) - 1) & ~((1u << BAND_160M) - 1))
+#define AUTO_LOAD_SWEEP_POINTS  12  // levels 1 and 2: 0, 3, ... 30, 31.5 dB
+#define AUTO_LEVEL3_POINTS       8  // level 3: 0, 5, ... 25, 31.5 dB plus the drift repeat
+#define AUTO_REFLECTION_POINTS   6  // open and short sweeps
+
+// Fields in declaration order: active, level, bandMask; the rest start at zero
+AutoCalSession autoCal = {false, 1, AUTO_DEFAULT_BAND_MASK};
+
+void AutoUnkey(void);
+
+static void RequestAutoService(void){
+    autoCal.servicePending = true;
+}
 
 /**
- * @brief Adjust transmit attenuation during automatic power calibration
- * @note Records forward/reflected power and ADC values at current attenuation
- * @note Increments attenuation by 1 dB and continues until 31.5 dB reached
- * @note Performs curve fit when complete and transitions to offset calibration
- * @note Used by automatic calibration mode
+ * @brief Run the work the AUTO calibration has posted from the state machine
+ * @note Called from the main loop. Returns at once when there is nothing to do.
  */
-void AdjustAttenuation(void){
-    // Read the current forward power
-    forwardPowerAtt_dB[Nswrpoints] = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-    forwardPower_W[Nswrpoints] = ReadForwardPower();
-    reflectedPower_W[Nswrpoints] = ReadReflectedPower();
-    forwardADC_mV[Nswrpoints] = ReadADCFwdRaw();
-    reflectedADC_mV[Nswrpoints] = ReadADCRefRaw();
-    Nswrpoints++;
-    // Change attenuation by 1 dB
-    ED.XAttenCW[ED.currentBand[ED.activeVFO]] += 1.0;
-    if (ED.XAttenCW[ED.currentBand[ED.activeVFO]] <= 31.5){
-        SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_NEXT_POINT);
-    } else {
-        // Leave this place
-        SetInterrupt(iPTT_RELEASED);
+void PowerCalAutoService(void){
+    if (!autoCal.servicePending)
+        return;
+    // TODO: band change, attenuation and mode changes, fits,
+    // checks and storage, depending on the state the request came from.
+    autoCal.servicePending = false;
+}
 
-        // Fit curve
-        // 1. Calculate power for each point
-        if (powerUnit == 0){
-            // Convert from dBm to W
-            measuredPower = pow(10.0f,measuredPower/10.0f)/1000.0f;
-        }
-        float32_t scale = measuredPower / forwardPower_W[0];
+/**
+ * @brief True while the power calibration state machine is in its AUTO branch
+ */
+bool PowerCalAutoActive(void){
+    return autoCal.active;
+}
 
-        sprintf(buff,"External measured power at 0dB is %5.4fW",measuredPower);
-        Serial.println(buff);
-        sprintf(buff,"Internal measured power at 0dB is %5.4fW",forwardPower_W[0]);
-        Serial.println(buff);
-        sprintf(buff,"Scale factor %5.4f",scale);
-        Serial.println(buff);
-
-        Serial.println("| Att [dB] | ADCf | ADCr | Pfwd [W] | Pref [W] | Pscaled [W] |");
-        Serial.println("|----------|------|------|----------|----------|-------------|");
-        for (size_t k=0; k<Nswrpoints; k++){
-            scaledForwardPower_mW[k] = scale*forwardPower_W[k]*1000.0;
-            sprintf(buff,"| %3.2f | %5.4f | %5.4f | %5.4f | %5.4f | %5.4f |",
-                        forwardPowerAtt_dB[k],
-                        forwardADC_mV[k],reflectedADC_mV[k],
-                        forwardPower_W[k],reflectedPower_W[k],
-                        scaledForwardPower_mW[k]/1000.0);
-            Serial.println(buff);
-        }
-
-        // 2. Fit the curve
-        struct FitResult f;
-        if (ED.PA100Wactive){
-            f = FitPowerCurve(forwardPowerAtt_dB, scaledForwardPower_mW, Nswrpoints, 75000.0f,10.0f);
-            ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
-            ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
-        } else {
-            f = FitPowerCurve(forwardPowerAtt_dB, scaledForwardPower_mW, Nswrpoints, 15000.0f,6.0f);
-            ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
-            ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
-        }
-        // Enqueue a button press in order to call the ChangePowerCalibrationPhase
-        // function *after* the iPTT_RELEASED event has been handled
-        SetButton(12);
-        SetInterrupt(iBUTTON_PRESSED);
+/**
+ * @brief Number of CW points to measure on the current band in the current stage
+ * @note The load stage's SSB tone point comes after these
+ */
+static uint32_t AutoPointCount(void){
+    if (autoCal.stage != AUTO_STAGE_LOAD)
+        return AUTO_REFLECTION_POINTS;
+    switch (autoCal.level){
+        case 3:
+            return AUTO_LEVEL3_POINTS;
+        case 2:
+            return AUTO_LOAD_SWEEP_POINTS + 1; // the sweep, then one wattmeter point near 2 W
+        default:
+            return AUTO_LOAD_SWEEP_POINTS;
     }
+}
+
+/**
+ * @brief The first band in the session's band mask at or above band
+ * @return The band, or LAST_BAND+1 if there is none
+ */
+static int32_t AutoBandFrom(int32_t band){
+    while ((band <= LAST_BAND) && !(autoCal.bandMask & (1u << band)))
+        band++;
+    return band;
+}
+
+/**
+ * @brief Start the automatic calibration
+ * @note Called by Loop.cpp when button 1 is pressed in power calibration
+ */
+void StartPowerAutoCal(void){
+    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_AUTO);
+}
+
+/**
+ * @brief Skip the current standard (level 1 only: the 50 Ohm load)
+ * @note Called by Loop.cpp when button 12 is pressed during the automatic calibration
+ */
+void SkipPowerCalStage(void){
+    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_SKIP);
+}
+
+/**
+ * @brief Repeat the session for the bands that failed
+ * @note Called by Loop.cpp when button 14 is pressed on the review screen
+ */
+void RetryPowerCal(void){
+    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RETRY);
+}
+
+/**
+ * @brief Change the calibration level on the setup screen
+ * @param delta +1 or -1; the level is kept within 1 to 3
+ */
+void ChangeAutoCalLevel(int32_t delta){
+    if (powerSM.state_id != PowerCalSm_StateId_SETUP)
+        return;
+    int32_t level = (int32_t)autoCal.level + delta;
+    if (level < 1) level = 1;
+    if (level > 3) level = 3;
+    autoCal.level = (uint8_t)level;
+}
+
+/**
+ * @brief Guard: the automatic calibration runs with the 20 W PA only
+ */
+bool AutoCalAllowed(void){
+    return !ED.PA100Wactive;
+}
+
+/**
+ * @brief Entry action of AUTO: set the timing and start a new session
+ */
+void AutoCalEnter(void){
+    autoCal.active = true;
+    autoCal.keyed = false;
+    autoCal.servicePending = false;
+    autoCal.failedMask = 0;
+    powerSM.vars.bandSettle_ms = 300;
+    powerSM.vars.settle_ms = 500;
+    powerSM.vars.collect_ms = 2000;
+    powerSM.vars.rest_ms = 1000;
+    powerSM.vars.meterTimeout_ms = 30000;
+    Debug("Auto calibration: choose the level and press SELECT");
+}
+
+/**
+ * @brief Exit action of AUTO: always leaves the transmitter unkeyed
+ * @note Runs on every way out, including RESET in the middle of a point
+ */
+void AutoCalExit(void){
+    AutoUnkey();
+    autoCal.active = false;
+    // TODO: return the mode to CALIBRATE_POWER_SPACE and restore the band and attenuation
+}
+
+/**
+ * @brief SETUP -> PROMPT: start measuring with the first standard
+ */
+void AutoBeginSession(void){
+    autoCal.stage = AUTO_STAGE_LOAD;
+    autoCal.loadSkipped = false;
+    autoCal.openFailMask = 0;
+    autoCal.shortFailMask = 0;
+    autoCal.failedMask = 0;
+    Debug("Auto calibration level " + String(autoCal.level));
+}
+
+/**
+ * @brief Entry action of PROMPT: ask the operator to fit the next standard
+ */
+void AutoPromptStandard(void){
+    switch (autoCal.stage){
+        case AUTO_STAGE_LOAD:
+            if (autoCal.level > 1)
+                Debug("Fit the wattmeter and its 50 Ohm load, then press SELECT");
+            else
+                Debug("Fit a 50 Ohm load, then press SELECT (button 12 skips it)");
+            break;
+        case AUTO_STAGE_OPEN:
+            Debug("Remove everything from the antenna connector, then press SELECT");
+            break;
+        case AUTO_STAGE_SHORT:
+            Debug("Fit the short on the antenna connector, then press SELECT");
+            break;
+    }
+}
+
+/**
+ * @brief Guard: only the level 1 load stage may be skipped
+ */
+bool AutoCanSkipStage(void){
+    return (autoCal.level == 1) && (autoCal.stage == AUTO_STAGE_LOAD);
+}
+
+/**
+ * @brief Skip the load stage: keep the stored PA curves, no S50 check
+ */
+void AutoSkipStage(void){
+    autoCal.loadSkipped = true;
+    autoCal.stage = AUTO_STAGE_OPEN;
+}
+
+/**
+ * @brief PROMPT -> BAND: start with the first band in the mask
+ */
+void AutoFirstBand(void){
+    autoCal.band = AutoBandFrom(FIRST_BAND);
+}
+
+/**
+ * @brief Entry action of BAND: tune to the band and plan its points
+ */
+void AutoSelectBand(void){
+    autoCal.point = 0;
+    autoCal.nPoints = AutoPointCount();
+    autoCal.forwardFitDone = false;
+    autoCal.ssbPoint = false;
+    autoCal.oscillation = false;
+    // TODO: band, mid-band frequency, LPF and the point list for this stage
+    RequestAutoService();
+}
+
+/**
+ * @brief Entry action of POINT: set the drive for the next point
+ */
+void AutoSetupPoint(void){
+    // TODO: attenuation (and DSP gain) for this point; CW, or SSB for the tone point
+    RequestAutoService();
+}
+
+/**
+ * @brief Key the transmitter for a calibration point
+ * @note Does nothing if the calibration has already keyed it
+ */
+void AutoKey(void){
+    if (autoCal.keyed)
+        return;
+    autoCal.keyed = true;
+    // TODO: SetInterrupt(iPTT_PRESSED)
+}
+
+/**
+ * @brief Unkey the transmitter if the calibration keyed it
+ */
+void AutoUnkey(void){
+    if (!autoCal.keyed)
+        return;
+    autoCal.keyed = false;
+    // TODO: SetInterrupt(iPTT_RELEASED)
+}
+
+/**
+ * @brief Guard: this point needs a wattmeter reading from the operator
+ * @note Level 3: every CW point. Level 2: the one point after the sweep.
+ */
+bool AutoNeedsMeterEntry(void){
+    if ((autoCal.stage != AUTO_STAGE_LOAD) || autoCal.ssbPoint)
+        return false;
+    if (autoCal.level == 3)
+        return true;
+    return (autoCal.level == 2) && (autoCal.point == autoCal.nPoints - 1);
+}
+
+/**
+ * @brief Entry action of METER_ENTRY: start the operator's wattmeter entry
+ */
+void AutoStartMeterEntry(void){
+    // TODO: target power for this point
+    ResetPowerTarget();
+}
+
+/**
+ * @brief COLLECT -> choice: keep the point's readings and check them
+ */
+void AutoStorePoint(void){
+    // TODO: GetSWRBridgeStats(), the wattmeter entry, the oscillation check and a log row
+    if (!autoCal.ssbPoint)
+        autoCal.point++;
+}
+
+/**
+ * @brief Guard: the last open or short point shows the PA oscillating
+ */
+bool AutoOscillationDetected(void){
+    return autoCal.oscillation;
+}
+
+/**
+ * @brief Abandon this band's sweep on this standard after an oscillation
+ */
+void AutoAbortBandStage(void){
+    if (autoCal.stage == AUTO_STAGE_OPEN)
+        autoCal.openFailMask |= (1u << autoCal.band);
+    else if (autoCal.stage == AUTO_STAGE_SHORT)
+        autoCal.shortFailMask |= (1u << autoCal.band);
+    autoCal.oscillation = false;
+}
+
+/**
+ * @brief Guard: CW points remain on this band and standard
+ */
+bool AutoMorePoints(void){
+    return !autoCal.ssbPoint && (autoCal.point < autoCal.nPoints);
+}
+
+/**
+ * @brief Guard: stay keyed between points (load stage only; the open and
+ *        short sweeps rest in receive between points to protect the PA)
+ */
+bool AutoKeepKeyed(void){
+    return autoCal.stage == AUTO_STAGE_LOAD;
+}
+
+/**
+ * @brief Guard: the load stage's CW points are done, fit the forward line next
+ */
+bool AutoForwardFitDue(void){
+    return (autoCal.stage == AUTO_STAGE_LOAD) && !autoCal.forwardFitDone;
+}
+
+/**
+ * @brief Entry action of FIT_FORWARD: fit the band's forward line, then
+ *        measure the SSB tone point with it
+ */
+void AutoFitForwardLine(void){
+    // TODO: level 1 defaults, level 2 one-point offset, level 3 least squares
+    autoCal.forwardFitDone = true;
+    autoCal.ssbPoint = true;
+    RequestAutoService();
+}
+
+/**
+ * @brief Entry action of BAND_DONE: finish the band on this standard
+ */
+void AutoFinishBand(void){
+    // TODO: load stage: PA curve and SSB gain into the session results
+    autoCal.ssbPoint = false;
+    RequestAutoService();
+}
+
+/**
+ * @brief Guard: more bands to measure on this standard
+ */
+bool AutoMoreBands(void){
+    return AutoBandFrom(autoCal.band + 1) <= LAST_BAND;
+}
+
+/**
+ * @brief Move on to the next band in the mask
+ */
+void AutoNextBand(void){
+    autoCal.band = AutoBandFrom(autoCal.band + 1);
+}
+
+/**
+ * @brief Guard: another standard follows this one
+ */
+bool AutoMoreStages(void){
+    return autoCal.stage != AUTO_STAGE_SHORT;
+}
+
+/**
+ * @brief Move on to the next standard
+ */
+void AutoNextStage(void){
+    autoCal.stage = (AutoCalStage)(autoCal.stage + 1);
+}
+
+/**
+ * @brief Entry action of FIT_ALL: fit the reflected lines and check every band
+ * @note A band whose short failed falls back to the open alone. A band whose
+ *       open failed has no reflected line and fails.
+ */
+void AutoFitAndCheckAll(void){
+    // TODO: reflected fits, S50 and the acceptance checks
+    autoCal.failedMask = autoCal.openFailMask & autoCal.bandMask;
+    RequestAutoService();
+}
+
+/**
+ * @brief REVIEW -> DONE: store the bands that passed
+ */
+void AutoCommitResults(void){
+    // TODO: passing bands into ED, then SaveDataToStorage(), from the main loop
+    RequestAutoService();
+}
+
+/**
+ * @brief Guard: at least one band failed
+ */
+bool AutoAnyFailed(void){
+    return autoCal.failedMask != 0;
+}
+
+/**
+ * @brief REVIEW -> SETUP: run the session again for the failed bands only
+ */
+void AutoRetryFailed(void){
+    autoCal.bandMask = autoCal.failedMask;
+    autoCal.failedMask = 0;
+}
+
+/**
+ * @brief Guard: the main loop has finished the work the state machine posted
+ */
+bool AutoServiceIdle(void){
+    return !autoCal.servicePending;
 }
 
 

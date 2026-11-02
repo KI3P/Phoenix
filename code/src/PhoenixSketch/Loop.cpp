@@ -871,24 +871,28 @@ void HandleButtonPress(int32_t button){
                     RecordPowerButtonPressed();
                     break;
                 }
-                // Auto power cal is not ready for prime time
-                // The behavior of the SWR bridge needs to be
-                // better characterized.
-                //case (1):{
-                //    StartPowerAutoCal();
-                //    break;
-                //}
+                case (1):{
+                    // Automatic power and SWR bridge calibration
+                    StartPowerAutoCal();
+                    break;
+                }
                 case (ZOOM):{
-                    // Reset and begin again
+                    // Reset and begin again; aborts the automatic calibration
                     ResetPowerCal();
                     break;
                 }
                 case (12):{
-                    ChangePowerCalibrationPhase();
+                    if (PowerCalAutoActive())
+                        SkipPowerCalStage();
+                    else
+                        ChangePowerCalibrationPhase();
                     break;
                 }
                 case (14):{
-                    ChangePowerUnits();
+                    if (powerSM.state_id == PowerCalSm_StateId_REVIEW)
+                        RetryPowerCal();
+                    else
+                        ChangePowerUnits();
                     break;
                 }
                 case (15):{
@@ -897,11 +901,15 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case (16):{
-                    // Change PA selection
-                    ChangeCalibrationPASelection();
+                    // Change PA selection; not during the automatic calibration
+                    if (!PowerCalAutoActive())
+                        ChangeCalibrationPASelection();
                     break;
                 }
                 case HOME_SCREEN:{
+                    // Leave the automatic calibration first, so it unkeys
+                    if (PowerCalAutoActive())
+                        ResetPowerCal();
                     RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
@@ -909,6 +917,8 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case BAND_UP:{
+                    if (PowerCalAutoActive())
+                        break; // the automatic calibration chooses the bands
                     if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
                         ED.currentBand[ED.activeVFO] = FIRST_BAND;
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
@@ -924,6 +934,8 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case BAND_DN:{
+                    if (PowerCalAutoActive())
+                        break; // the automatic calibration chooses the bands
                     if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
                         ED.currentBand[ED.activeVFO] = LAST_BAND;
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
@@ -1339,11 +1351,19 @@ void ConsumeInterrupt(void){
                     break;
                 }
                 case (iVOLUME_INCREASE):{
-                    IncrementCalibrationTransmitAtt();
+                    // In the automatic calibration the firmware sets the
+                    // attenuation; the volume encoder chooses the level instead
+                    if (PowerCalAutoActive())
+                        ChangeAutoCalLevel(+1);
+                    else
+                        IncrementCalibrationTransmitAtt();
                     break;
                 }
                 case (iVOLUME_DECREASE):{
-                    DecrementCalibrationTransmitAtt();
+                    if (PowerCalAutoActive())
+                        ChangeAutoCalLevel(-1);
+                    else
+                        DecrementCalibrationTransmitAtt();
                     break;
                 }
                 default:
@@ -1620,6 +1640,8 @@ FASTRUN void loop(void){
     CheckForSerialTimeSync();
 #endif
     ConsumeInterrupt();
+    // Work posted by the automatic power calibration's state machine
+    PowerCalAutoService();
 
     // Step 2: Perform signal processing
     PerformSignalProcessing();

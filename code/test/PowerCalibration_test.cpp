@@ -2183,136 +2183,275 @@ TEST_F(PowerCalibrationWalkthroughTest, StateTransitions_ResetBehavior) {
 }
 
 /**
- * Test AUTO flow path from POWERPOINT1 through ACQUISITION and READ_AND_ADJUST states
+ * Tests of the AUTO branch of PowerCalSm: the automatic power and SWR bridge
+ * calibration. These drive the state machine directly, one DO tick at a time
+ * followed by the main loop's PowerCalAutoService(), instead of through the
+ * 1 ms timer thread, so the paths are deterministic.
  *
- * This test verifies the new automated power calibration flow:
- * 1. Starting in POWERPOINT1, pressing button 1 triggers AUTO event
- * 2. Transitions to ACQUISITION state for 100ms
- * 3. After 100ms, transitions to READ_AND_ADJUST state
- * 4. READ_AND_ADJUST reads power and increases attenuation
- * 5. If attenuation < max, loops back to ACQUISITION
- * 6. If attenuation >= max, fits curve and transitions to SSBPOINT
- *
- * Modelled after RadioStateRunThrough in Radio_test.cpp
+ * The AUTO actions are still stubs, so these check the state machine's paths:
+ * the order of the standards, the number of points per band and stage, the
+ * wattmeter entries, the timeouts and the aborts.
  */
-/*TEST_F(PowerCalibrationWalkthroughTest, AutoCalibrationFlow_ACQUISITION_ReadAndAdjust) {
-    // Navigate to power calibration screen
-    NavigateToPowerCalibration();
+void ResetPowerCal(void);   // HardwareSm_PowerCalibration.cpp
+bool AutoAnyFailed(void);   // HardwareSm_PowerCalibration.cpp
 
-    printf("\n=== Testing Auto Calibration Flow with ACQUISITION/READ_AND_ADJUST ===\n\n");
-
-    // Verify initial state
-    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
-    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
-    printf("Initial state: ModeSM=CALIBRATE_POWER_SPACE, PowerSM=%s\n",
-           PowerCalSm_state_id_to_string(powerSM.state_id));
-
-    // Verify acquisitionDuration_ms is set to 100ms
-    EXPECT_EQ(powerSM.vars.acquisitionDuration_ms, 100u)
-        << "acquisitionDuration_ms should be 100ms";
-
-    // Press button 1 to trigger AUTO event and enter ACQUISITION state
-    printf("\nPressing button 1 to trigger AUTO event...\n");
-    SetButton(1);
-    SetInterrupt(iBUTTON_PRESSED);
-    loop(); MyDelay(10);
-
-    // Should transition to ACQUISITION state
-    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_ACQUISITION)
-        << "Should transition to ACQUISITION state after button 1 (AUTO event)";
-    // Note: ModeSM may already be in CALIBRATE_POWER_SPACE (6) instead of MARK (5) depending on timing
-    printf("After button 1: PowerSM=%s, ModeSM=%s, count_ms=%u\n",
-           PowerCalSm_state_id_to_string(powerSM.state_id),
-           ModeSm_state_id_to_string(modeSM.state_id),
-           powerSM.vars.count_ms);
-
-    // Note: count_ms may have already incremented by the time we check due to DO events in timer thread
-
-    // The state machine will cycle: ACQUISITION (100ms) -> READ_AND_ADJUST (instantaneous) -> ACQUISITION
-    // READ_AND_ADJUST transitions back to ACQUISITION so quickly we may not observe it
-    // We can verify the flow is working by checking that attenuation increases after ~100ms cycles
-
-    printf("\nWaiting for first READ_AND_ADJUST cycle (100ms)...\n");
-    float32_t initial_atten = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-
-    // Run for 120ms to ensure we complete first acquisition cycle
-    for (size_t i = 0; i < 120; i++) {
-        loop();
-        MyDelay(1);
+class PowerCalAutoTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        StartMillis();
+        InitializeStorage();
+        InitializeRFHardware();
+        modeSM.vars.waitDuration_ms = CW_TRANSMIT_SPACE_TIMEOUT_MS;
+        modeSM.vars.ditDuration_ms = DIT_DURATION_MS;
+        ModeSm_start(&modeSM);
+        ModeSm_dispatch_event(&modeSM, ModeSm_EventId_CALIBRATE_POWER);
+        ED.PA100Wactive = false;
+        autoCal.level = 1;
+        autoCal.bandMask = (1u << BAND_40M) | (1u << BAND_20M);
+        InitializePowerCalibration();
     }
 
-    // After ~100ms, the state machine should have:
-    // 1. Transitioned from ACQUISITION to READ_AND_ADJUST
-    // 2. Called AdjustAttenuation() which increases attenuation by 1dB
-    // 3. Dispatched NEXT_POINT and transitioned back to ACQUISITION
-    EXPECT_GT(ED.XAttenCW[ED.currentBand[ED.activeVFO]], initial_atten)
-        << "Attenuation should have increased after first 100ms acquisition cycle";
-    printf("After first cycle: PowerSM=%s, attenuation=%0.1f dB (was %0.1f dB)\n",
-           PowerCalSm_state_id_to_string(powerSM.state_id),
-           ED.XAttenCW[ED.currentBand[ED.activeVFO]],
-           initial_atten);
+    /** One 1 ms tick: the timer's DO event, then the main loop's service */
+    void Tick(void) {
+        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+        PowerCalAutoService();
+    }
 
-    // Should be back in ACQUISITION for next measurement
-    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_ACQUISITION)
-        << "Should be back in ACQUISITION state after completing first cycle";
+    /** Enter AUTO and shorten its timing so a session takes a few hundred ticks */
+    void EnterAuto(uint8_t level) {
+        StartPowerAutoCal();
+        ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_SETUP);
+        powerSM.vars.bandSettle_ms = 2;
+        powerSM.vars.settle_ms = 3;
+        powerSM.vars.collect_ms = 4;
+        powerSM.vars.rest_ms = 2;
+        powerSM.vars.meterTimeout_ms = 50;
+        autoCal.level = level;
+    }
 
-    // Simulate several cycles of ACQUISITION -> READ_AND_ADJUST
-    // until attenuation reaches maximum (31.5 dB)
-    printf("\nSimulating acquisition cycles until max attenuation...\n");
-    int num_cycles = 0;
-    const int MAX_CYCLES = 35;  // Safety limit (31.5 dB max + margin)
+    void Select(void) {
+        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RECORD_DATA_POINT);
+    }
 
-    while (powerSM.state_id != PowerCalSm_StateId_SSBPOINT && num_cycles < MAX_CYCLES) {
-        float32_t current_atten = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-
-        // Run through one acquisition cycle
-        StartMillis();
-        for (size_t i = 0; i < 110; i++) {
-            loop();
-            MyDelay(1);
-        }
-
-        num_cycles++;
-
-        // If we're still below max attenuation, should cycle back to ACQUISITION
-        if (current_atten < 31.5f) {
-            if (powerSM.state_id != PowerCalSm_StateId_SSBPOINT) {
-                EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_ACQUISITION)
-                    << "Should be in ACQUISITION state for next measurement at cycle " << num_cycles;
+    /**
+     * Tick until the state machine reaches target. Answers every wattmeter
+     * entry on the way and counts what happened.
+     * @return false if target was not reached within maxTicks
+     */
+    bool RunUntil(PowerCalSm_StateId target, uint32_t maxTicks = 5000) {
+        PowerCalSm_StateId last = powerSM.state_id;
+        for (uint32_t k = 0; k < maxTicks; k++) {
+            if (powerSM.state_id == target)
+                return true;
+            if (powerSM.state_id == PowerCalSm_StateId_METER_ENTRY) {
+                meterEntries++;
+                Select();
+            } else {
+                Tick();
+            }
+            if (powerSM.state_id != last) {
+                if (powerSM.state_id == PowerCalSm_StateId_COLLECT)
+                    collects[autoCal.stage]++;
+                if (powerSM.state_id == PowerCalSm_StateId_FIT_FORWARD)
+                    forwardFits++;
+                if (powerSM.state_id == PowerCalSm_StateId_REST)
+                    rests++;
+                last = powerSM.state_id;
             }
         }
-
-        // Every few cycles, print progress
-        if (num_cycles % 5 == 0) {
-            printf("  Cycle %d: attenuation=%0.1f dB, state=%s\n",
-                   num_cycles, ED.XAttenCW[ED.currentBand[ED.activeVFO]],
-                   PowerCalSm_state_id_to_string(powerSM.state_id));
-        }
+        return powerSM.state_id == target;
     }
 
-    printf("Completed %d acquisition cycles\n", num_cycles);
+    uint32_t meterEntries = 0;
+    uint32_t collects[3] = {0, 0, 0};
+    uint32_t forwardFits = 0;
+    uint32_t rests = 0;
+};
 
-    // Should have reached SSBPOINT state after max attenuation
-    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_SSBPOINT)
-        << "Should transition to SSBPOINT after reaching max attenuation and curve fit";
-    // Note: ModeSM state depends on whether CURVE_COMPLETE has been dispatched
-    // The PowerCalSm transitions to SSBPOINT, but ModeSm may need explicit state change
+TEST_F(PowerCalAutoTest, AutoEntersSetupAndResetReturnsToManual) {
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
+    EnterAuto(1);
+    EXPECT_TRUE(PowerCalAutoActive());
 
-    // Note: Attenuation gets reset to 0 after curve fit completes (part of curve fitting process)
+    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RESET);
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
+    EXPECT_FALSE(PowerCalAutoActive());
+}
 
-    printf("Final state: PowerSM=%s, ModeSM=%s, attenuation=%0.1f dB\n",
-           PowerCalSm_state_id_to_string(powerSM.state_id),
-           ModeSm_state_id_to_string(modeSM.state_id),
-           ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
+TEST_F(PowerCalAutoTest, AutoNotAllowedWith100WPA) {
+    ED.PA100Wactive = true;
+    StartPowerAutoCal();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
+    EXPECT_FALSE(PowerCalAutoActive());
+}
 
-    // Verify the curve fit was performed (check that calibration values were updated)
-    // These should be non-zero after curve fitting
-    
-    printf("\n✓ Verified: Auto calibration flow works correctly\n");
-    printf("  - POWERPOINT1 -> button 1 -> AUTO event\n");
-    printf("  - AUTO -> ACQUISITION (100ms)\n");
-    printf("  - ACQUISITION -> READ_AND_ADJUST (reads power, adjusts attenuation)\n");
-    printf("  - Loops through ACQUISITION/READ_AND_ADJUST until max attenuation\n");
-    printf("  - Fits curve and transitions to SSBPOINT\n\n");
-}*/
+TEST_F(PowerCalAutoTest, LevelIsChosenOnlyInSetup) {
+    EnterAuto(1);
+    ChangeAutoCalLevel(+1);
+    EXPECT_EQ(autoCal.level, 2);
+    ChangeAutoCalLevel(+1);
+    ChangeAutoCalLevel(+1);
+    EXPECT_EQ(autoCal.level, 3) << "Level is limited to 3";
+    ChangeAutoCalLevel(-5);
+    EXPECT_EQ(autoCal.level, 1) << "Level is limited to 1";
 
+    Select(); // to PROMPT
+    ChangeAutoCalLevel(+1);
+    EXPECT_EQ(autoCal.level, 1) << "Level cannot change once the session has started";
+}
+
+TEST_F(PowerCalAutoTest, Level1SessionVisitsLoadOpenShortWithoutOperatorReadings) {
+    EnterAuto(1);
+    Select(); // SETUP -> PROMPT
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_PROMPT);
+    EXPECT_EQ(autoCal.stage, AUTO_STAGE_LOAD);
+
+    Select(); // load fitted
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_EQ(autoCal.stage, AUTO_STAGE_OPEN);
+    EXPECT_EQ(forwardFits, 2u) << "One forward fit per band";
+    EXPECT_EQ(collects[AUTO_STAGE_LOAD], 2u * 13u) << "12 CW points and the SSB tone point per band";
+    EXPECT_EQ(rests, 0u) << "The load sweep stays keyed between points";
+    EXPECT_FALSE(autoCal.keyed) << "Unkeyed while the operator changes the connector";
+
+    Select(); // open fitted
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_EQ(autoCal.stage, AUTO_STAGE_SHORT);
+    EXPECT_EQ(collects[AUTO_STAGE_OPEN], 2u * 6u);
+    EXPECT_EQ(rests, 2u * 5u) << "Receive between the open points";
+    EXPECT_FALSE(autoCal.keyed);
+
+    Select(); // short fitted
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+    EXPECT_EQ(collects[AUTO_STAGE_SHORT], 2u * 6u);
+    EXPECT_EQ(forwardFits, 2u) << "No forward fit on the open or the short";
+    EXPECT_EQ(meterEntries, 0u) << "Level 1 needs no wattmeter";
+    EXPECT_FALSE(autoCal.keyed);
+
+    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RETRY);
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_REVIEW) << "Nothing failed, so nothing to retry";
+
+    Select(); // accept
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RESET);
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
+}
+
+TEST_F(PowerCalAutoTest, Level2TakesOneWattmeterReadingPerBand) {
+    EnterAuto(2);
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_EQ(meterEntries, 2u);
+    EXPECT_EQ(collects[AUTO_STAGE_LOAD], 2u * 14u) << "Sweep, wattmeter point and SSB point per band";
+}
+
+TEST_F(PowerCalAutoTest, Level3TakesAWattmeterReadingAtEveryCWPoint) {
+    EnterAuto(3);
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_EQ(meterEntries, 2u * 8u) << "7 levels and the drift repeat per band";
+    EXPECT_EQ(collects[AUTO_STAGE_LOAD], 2u * 9u);
+}
+
+TEST_F(PowerCalAutoTest, OnlyTheLevel1LoadStageCanBeSkipped) {
+    EnterAuto(2);
+    Select();
+    SkipPowerCalStage();
+    EXPECT_EQ(autoCal.stage, AUTO_STAGE_LOAD) << "Level 2 needs the wattmeter stage";
+
+    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_RESET);
+    EnterAuto(1);
+    Select();
+    SkipPowerCalStage();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_PROMPT);
+    EXPECT_EQ(autoCal.stage, AUTO_STAGE_OPEN);
+    EXPECT_TRUE(autoCal.loadSkipped);
+
+    SkipPowerCalStage();
+    EXPECT_EQ(autoCal.stage, AUTO_STAGE_OPEN) << "The open cannot be skipped";
+
+    Select(); // open fitted
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    EXPECT_EQ(forwardFits, 0u);
+    EXPECT_EQ(collects[AUTO_STAGE_OPEN], 2u * 6u);
+}
+
+TEST_F(PowerCalAutoTest, WattmeterEntryTimesOutUnkeyedAndRekeysOnSelect) {
+    EnterAuto(3);
+    Select();
+    Select();
+    // Reach the first wattmeter entry without answering it
+    for (int k = 0; k < 100 && powerSM.state_id != PowerCalSm_StateId_METER_ENTRY; k++)
+        Tick();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_METER_ENTRY);
+    EXPECT_TRUE(autoCal.keyed);
+
+    for (uint32_t k = 0; k <= powerSM.vars.meterTimeout_ms + 1; k++)
+        Tick();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_METER_PAUSED);
+    EXPECT_FALSE(autoCal.keyed) << "Unkeyed after the timeout";
+
+    Select();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_KEYDOWN);
+    EXPECT_TRUE(autoCal.keyed);
+    for (int k = 0; k < 100 && powerSM.state_id != PowerCalSm_StateId_METER_ENTRY; k++)
+        Tick();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_METER_ENTRY) << "Same point asks again";
+    EXPECT_EQ(autoCal.point, 0u);
+}
+
+TEST_F(PowerCalAutoTest, ResetDuringAPointUnkeys) {
+    EnterAuto(1);
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_TRUE(autoCal.keyed);
+
+    ResetPowerCal();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_POWERPOINT1);
+    EXPECT_FALSE(autoCal.keyed);
+    EXPECT_FALSE(PowerCalAutoActive());
+}
+
+TEST_F(PowerCalAutoTest, OscillationAbandonsThatBandsSweepOnly) {
+    EnterAuto(1);
+    Select();
+    SkipPowerCalStage(); // straight to the open
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    EXPECT_EQ(autoCal.band, BAND_40M);
+
+    autoCal.oscillation = true; // the check in AutoStorePoint() would set this
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND_DONE, 20));
+    EXPECT_FALSE(autoCal.keyed);
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND));
+    EXPECT_EQ(autoCal.band, BAND_20M) << "Moves on to the next band";
+    EXPECT_EQ(autoCal.openFailMask, 1u << BAND_40M);
+
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    Select(); // short
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+    EXPECT_TRUE(AutoAnyFailed());
+
+    Select(); // the passing band is accepted...
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+}
+
+TEST_F(PowerCalAutoTest, RetryRunsTheSessionAgainForTheFailedBandsOnly) {
+    EnterAuto(1);
+    Select();
+    SkipPowerCalStage();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
+    autoCal.oscillation = true;
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_PROMPT));
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
+
+    RetryPowerCal();
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_SETUP);
+    EXPECT_EQ(autoCal.bandMask, 1u << BAND_40M);
+    EXPECT_EQ(autoCal.level, 1) << "Same level";
+}

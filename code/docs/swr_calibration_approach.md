@@ -81,7 +81,7 @@ wattmeter can be raised to level 2 or 3 later.
 
 | Level | On the antenna connector, in order | Forward line from | Reflected line from |
 |---|---|---|---|
-| 1, no wattmeter | Open; short; optionally a 50 Ω load as a check | Per-band defaults for the radio's L44 turns, nominal slope (s_f = 0) | Open and short |
+| 1, no wattmeter | 50 Ω load (may be skipped); open; short | Per-band defaults for the radio's L44 turns, nominal slope (s_f = 0) | Open and short |
 | 2, one reading per band | Wattmeter with its 50 Ω load; open; short | One wattmeter reading per band near 2 W, nominal slope (s_f = 0). Cheaper variant: one reading on 40 m, carried with the level 1 defaults | Open and short |
 | 3, full | Wattmeter with its 50 Ω load; open; short | A sweep of 5–7 wattmeter readings per band | Open and short |
 
@@ -172,7 +172,7 @@ detectors. Both radios are in the same build: C147 and C154 removed, 100 pF acro
 |---|---|
 | Firmware | Includes the AD7991 fix: two discarded conversions after each channel switch, `AD7991::readADCsingle()` (commit 6217be9). Without it the readings compress the return loss to about 0.65 of its true value, and no calibration can recover it. |
 | Wattmeter and load | Levels 2 and 3 only. A wattmeter between the antenna connector and a 50 Ω dummy load. Level 3 needs it accurate from about 0.1 W to the 20 W PA's full output (about 6 W on 10 m, 16 W on 40 m); level 2 needs it only near 2 W. ±5 % gives about ±0.2 dB on the power display. |
-| 50 Ω load | Level 1, optional: a dummy load fitted directly on the connector after the short, for the S50 check (Section 8). |
+| 50 Ω load | Level 1: a dummy load on the connector for stage A, the first standard (Section 4). It gives the PA curve and the S50 check (Section 8). |
 | Open | Nothing on the antenna connector. |
 | Short | A low-inductance short fitted directly on the connector. |
 | No cables or adapters for the open and short | A cable between the connector and a standard reduces its reflection by twice the cable's loss. Every SWR then reads high, and the checks cannot detect it. |
@@ -202,11 +202,14 @@ means the operator then fits the antenna, which is the natural next step.
 - **Level 2:** stage A takes one wattmeter reading per band (Section 6) plus the key-up floor.
   The connector changes are the same as level 3; the operator enters 11 readings instead of
   about 70.
-- **Level 1:** no stage A. The forward line comes from the defaults, so the first change is
-  the open, and the key-up floor is taken there (it needs no load). After the short, the
-  operator may fit a 50 Ω load directly on the connector for a stage D: one key-down per band
-  that gives the S50 check (Section 8). That is two connector changes, or three with the
-  check, and no operator readings.
+- **Level 1:** stage A on a bare 50 Ω load, with no wattmeter readings. The forward line comes
+  from the defaults, and the firmware sweeps the attenuator automatically. The sweep gives the
+  PA power curve through the default forward line, the S50 check and the 50 Ω reference for
+  the oscillation check. The connector order is the same as at levels 2 and 3: two changes and
+  no operator readings. The operator may skip stage A for a quick SWR-only recalibration. The
+  stored PA curve then sets the open and short drive, and there is no S50 check. The firmware
+  does not take the key-up floor (it is only needed for the optional subtraction in Section 7). (Decided 2026-11-02, replacing the earlier open, short, optional
+  load order. See `code/docs/PowerCalibration/AutoCalibration.md`.)
 
 **The existing power calibration belongs inside stage A.**
 - **Use its readings twice.** It already takes wattmeter readings with the PA on its 50 Ω
@@ -277,9 +280,9 @@ compared level by level:
 - **Levels:** 5–6 of them, from about 1.2 W of forward power down to the lowest the
   attenuator gives. Choose the attenuations from the band's PA curve (stage A) for 50 Ω. The
   PA delivers a different power into an open or a short, but V_f measures what it actually
-  delivers, so the drive need not be exact. At level 1 there is no stage A: use the stored
-  PA curve, or step the attenuator on the open until V_f, read with the level 1 defaults,
-  shows about 1.2 W.
+  delivers, so the drive need not be exact. At level 1 stage A's automatic sweep gives the
+  PA curve. If stage A was skipped, use the stored PA curve, or step the attenuator on the
+  open until V_f, read with the level 1 defaults, shows about 1.2 W.
 - **Span:** at least 8 dB. Where the attenuator cannot reach 8 dB below 1.2 W, reduce the
   carrier's DSP gain as well. Its accuracy does not matter, for the same reason.
 - **Protecting the PA:** key each point for no more than 2 s, and leave at least 1 s in
@@ -376,7 +379,7 @@ $$
 - **Forward residuals (level 3):** the rms and the worst residual of the forward fit, in dB.
 - **The wattmeter load's SWR (S50).** Apply the new reflected calibration to stage A's V_r,k
   and V_f,k. This measures the bridge's leak plus the mismatch of the wattmeter and its load.
-  At level 1 it comes from the optional stage D on a 50 Ω load instead.
+  At level 1 stage A is on a bare 50 Ω load. If stage A was skipped, there is no S50.
 - **Drift (level 3):** the repeated point against its first reading, in dB.
 - **Level 2 against the defaults:** the difference between o_f from the reading and the
   level 1 default, in dB.
@@ -400,7 +403,7 @@ report the failure. The thresholds come from the 2026-10/11 bench sessions.
 | Reflected fit rms | ≤ 0.2 dB | 0.07–0.15 dB | Unsettled readings; oscillation |
 | Reflected slope against forward | \|m_r − m_f\| ≤ 1.5 mV/dB | within 0.6 mV/dB (160–20 m) | Lossy standard; oscillation |
 | Open–short gap \|b_o − b_s\| | ≤ 0.5 dB on 160–20 m; ≤ 1.0 dB above 20 m | 0.02–0.04 dB (160–20 m), 0.51 dB (10 m) | Lossy short or open; cable or adapter in the way |
-| S50 on the wattmeter load (level 1: the stage D load) | ≤ 1.3 below 20 MHz; ≤ 1.5 above | not taken on the meter chain; a bare 50 Ω load read 1.01–1.06 (160–20 m) and 1.22 (10 m) | Poorly matched wattmeter or load; bridge fault |
+| S50 on the stage A load (level 1: a bare 50 Ω load) | ≤ 1.3 below 20 MHz; ≤ 1.5 above | not taken on the meter chain; a bare 50 Ω load read 1.01–1.06 (160–20 m) and 1.22 (10 m) | Poorly matched wattmeter or load; bridge fault |
 | Drift of the repeated point (level 3) | ≤ 0.2 dB | ≤ 0.08 dB | Thermal drift; loose connection |
 | Level 2 offset against the level 1 default | within ±3 dB on 160–20 m, ±4 dB above 20 m | −0.6 to −0.2 dB against the defaults in Section 2 (−1.2 to −0.4 dB against radio 2's values alone) | Wattmeter entry error (2 W entered as 20 W is 10 dB); wrong L44 turns setting |
 | Oscillation | None detected (Section 6) | none on radio 1 | PA instability into the short (radio 2, 10 m) |
