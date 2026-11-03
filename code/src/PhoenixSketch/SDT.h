@@ -352,20 +352,28 @@ extern struct config_t {
     int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
     bool keyerFlip = KEYER_FLIP; /**false = right paddle = DAH, true = DIT */
     bool PA100Wactive = false;
-    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,0}; /** The saturation power output level when 20W PA is used */
-    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
+    // Uncalibrated defaults for 160-6 m, PA curve and bridge: radio 2's level 2 automatic
+    // calibration of 2026-11-02 (code/docs/PowerCalibration/AutoCalibration.md, "Uncalibrated
+    // defaults"); the forward offsets are the level 1 defaults for 10 turns. The SSB gain
+    // correction stays 0: the calibration keys its SSB tone at the stored correction, so a
+    // default far from a radio's need would overdrive the PA or fail the 10 dB change check
+    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {12324,17503,17378,17396,11848,10324,6556,8508,3595,4897,1749,14680,0}; /** The saturation power output level when 20W PA is used */
+    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {50.20,34.71,37.84,24.71,18.09,23.40,24.68,20.24,28.06,39.21,7.43,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
     float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = {86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,0};  /** The saturation power output level when 100W PA is used */
     float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = {10,10,10,10,10,10,10,10,10,10,10,10}; /** k index parameterizes the knee location in the Pout vs attenuation */
-    float32_t PowerCal_20W_shape[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Knee shape exponent s of the 20W PA curve; 1 is the plain tanh */
+    float32_t PowerCal_20W_shape[NUMBER_OF_BANDS] = {0.594,0.552,0.590,0.523,0.548,0.582,0.561,0.577,0.711,0.708,0.539,1,1}; /** Knee shape exponent s of the 20W PA curve; 1 is the plain tanh */
     float32_t PowerCal_100W_shape[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Knee shape exponent s of the 100W PA curve; 1 is the plain tanh */
     float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** The power threshold that switches in the 100W amplifier */
     float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
     float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
 
     float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
-    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
+    // Uncalibrated bridge: s_f = 0 and o_f the level 1 default for 10 turns
+    // (SWRCalLevel1ForwardOffset()); the reflected line keeps radio 2's place against its
+    // forward line (10 m from the open alone, 6 m from the short alone)
+    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {-0.22,0.01,-0.10,-0.18,-0.12,-0.05,-0.15,-0.11,-0.17,-0.18,-0.19,0,0}; /** SWR calibration */
+    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {-4.68,-3.89,-4.04,-4.16,-4.55,-4.85,-5.02,-4.81,-4.86,-5.26,-3.70,0,0}; /** SWR calibration */
+    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {-4.03,-3.85,-3.75,-3.68,-4.22,-4.73,-4.62,-4.55,-4.48,-4.42,-4.42,0,0}; /** SWR calibration */
     uint8_t SWR_CalLevel[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration level: 0 uncalibrated, else 1 to 3; SWR_CAL_OPEN_ONLY or SWR_CAL_SHORT_ONLY set if the reflected line is from one standard alone */
     uint32_t SWR_CalDate[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Time of the SWR calibration (seconds since 1970) */
     uint8_t SWR_CouplerTurns = 10; /** L44 turns per core; selects the level 1 forward offsets */

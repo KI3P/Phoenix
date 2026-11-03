@@ -3245,6 +3245,45 @@ TEST_F(PowerCalAutoTest, PrintsTheResultsTableWhenTheChecksFinish) {
     EXPECT_EQ(log.Count({"o: offset dB; s_f, s_r: slope adjustment mV/dB"}), 1);
 }
 
+TEST(UncalibratedDefaults, ForwardLineIsTheLevel1Default) {
+    const struct config_t factory;
+    EXPECT_EQ(factory.SWR_CouplerTurns, 10);
+    for (int32_t b = BAND_160M; b <= BAND_6M; b++){
+        EXPECT_NEAR(factory.SWR_F_Offset[b], SWRCalLevel1ForwardOffset(b, 10), 0.005f) << bands[b].name;
+        EXPECT_EQ(factory.SWR_F_SlopeAdj[b], 0.0f) << bands[b].name;
+        EXPECT_EQ(factory.SWR_CalLevel[b], 0) << "a default is not a calibration";
+    }
+}
+
+TEST(UncalibratedDefaults, ReflectedLineKeepsRadio2sPlaceAgainstTheForward) {
+    // Radio 2, level 2, 2026-11-02 (AUTOCAL-BAND): o_r - o_f and s_r, 160 m to 6 m
+    const float32_t gap[] = {-0.65f, -0.04f, -0.29f, -0.48f, -0.33f, -0.12f, -0.40f, -0.26f, -0.38f, -0.84f, 0.72f};
+    const float32_t s_r[] = {-0.22f, 0.01f, -0.10f, -0.18f, -0.12f, -0.05f, -0.15f, -0.11f, -0.17f, -0.18f, -0.19f};
+    const struct config_t factory;
+    for (int32_t b = BAND_160M; b <= BAND_6M; b++){
+        EXPECT_NEAR(factory.SWR_R_Offset[b] - factory.SWR_F_Offset[b], gap[b], 0.011f) << bands[b].name;
+        EXPECT_NEAR(factory.SWR_R_SlopeAdj[b], s_r[b], 0.001f) << bands[b].name;
+        // A matched load reads a low SWR with the defaults: the reflected line is not the forward's
+        float32_t Vf = 2000, Vr = Vf - 25 * 26; // 26 dB return loss
+        float32_t swr = SWRCalSWR(Vf, Vr, 25.0f + factory.SWR_F_SlopeAdj[b], factory.SWR_F_Offset[b] - SWRCAL_OFFSET_CONSTANT_DB,
+                                  25.0f + factory.SWR_R_SlopeAdj[b], factory.SWR_R_Offset[b] - SWRCAL_OFFSET_CONSTANT_DB);
+        EXPECT_LT(swr, 1.25f) << bands[b].name;
+    }
+}
+
+TEST(UncalibratedDefaults, PACurveGivesRadio2sFullPower) {
+    // Radio 2's wattmeter at 0 dB attenuation, level 2, 2026-11-02 (pa_curve_radio2_level2_2026-11-02.csv)
+    const float32_t full_W[] = {13.18f, 17.78f, 17.38f, 16.98f, 12.02f, 10.96f, 7.41f, 8.13f, 3.55f, 4.90f, 1.87f};
+    const struct config_t factory;
+    for (int32_t b = BAND_160M; b <= BAND_6M; b++){
+        float32_t P_mW = attenToPower_mW(0.0f, factory.PowerCal_20W_Psat_mW[b], factory.PowerCal_20W_kindex[b],
+                                         factory.PowerCal_20W_shape[b]);
+        EXPECT_NEAR(10.0f * log10f(P_mW / (1000.0f * full_W[b])), 0.0f, 0.75f) << bands[b].name;
+        EXPECT_GT(factory.PowerCal_20W_shape[b], 0.0f);
+        EXPECT_LT(factory.PowerCal_20W_shape[b], 1.0f) << "radio 2's knee is softer than the plain tanh";
+    }
+}
+
 TEST(AutoCalFailNames, ShortAndLongNameForEveryBit) {
     for (uint32_t k = 0; k < AUTO_FAIL_BIT_COUNT; k++){
         EXPECT_LE(strlen(AutoCalFailName(k, true)), 7u) << "fits the screen's status column with a +";

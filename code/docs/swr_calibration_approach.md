@@ -158,8 +158,9 @@ detectors. Both radios are in the same build: C147 and C154 removed, 100 pF acro
 - **Other bands.** Interpolate linearly in log frequency between the measured bands: 80 and
   60 m between 160 and 40 m, 30 m between 40 and 20 m, 17, 15 and 12 m between 20 and 10 m.
   6 m takes the 10 m value, unverified.
-- **Reflected line.** No default. Without a valid open sweep the band's SWR is uncalibrated
-  (the last item in Section 1).
+- **Reflected line.** No level 1 default: level 1 always measures it from the open and short.
+  An uncalibrated radio starts from radio 2's reflected line, kept at its place against these
+  forward offsets (`PowerCalibration/AutoCalibration.md`, "Uncalibrated defaults").
 - **The build matters.** C147 bridges the pad's series arm with a zero at 32 MHz, so it sets
   the forward offset on the upper bands. Removing C147 and C154 and adding the 100 pF moved
   radio 2's offsets by 3.1 dB on 10 m and 0.9 dB on 20 m. Its L44 rebuild then moved them by
