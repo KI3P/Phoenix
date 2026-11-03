@@ -172,6 +172,7 @@ TEST(SWRCalibration, ReflectedFitCancelsTheLeak){
     struct SWRReflectedFit f = SWRCalFitReflected(Vfo, Vro, 6, Vfs, Vrs, 6, m_f, b_f);
     ASSERT_TRUE(f.valid);
     EXPECT_FALSE(f.openOnly);
+    EXPECT_FALSE(f.shortOnly);
     EXPECT_NEAR(f.m, m_r, 1e-2);
     EXPECT_NEAR(f.b, b_r, 1e-2) << "Mean of the two intercepts";
     EXPECT_NEAR(f.b_open - f.b_short, -2.0f * leak_dB, 1e-2);
@@ -197,6 +198,33 @@ TEST(SWRCalibration, ReflectedFitFallsBackToTheOpen){
         << "The open alone needs two points";
 }
 
+TEST(SWRCalibration, ReflectedFitFallsBackToTheShort){
+    const float32_t m_f = 25.0f, b_f = -44.0f, m_r = 24.8f, b_r = -41.0f;
+    const float32_t leak_dB = 0.2f;
+    float32_t Vfs[6], Vrs[6];
+    for (int k = 0; k < 6; k++){
+        float32_t P = 30.0f - 2.0f * k;
+        Vfs[k] = Reading(P, m_f, b_f);
+        Vrs[k] = Reading(P - leak_dB, m_r, b_r);
+    }
+    struct SWRReflectedFit f = SWRCalFitReflected(nullptr, nullptr, 0, Vfs, Vrs, 6, m_f, b_f);
+    ASSERT_TRUE(f.valid);
+    EXPECT_FALSE(f.openOnly);
+    EXPECT_TRUE(f.shortOnly);
+    EXPECT_NEAR(f.m, m_r, 1e-2);
+    // The leak is not cancelled: the short reads it low, so the intercept comes out high by it
+    EXPECT_NEAR(f.b, b_r + leak_dB, 1e-2);
+    EXPECT_FLOAT_EQ(f.b_open, f.b_short);
+    EXPECT_NEAR(f.rms_dB, 0.0f, 1e-3);
+
+    // One open point is too few to use: the short alone
+    f = SWRCalFitReflected(Vfs, Vrs, 1, Vfs, Vrs, 6, m_f, b_f);
+    ASSERT_TRUE(f.valid);
+    EXPECT_TRUE(f.shortOnly);
+    EXPECT_FALSE(SWRCalFitReflected(Vfs, Vrs, 1, Vfs, Vrs, 1, m_f, b_f).valid)
+        << "Neither standard has two points";
+}
+
 TEST(SWRCalibration, SWROfKnownLoads){
     const float32_t m_f = 24.5f, b_f = -44.5f, m_r = 25.4f, b_r = -40.7f;
     float32_t Pf = 33.0f;
@@ -213,24 +241,101 @@ TEST(SWRCalibration, SWROfKnownLoads){
 
 TEST(SWRCalibration, OscillationRules){
     // A healthy point: the drive drops 2 dB, V_f falls 50 mV
-    EXPECT_FALSE(SWRCalOscillating(true, 1900, 2.0f, 1850, true, 1850));
-    // V_f stuck whatever the drive (radio 2 into the short on 10 m)
-    EXPECT_TRUE(SWRCalOscillating(true, 1900, 2.0f, 1890, false, 0));
-    // Falling just under half the drive drop
-    EXPECT_TRUE(SWRCalOscillating(true, 1900, 2.0f, 1876, false, 0));
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1900, 2.0f, 1850, true, 1850), SWRCAL_OSC_NONE);
+    // Falling just under half the drive drop: short, but not by itself an oscillation
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1900, 2.0f, 1876, false, 0), SWRCAL_OSC_SHORT_FALL);
     // More than 6 dB above the 50 Ohm reference
-    EXPECT_TRUE(SWRCalOscillating(false, 0, 0, 1960, true, 1800));
-    EXPECT_FALSE(SWRCalOscillating(false, 0, 0, 1940, true, 1800));
+    EXPECT_EQ(SWRCalOscillationCheck(false, 0, 0, 1960, true, 1800), SWRCAL_OSC_ABOVE_REFERENCE);
+    EXPECT_EQ(SWRCalOscillationCheck(false, 0, 0, 1940, true, 1800), SWRCAL_OSC_NONE);
     // Radio 2's 20 m open reads up to 128 mV (5 dB) above 50 Ohm: not an oscillation
-    EXPECT_FALSE(SWRCalOscillating(false, 0, 0, 1800 + 128, true, 1800));
+    EXPECT_EQ(SWRCalOscillationCheck(false, 0, 0, 1800 + 128, true, 1800), SWRCAL_OSC_NONE);
     // The first point with no reference cannot be judged
-    EXPECT_FALSE(SWRCalOscillating(false, 0, 0, 2100, false, 0));
+    EXPECT_EQ(SWRCalOscillationCheck(false, 0, 0, 2100, false, 0), SWRCAL_OSC_NONE);
 }
 
-TEST(SWRCalibration, OscillationCheckSaysWhichRule){
-    EXPECT_EQ(SWRCalOscillationCheck(true, 1900, 2.0f, 1850, true, 1850), SWRCAL_OSC_NONE);
-    EXPECT_EQ(SWRCalOscillationCheck(true, 1900, 2.0f, 1890, false, 0), SWRCAL_OSC_NO_FALL);
-    EXPECT_EQ(SWRCalOscillationCheck(false, 0, 0, 1960, true, 1800), SWRCAL_OSC_ABOVE_REFERENCE);
+// Radio 2, level 1, 2026-11-02 (autocal_r2_serial2.log): real readings
+TEST(SWRCalibration, CompressionIsAShortFallNotAnOscillation){
+    // The PA near its ceiling into the open: 20, 17 and 12 m fell 21, 14 and 5 mV for 2 dB
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1772.3f, 2.0f, 1751.7f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1730.0f, 2.0f, 1716.2f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1684.7f, 2.0f, 1679.6f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    // Fold-back near the ceiling: V_f rises a little as the drive drops (10 m load, +9.7 mV for 3 dB)
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1806.7f, 3.0f, 1816.4f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    // The other bands' open sweeps fell 40-52 mV per 2 dB
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1609.3f, 2.0f, 1561.7f, false, 0), SWRCAL_OSC_NONE);
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1430.8f, 2.0f, 1390.2f, false, 0), SWRCAL_OSC_NONE);
+}
+
+TEST(SWRCalibration, ARiseIsAnOscillation){
+    // Radio 2's 10 m short on 2026-11-02: V_f rose 52 mV, its spread 70 mV
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1594.2f, 2.0f, 1646.5f, false, 0), SWRCAL_OSC_RISE);
+    // Radio 2's 10 m short before its rebuild (bench sheet radio2): locked at 1930 mV
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1575.0f, 3.0f, 1929.6f, false, 0), SWRCAL_OSC_RISE);
+    // Once locked it stays: no rise, no fall
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1929.6f, 3.0f, 1931.7f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1931.7f, 3.0f, 1930.9f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    // A rise of just under 1 dB is still only a short fall
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1800.0f, 2.0f, 1824.0f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1800.0f, 2.0f, 1826.0f, false, 0), SWRCAL_OSC_RISE);
+}
+
+TEST(SWRCalibration, AJumpInTheSpreadIsAnOscillation){
+    // Radio 2's 10 m short at level 2, 2026-11-02: -5.98 dB 1608.1 mV (sd 4.2),
+    // then -7.98 dB 1602.6 mV (sd 56.1) as the oscillation began, then a 259 mV rise
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1608.1f, 2.0f, 1602.6f, false, 0, 4.2f, 56.1f), SWRCAL_OSC_UNSTEADY);
+    // Without the spreads it would only be a short fall
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1608.1f, 2.0f, 1602.6f, false, 0), SWRCAL_OSC_SHORT_FALL);
+    // Even with a proper fall, the jump in the spread decides
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1650.0f, 2.0f, 1600.0f, false, 0, 4.2f, 56.1f), SWRCAL_OSC_UNSTEADY);
+    // A rise is reported as a rise (level 1: 1594.2 -> 1646.5 mV, sd 5.2 -> 70.3)
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1594.2f, 2.0f, 1646.5f, false, 0, 5.2f, 70.3f), SWRCAL_OSC_RISE);
+    // Real sweeps' spreads grow at low drive: radio 2's 10 m open, 16.6 -> 23.4 mV
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1473.8f, 3.0f, 1400.0f, false, 0, 16.6f, 23.4f), SWRCAL_OSC_NONE);
+    // ...and 6 m's open, 4.6 -> 8.1 mV, stays a short fall at most
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1578.4f, 2.0f, 1549.2f, false, 0, 4.6f, 8.1f), SWRCAL_OSC_NONE);
+    // A spread below the minimum is never a jump, however large the ratio
+    EXPECT_EQ(SWRCalOscillationCheck(true, 1650.0f, 2.0f, 1600.0f, false, 0, 1.0f, 19.0f), SWRCAL_OSC_NONE);
+    // The sweep is abandoned at once
+    uint32_t shortFalls = 0;
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_UNSTEADY, &shortFalls), SWRCAL_SWEEP_ABANDON);
+}
+
+TEST(SWRCalibration, SweepDropsCompressedPointsAndAbandonsOscillation){
+    uint32_t shortFalls = 0;
+    // Compression at the top of the sweep: the previous point goes, the sweep goes on
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_SHORT_FALL, &shortFalls), SWRCAL_SWEEP_DROP_PREVIOUS);
+    EXPECT_EQ(shortFalls, 1u);
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_SHORT_FALL, &shortFalls), SWRCAL_SWEEP_DROP_PREVIOUS);
+    // ...until V_f falls properly again
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_NONE, &shortFalls), SWRCAL_SWEEP_KEEP);
+    EXPECT_EQ(shortFalls, 0u) << "a proper fall clears the run";
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_SHORT_FALL, &shortFalls), SWRCAL_SWEEP_DROP_PREVIOUS);
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_NONE, &shortFalls), SWRCAL_SWEEP_KEEP);
+
+    // A locked oscillation never falls: abandoned at the third short fall running
+    shortFalls = 0;
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_SHORT_FALL, &shortFalls), SWRCAL_SWEEP_DROP_PREVIOUS);
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_SHORT_FALL, &shortFalls), SWRCAL_SWEEP_DROP_PREVIOUS);
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_SHORT_FALL, &shortFalls), SWRCAL_SWEEP_ABANDON);
+
+    // A rise, or the first point far above the 50 Ohm reference, abandons at once
+    shortFalls = 0;
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_RISE, &shortFalls), SWRCAL_SWEEP_ABANDON);
+    shortFalls = 0;
+    EXPECT_EQ(SWRCalSweepStep(SWRCAL_OSC_ABOVE_REFERENCE, &shortFalls), SWRCAL_SWEEP_ABANDON);
+}
+
+TEST(SWRCalibration, LoadPresence){
+    // Radio 2, 2026-11-02, 50 Ohm load: 6 m at full drive has the smallest gap of the session
+    EXPECT_TRUE(SWRCalLoadPresent(1738.5f, 1222.2f));
+    // The smallest on any bench sheet: radio 2's 10 m before its rebuild
+    EXPECT_TRUE(SWRCalLoadPresent(1858.0f, 1692.3f));
+    // The load came off during 160 m: V_r read like V_f
+    EXPECT_FALSE(SWRCalLoadPresent(1572.2f, 1576.2f));
+    EXPECT_FALSE(SWRCalLoadPresent(1904.6f, 1904.4f));
+    // At the limit
+    EXPECT_TRUE(SWRCalLoadPresent(1600.0f, 1500.0f));
+    EXPECT_FALSE(SWRCalLoadPresent(1600.0f, 1500.5f));
 }
 
 TEST(SWRCalibration, Level3ReportsWhichCeilingPointsItDropped){

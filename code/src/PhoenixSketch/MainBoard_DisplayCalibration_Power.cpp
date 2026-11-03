@@ -203,6 +203,13 @@ void ChangePowerIncrement(void){
 }
 
 /**
+ * @brief Step of the measured power entry, in the entry's units (W or dB)
+ */
+float32_t GetPowerIncrement(void){
+    return powerincvals[incindexPower];
+}
+
+/**
  * @brief Increase measured power value during calibration
  * @note Increments by current step size (powerincvals[incindexPower])
  * @note Clamped to maximum 100.0

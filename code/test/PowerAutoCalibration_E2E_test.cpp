@@ -177,7 +177,8 @@ struct Bench {
     const RadioProfile *radio = &RADIO1;
     Connector connector = CONNECT_LOAD;
     int32_t extraOscillationBand = -1;         // a test may add an oscillation...
-    Connector extraOscillationInto = CONNECT_OPEN; // ...into this standard
+    Connector extraOscillationInto = CONNECT_OPEN; // ...into this standard...
+    bool extraOscillationBoth = false;             // ...or into the open and the short
     uint32_t conversions = 0;                  // for the readings' dither
 
     float32_t m_f(int32_t b) const { return AtBand(radio->m_f, b); }
@@ -191,7 +192,8 @@ struct Bench {
     float32_t ssbGainFor3W(int32_t b) const { return 0.5f + 0.1f * b; }
     bool Oscillates(int32_t b, Connector c) const {
         return ((b == radio->oscillatesIntoShort) && (c == CONNECT_SHORT)) ||
-               ((b == extraOscillationBand) && (c == extraOscillationInto));
+               ((b == extraOscillationBand) &&
+                ((c == extraOscillationInto) || (extraOscillationBoth && (c != CONNECT_LOAD))));
     }
 };
 static Bench bench;
@@ -744,8 +746,10 @@ protected:
                 std::vector<KeyInterval> v = KeyDowns(b, c);
                 bool oscillates = bench.Oscillates(b, c);
                 if (oscillates){
+                    // Stuck whatever the drive: abandoned at the first point if it is
+                    // far above the 50 Ohm reference, else at the third short fall
                     EXPECT_GE(v.size(), 1u);
-                    EXPECT_LE(v.size(), 2u) << "abandoned at the first bad point";
+                    EXPECT_LE(v.size(), 4u) << "abandoned by the third short fall running";
                 } else {
                     EXPECT_EQ(v.size(), 6u);
                 }
@@ -872,8 +876,8 @@ TEST_P(PowerAutoCalE2E, Level3FullSessionFromTheMenu) {
 
 /**
  * Level 1: abort with ZOOM while transmitting, start again, a band whose PA
- * oscillates into the open fails, and RETRY repeats only that band once the
- * fault is cleared.
+ * oscillates into both the open and the short fails, and RETRY repeats only
+ * that band once the fault is cleared.
  */
 TEST_P(PowerAutoCalE2E, Level1AbortRetryAndAccept) {
     NavigateToPowerCalibration();
@@ -895,9 +899,10 @@ TEST_P(PowerAutoCalE2E, Level1AbortRetryAndAccept) {
         EXPECT_FALSE(Transmitting());
     }
 
-    // Again, with the 6 m PA oscillating into the open as well
+    // Again, with the 6 m PA oscillating into the open and the short as well
     bench.extraOscillationBand = BAND_6M;
     bench.extraOscillationInto = CONNECT_OPEN;
+    bench.extraOscillationBoth = true;
     monitor.Reset();
     StartAuto(1);
     Press(MENU_OPTION_SELECT);
@@ -914,6 +919,7 @@ TEST_P(PowerAutoCalE2E, Level1AbortRetryAndAccept) {
     ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_SETUP);
     EXPECT_EQ(autoCal.bandMask, 1u << BAND_6M);
     bench.extraOscillationBand = -1;
+    bench.extraOscillationBoth = false;
     monitor.Reset();
     Press(MENU_OPTION_SELECT);
     RunStandards();

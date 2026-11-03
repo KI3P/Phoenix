@@ -27,6 +27,18 @@ If not, see <https://www.gnu.org/licenses/>.
 #include <RA8875.h>
 
 extern RA8875 tft;
+float32_t GetPowerIncrement(void);  // MainBoard_DisplayCalibration_Power.cpp
+
+/**
+ * @brief Frequency the radio transmits on now, in Hz
+ * @note CW points key the carrier with the CW tone offset (TuneCWTX); SSB tone
+ *       points are near the dial frequency
+ */
+static int64_t AutoTransmitFrequency_Hz(void){
+    if (autoCal.ssbMode)
+        return GetTXRXFreq(ED.activeVFO);
+    return GetCWTXFreq_cHz() / 100;
+}
 
 static const int8_t NUMBER_OF_AUTO_PANES = 4;
 static void DrawAutoStatusPane(void);
@@ -34,7 +46,7 @@ static void DrawAutoReadingsPane(void);
 static void DrawAutoTablePane(void);
 static void DrawAutoPromptPane(void);
 
-static Pane PaneAutoStatus =   {10,45,510,75,DrawAutoStatusPane,1};
+static Pane PaneAutoStatus =   {10,45,510,80,DrawAutoStatusPane,1};
 static Pane PaneAutoReadings = {10,125,510,40,DrawAutoReadingsPane,1};
 static Pane PaneAutoTable =    {10,170,515,305,DrawAutoTablePane,1};
 // Out to the screen's edge, so nothing is left beyond it. Prompt lines are at
@@ -64,12 +76,12 @@ static void PrintAt(int16_t x, int16_t y, const char *text, uint16_t color = RA8
 }
 
 // Names of the AUTO_FAIL_* bits, short for the table and long for the review
-static const char *failShort[] = {"few rdg", "fwd fit", "fwd slp", "drift", "L2 offs", "open",
-                                  "ref fit", "ref slp", "gap", "S50", "PA fit"};
+static const char *failShort[] = {"few rdg", "fwd fit", "fwd slp", "drift", "L2 offs", "no refl",
+                                  "ref fit", "ref slp", "gap", "S50", "PA fit", "no load"};
 static const char *failLong[] = {"too few readings", "forward fit", "forward slope", "drift",
-                                 "level 2 offset", "open sweep abandoned", "reflected fit",
+                                 "level 2 offset", "open and short abandoned", "reflected fit",
                                  "reflected slope", "open/short gap", "load SWR too high",
-                                 "PA curve fit"};
+                                 "PA curve fit", "50 Ohm load missing"};
 static const uint32_t NUMBER_OF_FAIL_BITS = sizeof(failShort) / sizeof(failShort[0]);
 
 static uint32_t FirstFailBit(uint32_t failBits){
@@ -116,6 +128,7 @@ static void DrawAutoStatusPane(void){
     uint32_t key = powerSM.state_id + 31u * (autoCal.stage + 7u * (autoCal.band + 17u * (autoCal.point
                    + 19u * (autoCal.keyed + 2u * (autoCal.level + 5u * (uint32_t)(autoCal.drive_dB * 4.0f + 200.0f))))));
     key += 0x9E3779B9u * autoCal.resultsVersion;
+    key += 0x85EBCA6Bu * (uint32_t)(AutoTransmitFrequency_Hz() / 100) + 0xC2B2AE35u * autoCal.ssbMode;
     if (key != oldStatusKey)
         PaneAutoStatus.stale = true;
     oldStatusKey = key;
@@ -138,6 +151,9 @@ static void DrawAutoStatusPane(void){
         else
             sprintf(buff, "Drive: attenuation %.1f dB", autoCal.drive_dB);
         PrintAt(p->x0, p->y0 + 40, buff);
+        sprintf(buff, "Frequency: %.4f MHz%s", (double)AutoTransmitFrequency_Hz() / 1e6,
+                autoCal.ssbMode ? " (SSB tone)" : "");
+        PrintAt(p->x0, p->y0 + 60, buff, RA8875_YELLOW);
     } else if ((powerSM.state_id == PowerCalSm_StateId_REVIEW) || (powerSM.state_id == PowerCalSm_StateId_DONE)){
         uint32_t passed = 0, failed = 0;
         for (int32_t band = BAND_160M; band <= BAND_6M; band++){
@@ -208,7 +224,7 @@ static void DrawAutoTablePane(void){
                 status = "FAIL";
                 color = RA8875_RED;
             } else {
-                status = r->openOnly ? "pass(open)" : "pass";
+                status = r->openOnly ? "pass(open)" : (r->shortOnly ? "pass(shrt)" : "pass");
                 color = RA8875_GREEN;
             }
         }
@@ -251,6 +267,8 @@ static void DrawAutoPromptPane(void){
     uint32_t key = powerSM.state_id + 31u * (autoCal.stage + 7u * (autoCal.level + 5u * (ED.SWR_CouplerTurns
                    + 64u * (autoCal.failedMask != 0))));
     key += 0x9E3779B9u * autoCal.resultsVersion;
+    key += 0x85EBCA6Bu * (uint32_t)(GetPowerIncrement() * 1000.0f) + 0xC2B2AE35u * GetPowerUnit();
+    key += 0x27D4EB2Fu * (uint32_t)(AutoTransmitFrequency_Hz() / 100);
     if ((key != oldPromptKey) || (oldPromptPower != GetMeasuredPower()))
         PaneAutoPrompt.stale = true;
     oldPromptKey = key;
@@ -299,6 +317,8 @@ static void DrawAutoPromptPane(void){
             break;
         }
         case PowerCalSm_StateId_METER_ENTRY:{
+            sprintf(buff, "Wattmeter at %.4f MHz", (double)AutoTransmitFrequency_Hz() / 1e6);
+            PrintAt(x, y, buff, RA8875_YELLOW); y += line;
             PrintAt(x, y, "Read the wattmeter. Turn the"); y += line;
             PrintAt(x, y, "filter encoder until this shows"); y += line;
             PrintAt(x, y, "the same, then press SELECT."); y += 2*line;
@@ -311,7 +331,12 @@ static void DrawAutoPromptPane(void){
             tft.setFontScale((enum RA8875tsize)1);
             PrintAt(x, y, buff, RA8875_YELLOW); y += 2*line;
             tft.setFontScale((enum RA8875tsize)0);
-            PrintAt(x, y, "Button 14: W/dBm  15: increment"); y += line;
+            if (GetPowerUnit())
+                sprintf(buff, "Step: %g W", (double)GetPowerIncrement());
+            else
+                sprintf(buff, "Step: %g dB", (double)GetPowerIncrement());
+            PrintAt(x, y, buff); y += line;
+            PrintAt(x, y, "Button 14: W/dBm  15: step"); y += line;
             sprintf(buff, "Unkeys after %lu s.", (unsigned long)(powerSM.vars.meterTimeout_ms / 1000));
             PrintAt(x, y, buff); y += line;
             break;

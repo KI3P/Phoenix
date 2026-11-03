@@ -51,9 +51,9 @@ The session covers the 11 bands with an LPF, 160–6 m. 4 m and GENERAL have no 
 
 | Stage | Level 1, no wattmeter | Level 2, two readings per band | Level 3, full |
 |---|---|---|---|
-| Load | Automatic CW sweep, 0 to 31.5 dB in about 3 dB steps (12 points). Forward line from the defaults. PA curve from the sweep. SSB tone point | The same sweep, then wattmeter readings near 2 W and at 0 dB. o_f from the 2 W reading. PA curve from the sweep, read through the new line, with its ceiling from the 0 dB reading. SSB point | A wattmeter reading at 0, 5 … 25 and 31.5 dB, plus a drift repeat (8 points). Full forward fit. PA curve from the wattmeter readings. SSB point |
-| Open | 6 points of the SSB tone, from about 1.2 W down in DSP-gain steps, ≥ 8 dB span. ≤ 2 s keyed per point, then 1 s in true receive. Oscillation check after each point | same | same |
-| Short | The same DSP gains as the open. If it fails, the band falls back to the open alone | same | same |
+| Load | Automatic CW sweep, 0 to 31.5 dB in about 3 dB steps (12 points, 1.5 s keyed each). Forward line from the defaults. PA curve from the sweep. SSB tone point. Every point must show the load fitted | The same sweep, then wattmeter readings near 2 W and at 0 dB. o_f from the 2 W reading. PA curve from the sweep, read through the new line, with its ceiling from the 0 dB reading. SSB point | A wattmeter reading at 0, 5 … 25 and 31.5 dB, plus a drift repeat (8 points). Full forward fit. PA curve from the wattmeter readings. SSB point |
+| Open | 6 points of the SSB tone, from about 1.2 W down in DSP-gain steps, ≥ 8 dB span. ≤ 2 s keyed per point, then 1 s in true receive. Oscillation check after each point; up to 3 more points for compressed ones left out. If it fails, the band falls back to the short alone | same | same |
+| Short | The same DSP gains as the open, and the same checks. If it fails, the band falls back to the open alone; if both fail, the band fails | same | same |
 | Review | Reflected fits and the acceptance checks. The operator accepts the passing bands or retries the failed ones | same | same |
 | Operator readings | 0 | 2 per band | 8 per band |
 | Stored for a band that passes | The four bridge values, the PA curve and the SSB gain, level 1 | the same, level 2 | the same, level 3 |
@@ -85,27 +85,75 @@ attenuation, so the operator only has to adjust it.
   not set it: fitted to no readings, it once came out at +77 dB.
   - The PA curve is fitted with `FitPowerCurve()`. Levels 1 and 2 use the sweep read through the
     forward line; level 3 uses the wattmeter readings.
+  - `FitPowerCurve()` fits P = P_sat·tanh((k·x)^s)^(1/s), x = 10^(−att/10), in dB:
+    Levenberg–Marquardt on ln P_sat, ln k and ln s, in double precision, so every point counts
+    by its relative error. It fits the plain tanh (s = 1) first, then releases the shape s, which
+    sets how sharp the knee is. With fewer than 4 points (the manual calibration's 3) s stays 1.
+    The shape is stored as `ED.PowerCal_20W_shape` / `ED.PowerCal_100W_shape`; a configuration
+    saved before it existed loads s = 1, its old curve.
+  - Why (2026-11-02, radio 2's level 2 sweeps, `code/tools/swr/pa_curve_fits.ipynb`):
+
+    | Fit | rms miss (median, worst band) | worst miss (median, worst band) |
+    |---|---|---|
+    | tanh in mW, float32 (before) | 0.69, 1.64 dB | 1.28, 2.59 dB |
+    | tanh in dB | 0.35, 0.62 dB | 0.59, 1.31 dB |
+    | tanh with shape s, in dB (now) | 0.16, 0.50 dB | 0.29, 0.74 dB |
+
+    The plain tanh's knee is too soft for this PA (fitted s = 0.5–0.75): in mW it let the low end
+    go by up to 1.6 dB (6 m 2.6 dB); in dB it read up to 0.7 dB high through the knee and 0.7 dB
+    low at full power. The old fit's convergence test (1e-6 mW in float32) never fired, so it
+    always ran 100 iterations; the new one converges in about 20. 6 m is the worst band with any
+    model, because its PA's output does not follow the drive smoothly.
   - Level 2 takes the PA's ceiling from its 0 dB wattmeter reading: that point is the
     wattmeter's, and no sweep point may read above it. Level 1 has no wattmeter. On a band whose
     forward detector over-reads in saturation, such as radio 1's 10 m, its P_sat comes out
     about 2 dB high.
   - SSB correction = gain used + 10·log10(3 W / tone power).
 - **Reflected line and checks (FIT_ALL).**
-  - The joint open/short fit of §7, or the open alone if the short's sweep was abandoned.
+  - The joint open/short fit of §7, or the open alone if the short's sweep was abandoned, or the
+    short alone if the open's was.
   - S50: the median SWR of the load's CW points of 0.1 W or more.
   - The §8 checks. The failures are bit flags (`AUTO_FAIL_*` in `HardwareSm.h`), shown in hex on
     the review table.
-- **Oscillation (STORE, open and short).** After each point, V_f must have fallen by at least
-  half of the 2 dB drive step × 25 mV/dB. A sweep's first point has nothing to fall from. It
-  must stay within 6 dB of the load's SSB point scaled to its gain.
+- **Load present (STORE, load).** Every load point must read V_f − V_r ≥ 100 mV
+  (`SWRCAL_LOAD_MIN_GAP_MV`). An open, a short or a loose connector reflects everything, so V_r
+  reads like V_f (within about 10 mV). The smallest gap into 50 Ω on any bench sheet is 166 mV
+  (radio 2 before its rebuild, 10 m); on 2026-11-02 the smallest was 486 mV (radio 2, 6 m). A
+  band with any such point fails (`AUTO_FAIL_NO_LOAD`). On 2026-11-02 the load came off part-way
+  through radio 2's 160 m sweep, and the session went on to fit every band's PA curve from the
+  mismatch.
+- **Oscillation (STORE, open and short).** After each point, compare V_f with the previous point's,
+  for the 2 dB drive step (`SWRCalOscillationCheck()`, `SWRCalSweepStep()`):
+  - **Fell by at least half the step × 25 mV/dB (25 mV):** keep the point.
+  - **Rose by more than 1 dB × 25 mV/dB (25 mV):** the PA is oscillating. Abandon the sweep.
+    Radio 2's 10 m short rose 52 mV on 2026-11-02 (its spread from 5 to 70 mV), and 355 mV
+    before its rebuild. The PA's fold-back near its ceiling rises 10 mV at most.
+  - **Spread jumped, above 20 mV and more than 4 times the previous point's:** an oscillation
+    that started part-way through the point. Abandon the sweep there. At level 2 on 2026-11-02
+    radio 2's 10 m short fell only 5.5 mV with a spread of 56 mV (4 mV before), then rose
+    259 mV; taken for compression, the onset point was kept and the good point before it left
+    out. Real sweeps' spreads grow at most about 1.5 times a step, to about 27 mV at low drive.
+  - **Anything in between, a short fall:** usually the PA compressing near its ceiling. Leave the
+    *previous* point out (it was the compressed one), keep this one, and add a point at the end of
+    the sweep (at most 3 per sweep). Radio 2's 20, 17 and 12 m open fell 21, 14 and 5 mV on
+    2026-11-02, with spreads of 1–5 mV, while the short on the same bands fell normally. The old
+    rule took these for oscillations and failed the three bands.
+  - **The third short fall running:** a locked oscillation, which never falls. Before its rebuild
+    radio 2's 10 m short locked at 1930 mV with a spread of 1–2 mV, whatever the drive, so the
+    spread does not tell compression from oscillation; only whether V_f falls again does. Abandon
+    the sweep. A sweep that starts locked is keyed for 4 points, 8 s, before it is abandoned.
+
+  A sweep's first point has nothing to fall from. It must stay within 6 dB of the load's SSB point
+  scaled to its gain, or the sweep is abandoned at once.
   - The margin is wide because the PA puts several dB more or less into an open or a short
     than into 50 Ω: −3.3 to +4.9 dB on the bench sheets.
   - The short isn't compared with the open: on 160 m it reads up to 7 dB above it.
   - The 3 dB margin first proposed would have failed radio 2's 20 m open and abandoned five
     real short sweeps.
-  - A failed open fails the band.
   - A failed short leaves the band calibrated from the open alone (`SWR_CAL_OPEN_ONLY` in
-    `ED.SWR_CalLevel`).
+    `ED.SWR_CalLevel`), and a failed open from the short alone (`SWR_CAL_SHORT_ONLY`). Either
+    costs up to half the open–short gap, since the leak is not cancelled.
+  - If both fail, the band fails.
 - **Storage (SELECT on REVIEW).** For each band that passed: `SWR_F/R_SlopeAdj/Offset`,
   `SWR_CalLevel`, `SWR_CalDate`, and, if the load stage ran, `PowerCal_20W_Psat_mW`,
   `PowerCal_20W_kindex` and `PowerCal_20W_DSP_Gain_correction_dB`. Then `SaveDataToStorage()`.
@@ -119,7 +167,7 @@ Every point and every band's result is written through `Debug()`, so a session c
 offline:
 ```
 AUTOCAL,<band>,<load|open|short>,<cw|meter|ssb|tone|oscillation>,<drive dB>,<wattmeter W>,<Vf>,<Vf sd>,<Vr>,<Vr sd>,<n>
-AUTOCAL-BAND,<band>,level <n>,fail 0x<bits>,m_f …,o_f …,m_r …,o_r …,gap …,rms_r …,S50 …,Psat …,k …,ssb …,<open+short|open only>
+AUTOCAL-BAND,<band>,level <n>,fail 0x<bits>,m_f …,o_f …,m_r …,o_r …,gap …,rms_r …,S50 …,Psat …,k …,s …,ssb …,<open+short|open only|short only>
 ```
 
 Every decision to leave a point or a result out, or to fail a band, gets its own line. It
@@ -132,8 +180,10 @@ AUTOCAL-SKIP,<band>,<load|open|short|band>,<what>,<reason (units)>,<value>,<limi
 |---|---|
 | Bridge readings within a point | rejected as failed I²C reads (count) |
 | A point | too few bridge readings, so the band fails (count against the minimum) |
-| An open or short point | oscillation: V_f fell too little, or V_f above the 50 Ω reference (mV against the limit) |
-| The rest of that sweep | abandoned: the band fails (open), or the reflected line comes from the open alone (short) |
+| A load point | no load: V_f minus V_r below the limit, so the band fails (mV against 100; logged at the band's first such point) |
+| An open or short point | compression: the next point fell too little, so this one is left out (mV against the needed fall) |
+| An open or short point, and the rest of that sweep | oscillation: V_f rose as the drive fell, V_f unsteady as its spread jumped, V_f fell too little at 3 points running, or V_f above the 50 Ω reference (mV against the limit) |
+| The rest of that sweep | abandoned: the reflected line comes from the short alone (open), or from the open alone (short) |
 | A level 3 wattmeter point | no wattmeter reading; or a ceiling point off the line (dB against 0.5) |
 | A level 2 sweep point | the PA curve uses the wattmeter's ceiling instead (detector minus wattmeter, dB) |
 | The PA curve and SSB gain | no forward line; SSB point missing or short of readings; a load point short of readings; too few points; P_sat out of range; SSB correction more than 10 dB from the stored one |
@@ -239,7 +289,7 @@ These are set in `AutoCalEnter()`, and tests shorten them:
 |---|---|---|
 | `bandSettle_ms` | 300 | After a band change |
 | `settle_ms` | 500 | Keyed, before collecting |
-| `collect_ms` | 2000 | Length of the averaged reading. Use 1500 on the open and short so each point is keyed for ≤ 2 s |
+| `collect_ms` | 1000 on the load, 1500 on the open and short | Length of the averaged reading: about 75 and 110 readings. The load stays keyed through its sweep and runs hot, so its points are kept short (1.5 s keyed with the settle; 2.5 s before 2026-11-02); each open and short point is keyed for ≤ 2 s |
 | `rest_ms` | 1000 | Receive between open and short points |
 | `meterTimeout_ms` | 30000 | Unkey if no wattmeter entry arrives |
 

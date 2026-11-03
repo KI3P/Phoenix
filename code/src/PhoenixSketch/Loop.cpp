@@ -458,11 +458,12 @@ void SetCalibrationBand(int32_t band){
  */
 void HandleButtonPress(int32_t button){
     // The automatic power calibration keys the transmitter itself, and needs
-    // SELECT (wattmeter entry), ZOOM (abort) and HOME while it is keyed
+    // SELECT (wattmeter entry), ZOOM (abort), HOME, and the wattmeter entry's
+    // units (14) and increment (15) while it is keyed
     bool autoCalButton = PowerCalAutoActive() &&
                          (uiSM.state_id == UISm_StateId_CALIBRATE_POWER) &&
                          ((button == MENU_OPTION_SELECT) || (button == ZOOM) ||
-                          (button == HOME_SCREEN));
+                          (button == HOME_SCREEN) || (button == 14) || (button == 15));
     // Disable all buttons when in an active transmit mode
     if (!autoCalButton && (
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||

@@ -153,17 +153,20 @@ float32_t SWRCalLevel1ForwardOffset(int32_t band, uint8_t turns){
 struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float32_t *Vr_open, uint32_t n_open,
                                           const float32_t *Vf_short, const float32_t *Vr_short, uint32_t n_short,
                                           float32_t m_f, float32_t b_f){
-    struct SWRReflectedFit f = {false, false, 0, 0, 0, 0, 0};
-    if (n_open < 2)
-        return f;
+    struct SWRReflectedFit f = {false, false, false, 0, 0, 0, 0, 0};
+    bool useOpen = (n_open >= 2);
     bool useShort = (n_short >= 2);
+    if (!useOpen && !useShort)
+        return f;
     // The reflected power equals the forward power, which the forward line gives
     double mxo = 0, myo = 0, mxs = 0, mys = 0;
-    for (uint32_t k = 0; k < n_open; k++){
-        mxo += Vr_open[k];
-        myo += SWRCalPower_dBm(Vf_open[k], m_f, b_f);
+    if (useOpen){
+        for (uint32_t k = 0; k < n_open; k++){
+            mxo += Vr_open[k];
+            myo += SWRCalPower_dBm(Vf_open[k], m_f, b_f);
+        }
+        mxo /= n_open; myo /= n_open;
     }
-    mxo /= n_open; myo /= n_open;
     if (useShort){
         for (uint32_t k = 0; k < n_short; k++){
             mxs += Vr_short[k];
@@ -173,10 +176,12 @@ struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float3
     }
     // One slope for both standards, a separate intercept for each
     double sxx = 0, sxy = 0;
-    for (uint32_t k = 0; k < n_open; k++){
-        double dx = Vr_open[k] - mxo;
-        sxx += dx * dx;
-        sxy += dx * (SWRCalPower_dBm(Vf_open[k], m_f, b_f) - myo);
+    if (useOpen){
+        for (uint32_t k = 0; k < n_open; k++){
+            double dx = Vr_open[k] - mxo;
+            sxx += dx * dx;
+            sxy += dx * (SWRCalPower_dBm(Vf_open[k], m_f, b_f) - myo);
+        }
     }
     if (useShort){
         for (uint32_t k = 0; k < n_short; k++){
@@ -189,14 +194,20 @@ struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float3
         return f;
     double slope = sxy / sxx;
     f.m = (float32_t)(1.0 / slope);
-    f.b_open = (float32_t)(myo - slope * mxo);
-    f.b_short = useShort ? (float32_t)(mys - slope * mxs) : f.b_open;
+    f.b_open = useOpen ? (float32_t)(myo - slope * mxo) : 0.0f;
+    f.b_short = useShort ? (float32_t)(mys - slope * mxs) : 0.0f;
+    // With one standard alone, the other's intercept is taken equal to it
+    if (!useOpen) f.b_open = f.b_short;
+    if (!useShort) f.b_short = f.b_open;
     f.b = 0.5f * (f.b_open + f.b_short);
     f.openOnly = !useShort;
+    f.shortOnly = !useOpen;
     double ss = 0;
-    for (uint32_t k = 0; k < n_open; k++){
-        double r = SWRCalPower_dBm(Vf_open[k], m_f, b_f) - (slope * Vr_open[k] + f.b_open);
-        ss += r * r;
+    if (useOpen){
+        for (uint32_t k = 0; k < n_open; k++){
+            double r = SWRCalPower_dBm(Vf_open[k], m_f, b_f) - (slope * Vr_open[k] + f.b_open);
+            ss += r * r;
+        }
     }
     if (useShort){
         for (uint32_t k = 0; k < n_short; k++){
@@ -204,7 +215,7 @@ struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float3
             ss += r * r;
         }
     }
-    f.rms_dB = (float32_t)sqrt(ss / (n_open + (useShort ? n_short : 0)));
+    f.rms_dB = (float32_t)sqrt(ss / ((useOpen ? n_open : 0) + (useShort ? n_short : 0)));
     f.valid = true;
     return f;
 }
@@ -221,20 +232,40 @@ float32_t SWRCalSWR(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b
 }
 
 enum SWRCalOscillationRule SWRCalOscillationCheck(bool hasPrevious, float32_t Vf_previous, float32_t drop_dB,
-                                                  float32_t Vf, bool hasReference, float32_t Vf_reference){
-    if (hasPrevious && (drop_dB > 0.0f) &&
-        ((Vf_previous - Vf) < SWRCAL_OSC_DROP_FRACTION * drop_dB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB))
-        return SWRCAL_OSC_NO_FALL;
+                                                  float32_t Vf, bool hasReference, float32_t Vf_reference,
+                                                  float32_t VfSD_previous, float32_t VfSD){
+    if (hasPrevious && (drop_dB > 0.0f)){
+        float32_t fall = Vf_previous - Vf;
+        if (fall < -SWRCAL_OSC_RISE_DB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB)
+            return SWRCAL_OSC_RISE;
+        // An oscillation that starts part-way through the point leaves a wide
+        // spread; its mean can still look like a fall, or a short one
+        if ((VfSD > SWRCAL_OSC_SD_MIN_MV) && (VfSD > SWRCAL_OSC_SD_JUMP * VfSD_previous))
+            return SWRCAL_OSC_UNSTEADY;
+        if (fall < SWRCAL_OSC_DROP_FRACTION * drop_dB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB)
+            return SWRCAL_OSC_SHORT_FALL;
+    }
     if (hasReference &&
         (Vf > Vf_reference + SWRCAL_OSC_MARGIN_DB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB))
         return SWRCAL_OSC_ABOVE_REFERENCE;
     return SWRCAL_OSC_NONE;
 }
 
-bool SWRCalOscillating(bool hasPrevious, float32_t Vf_previous, float32_t drop_dB, float32_t Vf,
-                       bool hasReference, float32_t Vf_reference){
-    return SWRCalOscillationCheck(hasPrevious, Vf_previous, drop_dB, Vf, hasReference, Vf_reference)
-           != SWRCAL_OSC_NONE;
+enum SWRCalSweepAction SWRCalSweepStep(enum SWRCalOscillationRule rule, uint32_t *shortFalls){
+    switch (rule){
+        case SWRCAL_OSC_NONE:
+            *shortFalls = 0;
+            return SWRCAL_SWEEP_KEEP;
+        case SWRCAL_OSC_SHORT_FALL:
+            (*shortFalls)++;
+            return (*shortFalls >= SWRCAL_OSC_MAX_SHORT_FALLS) ? SWRCAL_SWEEP_ABANDON : SWRCAL_SWEEP_DROP_PREVIOUS;
+        default:
+            return SWRCAL_SWEEP_ABANDON;
+    }
+}
+
+bool SWRCalLoadPresent(float32_t Vf_mV, float32_t Vr_mV){
+    return (Vf_mV - Vr_mV) >= SWRCAL_LOAD_MIN_GAP_MV;
 }
 
 float32_t SWRCalMedian(float32_t *values, uint32_t n){

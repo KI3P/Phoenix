@@ -259,10 +259,12 @@ void CalculatePowerCurveFit(void){
         f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 75000.0f,10.0f);
         ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+        ED.PowerCal_100W_shape[ED.currentBand[ED.activeVFO]] = f.shape;
     } else {
         f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 15000.0f,6.0f);
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+        ED.PowerCal_20W_shape[ED.currentBand[ED.activeVFO]] = f.shape;
     }
     //Serial.println("| P_meas [W] | P_f [W] | P_r [W] | SWR |");
     //Serial.println("|------------|---------|---------|-----|");

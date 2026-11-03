@@ -47,6 +47,8 @@ If not, see <https://www.gnu.org/licenses/>.
 #define AUTO_LEVEL2_METER_POINT 12    // level 2: the wattmeter point near 2 W
 #define AUTO_LEVEL2_CEILING_POINT 13  // level 2: the wattmeter point at 0 dB, the PA's ceiling
 #define AUTO_REFLECTION_POINTS   6    // open and short sweeps
+#define AUTO_REFLECTION_EXTRA_POINTS 3 // open and short: points a sweep may add for compressed ones left out
+static_assert(SWRCAL_OSC_MAX_SHORT_FALLS == 3, "the log's oscillation reason says 3 points running");
 #define AUTO_MIN_READINGS       20    // fewer bridge readings in a point fails the band (about 0.3 s)
 #define AUTO_LEVEL2_TARGET_W     2.0f // level 2: wattmeter point near this power
 #define AUTO_REFLECTION_START_W  1.2f // open and short: first point near this power
@@ -95,6 +97,7 @@ struct AutoBandData {
     AutoPoint shrt[AUTO_REFLECTION_POINTS];
     uint32_t nShort;
     bool fewReadings;     // a point had fewer than AUTO_MIN_READINGS readings
+    uint32_t noLoadPoints;// load points that reflected everything: no 50 Ohm load
 };
 
 // In RAM2 (DMAMEM), which is not cleared at start-up: AutoCalEnter() clears the
@@ -288,6 +291,15 @@ static void StorePoint(void){
     }
 
     if (autoCal.stage == AUTO_STAGE_LOAD){
+        // An open, a short or a loose connector reflects everything: V_r then
+        // reads like V_f, and the band's power curve would come from a mismatch
+        if (!SWRCalLoadPresent(p.vf, p.vr)){
+            if (bd->noLoadPoints == 0)
+                LogSkip(band, stage, PointName(kind, p.drive_dB),
+                        "no load: V_f minus V_r below the limit so the band fails: is the 50 Ohm load fitted? (mV)",
+                        p.vf - p.vr, SWRCAL_LOAD_MIN_GAP_MV);
+            bd->noLoadPoints++;
+        }
         if (autoCal.ssbPoint){
             bd->ssb = p;
             bd->hasSSB = true;
@@ -310,32 +322,62 @@ static void StorePoint(void){
     // SSB point scaled to its drive. Only the first: the PA puts several dB more
     // or less into an open or short than into 50 Ohm, differently on each band
     // and radio, so the falls are the dependable test.
+    // A fall that is too small is not by itself an oscillation: near its ceiling
+    // the PA compresses into an open or short (radio 2's 20, 17 and 12 m open on
+    // 2026-11-02 fell 21, 14 and 5 mV for 2 dB). The previous point is left out
+    // and the sweep goes one point lower; only a rise, a jump in the spread (an
+    // oscillation starting during the point, whose mean can still look like a
+    // short fall), or short falls running abandon it (SWRCalSweepStep()).
     AutoPoint *sweep = (autoCal.stage == AUTO_STAGE_OPEN) ? bd->open : bd->shrt;
     uint32_t *count = (autoCal.stage == AUTO_STAGE_OPEN) ? &bd->nOpen : &bd->nShort;
     bool hasPrevious = (*count > 0);
     float32_t Vf_previous = hasPrevious ? sweep[*count - 1].vf : 0;
+    float32_t VfSD_previous = hasPrevious ? sweep[*count - 1].vfSD : 0;
     float32_t drop_dB = hasPrevious ? sweep[*count - 1].drive_dB - p.drive_dB : 0;
     bool hasReference = !hasPrevious && bd->hasSSB;
     float32_t Vf_reference = hasReference
         ? bd->ssb.vf + (p.drive_dB - bd->ssb.drive_dB) * SWRCAL_NOMINAL_SLOPE_MV_PER_DB : 0;
     enum SWRCalOscillationRule rule =
-        SWRCalOscillationCheck(hasPrevious, Vf_previous, drop_dB, p.vf, hasReference, Vf_reference);
-    if (rule != SWRCAL_OSC_NONE){
-        autoCal.oscillation = true;
-        LogPoint("oscillation", &p);
-        if (rule == SWRCAL_OSC_NO_FALL)
-            LogSkip(band, stage, PointName(kind, p.drive_dB), "oscillation: V_f fell too little (mV)",
-                    Vf_previous - p.vf, SWRCAL_OSC_DROP_FRACTION * drop_dB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB);
-        else
-            LogSkip(band, stage, PointName(kind, p.drive_dB), "oscillation: V_f above the 50 Ohm reference (mV)",
-                    p.vf - Vf_reference, SWRCAL_OSC_MARGIN_DB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB);
-        LogSkip(band, stage, "sweep", (autoCal.stage == AUTO_STAGE_OPEN)
-                    ? "abandoned: no reflected line so the band fails (points kept)"
-                    : "abandoned: reflected line from the open alone (points kept)",
-                *count, 0);
-    } else if (*count < AUTO_REFLECTION_POINTS){
-        sweep[(*count)++] = p;
-        LogPoint("tone", &p);
+        SWRCalOscillationCheck(hasPrevious, Vf_previous, drop_dB, p.vf, hasReference, Vf_reference,
+                               VfSD_previous, p.vfSD);
+    float32_t fall = Vf_previous - p.vf;
+    float32_t needed = SWRCAL_OSC_DROP_FRACTION * drop_dB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB;
+    switch (SWRCalSweepStep(rule, &autoCal.shortFalls)){
+        case SWRCAL_SWEEP_ABANDON:
+            autoCal.oscillation = true;
+            LogPoint("oscillation", &p);
+            if (rule == SWRCAL_OSC_RISE)
+                LogSkip(band, stage, PointName(kind, p.drive_dB), "oscillation: V_f rose as the drive fell (mV)",
+                        -fall, SWRCAL_OSC_RISE_DB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB);
+            else if (rule == SWRCAL_OSC_UNSTEADY)
+                LogSkip(band, stage, PointName(kind, p.drive_dB), "oscillation: V_f unsteady as its spread jumped (mV)",
+                        p.vfSD, fmaxf(SWRCAL_OSC_SD_MIN_MV, SWRCAL_OSC_SD_JUMP * VfSD_previous));
+            else if (rule == SWRCAL_OSC_SHORT_FALL)
+                LogSkip(band, stage, PointName(kind, p.drive_dB),
+                        "oscillation: V_f fell too little at 3 points running (mV)", fall, needed);
+            else
+                LogSkip(band, stage, PointName(kind, p.drive_dB), "oscillation: V_f above the 50 Ohm reference (mV)",
+                        p.vf - Vf_reference, SWRCAL_OSC_MARGIN_DB * SWRCAL_NOMINAL_SLOPE_MV_PER_DB);
+            LogSkip(band, stage, "sweep", (autoCal.stage == AUTO_STAGE_OPEN)
+                        ? "abandoned: reflected line from the short alone (points kept)"
+                        : "abandoned: reflected line from the open alone (points kept)",
+                    *count, 0);
+            break;
+        case SWRCAL_SWEEP_DROP_PREVIOUS:
+            (*count)--;
+            LogSkip(band, stage, PointName(kind, sweep[*count].drive_dB),
+                    "compression: the next point fell too little so this one is left out (mV)", fall, needed);
+            if (autoCal.extraPoints < AUTO_REFLECTION_EXTRA_POINTS){
+                autoCal.extraPoints++;
+                autoCal.nPoints++;
+            }
+            // fall through: keep this point
+        case SWRCAL_SWEEP_KEEP:
+            if (*count < AUTO_REFLECTION_POINTS){
+                sweep[(*count)++] = p;
+                LogPoint("tone", &p);
+            }
+            break;
     }
     autoCal.point++;
 }
@@ -501,6 +543,7 @@ static void FinishLoadBand(int32_t band){
     }
     r->Psat_mW = f.P_sat;
     r->kindex = f.k;
+    r->shape = f.shape;
     r->ssbCorrection_dB = correction;
     r->hasPACurve = true;
     autoCal.resultsVersion++;
@@ -535,40 +578,50 @@ static void FitAndCheckAll(void){
         }
         if (!r->hasForward)
             Fail(AUTO_FAIL_FORWARD_FIT, "no forward line", 0, 0);
-        if (autoCal.shortFailMask & bit)
+        bool openFailed = (autoCal.openFailMask & bit) != 0;
+        bool shortFailed = (autoCal.shortFailMask & bit) != 0;
+        if (shortFailed && !openFailed)
             LogSkip(band, "short", "short sweep", "abandoned: reflected line from the open alone (points)",
                     bd->nShort, 0);
+        if (openFailed && !shortFailed)
+            LogSkip(band, "open", "open sweep", "abandoned: reflected line from the short alone (points)",
+                    bd->nOpen, 0);
 
-        // Reflected line: the open and short, or the open alone if the short failed
+        // Reflected line: the open and short, or whichever of them was not abandoned
         r->hasReflected = false;
-        if (r->hasForward && !(autoCal.openFailMask & bit)){
-            uint32_t nShort = (autoCal.shortFailMask & bit) ? 0 : bd->nShort;
+        uint32_t nOpen = openFailed ? 0 : bd->nOpen;
+        uint32_t nShort = shortFailed ? 0 : bd->nShort;
+        if (r->hasForward){
             float32_t Vfo[AUTO_REFLECTION_POINTS], Vro[AUTO_REFLECTION_POINTS];
             float32_t Vfs[AUTO_REFLECTION_POINTS], Vrs[AUTO_REFLECTION_POINTS];
-            for (uint32_t k = 0; k < bd->nOpen; k++){ Vfo[k] = bd->open[k].vf; Vro[k] = bd->open[k].vr; }
+            for (uint32_t k = 0; k < nOpen; k++){ Vfo[k] = bd->open[k].vf; Vro[k] = bd->open[k].vr; }
             for (uint32_t k = 0; k < nShort; k++){ Vfs[k] = bd->shrt[k].vf; Vrs[k] = bd->shrt[k].vr; }
-            struct SWRReflectedFit f = SWRCalFitReflected(Vfo, Vro, bd->nOpen, Vfs, Vrs, nShort, r->m_f, r->b_f);
+            struct SWRReflectedFit f = SWRCalFitReflected(Vfo, Vro, nOpen, Vfs, Vrs, nShort, r->m_f, r->b_f);
             if (f.valid){
                 r->hasReflected = true;
                 r->openOnly = f.openOnly;
+                r->shortOnly = f.shortOnly;
                 r->m_r = f.m;
                 r->b_r = f.b;
                 r->gap_dB = f.b_open - f.b_short;
                 r->reflectedRms_dB = f.rms_dB;
             }
         }
-        if (!r->hasReflected){
-            Fail(AUTO_FAIL_OPEN, (autoCal.openFailMask & bit)
-                     ? "no reflected line: open sweep abandoned (open points)"
-                     : "no reflected line: too few open points (open points)",
-                 bd->nOpen, 2);
+        if (!r->hasReflected && r->hasForward){
+            if (openFailed && shortFailed)
+                Fail(AUTO_FAIL_OPEN, "no reflected line: open and short sweeps both abandoned (sweeps)", 2, 1);
+            else
+                Fail(AUTO_FAIL_OPEN, "no reflected line: too few points on the open and short (points)",
+                     nOpen + nShort, 2);
+        } else if (!r->hasReflected){
+            Fail(AUTO_FAIL_OPEN, "no reflected line: no forward line to fit it to", 0, 0);
         } else {
             if (r->reflectedRms_dB > AUTO_REFLECTED_RMS_MAX_DB)
                 Fail(AUTO_FAIL_REFLECTED_FIT, "reflected fit rms (dB)", r->reflectedRms_dB, AUTO_REFLECTED_RMS_MAX_DB);
             if (fabsf(r->m_r - r->m_f) > AUTO_REFLECTED_SLOPE_MAX)
                 Fail(AUTO_FAIL_REFLECTED_SLOPE, "reflected slope minus forward slope (mV/dB)",
                      r->m_r - r->m_f, AUTO_REFLECTED_SLOPE_MAX);
-            if (!r->openOnly && (fabsf(r->gap_dB) > (high ? AUTO_GAP_MAX_HI_DB : AUTO_GAP_MAX_DB)))
+            if (!r->openOnly && !r->shortOnly && (fabsf(r->gap_dB) > (high ? AUTO_GAP_MAX_HI_DB : AUTO_GAP_MAX_DB)))
                 Fail(AUTO_FAIL_GAP, "open-short gap (dB)", r->gap_dB, high ? AUTO_GAP_MAX_HI_DB : AUTO_GAP_MAX_DB);
         }
 
@@ -599,6 +652,9 @@ static void FitAndCheckAll(void){
 
         if (loadRan && !r->hasPACurve)
             Fail(AUTO_FAIL_PA_CURVE, "no PA curve or SSB gain (see the load's lines above)", 0, 0);
+        if (loadRan && (bd->noLoadPoints > 0))
+            Fail(AUTO_FAIL_NO_LOAD, "no 50 Ohm load: load points that reflected everything (count)",
+                 bd->noLoadPoints, 0);
         if (bd->fewReadings)
             Fail(AUTO_FAIL_FEW_READINGS, "a point had too few bridge readings (minimum)", 0, autoCal.minReadings);
         if (autoCal.level == 2 && r->hasForward &&
@@ -642,15 +698,15 @@ static void FitAndCheckAll(void){
             continue;
         if (r->failBits)
             autoCal.failedMask |= (1u << band);
-        char line[200];
+        char line[220];
         snprintf(line, sizeof(line),
                  "AUTOCAL-BAND,%s,level %u,fail 0x%03lx,m_f %.2f,o_f %.2f,m_r %.2f,o_r %.2f,gap %.2f,"
-                 "rms_r %.2f,S50 %.2f,Psat %.0f,k %.2f,ssb %.2f,%s",
+                 "rms_r %.2f,S50 %.2f,Psat %.0f,k %.2f,s %.3f,ssb %.2f,%s",
                  bands[band].name, autoCal.level, (unsigned long)r->failBits,
                  r->m_f, r->b_f + SWRCAL_OFFSET_CONSTANT_DB, r->m_r, r->b_r + SWRCAL_OFFSET_CONSTANT_DB,
                  r->gap_dB, r->reflectedRms_dB, r->hasS50 ? r->S50 : 0.0f,
                  r->hasPACurve ? r->Psat_mW : 0.0f, r->hasPACurve ? r->kindex : 0.0f,
-                 r->hasPACurve ? r->ssbCorrection_dB : 0.0f, r->openOnly ? "open only" : "open+short");
+                 r->hasPACurve ? r->shape : 0.0f, r->hasPACurve ? r->ssbCorrection_dB : 0.0f, r->openOnly ? "open only" : (r->shortOnly ? "short only" : "open+short"));
         Debug(line);
     }
     autoCal.resultsVersion++;
@@ -673,11 +729,13 @@ static void CommitResults(void){
         ED.SWR_F_Offset[band] = r->b_f + SWRCAL_OFFSET_CONSTANT_DB;
         ED.SWR_R_SlopeAdj[band] = r->m_r - SWRCAL_NOMINAL_SLOPE_MV_PER_DB;
         ED.SWR_R_Offset[band] = r->b_r + SWRCAL_OFFSET_CONSTANT_DB;
-        ED.SWR_CalLevel[band] = autoCal.level | (r->openOnly ? SWR_CAL_OPEN_ONLY : 0);
+        ED.SWR_CalLevel[band] = autoCal.level | (r->openOnly ? SWR_CAL_OPEN_ONLY : 0)
+                                              | (r->shortOnly ? SWR_CAL_SHORT_ONLY : 0);
         ED.SWR_CalDate[band] = (uint32_t)Teensy3Clock.get();
         if (r->hasPACurve){
             ED.PowerCal_20W_Psat_mW[band] = r->Psat_mW;
             ED.PowerCal_20W_kindex[band] = r->kindex;
+            ED.PowerCal_20W_shape[band] = r->shape;
             ED.PowerCal_20W_DSP_Gain_correction_dB[band] = r->ssbCorrection_dB;
         }
     }
@@ -864,7 +922,7 @@ void AutoCalEnter(void){
     autoCal.servicePending = false;
     autoCal.failedMask = 0;
     autoCal.bandMask = AUTO_DEFAULT_BAND_MASK;
-    autoCal.collectLoad_ms = 2000;
+    autoCal.collectLoad_ms = 1000; // about 75 readings; shorter key-downs keep the load cooler
     autoCal.collectReflection_ms = 1500;
     autoCal.minReadings = AUTO_MIN_READINGS;
     powerSM.vars.bandSettle_ms = 300;
@@ -982,6 +1040,8 @@ void AutoSelectBand(void){
     autoCal.forwardFitDone = false;
     autoCal.ssbPoint = false;
     autoCal.oscillation = false;
+    autoCal.shortFalls = 0;
+    autoCal.extraPoints = 0;
     switch (autoCal.stage){
         case AUTO_STAGE_LOAD:
             bd->nLoad = 0;
@@ -1086,8 +1146,8 @@ bool AutoOscillationDetected(void){
 
 /**
  * @brief Abandon this band's sweep on this standard after an oscillation
- * @note A failed short leaves the band calibrated from the open alone; a failed
- *       open fails the band
+ * @note The band is then calibrated from the other standard alone; it fails
+ *       only if both were abandoned
  */
 void AutoAbortBandStage(void){
     if (autoCal.stage == AUTO_STAGE_OPEN)

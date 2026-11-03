@@ -33,9 +33,21 @@ If not, see <https://www.gnu.org/licenses/>.
 #define SWRCAL_OFFSET_CONSTANT_DB      38.0f  // 84 - PAD_ATTENUATION_DB - COUPLER_ATTENUATION_DB
 #define SWRCAL_CEILING_RESIDUAL_DB      0.5f  // level 3: keep a ceiling point if it fits this well
 #define SWRCAL_CEILING_SPAN_DB          1.0f  // level 3: a point this close to the highest power is at the ceiling
-#define SWRCAL_OSC_DROP_FRACTION        0.5f  // V_f must fall by at least this share of the drive drop
+#define SWRCAL_OSC_DROP_FRACTION        0.5f  // V_f should fall by at least this share of the drive drop
+#define SWRCAL_OSC_RISE_DB              1.0f  // V_f rising by more than this when the drive drops is an
+                                              // oscillation: radio 2's 10 m short rose 52 and 355 mV;
+                                              // the PA's fold-back near its ceiling rises 10 mV at most
+#define SWRCAL_OSC_SD_MIN_MV           20.0f  // V_f's spread above this, and SWRCAL_OSC_SD_JUMP times the
+#define SWRCAL_OSC_SD_JUMP              4.0f  // previous point's, is an oscillation starting during the point:
+                                              // radio 2's 10 m short went 4 -> 56 and 5 -> 70 mV (2026-11-02);
+                                              // real sweeps grow at most 1.5 times a step, to about 27 mV
+#define SWRCAL_OSC_MAX_SHORT_FALLS      3     // this many short falls running is an oscillation, not
+                                              // compression: a locked oscillation never falls
 #define SWRCAL_OSC_MARGIN_DB            6.0f  // V_f may exceed its 50 Ohm reference by this much: the PA
                                               // puts up to about 5 dB more into an open or short (bench sheets)
+#define SWRCAL_LOAD_MIN_GAP_MV        100.0f  // on the 50 Ohm load V_f - V_r is at least this: the bench
+                                              // sheets' smallest is 166 mV (radio 2 before its rebuild,
+                                              // 10 m); an open or short reads within about 10 mV
 #define SWRCAL_UNCALIBRATED_SWR        99.0f  // returned when the reflected power is not below the forward
 
 /** A detector line fitted to readings */
@@ -49,11 +61,12 @@ struct SWRLineFit {
 
 /** The reflected line fitted to the open and short sweeps */
 struct SWRReflectedFit {
-    bool valid;          // false if the open sweep could not be fitted
+    bool valid;          // false if neither sweep could be fitted
     bool openOnly;       // the short was missing, so the line comes from the open alone
+    bool shortOnly;      // the open was missing, so the line comes from the short alone
     float32_t m;         // slope in mV/dB
     float32_t b;         // intercept in dBm: the mean of the open and short intercepts
-    float32_t b_open;    // intercept from the open
+    float32_t b_open;    // intercept from the open (equal to b_short if shortOnly)
     float32_t b_short;   // intercept from the short (equal to b_open if openOnly)
     float32_t rms_dB;    // rms residual over both sweeps
 };
@@ -126,12 +139,14 @@ float32_t SWRCalBandFrequency_MHz(int32_t band);
 /**
  * @brief Reflected line from the open and short sweeps (Section 7)
  * @param Vf_open,Vr_open Forward and reflected readings on the open, in mV
- * @param n_open Number of open points
+ * @param n_open Number of open points; fewer than 2 fits the short alone
  * @param Vf_short,Vr_short Forward and reflected readings on the short, in mV
  * @param n_short Number of short points; fewer than 2 fits the open alone
  * @param m_f,b_f The band's forward line
  * @return One slope fitted to both standards, with an intercept for each; the
- *         stored intercept is their mean, which cancels the bridge's leak
+ *         stored intercept is their mean, which cancels the bridge's leak. With
+ *         one standard alone the leak is not cancelled, which costs up to half
+ *         the open-short gap. Not valid if neither has 2 points.
  */
 struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float32_t *Vr_open, uint32_t n_open,
                                           const float32_t *Vf_short, const float32_t *Vr_short, uint32_t n_short,
@@ -145,6 +160,17 @@ struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float3
 float32_t SWRCalSWR(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b_f,
                     float32_t m_r, float32_t b_r);
 
+/** What the oscillation check found at one open or short point */
+enum SWRCalOscillationRule {
+    SWRCAL_OSC_NONE = 0,          // V_f fell with the drive
+    SWRCAL_OSC_SHORT_FALL,        // V_f fell by less than half the drive drop, or rose a little:
+                                  // the PA compressing near its ceiling, or a locked oscillation.
+                                  // One alone is not an oscillation (SWRCalSweepStep())
+    SWRCAL_OSC_RISE,              // V_f rose by more than SWRCAL_OSC_RISE_DB: an oscillation
+    SWRCAL_OSC_UNSTEADY,          // V_f's spread jumped: an oscillation starting during the point
+    SWRCAL_OSC_ABOVE_REFERENCE,   // V_f above the 50 Ohm reference by more than the margin
+};
+
 /**
  * @brief The oscillation check after an open or short point (Section 6)
  * @param hasPrevious There is a previous point on this sweep
@@ -153,28 +179,42 @@ float32_t SWRCalSWR(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b
  * @param Vf Forward reading of this point, in mV
  * @param hasReference There is a reference reading for this drive
  * @param Vf_reference Forward reading into 50 Ohm at this drive, in mV
- * @return true if the PA looks to be oscillating: V_f fell by less than half
- *         the drive drop, or exceeds the reference by more than
- *         SWRCAL_OSC_MARGIN_DB. The caller gives a reference only for a sweep's
- *         first point, which has no previous point to fall from.
+ * @param VfSD_previous,VfSD Standard deviation of the previous point's and
+ *        this point's forward readings, in mV; 0 leaves the spread unchecked
+ * @return What the point shows, checked in this order: a rise, a jump in the
+ *         spread, a short fall, the reference. The caller gives a reference
+ *         only for a sweep's first point, which has no previous point to fall from.
  */
-bool SWRCalOscillating(bool hasPrevious, float32_t Vf_previous, float32_t drop_dB, float32_t Vf,
-                       bool hasReference, float32_t Vf_reference);
+enum SWRCalOscillationRule SWRCalOscillationCheck(bool hasPrevious, float32_t Vf_previous, float32_t drop_dB,
+                                                  float32_t Vf, bool hasReference, float32_t Vf_reference,
+                                                  float32_t VfSD_previous = 0.0f, float32_t VfSD = 0.0f);
 
-/** Which of the oscillation check's rules a point failed */
-enum SWRCalOscillationRule {
-    SWRCAL_OSC_NONE = 0,          // no oscillation
-    SWRCAL_OSC_NO_FALL,           // V_f fell by less than half the drive drop
-    SWRCAL_OSC_ABOVE_REFERENCE,   // V_f above the 50 Ohm reference by more than the margin
+/** What an open or short sweep does after the oscillation check */
+enum SWRCalSweepAction {
+    SWRCAL_SWEEP_KEEP = 0,        // keep the point
+    SWRCAL_SWEEP_DROP_PREVIOUS,   // the previous point was in compression: leave it out, keep this one
+    SWRCAL_SWEEP_ABANDON,         // the PA is oscillating: unkey and abandon the sweep
 };
 
 /**
- * @brief The oscillation check, saying which rule failed
- * @return SWRCAL_OSC_NONE, or the first rule the point failed; arguments as
- *         for SWRCalOscillating()
+ * @brief Decide what an open or short sweep does with a point
+ * @param rule The point's oscillation check
+ * @param shortFalls Short falls running on this sweep, updated: 0 at the
+ *        sweep's start, cleared by a point that falls properly
+ * @return Abandon on a rise, a jump in the spread or above the reference at once, and on the
+ *         SWRCAL_OSC_MAX_SHORT_FALLS-th short fall running. A short fall
+ *         before that leaves out the previous point instead: compression
+ *         lets V_f fall again a few dB lower, a locked oscillation does not.
  */
-enum SWRCalOscillationRule SWRCalOscillationCheck(bool hasPrevious, float32_t Vf_previous, float32_t drop_dB,
-                                                  float32_t Vf, bool hasReference, float32_t Vf_reference);
+enum SWRCalSweepAction SWRCalSweepStep(enum SWRCalOscillationRule rule, uint32_t *shortFalls);
+
+/**
+ * @brief Whether a load point's readings show the 50 Ohm load fitted
+ * @param Vf_mV,Vr_mV Forward and reflected readings, in mV
+ * @return false if V_f - V_r is below SWRCAL_LOAD_MIN_GAP_MV: an open, a short
+ *         or a loose connector reflects everything, so V_r reads like V_f
+ */
+bool SWRCalLoadPresent(float32_t Vf_mV, float32_t Vr_mV);
 
 /**
  * @brief The median of a set of values

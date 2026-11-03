@@ -282,6 +282,7 @@ enum MorseStates { state0,
 #define CW_20W_CAL_POWER_POINT_W  10.0f
 #define CW_100W_CAL_POWER_POINT_W 75.0f
 #define SWR_CAL_OPEN_ONLY 0x10 // ED.SWR_CalLevel flag: reflected line from the open alone
+#define SWR_CAL_SHORT_ONLY 0x20 // ED.SWR_CalLevel flag: reflected line from the short alone
 
 
 /** Radio configuration parameters that are kept in persistent storage */
@@ -355,6 +356,8 @@ extern struct config_t {
     float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
     float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = {86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,0};  /** The saturation power output level when 100W PA is used */
     float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = {10,10,10,10,10,10,10,10,10,10,10,10}; /** k index parameterizes the knee location in the Pout vs attenuation */
+    float32_t PowerCal_20W_shape[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Knee shape exponent s of the 20W PA curve; 1 is the plain tanh */
+    float32_t PowerCal_100W_shape[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Knee shape exponent s of the 100W PA curve; 1 is the plain tanh */
     float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** The power threshold that switches in the 100W amplifier */
     float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
     float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
@@ -363,7 +366,7 @@ extern struct config_t {
     float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
     float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
     float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
-    uint8_t SWR_CalLevel[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration level: 0 uncalibrated, else 1 to 3; SWR_CAL_OPEN_ONLY set if the reflected line is from the open alone */
+    uint8_t SWR_CalLevel[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration level: 0 uncalibrated, else 1 to 3; SWR_CAL_OPEN_ONLY or SWR_CAL_SHORT_ONLY set if the reflected line is from one standard alone */
     uint32_t SWR_CalDate[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Time of the SWR calibration (seconds since 1970) */
     uint8_t SWR_CouplerTurns = 10; /** L44 turns per core; selects the level 1 forward offsets */
 } ED;

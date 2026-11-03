@@ -1493,6 +1493,72 @@ TEST_F(PowerCalibrationTest, FitPowerCurve_DifferentInitialGuesses) {
 }
 
 /**
+ * FitPowerCurve on radio 2's level 2 sweeps (2026-11-02, autocal_r2_level2c):
+ * the detector's 12-point sweep read through the band's new forward line, with
+ * the wattmeter's ceiling at 0 dB. The plain tanh fitted in mW missed these by up
+ * to 1.2 dB (160 m), 1.6 dB (40 m) and 2.6 dB (6 m), and always ran to 100
+ * iterations; fitted in dB, by 0.69, 0.59 and 1.31 dB. With the shape exponent
+ * the best fit (scipy, code/tools/swr/pa_curve_fits.ipynb) misses them by 0.49,
+ * 0.22 and 0.74 dB.
+ */
+TEST_F(PowerCalibrationTest, FitPowerCurve_FitsRadio2sSweepsWithTheShape) {
+    const int32_t N = 12;
+    float32_t att_dB[N] = {0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 31.5f};
+    struct Sweep { const char *band; float32_t P_mW[N]; float32_t Psat, k, shape, worst_dB, rms_dB; };
+    Sweep sweeps[] = {
+        {"160m", {13176.78f, 12145.47f, 11540.72f, 10976.56f, 10031.12f, 8937.56f, 7130.86f, 4142.34f,
+                  2166.4f, 1166.42f, 567.03f, 443.94f}, 11775.3f, 52.011f, 0.5754f, 0.488f, 0.255f},
+        {"40m",  {16983.51f, 16188.73f, 15836.31f, 15248.9f, 12428.17f, 8829.58f, 5085.15f, 2814.62f,
+                  1555.84f, 805.94f, 424.38f, 306.3f}, 16636.7f, 25.313f, 0.5077f, 0.215f, 0.122f},
+        {"6m",   {1866.43f, 1754.95f, 1268.01f, 886.21f, 701.84f, 437.88f, 224.18f, 117.23f, 51.27f,
+                  24.55f, 11.62f, 7.93f}, 1778.3f, 7.387f, 0.5489f, 0.740f, 0.501f},
+    };
+    for (const Sweep &w : sweeps){
+        SCOPED_TRACE(w.band);
+        FitResult fit = FitPowerCurve(att_dB, (float32_t *)w.P_mW, N, 15000.0f, 6.0f);
+        EXPECT_LT(fit.iterations, 100) << "converged";
+        // The least-squares optimum, as scipy finds it
+        EXPECT_NEAR(fit.P_sat, w.Psat, 0.002f * w.Psat);
+        EXPECT_NEAR(fit.k, w.k, 0.005f * w.k);
+        EXPECT_NEAR(fit.shape, w.shape, 0.002f);
+        float32_t worst = 0, sumsq = 0;
+        for (int32_t i = 0; i < N; i++){
+            float32_t e = 10.0f * log10f(attenToPower_mW(att_dB[i], fit.P_sat, fit.k, fit.shape) / w.P_mW[i]);
+            worst = fmaxf(worst, fabsf(e));
+            sumsq += e * e;
+        }
+        EXPECT_NEAR(worst, w.worst_dB, 0.005f);
+        EXPECT_NEAR(fit.rms_dB, w.rms_dB, 0.002f);
+        EXPECT_NEAR(fit.rms_dB, sqrtf(sumsq / N), 1e-3f) << "rms_dB reports the dB residuals";
+        // The inverse finds the attenuation for each fitted power again
+        for (int32_t i = 1; i < N; i++){
+            float32_t P = attenToPower_mW(att_dB[i], fit.P_sat, fit.k, fit.shape);
+            EXPECT_NEAR(powerToAtten_dB(P, fit.P_sat, fit.k, fit.shape), att_dB[i], 0.01f) << "point " << i;
+        }
+    }
+}
+
+/** The manual calibration's three points hold the shape at 1: the plain tanh */
+TEST_F(PowerCalibrationTest, FitPowerCurve_ThreePointsKeepThePlainTanh) {
+    float32_t att_dB[3] = {3.0f, 16.5f, 24.0f};
+    float32_t pout_mW[3] = {14791.08f, 5248.07f, 1047.13f};
+    FitResult fit = FitPowerCurve(att_dB, pout_mW, 3, 15000.0f, 6.0f);
+    EXPECT_FLOAT_EQ(fit.shape, 1.0f);
+    EXPECT_NEAR(fit.P_sat, 14743.0f, 50.0f);
+    EXPECT_NEAR(fit.k, 17.30f, 0.05f);
+}
+
+/** A shape of 0 (a configuration saved before the shape existed) is the plain tanh */
+TEST_F(PowerCalibrationTest, PowerCurveShapeZeroIsThePlainTanh) {
+    for (float32_t att : {0.0f, 6.0f, 15.0f, 31.5f}){
+        EXPECT_FLOAT_EQ(attenToPower_mW(att, 14680.0f, 16.2f, 0.0f), attenToPower_mW(att, 14680.0f, 16.2f, 1.0f));
+        float32_t P = attenToPower_mW(att, 14680.0f, 16.2f, 1.0f);
+        EXPECT_NEAR(14680.0f * tanhf(16.2f * powf(10.0f, -att / 10.0f)), P, 0.01f);
+    }
+    EXPECT_NEAR(powerToAtten_dB(5000.0f, 14680.0f, 16.2f, 0.0f), powerToAtten_dB(5000.0f, 14680.0f, 16.2f), 1e-4f);
+}
+
+/**
  * Test FitPowerCurve with real-world hardware measurements
  *
  * This test uses actual power calibration data collected from a real radio
@@ -1604,8 +1670,14 @@ TEST_F(PowerCalibrationTest, FitPowerCurve_RealWorldData) {
         EXPECT_LT(fit.P_sat, 100000.0f) << "Band " << m.band_name << ": P_sat unreasonably high";
         EXPECT_GT(fit.k, 0.0f) << "Band " << m.band_name << ": k must be positive";
 
-        // Validate fit quality - RMS error should be less than 1% of max power
-        EXPECT_LT(rms_percent, 1.0f) << "Band " << m.band_name << ": RMS error exceeds 1% threshold";
+        // Validate fit quality in dB, which the fit minimises: three points and two
+        // parameters, so the misses are small but not zero. Fitted in mW (before
+        // 2026-11-02) the lowest point missed by up to 0.76 dB (12 m); in dB it is 0.40
+        EXPECT_LT(fit.rms_dB, 0.35f) << "Band " << m.band_name;
+        for (int j = 0; j < 3; j++)
+            EXPECT_LT(fabsf(10.0f * log10f(attenToPower_mW(m.att_dB[j], fit.P_sat, fit.k) / power_mW[j])), 0.45f)
+                << "Band " << m.band_name << " point " << j;
+        EXPECT_LT(fit.iterations, 100) << "Band " << m.band_name << ": converged";
     }
 
     // Close CSV file
@@ -1884,18 +1956,19 @@ TEST_F(PowerCalibrationWalkthroughTest, CompleteCalibrationAllBands) {
         float32_t expected_k;        // Expected k from curve fit
     };
 
+    // P_sat and k: the least-squares tanh fit in dB (FitPowerCurve, 2026-11-02; scipy agrees)
     BandCalData calData[] = {
-        {BAND_160M, "160m", 0.0f, 40.7f, 21.5f, 34.0f, 28.0f, 28.0f, 0.0f, 39.0f, 11748.0f, 30.81f},
-        {BAND_80M,  "80m",  0.0f, 40.8f, 11.5f, 34.3f, 18.5f, 27.9f, 0.0f, 31.7f, 12060.0f,  3.22f},
-        {BAND_60M,  "60m",  0.0f, 41.7f, 12.0f, 34.0f, 18.0f, 28.1f, 0.0f, 33.2f, 14926.0f,  2.70f},
-        {BAND_40M,  "40m",  0.0f, 41.7f, 20.0f, 34.0f, 27.0f, 27.7f, 0.0f, 38.6f, 14791.0f, 17.26f},
-        {BAND_30M,  "30m",  0.0f, 40.2f, 17.0f, 34.0f, 24.0f, 27.7f, 0.0f, 35.9f, 10471.0f, 12.34f},
-        {BAND_20M,  "20m",  0.0f, 39.9f, 11.5f, 33.9f, 18.0f, 28.0f, 0.0f, 30.8f,  9785.0f,  3.64f},
-        {BAND_17M,  "17m",  0.0f, 40.6f, 12.0f, 33.9f, 18.5f, 28.0f, 0.0f, 30.4f, 11504.0f,  3.46f},
-        {BAND_15M,  "15m",  0.0f, 39.6f, 14.5f, 33.9f, 21.0f, 28.1f, 0.0f, 26.1f,  9119.0f,  7.84f},
-        {BAND_12M,  "12m",  0.0f, 39.7f, 12.5f, 33.8f, 19.0f, 28.2f, 0.0f, 30.4f,  9333.0f,  4.73f},
-        {BAND_10M,  "10m",  0.0f, 37.2f, 16.5f, 34.0f, 23.5f, 28.0f, 0.0f, 32.9f,  5246.0f, 23.52f},
-        {BAND_6M,   "6m",   0.0f, 39.0f,  7.0f, 34.0f, 13.5f, 28.0f, 0.0f, 20.5f,  8818.0f,  1.48f},
+        {BAND_160M, "160m", 0.0f, 40.7f, 21.5f, 34.0f, 28.0f, 28.0f, 0.0f, 39.0f, 11730.0f, 32.36f},
+        {BAND_80M,  "80m",  0.0f, 40.8f, 11.5f, 34.3f, 18.5f, 27.9f, 0.0f, 31.7f, 12021.0f,  3.43f},
+        {BAND_60M,  "60m",  0.0f, 41.7f, 12.0f, 34.0f, 18.0f, 28.1f, 0.0f, 33.2f, 14920.0f,  2.71f},
+        {BAND_40M,  "40m",  0.0f, 41.7f, 20.0f, 34.0f, 27.0f, 27.7f, 0.0f, 38.6f, 14767.0f, 18.56f},
+        {BAND_30M,  "30m",  0.0f, 40.2f, 17.0f, 34.0f, 24.0f, 27.7f, 0.0f, 35.9f, 10439.0f, 13.25f},
+        {BAND_20M,  "20m",  0.0f, 39.9f, 11.5f, 33.9f, 18.0f, 28.0f, 0.0f, 30.8f, 9755.0f,  3.86f},
+        {BAND_17M,  "17m",  0.0f, 40.6f, 12.0f, 33.9f, 18.5f, 28.0f, 0.0f, 30.4f, 11473.0f,  3.67f},
+        {BAND_15M,  "15m",  0.0f, 39.6f, 14.5f, 33.9f, 21.0f, 28.1f, 0.0f, 26.1f, 9086.0f,  8.40f},
+        {BAND_12M,  "12m",  0.0f, 39.7f, 12.5f, 33.8f, 19.0f, 28.2f, 0.0f, 30.4f, 9288.0f,  5.18f},
+        {BAND_10M,  "10m",  0.0f, 37.2f, 16.5f, 34.0f, 23.5f, 28.0f, 0.0f, 32.9f, 5178.0f, 25.83f},
+        {BAND_6M,   "6m",   0.0f, 39.0f,  7.0f, 34.0f, 13.5f, 28.0f, 0.0f, 20.5f, 8622.0f,  1.58f},
     };
 
     // Set starting band to 160m
@@ -2199,6 +2272,7 @@ void ResetPowerCal(void);   // HardwareSm_PowerCalibration.cpp
 void HandleButtonPress(int32_t button); // Loop.cpp
 char *BR_write(char* cmd);  // CAT.cpp
 bool AutoAnyFailed(void);   // HardwareSm_PowerCalibration.cpp
+float32_t GetPowerIncrement(void); // MainBoard_DisplayCalibration_Power.cpp
 
 class PowerCalAutoTest : public ::testing::Test {
 protected:
@@ -2235,7 +2309,15 @@ protected:
         float32_t gamma50 = 0.03f;      // the load's reflection
         float32_t leak_dB = 0.15f;      // adds on the open, subtracts on the short
         int32_t oscillateBand = -1;     // this band oscillates...
-        AutoCalStage oscillateStage = AUTO_STAGE_SHORT; // ...on this standard
+        AutoCalStage oscillateStage = AUTO_STAGE_SHORT; // ...on this standard...
+        bool oscillateBothStandards = false; // ...or on the open and the short
+        uint32_t oscillateFromPoint = 0; // ...from this point of the sweep on...
+        bool oscillateUnsteady = false; // ...as readings scattered 60 mV about the normal V_f
+        mutable uint32_t scatter = 0;
+        int32_t compressBand = -1;      // the PA compresses on this band...
+        AutoCalStage compressStage = AUTO_STAGE_OPEN; // ...into this standard...
+        float32_t compressCeiling_dBm = 99.0f; // ...at this power
+        int32_t loadMissingBand = -1;   // on this band the load stage sees an open
         float32_t meterFactor = 1.0f;   // wattmeter entries are this times the truth
         bool saturationOverRead = false; // the forward detector over-reads in saturation (radio 1, 10 m)
 
@@ -2248,12 +2330,24 @@ protected:
         float32_t b_r(void) const { return o_r - SWRCAL_OFFSET_CONSTANT_DB; }
         /** Forward power on the line now, in dBm */
         float32_t ForwardPower_dBm(void) const {
+            float32_t P;
             if (autoCal.ssbMode)
-                return 10.0f * log10f(3000.0f) + autoCal.drive_dB - ssbGainFor3W_dB;
-            return 10.0f * log10f(Psat_mW * tanhf(k * powf(10.0f, -autoCal.drive_dB / 10.0f)));
+                P = 10.0f * log10f(3000.0f) + autoCal.drive_dB - ssbGainFor3W_dB;
+            else
+                P = 10.0f * log10f(Psat_mW * tanhf(k * powf(10.0f, -autoCal.drive_dB / 10.0f)));
+            if ((autoCal.band == compressBand) && (autoCal.stage == compressStage) && (P > compressCeiling_dBm))
+                P = compressCeiling_dBm;
+            return P;
+        }
+        bool Oscillating(void) const {
+            bool stage = (autoCal.stage == oscillateStage) ||
+                         (oscillateBothStandards && (autoCal.stage != AUTO_STAGE_LOAD));
+            return (autoCal.band == oscillateBand) && stage && (autoCal.point >= oscillateFromPoint);
         }
         float32_t Vf(void) const {
-            if ((autoCal.band == oscillateBand) && (autoCal.stage == oscillateStage))
+            if (Oscillating() && oscillateUnsteady)
+                return m_f * (ForwardPower_dBm() - b_f(autoCal.band)) + ((scatter++ & 1) ? 60.0f : -60.0f);
+            if (Oscillating())
                 return 1950.0f; // stuck whatever the drive
             return m_f * (ForwardPower_dBm() + OverRead_dB() - b_f(autoCal.band));
         }
@@ -2272,7 +2366,9 @@ protected:
         }
         float32_t Vr(void) const {
             float32_t Pr = ForwardPower_dBm();
-            if (autoCal.stage == AUTO_STAGE_LOAD)
+            if ((autoCal.stage == AUTO_STAGE_LOAD) && (autoCal.band == loadMissingBand))
+                Pr += leak_dB;  // nothing on the connector: an open
+            else if (autoCal.stage == AUTO_STAGE_LOAD)
                 Pr += 20.0f * log10f(gamma50);
             else
                 Pr += (autoCal.stage == AUTO_STAGE_OPEN) ? leak_dB : -leak_dB;
@@ -2465,6 +2561,34 @@ TEST_F(PowerCalAutoTest, Level2TakesTwoWattmeterReadingsPerBand) {
     EXPECT_EQ(collects[AUTO_STAGE_LOAD], 2u * 15u) << "Sweep, two wattmeter points and SSB point per band";
 }
 
+TEST_F(PowerCalAutoTest, WattmeterEntryUnitsAndStepWorkWhileKeyed) {
+    // 2026-11-02, radio 2 at level 2: button 15 did nothing at the wattmeter
+    // entry, because buttons are ignored while the radio is keyed
+    EnterAuto(2);
+    uiSM.state_id = UISm_StateId_CALIBRATE_POWER;
+    Select();
+    Select();
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_METER_ENTRY));
+    ASSERT_TRUE(autoCal.keyed);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_MARK);
+
+    float32_t step = GetPowerIncrement();
+    HandleButtonPress(15);
+    EXPECT_NE(GetPowerIncrement(), step) << "button 15 changes the step";
+    uint8_t unit = GetPowerUnit();
+    HandleButtonPress(14);
+    EXPECT_NE(GetPowerUnit(), unit) << "button 14 changes the units";
+    HandleButtonPress(14);
+    EXPECT_EQ(GetPowerUnit(), unit);
+
+    // Other buttons stay locked out while keyed
+    bool pa = ED.PA100Wactive;
+    HandleButtonPress(16);
+    EXPECT_EQ(ED.PA100Wactive, pa);
+    EXPECT_EQ(powerSM.state_id, PowerCalSm_StateId_METER_ENTRY);
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
+}
+
 TEST_F(PowerCalAutoTest, Level3TakesAWattmeterReadingAtEveryCWPoint) {
     EnterAuto(3);
     Select();
@@ -2541,15 +2665,16 @@ TEST_F(PowerCalAutoTest, OscillationAbandonsThatBandsSweepOnly) {
     EnterAuto(1);
     radio.oscillateBand = BAND_40M;
     radio.oscillateStage = AUTO_STAGE_OPEN;
+    radio.oscillateBothStandards = true;
     Select();
     SkipPowerCalStage(); // straight to the open
     Select();
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_COLLECT));
     EXPECT_EQ(autoCal.band, BAND_40M);
 
-    // The second point shows V_f not falling with the drive
-    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND_DONE, 200));
-    EXPECT_EQ(autoCal.point, 2u) << "Abandoned at the second point";
+    // V_f stuck whatever the drive: three short falls running, so not compression
+    ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND_DONE, 400));
+    EXPECT_EQ(autoCal.point, 4u) << "Abandoned at the third short fall running";
     EXPECT_FALSE(autoCal.keyed);
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_BAND));
     EXPECT_EQ(autoCal.band, BAND_20M) << "Moves on to the next band";
@@ -2567,7 +2692,7 @@ TEST_F(PowerCalAutoTest, OscillationAbandonsThatBandsSweepOnly) {
 TEST_F(PowerCalAutoTest, RetryRunsTheSessionAgainForTheFailedBandsOnly) {
     EnterAuto(1);
     radio.oscillateBand = BAND_40M;
-    radio.oscillateStage = AUTO_STAGE_OPEN;
+    radio.oscillateBothStandards = true;
     Select();
     SkipPowerCalStage();
     Select();
@@ -2775,10 +2900,30 @@ TEST_F(PowerCalAutoTest, OscillationIntoTheShortLeavesTheOpenAlone) {
     EXPECT_NEAR(StoredSWR(BAND_20M, 1.0f / 3.0f), 2.0f, 0.1);
 }
 
-TEST_F(PowerCalAutoTest, OscillationIntoTheOpenFailsOnlyThatBand) {
-    EnterAuto(1);
+TEST_F(PowerCalAutoTest, OscillationIntoTheOpenLeavesTheShortAlone) {
+    EnterAuto(3);
     radio.oscillateBand = BAND_40M;
     radio.oscillateStage = AUTO_STAGE_OPEN;
+    RunSession();
+    const AutoCalBandResult *r = GetAutoCalResult(BAND_40M);
+    EXPECT_EQ(r->failBits, 0u);
+    EXPECT_TRUE(r->shortOnly);
+    EXPECT_FALSE(r->openOnly);
+    Select();
+    ASSERT_EQ(powerSM.state_id, PowerCalSm_StateId_DONE);
+    Tick();   // the main loop stores
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 3 | SWR_CAL_SHORT_ONLY);
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_20M], 3);
+    // From the short alone the leak is not cancelled: the short reads it low, so
+    // the line's offset comes out high by the leak
+    EXPECT_NEAR(ED.SWR_R_Offset[BAND_40M], radio.o_r + radio.leak_dB, 0.01);
+    EXPECT_NEAR(StoredSWR(BAND_40M, 1.0f / 3.0f), 2.0f, 0.1);
+}
+
+TEST_F(PowerCalAutoTest, OscillationIntoBothStandardsFailsOnlyThatBand) {
+    EnterAuto(1);
+    radio.oscillateBand = BAND_40M;
+    radio.oscillateBothStandards = true;
     float32_t before = ED.SWR_R_Offset[BAND_40M] = -7.5f;
     RunSession();
     EXPECT_TRUE(GetAutoCalResult(BAND_40M)->failBits & AUTO_FAIL_OPEN);
@@ -2948,10 +3093,10 @@ private:
     std::streambuf *old;
 };
 
-TEST_F(PowerCalAutoTest, LogsTheOpenOscillationAndItsConsequences) {
+TEST_F(PowerCalAutoTest, LogsTheOscillationAndItsConsequences) {
     EnterAuto(1);
     radio.oscillateBand = BAND_40M;
-    radio.oscillateStage = AUTO_STAGE_OPEN;
+    radio.oscillateBothStandards = true;
     LogCapture log;
     Select();
     SkipPowerCalStage();
@@ -2961,9 +3106,14 @@ TEST_F(PowerCalAutoTest, LogsTheOpenOscillationAndItsConsequences) {
     ASSERT_TRUE(RunUntil(PowerCalSm_StateId_REVIEW));
     Select();
     Tick();
-    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,tone", "oscillation: V_f fell too little"}), 1) << log.Text();
-    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,sweep,abandoned: no reflected line"}), 1);
-    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,band fails,no reflected line: open sweep abandoned"}), 1);
+    // Stuck whatever the drive: two points left out as if compressed, then abandoned
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,tone", "compression: the next point fell too little"}), 2)
+        << log.Text();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,tone", "oscillation: V_f fell too little at 3 points running"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,sweep,abandoned: reflected line from the short alone"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,short,tone", "oscillation: V_f fell too little at 3 points running"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,band fails,no reflected line: open and short sweeps both abandoned"}), 1);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,open sweep"}), 0) << "no fallback to log";
     EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,not stored"}), 1);
     EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M"}), 0) << "nothing left out on 20 m";
 }
@@ -2979,6 +3129,99 @@ TEST_F(PowerCalAutoTest, LogsTheShortOscillationAsOpenOnly) {
     EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,sweep,abandoned: reflected line from the open alone"}), 1);
     EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,short sweep,abandoned"}), 1);
     EXPECT_EQ(log.Count({"band fails"}), 0) << "open alone is not a failure";
+}
+
+TEST_F(PowerCalAutoTest, CompressionLeavesOutTheTopPointsAndExtendsTheSweep) {
+    // Radio 2's 20, 17 and 12 m open on 2026-11-02: the PA at its ceiling into the
+    // open at the sweep's first drive, so V_f hardly fell at the next point.
+    // Level 3, so the stored reflected line can be checked against the truth
+    EnterAuto(3);
+    radio.compressBand = BAND_40M;
+    radio.compressStage = AUTO_STAGE_OPEN;
+    radio.compressCeiling_dBm = 10.0f * log10f(1200.0f) - 3.3f; // the first two points at the ceiling
+    LogCapture log;
+    RunToReviewForLog();
+    const AutoCalBandResult *r = GetAutoCalResult(BAND_40M);
+    EXPECT_EQ(r->failBits, 0u) << log.Text();
+    EXPECT_FALSE(r->openOnly);
+    EXPECT_FALSE(r->shortOnly) << "the open is used, without its compressed points";
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,open,tone", "compression: the next point fell too little"}), 2);
+    EXPECT_EQ(log.Count({"oscillation"}), 0);
+    // 6 points each on two bands, and on 40 m's open two more for the two left out
+    EXPECT_EQ(collects[AUTO_STAGE_OPEN], 14u);
+    EXPECT_EQ(collects[AUTO_STAGE_SHORT], 12u);
+    EXPECT_EQ(log.Count({"AUTOCAL,40M,open,tone,"}), 8) << "each point is logged as it is measured";
+    Select();
+    Tick();
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 3);
+    EXPECT_NEAR(ED.SWR_R_Offset[BAND_40M], radio.o_r, 0.01) << "the leak still cancels";
+    EXPECT_NEAR(StoredSWR(BAND_40M, 1.0f / 3.0f), 2.0f, 0.05);
+}
+
+TEST_F(PowerCalAutoTest, ARiseInTheSweepAbandonsItAtOnce) {
+    // Radio 2's 10 m short on 2026-11-02: three good points, then V_f jumped up
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_20M;
+    radio.oscillateBand = BAND_20M;
+    radio.oscillateStage = AUTO_STAGE_SHORT;
+    radio.oscillateFromPoint = 3;
+    LogCapture log;
+    RunToReviewForLog();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,tone", "oscillation: V_f rose as the drive fell"}), 1)
+        << log.Text();
+    EXPECT_EQ(log.Count({"compression"}), 0);
+    EXPECT_EQ(collects[AUTO_STAGE_SHORT], 4u) << "abandoned at the point that rose";
+    const AutoCalBandResult *r = GetAutoCalResult(BAND_20M);
+    EXPECT_EQ(r->failBits, 0u);
+    EXPECT_TRUE(r->openOnly);
+}
+
+TEST_F(PowerCalAutoTest, AnOscillationStartingDuringAPointAbandonsTheSweepThere) {
+    // Radio 2's 10 m short at level 2 on 2026-11-02: the point where the
+    // oscillation began fell only 5.5 mV with a spread of 56 mV (4 mV before).
+    // Taken for compression, it was kept and the good point before it dropped.
+    EnterAuto(1);
+    autoCal.bandMask = 1u << BAND_20M;
+    radio.oscillateBand = BAND_20M;
+    radio.oscillateStage = AUTO_STAGE_SHORT;
+    radio.oscillateFromPoint = 2;
+    radio.oscillateUnsteady = true;
+    LogCapture log;
+    RunToReviewForLog();
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M,short,tone", "oscillation: V_f unsteady as its spread jumped"}), 1)
+        << log.Text();
+    EXPECT_EQ(log.Count({"compression"}), 0) << "the good point before it is kept";
+    EXPECT_EQ(collects[AUTO_STAGE_SHORT], 3u) << "abandoned at the unsteady point";
+    const AutoCalBandResult *r = GetAutoCalResult(BAND_20M);
+    EXPECT_EQ(r->failBits, 0u);
+    EXPECT_TRUE(r->openOnly);
+}
+
+TEST_F(PowerCalAutoTest, AMissingLoadFailsTheBand) {
+    // 2026-11-02: the load came off part-way through radio 2's 160 m sweep
+    EnterAuto(1);
+    radio.loadMissingBand = BAND_40M;
+    LogCapture log;
+    RunToReviewForLog();
+    EXPECT_TRUE(GetAutoCalResult(BAND_40M)->failBits & AUTO_FAIL_NO_LOAD) << log.Text();
+    EXPECT_EQ(GetAutoCalResult(BAND_20M)->failBits, 0u);
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,load,cw 0.00 dB,no load: V_f minus V_r below the limit"}), 1)
+        << "logged once, at the band's first point";
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,40M,band,band fails,no 50 Ohm load", ",13.000,"}), 1)
+        << "every CW point and the SSB point";
+    EXPECT_EQ(log.Count({"AUTOCAL-SKIP,20M", "no load"}), 0);
+    Select();
+    Tick();
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_40M], 0) << "not stored";
+    EXPECT_EQ(ED.SWR_CalLevel[BAND_20M], 1);
+}
+
+TEST_F(PowerCalAutoTest, LoadPointsAreKeyedForAtMostOneAndAHalfSeconds) {
+    // The 50 Ohm load runs hot: settle and collect are its whole key-down per point
+    StartPowerAutoCal();
+    EXPECT_LE(powerSM.vars.settle_ms + autoCal.collectLoad_ms, 1500u);
+    EXPECT_GE(autoCal.collectLoad_ms, 1000u) << "enough readings for the averages";
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
 }
 
 TEST_F(PowerCalAutoTest, LogsPointsWithTooFewOrRejectedReadings) {

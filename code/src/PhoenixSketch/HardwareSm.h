@@ -119,6 +119,8 @@ struct AutoCalSession {
     bool forwardFitDone;      // load stage: forward line fitted for this band
     bool ssbPoint;            // the current point is the SSB tone point
     bool oscillation;         // the last point failed the oscillation check
+    uint32_t shortFalls;      // open and short: short falls running on this sweep (compression)
+    uint32_t extraPoints;     // open and short: points added to this sweep for those left out
     bool keyed;               // the calibration wants the transmitter keyed
     bool ssbMode;             // the point uses the SSB tone (CALIBRATE_OFFSET), not CW
     float32_t drive_dB;       // drive of the current point: attenuation (CW) or DSP gain (SSB)
@@ -148,12 +150,13 @@ extern AutoCalSession autoCal;
 #define AUTO_FAIL_FORWARD_SLOPE  (1u << 2)  // level 3 slope outside 22-28 mV/dB or 5 % of the median
 #define AUTO_FAIL_DRIFT          (1u << 3)  // level 3 repeated point moved too far
 #define AUTO_FAIL_LEVEL2_OFFSET  (1u << 4)  // level 2 offset too far from the level 1 default
-#define AUTO_FAIL_OPEN           (1u << 5)  // open sweep abandoned or not fitted
+#define AUTO_FAIL_OPEN           (1u << 5)  // no reflected line: open and short both abandoned or not fitted
 #define AUTO_FAIL_REFLECTED_FIT  (1u << 6)  // reflected fit rms too large
 #define AUTO_FAIL_REFLECTED_SLOPE (1u << 7) // reflected slope too far from the forward slope
 #define AUTO_FAIL_GAP            (1u << 8)  // open-short intercept gap too large
 #define AUTO_FAIL_S50            (1u << 9)  // the load's SWR too high
 #define AUTO_FAIL_PA_CURVE       (1u << 10) // the PA curve or SSB gain could not be fitted
+#define AUTO_FAIL_NO_LOAD        (1u << 11) // a load point reflected everything: the 50 Ohm load was not fitted
 
 /** Results of one band in the automatic calibration */
 struct AutoCalBandResult {
@@ -166,10 +169,12 @@ struct AutoCalBandResult {
     float32_t level2Delta_dB; // level 2: offset minus the level 1 default
     bool hasPACurve;          // PA curve and SSB gain measured
     float32_t Psat_mW, kindex;// PA curve
+    float32_t shape;          // PA curve's knee shape exponent
     float32_t ceilingOverRead_dB; // level 2: detector at 0 dB minus the wattmeter
     float32_t ssbCorrection_dB; // SSB DSP gain correction
     bool hasReflected;        // reflected line fitted
     bool openOnly;            // reflected line from the open alone
+    bool shortOnly;           // reflected line from the short alone
     float32_t m_r, b_r;       // reflected line
     float32_t gap_dB;         // open intercept minus short intercept
     float32_t reflectedRms_dB;

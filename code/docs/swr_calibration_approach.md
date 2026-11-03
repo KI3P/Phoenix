@@ -295,21 +295,38 @@ the radio in true receive between points:
   receive between points. The whole short sweep on one band then puts about 12 s of full
   reflection into the PA.
 - **Oscillation check (abort rule).** Radio 2's PA oscillates into a short on 10 m: in
-  October, and in all three runs of 2026-11-01 and 11-02, whatever the bridge build. The
-  forward reading sat at 1700–2100 mV whatever the drive. After each point, compare V_f with the previous point. When the drive drops by
-  Δ dB, V_f must fall by at least 0.5 × Δ × 25 mV. The sweep's first point has no previous
-  point: its V_f must not exceed the 50 Ω V_f at the same drive by more than 6 dB × 25 mV. If
-  either test fails: unkey, discard that band's short (or open) sweep, and move on to the
-  next band.
+  October, and in all four runs of 2026-11-01 and 11-02, whatever the bridge build. Before the
+  rebuild the forward reading locked at 1700–2100 mV whatever the drive; on 2026-11-02 it jumped
+  52 mV up at the sweep's fourth point. After each point, compare V_f with the previous point.
+  When the drive drops by Δ dB:
+  - **V_f falls by at least 0.5 × Δ × 25 mV:** keep the point.
+  - **V_f's spread jumps above 20 mV and to more than 4 times the previous point's:** the
+    oscillation started during the point (radio 2's 10 m short at level 2: 4 → 56 mV), whatever
+    its mean did. Treat it as below.
+  - **V_f rises by more than 25 mV (1 dB):** the PA is oscillating. Unkey, discard that band's
+    short (or open) sweep, and move on to the next band.
+  - **Anything in between (a short fall):** the PA is most likely compressing near its ceiling.
+    Leave out the previous point, which was the compressed one, keep this one, and add a point at
+    the bottom of the sweep (at most 3 per sweep). Only the third short fall running counts as
+    an oscillation: a locked oscillation never falls again, compression does a few dB lower.
+  - The sweep's first point has no previous point: its V_f must not exceed the 50 Ω V_f at the
+    same drive by more than 6 dB × 25 mV, or the sweep is discarded at once.
   - **Why only the first point, and why 6 dB (2026-11-02):** on the bench sheets the PA puts
     −3.3 to +4.9 dB into an open or short against 50 Ω at the same drive, and the short reads
     up to 7 dB above the open (radio 2, 160 m). A 3 dB margin against 50 Ω, or against the
     open, would have failed radio 2's 20 m open and abandoned five real short sweeps.
   - **The fall test is the dependable one:** real sweeps fall 17–28 mV per dB of drive.
-- **Falling back to the open alone.** If only the short failed, fit the reflected line to
-  the open alone (b_r = b_o, Section 7) and log the band as calibrated from the open only.
-  The leak is then not cancelled, which costs up to half the open–short gap: about 0.25 dB
-  on radio 1's 10 m, where the gap was 0.51 dB. If the open failed too, the band's SWR is
+  - **Why a short fall is not an oscillation (2026-11-02):** in radio 2's first level 1 run,
+    the 1.2 W start point put the PA at its ceiling into the open on 20, 17 and 12 m. V_f fell
+    only 21, 14 and 5 mV for 2 dB, with spreads of 1–5 mV, and the shorts on the same bands
+    fell normally. Taking each short fall as an oscillation failed all three bands. The reading
+    spread does not separate the two cases: radio 2's locked 10 m oscillation before the rebuild
+    had a spread of 1–2 mV.
+- **Falling back to one standard.** If only the short failed, fit the reflected line to the
+  open alone (b_r = b_o, Section 7) and log the band as calibrated from the open only. If only
+  the open failed, fit it to the short alone in the same way. The leak is then not cancelled,
+  which costs up to half the open–short gap: about 0.25 dB on radio 1's 10 m, where the gap was
+  0.51 dB, and at most 0.2 dB on radio 2's 160–20 m. If both failed, the band's SWR is
   uncalibrated.
 
 ## 7. The calculations
@@ -422,7 +439,8 @@ report the failure. The thresholds come from the 2026-10/11 bench sessions.
 | S50 on the stage A load (level 1: a bare 50 Ω load) | ≤ 1.3 below 20 MHz; ≤ 1.5 above | not taken on the meter chain; a bare 50 Ω load read 1.01–1.06 (160–20 m) and 1.22 (10 m) | Poorly matched wattmeter or load; bridge fault |
 | Drift of the repeated point (level 3) | ≤ 0.2 dB | ≤ 0.08 dB | Thermal drift; loose connection |
 | Level 2 offset against the level 1 default | within ±3 dB on 160–20 m, ±4 dB above 20 m | −0.6 to −0.2 dB against the defaults in Section 2 (−1.2 to −0.4 dB against radio 2's values alone) | Wattmeter entry error (2 W entered as 20 W is 10 dB); wrong L44 turns setting |
-| Oscillation | None detected (Section 6) | none on radio 1 | PA instability into the short (radio 2, 10 m) |
+| Oscillation | None detected on at least one of the open and short (Section 6) | none on radio 1 | PA instability into the short (radio 2, 10 m) |
+| Load present (stage A) | every load point V_f − V_r ≥ 100 mV | 166 mV the smallest on any bench sheet; 486–1100 mV on radio 2, 2026-11-02 | Load not fitted, or its connector loose (radio 2, 2026-11-02: V_r read within 4 mV of V_f) |
 
 ## 9. What to save
 
@@ -434,9 +452,9 @@ report the failure. The thresholds come from the 2026-10/11 bench sessions.
 | `ED.SWR_F_Offset[band]` | yes | o_f = b_f + 38 |
 | `ED.SWR_R_SlopeAdj[band]` | yes | s_r = m_r − 25 |
 | `ED.SWR_R_Offset[band]` | yes | o_r = b_r + 38 |
-| `ED.PowerCal_20W_Psat_mW[band]`, `ED.PowerCal_20W_kindex[band]` | yes | PA curve, from stage A as now |
+| `ED.PowerCal_20W_Psat_mW[band]`, `ED.PowerCal_20W_kindex[band]`, `ED.PowerCal_20W_shape[band]` | yes (the shape from 2026-11-02) | PA curve P = P_sat·tanh((k·x)^s)^(1/s), from stage A, fitted in dB (`PowerCalibration/AutoCalibration.md`) |
 | `ED.SWR_F_Floor_mW[band]`, `ED.SWR_R_Floor_mW[band]` | new, optional | P_floor,f and P_floor,r on the line (Section 7) |
-| `ED.SWR_CalLevel[band]` | yes (2026-11-02) | 0 if the band is uncalibrated, otherwise the level it passed (1, 2 or 3, Section 2), with a flag for a reflected line from the open alone. Lets the display mark the SWR as uncalibrated and show the power display's expected accuracy |
+| `ED.SWR_CalLevel[band]` | yes (2026-11-02) | 0 if the band is uncalibrated, otherwise the level it passed (1, 2 or 3, Section 2), with a flag for a reflected line from the open alone (`SWR_CAL_OPEN_ONLY`) or the short alone (`SWR_CAL_SHORT_ONLY`). Lets the display mark the SWR as uncalibrated and show the power display's expected accuracy |
 | `ED.SWR_CalDate[band]` | yes (2026-11-02) | Time stamp of the calibration (the radio keeps time from the PJRC sync) |
 
 Per radio, not per band:
