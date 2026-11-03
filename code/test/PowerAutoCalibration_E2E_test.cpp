@@ -524,14 +524,19 @@ protected:
         digitalWrite(KEY1, 1);
         digitalWrite(KEY2, 1);
 
+        // An uncalibrated radio: the PA curve, SSB gain and bridge at their factory defaults
         ED.PA100Wactive = false;
         ED.SWR_CouplerTurns = 10;
+        const struct config_t factory;
         for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
-            ED.PowerCal_20W_DSP_Gain_correction_dB[b] = 0;
-            ED.PowerCal_20W_Psat_mW[b] = 14680;
-            ED.PowerCal_20W_kindex[b] = 16.2f;
-            ED.SWR_F_SlopeAdj[b] = ED.SWR_R_SlopeAdj[b] = 0;
-            ED.SWR_F_Offset[b] = ED.SWR_R_Offset[b] = 0;
+            ED.PowerCal_20W_DSP_Gain_correction_dB[b] = factory.PowerCal_20W_DSP_Gain_correction_dB[b];
+            ED.PowerCal_20W_Psat_mW[b] = factory.PowerCal_20W_Psat_mW[b];
+            ED.PowerCal_20W_kindex[b] = factory.PowerCal_20W_kindex[b];
+            ED.PowerCal_20W_shape[b] = factory.PowerCal_20W_shape[b];
+            ED.SWR_F_SlopeAdj[b] = factory.SWR_F_SlopeAdj[b];
+            ED.SWR_R_SlopeAdj[b] = factory.SWR_R_SlopeAdj[b];
+            ED.SWR_F_Offset[b] = factory.SWR_F_Offset[b];
+            ED.SWR_R_Offset[b] = factory.SWR_R_Offset[b];
             ED.SWR_CalLevel[b] = 0;
         }
         extern size_t primaryMenuIndex;

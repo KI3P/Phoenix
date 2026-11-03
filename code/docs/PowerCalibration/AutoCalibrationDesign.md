@@ -349,6 +349,39 @@ These are set in `AutoCalEnter()`, and tests shorten them:
   arrays on entry. That must stop before AUTO stores anything
   (`swr_calibration_approach.md` §4).
 
+## Uncalibrated defaults
+
+A radio with no saved configuration, or after a reset, starts from these values on 160–6 m
+(`struct config_t` in `SDT.h`). Calibrated radios keep their stored values.
+
+| Value | Default | From |
+|---|---|---|
+| Forward offset o_f | −4.03 (160 m) to −4.73 dB (20 m); s_f = 0 | The level 1 defaults for 10 turns (`SWRCalLevel1ForwardOffset()`), measured on both bench radios |
+| Reflected line o_r, s_r | o_f plus radio 2's o_r − o_f (−0.84 to +0.72 dB), radio 2's s_r (−0.22 to +0.01) | Radio 2, level 2, 2026-11-02: the reflected line keeps its place against the forward line, so SWR reads as on radio 2 |
+| PA curve P_sat, k, s | Radio 2's fit per band: P_sat 1.7–17.5 W, s 0.52–0.71 | Radio 2, level 2, 2026-11-02 (`autocal_r2_level2_shape.log`) |
+| SSB gain correction | 0 dB | Not changed (below) |
+
+Before these, every band started from o_f = o_r = 0, P_sat 14.7 W, k 16.2 and s = 1. The
+forward reading was then about 4 dB high, and the PA curve missed radio 2's sweeps by up to
+13 dB (6 m).
+
+- **Why radio 2 alone.** Radio 1 runs the KI3P prototype build. Its PA is much stronger above
+  20 m (6.8 W on 6 m against 1.9 W) and its reflected line sits about 1.5 dB higher against its
+  forward line. With radio 2's defaults, radio 1's PA curve misses by up to 10 dB (80 m) at mid
+  drive, and its uncalibrated SWR reads low.
+- **One standard on 10 and 6 m.** Radio 2's 10 m line is from the open alone and its 6 m line
+  from the short alone, so these two carry the bridge's leak (up to half the open–short gap,
+  about 0.4 dB).
+- **The SSB gain correction stays 0.** The load stage keys its SSB tone at the stored
+  correction, and rejects a new one more than 10 dB from it (`AUTO_SSB_CHANGE_MAX_DB`). A
+  default far above a radio's need overdrives the PA and stores a wrong value; one more than
+  10 dB away fails the band. Radio 2 needs −8 to +21 dB and radio 1 −6 to +14 dB, so radio 2's
+  values would not suit every radio. As it is, a radio needing more than 10 dB (radio 2's 6 m)
+  fails that band's first automatic calibration.
+- **The detector-input build.** Both radios have C147 and C154 removed and 100 pF across the
+  detector inputs. A radio without that change can read up to about 3 dB differently above
+  20 m.
+
 ## Still to do
 
 - **Run it on a radio.** At level 1 on a dummy load, then the open and the short, check:
