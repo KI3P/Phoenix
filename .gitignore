@@ -21,9 +21,6 @@ code/test/all_*.cmake
 code/test/all_*.a
 code/tools/*.png
 code/tools/*.csv
-code/tools/swr/*.csv
-code/tools/swr/**/*.npz
-code/tools/swr/**/__pycache__/
 code/tools/__pycache__/
 *.log
 *.bin
