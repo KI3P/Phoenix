@@ -19,7 +19,7 @@ If not, see <https://www.gnu.org/licenses/>.
 /**
  * The screen of the automatic power and SWR calibration (the AUTO branch of
  * PowerCalSm). DrawCalibratePower() hands over to DrawCalibratePowerAuto() while
- * PowerCalAutoActive(). See code/docs/PowerCalibration/AutoCalibration.md.
+ * PowerCalAutoActive(). See code/docs/PowerCalibration/AutoCalibrationDesign.md.
  */
 
 #include "SDT.h"

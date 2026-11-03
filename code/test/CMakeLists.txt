@@ -181,8 +181,9 @@ gtest_discover_tests(all_PowerAutoCalE2E_tests PROPERTIES TIMEOUT 300)
 # SDL2 Display Simulator executable (optional)
 # Build with: cmake -DUSE_SDL_DISPLAY=ON ..
 if(USE_SDL_DISPLAY)
-    add_executable(radio_simulator
-        RadioSimulator_main.cpp
+    # The firmware and the SDL display, shared by the simulator and the
+    # calibration screenshot tool
+    set(SIMULATOR_SOURCES
         ../src/PhoenixSketch/MainBoard_Display.cpp
         ../src/PhoenixSketch/MainBoard_DisplayHome.cpp
         ../src/PhoenixSketch/MainBoard_DisplayMenus.cpp
@@ -232,9 +233,20 @@ if(USE_SDL_DISPLAY)
         RA8875_SDL.cpp
     )
 
+    add_executable(radio_simulator RadioSimulator_main.cpp ${SIMULATOR_SOURCES})
+
     target_compile_definitions(radio_simulator PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS)
     target_include_directories(radio_simulator PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(radio_simulator ${SDL2_LIBRARIES})
 
     message(STATUS "Radio simulator enabled - build with 'make radio_simulator'")
+
+    # Screenshots of the automatic power calibration for
+    # code/docs/PowerCalibration/AutoCalibration.md:
+    #   SDL_VIDEODRIVER=offscreen ./autocal_screenshots <1|2> <output directory>
+    add_executable(autocal_screenshots AutoCalScreenshots_main.cpp ${SIMULATOR_SOURCES})
+    target_compile_definitions(autocal_screenshots PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS)
+    target_include_directories(autocal_screenshots PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(autocal_screenshots ${SDL2_LIBRARIES})
+
 endif()

@@ -124,6 +124,7 @@ RA8875PrintRecord RA8875PrintLogEntry(unsigned index);
 #ifdef USE_SDL_DISPLAY
 // Cleanup function for SDL resources - call at program exit
 void RA8875_SDL_Cleanup();
+bool RA8875_SDL_SaveScreenshot(const char* path);
 #endif
 
 #endif

@@ -97,7 +97,7 @@ uint8_t GetPowerUnit(void);
 void InitializePowerCalibration(void);
 
 // Automatic power and SWR bridge calibration (the AUTO branch of PowerCalSm).
-// See code/docs/PowerCalibration/AutoCalibration.md
+// See code/docs/PowerCalibration/AutoCalibrationDesign.md
 enum AutoCalStage {
     AUTO_STAGE_LOAD = 0,   // 50 Ohm load, with the wattmeter at levels 2 and 3
     AUTO_STAGE_OPEN,       // nothing on the antenna connector

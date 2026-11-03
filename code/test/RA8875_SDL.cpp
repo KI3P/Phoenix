@@ -804,6 +804,10 @@ bool RA8875::begin(uint8_t display_size, uint8_t color_bpp, uint32_t spi_clock, 
     // which is too slow for audio processing (need ~94 Hz for 48kHz audio at 512 samples/frame)
     g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
     if (!g_renderer) {
+        // No GPU, e.g. a headless run with SDL_VIDEODRIVER=offscreen
+        g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_SOFTWARE);
+    }
+    if (!g_renderer) {
         std::cerr << "Renderer creation failed: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(g_window);
         SDL_Quit();
@@ -1257,6 +1261,20 @@ void RA8875::writeRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uin
 // Public function to update the SDL display - call once per frame
 void RA8875::updateScreen() {
     update_display();
+}
+
+// Save the 800x480 display (not the simulator's register and help panels) as
+// a BMP. Returns false if the display is not initialized or the save fails.
+bool RA8875_SDL_SaveScreenshot(const char* path) {
+    if (!g_initialized || !g_framebuffer) return false;
+    update_display();
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(
+        g_framebuffer, DISPLAY_WIDTH, DISPLAY_HEIGHT, 32,
+        DISPLAY_WIDTH * sizeof(uint32_t), SDL_PIXELFORMAT_ARGB8888);
+    if (!surface) return false;
+    bool ok = SDL_SaveBMP(surface, path) == 0;
+    SDL_FreeSurface(surface);
+    return ok;
 }
 
 // Cleanup function - call at program exit

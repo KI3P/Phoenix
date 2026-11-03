@@ -210,7 +210,7 @@ means the operator then fits the antenna, which is the natural next step.
   stored SSB gain correction then sets the open and short drive, and there is no S50 check.
   The firmware does not take the key-up floor (it is only needed for the optional
   subtraction in Section 7). (Decided 2026-11-02, replacing the earlier open, short, optional
-  load order. See `code/docs/PowerCalibration/AutoCalibration.md`.)
+  load order. See `code/docs/PowerCalibration/AutoCalibrationDesign.md`.)
 
 **The existing power calibration belongs inside stage A.**
 - **Use its readings twice.** It already takes wattmeter readings with the PA on its 50 Ω
@@ -281,7 +281,7 @@ CW carrier, set by the TX attenuator (`ED.XAttenCW`, `SetTXAttenuation()`):
 Automatic. Use the same drive levels on the open and the short, so the two sweeps can be
 compared level by level. The firmware drives them with the SSB tone and sets its level with DSP
 gain, because the CW carrier's only level control is the 31.5 dB attenuator, and that may not
-give the 8 dB span below (`code/docs/PowerCalibration/AutoCalibration.md`). The tone also leaves
+give the 8 dB span below (`code/docs/PowerCalibration/AutoCalibrationDesign.md`). The tone also leaves
 the radio in true receive between points:
 
 - **Levels:** 5–6 of them, from about 1.2 W of forward power down in DSP-gain steps. Choose
@@ -452,7 +452,7 @@ report the failure. The thresholds come from the 2026-10/11 bench sessions.
 | `ED.SWR_F_Offset[band]` | yes | o_f = b_f + 38 |
 | `ED.SWR_R_SlopeAdj[band]` | yes | s_r = m_r − 25 |
 | `ED.SWR_R_Offset[band]` | yes | o_r = b_r + 38 |
-| `ED.PowerCal_20W_Psat_mW[band]`, `ED.PowerCal_20W_kindex[band]`, `ED.PowerCal_20W_shape[band]` | yes (the shape from 2026-11-02) | PA curve P = P_sat·tanh((k·x)^s)^(1/s), from stage A, fitted in dB (`PowerCalibration/AutoCalibration.md`) |
+| `ED.PowerCal_20W_Psat_mW[band]`, `ED.PowerCal_20W_kindex[band]`, `ED.PowerCal_20W_shape[band]` | yes (the shape from 2026-11-02) | PA curve P = P_sat·tanh((k·x)^s)^(1/s), from stage A, fitted in dB (`PowerCalibration/AutoCalibrationDesign.md`) |
 | `ED.SWR_F_Floor_mW[band]`, `ED.SWR_R_Floor_mW[band]` | new, optional | P_floor,f and P_floor,r on the line (Section 7) |
 | `ED.SWR_CalLevel[band]` | yes (2026-11-02) | 0 if the band is uncalibrated, otherwise the level it passed (1, 2 or 3, Section 2), with a flag for a reflected line from the open alone (`SWR_CAL_OPEN_ONLY`) or the short alone (`SWR_CAL_SHORT_ONLY`). Lets the display mark the SWR as uncalibrated and show the power display's expected accuracy |
 | `ED.SWR_CalDate[band]` | yes (2026-11-02) | Time stamp of the calibration (the radio keeps time from the PJRC sync) |

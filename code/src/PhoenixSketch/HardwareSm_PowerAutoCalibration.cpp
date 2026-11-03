@@ -25,7 +25,7 @@ If not, see <https://www.gnu.org/licenses/>.
  * sweeps the CW carrier (CALIBRATE_POWER) and ends each band with an SSB tone
  * point; the open and short are driven with the SSB tone (CALIBRATE_OFFSET), whose
  * level DSP gain sets, so that the radio is in true receive between their points.
- * See code/docs/PowerCalibration/AutoCalibration.md and
+ * See code/docs/PowerCalibration/AutoCalibrationDesign.md and
  * code/docs/swr_calibration_approach.md; the calculations are in SWRCalibration.cpp.
  *
  * The functions named Auto* are the state machine's actions and guards. They run
@@ -185,7 +185,7 @@ static float32_t ReflectionBaseCorrection(int32_t band){
 }
 
 /**
- * @brief Drive of the current point (Section 6, point lists in AutoCalibration.md)
+ * @brief Drive of the current point (Section 6, point lists in AutoCalibrationDesign.md)
  * @return Attenuation in dB for a CW point, DSP gain in dB for an SSB point
  */
 static float32_t PointDrive(void){
