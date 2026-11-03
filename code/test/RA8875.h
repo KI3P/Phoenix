@@ -96,6 +96,9 @@ public:
     void updateScreen();
 
 private:
+    // Test instrumentation - see RA8875ClearPrintLog() below
+    void recordPrint();
+
     uint8_t _cs;
     uint8_t _rst;
     uint8_t _font_scale;
@@ -105,9 +108,23 @@ private:
     const void* _custom_font;
 };
 
+// Test instrumentation (implemented by RA8875_mock.cpp). Every print() is logged
+// along with the cursor position and whether a GFX font was installed at the time,
+// so tests can check that each pane draws its text in the font it intends to.
+struct RA8875PrintRecord {
+    uint16_t x;
+    uint16_t y;
+    bool customFont;
+    uint8_t fontScale;
+};
+void RA8875ClearPrintLog();
+unsigned RA8875PrintLogSize();
+RA8875PrintRecord RA8875PrintLogEntry(unsigned index);
+
 #ifdef USE_SDL_DISPLAY
 // Cleanup function for SDL resources - call at program exit
 void RA8875_SDL_Cleanup();
+bool RA8875_SDL_SaveScreenshot(const char* path);
 #endif
 
 #endif

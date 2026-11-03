@@ -94,6 +94,9 @@ static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
 static RFHardwareState rfHardwareState = RFReceive;
 static RFHardwareState oldrfHardwareState = RFInvalid;
 static TuneState tuneState = TuneReceive;
+static float32_t cwAttenOverride_dB = -1;  // negative: CW attenuation follows the power setting
+static bool ssbGainOverrideActive = false; // false: SSB DSP gain follows the power setting
+static float32_t ssbGainOverride_dB = 0;
 
 /**
  * @brief Initialize the RF board by calling the initialization functions for each
@@ -158,6 +161,29 @@ errno_t InitializeRFHardware(void){
  */
 ModeSm_StateId GetRFHardwarePreviousState(void){
     return previousRadioState;
+}
+
+void SetCWAttenuationOverride(float32_t att_dB){
+    cwAttenOverride_dB = (att_dB > 31.5f) ? 31.5f : att_dB;
+}
+
+float32_t GetCWAttenuationOverride(void){
+    return cwAttenOverride_dB;
+}
+
+void SetSSBGainOverride(float32_t gain_dB){
+    ssbGainOverride_dB = gain_dB;
+    ssbGainOverrideActive = true;
+}
+
+void ClearSSBGainOverride(void){
+    ssbGainOverrideActive = false;
+}
+
+bool GetSSBGainOverride(float32_t *gain_dB){
+    if (ssbGainOverrideActive)
+        *gain_dB = ssbGainOverride_dB;
+    return ssbGainOverrideActive;
 }
 
 /**
@@ -373,6 +399,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                    if (cwAttenOverride_dB >= 0)
+                        att_dB = cwAttenOverride_dB;
                 }
 
                 RXBypassBPF(); // BPF out of RX path
@@ -422,6 +450,8 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                    if (cwAttenOverride_dB >= 0)
+                        att_dB = cwAttenOverride_dB;
                 }
 
                 RXBypassBPF(); // BPF out of RX path

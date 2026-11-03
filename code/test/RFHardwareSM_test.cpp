@@ -113,6 +113,53 @@ TEST(RFHardwareState, StateTransitionToCWMark){
     EXPECT_EQ(GET_BIT(hardwareRegister, PA100WBIT), 0); // 100W PA bypassed
 }
 
+TEST(RFHardwareState, CWAttenuationOverrideReplacesPowerModel){
+    InitializeRFHardware();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+
+    SetCWAttenuationOverride(12.5);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+    EXPECT_FLOAT_EQ(GetTXAttenuation(), 12.5);
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+    SetCWAttenuationOverride(0);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+    EXPECT_FLOAT_EQ(GetTXAttenuation(), 0.0) << "0 dB is a valid override, not 'off'";
+
+    // Cleared: the power setting decides again
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+    SetCWAttenuationOverride(-1);
+    bool pa;
+    float32_t model = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]], &pa);
+    float32_t expected = ((model >= 0) && (model < 32)) ? model : ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateRFHardwareState();
+    EXPECT_NEAR(GetTXAttenuation(), expected, 0.26);
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+}
+
+TEST(RFHardwareState, CWAttenuationOverrideAppliesFromSpaceToo){
+    InitializeRFHardware();
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+
+    SetCWAttenuationOverride(31.5);
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_SPACE;
+    UpdateRFHardwareState();
+    EXPECT_FLOAT_EQ(GetTXAttenuation(), 31.5);
+
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+    UpdateRFHardwareState();
+    SetCWAttenuationOverride(-1);
+}
+
 TEST(RFHardwareState, FrequenciesSetUponStateChange){
     // Set up the arrays
     ED.centerFreq_Hz[ED.activeVFO] = 7100000L;
@@ -376,6 +423,94 @@ TEST(RFHardwareState, TuneStateMachine_DifferentSampleRates) {
     UpdateTuneState();
     // GetTXRXFreq_cHz() = (14074000 - 100 - 48000/4) * 100 = (14073900 - 12000) * 100 = 1406190000 (see Tune.cpp:98)
     EXPECT_EQ(GetTXVFOFrequency(), 14061900);
+}
+
+// ================== SHARED PLLB TESTS ==================
+// On dual-VFO boards the TX quadrature outputs (CLK4/CLK5) and the CW output (CLK6)
+// both run from PLLB. Setting CLK6 retunes PLLB, and both VFO setters cache their
+// last frequency, so moving between CW and SSB transmit without retuning must still
+// leave PLLB where the output in use needs it.
+
+extern int32_t EvenDivisor(int64_t freq2_Hz);
+
+// The TX outputs divide PLLB by EvenDivisor(f), so PLLB must be exactly f times that
+static void ExpectPLLBTunedForTX(void){
+    uint64_t tx_cHz = GetTXRXFreq_cHz();
+    EXPECT_EQ(si5351.pllb_freq, tx_cHz * EvenDivisor(tx_cHz / SI5351_FREQ_MULT));
+}
+
+// CLK6 is an integer-only divider, so PLLB must be an even multiple of the CW frequency
+static void ExpectPLLBTunedForCW(void){
+    uint64_t cw_cHz = GetCWTXFreq_cHz();
+    EXPECT_EQ(si5351.pllb_freq % cw_cHz, 0u);
+    EXPECT_EQ((si5351.pllb_freq / cw_cHz) % 2, 0u);
+}
+
+static void SetUpSharedPLLBTest(void){
+    SetDualVFOs(true);
+    si5351 = Si5351(); // Reset mock
+    si5351.reset();
+    ResetVFOState();
+    InitRXVFO();  // CLK0/CLK1 on PLLA
+    InitTXVFO();  // CLK4/CLK5 on PLLB
+    InitCWVFO();  // CLK6 on PLLB
+    SampleRate = SAMPLE_RATE_192K;
+    ED.centerFreq_Hz[ED.activeVFO] = 14248000L; // TX at 14.200 MHz
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+    ED.currentBand[ED.activeVFO] = BAND_20M;
+    ED.CWToneIndex = 3;
+}
+
+// The power calibration sequence on one band: an earlier SSB transmission primes the
+// TX VFO cache, steps 1-3 transmit CW, and step 4 transmits SSB at the same frequency
+TEST(RFHardwareState, SharedPLLB_SSBAfterCWAtSameFrequencyRetunesPLLB) {
+    SetUpSharedPLLBTest();
+
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    ExpectPLLBTunedForTX();
+
+    modeSM.state_id = ModeSm_StateId_CALIBRATE_POWER_MARK;
+    UpdateTuneState();
+    ExpectPLLBTunedForCW();
+
+    uint8_t resets = si5351.pll_reset_calls[SI5351_PLLB];
+    modeSM.state_id = ModeSm_StateId_CALIBRATE_OFFSET_MARK;
+    UpdateTuneState();
+    ExpectPLLBTunedForTX();
+    // The full reprogram ends with a PLL reset to realign the I and Q outputs
+    EXPECT_GT(si5351.pll_reset_calls[SI5351_PLLB], resets);
+}
+
+TEST(RFHardwareState, SharedPLLB_CWAfterSSBAtSameFrequencyRetunesPLLB) {
+    SetUpSharedPLLBTest();
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateTuneState();
+    ExpectPLLBTunedForCW();
+
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    ExpectPLLBTunedForTX();
+
+    modeSM.state_id = ModeSm_StateId_CW_TRANSMIT_MARK;
+    UpdateTuneState();
+    ExpectPLLBTunedForCW();
+}
+
+// Staying in one mode must not cause redundant Si5351 writes
+TEST(RFHardwareState, SharedPLLB_RepeatedSSBTransmitDoesNotReprogram) {
+    SetUpSharedPLLBTest();
+
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    uint8_t resets = si5351.pll_reset_calls[SI5351_PLLB];
+    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+    UpdateTuneState();
+    modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+    UpdateTuneState();
+    EXPECT_EQ(si5351.pll_reset_calls[SI5351_PLLB], resets);
+    ExpectPLLBTunedForTX();
 }
 
 // ================== BUFFER LOGGING TESTS ==================

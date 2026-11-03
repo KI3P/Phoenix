@@ -1124,6 +1124,10 @@ void TXGain(DataBlock *data){
     // gain_dB: the band-dependent gain factor needed to get this band to the setpoint
     // txGain_dB: the gain factor needed to adjust from the setpoint to the 
     // requested power
+    // The automatic power calibration sets the total gain directly
+    float32_t override_dB;
+    if (GetSSBGainOverride(&override_dB))
+        TXgainDSP = override_dB;
     float32_t amp_factor = powf(10.0f,(TXgainDSP)/20.0);
     arm_scale_f32(data->I, amp_factor, data->I, data->N);
 }

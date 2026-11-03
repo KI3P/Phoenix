@@ -253,97 +253,225 @@ stateDiagram
 %% See https://github.com/StateSmith/StateSmith/issues/404
 state "." as ROOT.(InitialState)
 
-PowerPoint1
+state MANUAL {
 
-PowerPoint1 : PowerPoint1
+        %% Initial state name as "." so that it fits in black circle shape.
+        %% See https://github.com/StateSmith/StateSmith/issues/404
+        state "." as MANUAL.(InitialState)
 
-PowerPoint1 : enter / #123; ResetPowerCalibration()#59; #125;
+        PowerPoint1
 
-PowerPoint1 : exit / #123; RecordPowerDataPoint()#59; #125;
+        PowerPoint1 : PowerPoint1
 
-PowerPoint2
+        PowerPoint1 : enter / #123; ResetPowerCalibration()#59; #125;
 
-PowerPoint2 : PowerPoint2
+        PowerPoint2
 
-PowerPoint2 : enter / #123; StartPowerPoint()#59; #125;
+        PowerPoint2 : PowerPoint2
 
-PowerPoint2 : exit / #123; RecordPowerDataPoint()#59; #125;
+        PowerPoint2 : enter / #123; StartPowerPoint()#59; #125;
 
-PowerPoint3
+        PowerPoint3
 
-PowerPoint3 : PowerPoint3
+        PowerPoint3 : PowerPoint3
 
-PowerPoint3 : enter / #123; StartPowerPoint()#59; #125;
+        PowerPoint3 : enter / #123; StartPowerPoint()#59; #125;
 
-PowerPoint3 : exit / #123; RecordPowerDataPoint()#59; #125;
+        PowerComplete
 
-PowerComplete
+        PowerComplete : PowerComplete
 
-PowerComplete : PowerComplete
+        PowerComplete : enter / #123; CalculatePowerCurveFit()#59; #125;
 
-PowerComplete : enter / #123; CalculatePowerCurveFit()#59; #125;
+        SSBPoint
 
-PowerComplete : exit / #123;  #125;
+        SSBPoint : SSBPoint
 
-SSBPoint
+        SSBPoint : enter / #123; StartSSBPoint()#59; #125;
 
-SSBPoint : SSBPoint
+        MeasurementComplete
 
-SSBPoint : enter / #123; StartSSBPoint()#59; #125;
+        MeasurementComplete : MeasurementComplete
 
-SSBPoint : exit / #123; RecordPowerDataPoint()#59; #125;
+        MeasurementComplete : enter / #123; CalculateSSBPoint()#59; #125;
 
-MeasurementComplete
+}
 
-MeasurementComplete : MeasurementComplete
+state AUTO {
 
-MeasurementComplete : enter / #123; CalculateSSBPoint()#59; #125;
+        %% Initial state name as "." so that it fits in black circle shape.
+        %% See https://github.com/StateSmith/StateSmith/issues/404
+        state "." as AUTO.(InitialState)
 
-MeasurementComplete : exit / #123;  #125;
+        state POINT {
 
-ACQUISITION
+                %% Initial state name as "." so that it fits in black circle shape.
+                %% See https://github.com/StateSmith/StateSmith/issues/404
+                state "." as POINT.(InitialState)
 
-ACQUISITION : ACQUISITION
+                KEYDOWN
 
-ACQUISITION : enter / #123; count_ms = 0#59; #125;
+                KEYDOWN : KEYDOWN
 
-ACQUISITION : 1. do / #123; count_ms++#59; #125;
+                KEYDOWN : enter / #123; AutoKey()#59; count_ms = 0#59; #125;
 
-READ_AND_ADJUST
+                state POINT.(ChoicePoint)() <<choice>>
 
-READ_AND_ADJUST : READ_AND_ADJUST
+                METER_ENTRY
 
-READ_AND_ADJUST : enter / #123; AdjustAttenuation()#59; #125;
+                METER_ENTRY : METER_ENTRY
 
-ROOT.(InitialState) --> PowerPoint1
+                METER_ENTRY : enter / #123; AutoStartMeterEntry()#59; count_ms = 0#59; #125;
 
-PowerPoint1 --> PowerPoint2 : RECORD_DATA_POINT
+                METER_PAUSED
 
-PowerPoint1 --> ACQUISITION : AUTO
+                METER_PAUSED : METER_PAUSED
 
-PowerPoint2 --> PowerPoint3 : RECORD_DATA_POINT
+                METER_PAUSED : enter / #123; AutoUnkey()#59; #125;
 
-PowerPoint2 --> PowerPoint1 : RESET
+                COLLECT
 
-PowerPoint3 --> PowerComplete : RECORD_DATA_POINT
+                COLLECT : COLLECT
 
-PowerPoint3 --> PowerPoint1 : RESET
+                COLLECT : enter / #123; AutoStartCollect()#59; count_ms = 0#59; #125;
+
+        }
+
+        state AUTO.(ChoicePoint)() <<choice>>
+
+        REST
+
+        REST : REST
+
+        REST : enter / #123; AutoUnkey()#59; count_ms = 0#59; #125;
+
+        FIT_FORWARD
+
+        FIT_FORWARD : FIT_FORWARD
+
+        FIT_FORWARD : enter / #123; AutoUnkey()#59; AutoFitForwardLine()#59; #125;
+
+        BAND_DONE
+
+        BAND_DONE : BAND_DONE
+
+        BAND_DONE : enter / #123; AutoUnkey()#59; AutoFinishBand()#59; #125;
+
+        state AUTO.(ChoicePoint)() <<choice>>
+
+        FIT_ALL
+
+        FIT_ALL : FIT_ALL
+
+        FIT_ALL : enter / #123; AutoFitAndCheckAll()#59; #125;
+
+        REVIEW
+
+        REVIEW : REVIEW
+
+        DONE
+
+        DONE : DONE
+
+        SETUP
+
+        SETUP : SETUP
+
+        PROMPT
+
+        PROMPT : PROMPT
+
+        PROMPT : enter / #123; AutoPromptStandard()#59; #125;
+
+        BAND
+
+        BAND : BAND
+
+        BAND : enter / #123; AutoSelectBand()#59; count_ms = 0#59; #125;
+
+        STORE
+
+        STORE : STORE
+
+        STORE : enter / #123; AutoStorePoint()#59; #125;
+
+}
+
+ROOT.(InitialState) --> MANUAL
+
+MANUAL --> PowerPoint1 : RESET
+
+MANUAL --> AUTO : AUTO [AutoCalAllowed()]
+
+MANUAL.(InitialState) --> PowerPoint1
+
+PowerPoint1 --> PowerPoint2 : RECORD_DATA_POINT / #123; RecordPowerDataPoint()#59; #125;
+
+PowerPoint2 --> PowerPoint3 : RECORD_DATA_POINT / #123; RecordPowerDataPoint()#59; #125;
+
+PowerPoint3 --> PowerComplete : RECORD_DATA_POINT / #123; RecordPowerDataPoint()#59; #125;
 
 PowerComplete --> SSBPoint : CURVE_COMPLETE
 
-PowerComplete --> PowerPoint1 : RESET
+SSBPoint --> MeasurementComplete : RECORD_DATA_POINT / #123; RecordPowerDataPoint()#59; #125;
 
-SSBPoint --> MeasurementComplete : RECORD_DATA_POINT
+AUTO --> MANUAL : RESET
 
-SSBPoint --> PowerPoint1 : RESET
+AUTO.(InitialState) --> SETUP
 
-MeasurementComplete --> PowerPoint1 : RESET
+POINT.(InitialState) --> KEYDOWN
 
-ACQUISITION --> READ_AND_ADJUST : do [count_ms >= acquisitionDuration_ms]
+KEYDOWN --> POINT.(ChoicePoint)() : do [AutoServiceIdle() && count_ms >= settle_ms]
 
-READ_AND_ADJUST --> ACQUISITION : NEXT_POINT
+POINT.(ChoicePoint)() --> METER_ENTRY : [AutoNeedsMeterEntry()]
 
-READ_AND_ADJUST --> SSBPoint : CURVE_COMPLETE
+POINT.(ChoicePoint)() --> COLLECT : else
+
+METER_ENTRY --> COLLECT : RECORD_DATA_POINT
+
+METER_ENTRY --> METER_PAUSED : do [count_ms >= meterTimeout_ms]
+
+METER_PAUSED --> KEYDOWN : RECORD_DATA_POINT
+
+COLLECT --> STORE : do [AutoServiceIdle() && count_ms >= collect_ms]
+
+AUTO.(ChoicePoint)() --> BAND_DONE : 1. [AutoOscillationDetected()] / #123; AutoAbortBandStage()#59; #125;
+
+AUTO.(ChoicePoint)() --> POINT : 2. [AutoMorePoints() && AutoKeepKeyed()]
+
+AUTO.(ChoicePoint)() --> REST : 3. [AutoMorePoints()]
+
+AUTO.(ChoicePoint)() --> FIT_FORWARD : 4. [AutoForwardFitDue()]
+
+AUTO.(ChoicePoint)() --> BAND_DONE : else
+
+REST --> POINT : do [AutoServiceIdle() && count_ms >= rest_ms]
+
+FIT_FORWARD --> POINT : do [AutoServiceIdle()]
+
+BAND_DONE --> AUTO.(ChoicePoint)() : do [AutoServiceIdle()]
+
+AUTO.(ChoicePoint)() --> BAND : 1. [AutoMoreBands()] / #123; AutoNextBand()#59; #125;
+
+AUTO.(ChoicePoint)() --> PROMPT : 2. [AutoMoreStages()] / #123; AutoNextStage()#59; #125;
+
+AUTO.(ChoicePoint)() --> FIT_ALL : else
+
+FIT_ALL --> REVIEW : do [AutoServiceIdle()]
+
+REVIEW --> DONE : RECORD_DATA_POINT / #123; AutoCommitResults()#59; #125;
+
+REVIEW --> SETUP : RETRY [AutoAnyFailed()] / #123; AutoRetryFailed()#59; #125;
+
+SETUP --> PROMPT : RECORD_DATA_POINT / #123; AutoBeginSession()#59; #125;
+
+PROMPT --> BAND : RECORD_DATA_POINT / #123; AutoFirstBand()#59; #125;
+
+PROMPT --> PROMPT : SKIP [AutoCanSkipStage()] / #123; AutoSkipStage()#59; #125;
+
+BAND --> POINT : do [AutoServiceIdle() && count_ms >= bandSettle_ms]
+
+STORE --> AUTO.(ChoicePoint)() : do [AutoServiceIdle()]
 
 
 
@@ -397,30 +525,46 @@ evaluateGuard = null;
         DO : 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
         AUTO : 1,
         CURVE_COMPLETE : 2,
-        NEXT_POINT : 3,
-        RECORD_DATA_POINT : 4,
-        RESET : 5,
+        RECORD_DATA_POINT : 3,
+        RESET : 4,
+        RETRY : 5,
+        SKIP : 6,
     }
     static { Object.freeze(this.EventId); }
     
-    static EventIdCount = 6;
+    static EventIdCount = 7;
     static { Object.freeze(this.EventIdCount); }
     
     static StateId = 
     {
         ROOT : 0,
-        ACQUISITION : 1,
-        MEASUREMENTCOMPLETE : 2,
-        POWERCOMPLETE : 3,
-        POWERPOINT1 : 4,
-        POWERPOINT2 : 5,
-        POWERPOINT3 : 6,
-        READ_AND_ADJUST : 7,
-        SSBPOINT : 8,
+        AUTO : 1,
+        BAND : 2,
+        BAND_DONE : 3,
+        DONE : 4,
+        FIT_ALL : 5,
+        FIT_FORWARD : 6,
+        POINT : 7,
+        COLLECT : 8,
+        KEYDOWN : 9,
+        METER_ENTRY : 10,
+        METER_PAUSED : 11,
+        PROMPT : 12,
+        REST : 13,
+        REVIEW : 14,
+        SETUP : 15,
+        STORE : 16,
+        MANUAL : 17,
+        MEASUREMENTCOMPLETE : 18,
+        POWERCOMPLETE : 19,
+        POWERPOINT1 : 20,
+        POWERPOINT2 : 21,
+        POWERPOINT3 : 22,
+        SSBPOINT : 23,
     }
     static { Object.freeze(this.StateId); }
     
-    static StateIdCount = 9;
+    static StateIdCount = 24;
     static { Object.freeze(this.StateIdCount); }
     
     // Used internally by state machine. Feel free to inspect, but don't modify.
@@ -441,18 +585,19 @@ evaluateGuard = null;
             // ROOT.<InitialState> is a pseudo state and cannot have an `enter` trigger.
             
             // ROOT.<InitialState> behavior
-            // uml: / { this.tracer?.edgeTransition("edge0"); } TransitionTo(PowerPoint1)
+            // uml: / { this.tracer?.edgeTransition("edge0"); } TransitionTo(MANUAL)
             {
                 // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
                 
                 // Step 2: Transition action: `this.tracer?.edgeTransition("edge0");`.
                 this.tracer?.edgeTransition("edge0");
                 
-                // Step 3: Enter/move towards transition target `PowerPoint1`.
-                this.#POWERPOINT1_enter();
+                // Step 3: Enter/move towards transition target `MANUAL`.
+                this.#MANUAL_enter();
                 
-                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-                return;
+                // Finish transition by calling pseudo state transition function.
+                this.#MANUAL_InitialState_transition();
+                return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
             } // end of behavior for ROOT.<InitialState>
         } // end of behavior for ROOT
     }
@@ -468,11 +613,163 @@ evaluateGuard = null;
                 // No events handled by this state (or its ancestors).
                 break;
             
-            // STATE: ACQUISITION
-            case PowerCalSm.StateId.ACQUISITION:
+            // STATE: AUTO
+            case PowerCalSm.StateId.AUTO:
                 switch (eventId)
                 {
-                    case PowerCalSm.EventId.DO: this.#ACQUISITION_do(); break;
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break;
+                }
+                break;
+            
+            // STATE: BAND
+            case PowerCalSm.StateId.BAND:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#BAND_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: BAND_DONE
+            case PowerCalSm.StateId.BAND_DONE:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#BAND_DONE_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: DONE
+            case PowerCalSm.StateId.DONE:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: FIT_ALL
+            case PowerCalSm.StateId.FIT_ALL:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#FIT_ALL_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: FIT_FORWARD
+            case PowerCalSm.StateId.FIT_FORWARD:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#FIT_FORWARD_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: POINT
+            case PowerCalSm.StateId.POINT:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: COLLECT
+            case PowerCalSm.StateId.COLLECT:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#COLLECT_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: KEYDOWN
+            case PowerCalSm.StateId.KEYDOWN:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#KEYDOWN_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: METER_ENTRY
+            case PowerCalSm.StateId.METER_ENTRY:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RECORD_DATA_POINT: this.#METER_ENTRY_record_data_point(); break;
+                    case PowerCalSm.EventId.DO: this.#METER_ENTRY_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: METER_PAUSED
+            case PowerCalSm.StateId.METER_PAUSED:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RECORD_DATA_POINT: this.#METER_PAUSED_record_data_point(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: PROMPT
+            case PowerCalSm.StateId.PROMPT:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RECORD_DATA_POINT: this.#PROMPT_record_data_point(); break;
+                    case PowerCalSm.EventId.SKIP: this.#PROMPT_skip(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: REST
+            case PowerCalSm.StateId.REST:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#REST_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: REVIEW
+            case PowerCalSm.StateId.REVIEW:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RECORD_DATA_POINT: this.#REVIEW_record_data_point(); break;
+                    case PowerCalSm.EventId.RETRY: this.#REVIEW_retry(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: SETUP
+            case PowerCalSm.StateId.SETUP:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RECORD_DATA_POINT: this.#SETUP_record_data_point(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.DO: this.#AUTO_do(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: STORE
+            case PowerCalSm.StateId.STORE:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.DO: this.#STORE_do(); break;
+                    case PowerCalSm.EventId.RESET: this.#AUTO_reset(); break; // First ancestor handler for this event
+                }
+                break;
+            
+            // STATE: MANUAL
+            case PowerCalSm.StateId.MANUAL:
+                switch (eventId)
+                {
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break;
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break;
                 }
                 break;
             
@@ -480,7 +777,8 @@ evaluateGuard = null;
             case PowerCalSm.StateId.MEASUREMENTCOMPLETE:
                 switch (eventId)
                 {
-                    case PowerCalSm.EventId.RESET: this.#MEASUREMENTCOMPLETE_reset(); break;
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break; // First ancestor handler for this event
                 }
                 break;
             
@@ -489,7 +787,8 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case PowerCalSm.EventId.CURVE_COMPLETE: this.#POWERCOMPLETE_curve_complete(); break;
-                    case PowerCalSm.EventId.RESET: this.#POWERCOMPLETE_reset(); break;
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break; // First ancestor handler for this event
                 }
                 break;
             
@@ -498,7 +797,8 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case PowerCalSm.EventId.RECORD_DATA_POINT: this.#POWERPOINT1_record_data_point(); break;
-                    case PowerCalSm.EventId.AUTO: this.#POWERPOINT1_auto(); break;
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break; // First ancestor handler for this event
                 }
                 break;
             
@@ -507,7 +807,8 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case PowerCalSm.EventId.RECORD_DATA_POINT: this.#POWERPOINT2_record_data_point(); break;
-                    case PowerCalSm.EventId.RESET: this.#POWERPOINT2_reset(); break;
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break; // First ancestor handler for this event
                 }
                 break;
             
@@ -516,16 +817,8 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case PowerCalSm.EventId.RECORD_DATA_POINT: this.#POWERPOINT3_record_data_point(); break;
-                    case PowerCalSm.EventId.RESET: this.#POWERPOINT3_reset(); break;
-                }
-                break;
-            
-            // STATE: READ_AND_ADJUST
-            case PowerCalSm.StateId.READ_AND_ADJUST:
-                switch (eventId)
-                {
-                    case PowerCalSm.EventId.NEXT_POINT: this.#READ_AND_ADJUST_next_point(); break;
-                    case PowerCalSm.EventId.CURVE_COMPLETE: this.#READ_AND_ADJUST_curve_complete(); break;
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break; // First ancestor handler for this event
                 }
                 break;
             
@@ -534,7 +827,8 @@ evaluateGuard = null;
                 switch (eventId)
                 {
                     case PowerCalSm.EventId.RECORD_DATA_POINT: this.#SSBPOINT_record_data_point(); break;
-                    case PowerCalSm.EventId.RESET: this.#SSBPOINT_reset(); break;
+                    case PowerCalSm.EventId.RESET: this.#MANUAL_reset(); break; // First ancestor handler for this event
+                    case PowerCalSm.EventId.AUTO: this.#MANUAL_auto(); break; // First ancestor handler for this event
                 }
                 break;
         }
@@ -549,7 +843,39 @@ evaluateGuard = null;
         {
             switch (this.stateId)
             {
-                case PowerCalSm.StateId.ACQUISITION: this.#ACQUISITION_exit(); break;
+                case PowerCalSm.StateId.AUTO: this.#AUTO_exit(); break;
+                
+                case PowerCalSm.StateId.BAND: this.#BAND_exit(); break;
+                
+                case PowerCalSm.StateId.BAND_DONE: this.#BAND_DONE_exit(); break;
+                
+                case PowerCalSm.StateId.DONE: this.#DONE_exit(); break;
+                
+                case PowerCalSm.StateId.FIT_ALL: this.#FIT_ALL_exit(); break;
+                
+                case PowerCalSm.StateId.FIT_FORWARD: this.#FIT_FORWARD_exit(); break;
+                
+                case PowerCalSm.StateId.POINT: this.#POINT_exit(); break;
+                
+                case PowerCalSm.StateId.COLLECT: this.#COLLECT_exit(); break;
+                
+                case PowerCalSm.StateId.KEYDOWN: this.#KEYDOWN_exit(); break;
+                
+                case PowerCalSm.StateId.METER_ENTRY: this.#METER_ENTRY_exit(); break;
+                
+                case PowerCalSm.StateId.METER_PAUSED: this.#METER_PAUSED_exit(); break;
+                
+                case PowerCalSm.StateId.PROMPT: this.#PROMPT_exit(); break;
+                
+                case PowerCalSm.StateId.REST: this.#REST_exit(); break;
+                
+                case PowerCalSm.StateId.REVIEW: this.#REVIEW_exit(); break;
+                
+                case PowerCalSm.StateId.SETUP: this.#SETUP_exit(); break;
+                
+                case PowerCalSm.StateId.STORE: this.#STORE_exit(); break;
+                
+                case PowerCalSm.StateId.MANUAL: this.#MANUAL_exit(); break;
                 
                 case PowerCalSm.StateId.MEASUREMENTCOMPLETE: this.#MEASUREMENTCOMPLETE_exit(); break;
                 
@@ -560,8 +886,6 @@ evaluateGuard = null;
                 case PowerCalSm.StateId.POWERPOINT2: this.#POWERPOINT2_exit(); break;
                 
                 case PowerCalSm.StateId.POWERPOINT3: this.#POWERPOINT3_exit(); break;
-                
-                case PowerCalSm.StateId.READ_AND_ADJUST: this.#READ_AND_ADJUST_exit(); break;
                 
                 case PowerCalSm.StateId.SSBPOINT: this.#SSBPOINT_exit(); break;
                 
@@ -582,67 +906,1271 @@ evaluateGuard = null;
     
     
     ////////////////////////////////////////////////////////////////////////////////
-    // event handlers for state ACQUISITION
+    // event handlers for state AUTO
     ////////////////////////////////////////////////////////////////////////////////
     
-    #ACQUISITION_enter()
+    #AUTO_enter()
     {
-        this.stateId = PowerCalSm.StateId.ACQUISITION;
+        this.stateId = PowerCalSm.StateId.AUTO;
         
-        // ACQUISITION behavior
-        // uml: enter / { this.tracer?.enterState('ACQUISITION'); }
+        // AUTO behavior
+        // uml: enter / { this.tracer?.enterState('AUTO'); }
         {
-            // Step 1: execute action `this.tracer?.enterState('ACQUISITION');`
-            this.tracer?.enterState('ACQUISITION');
-        } // end of behavior for ACQUISITION
+            // Step 1: execute action `this.tracer?.enterState('AUTO');`
+            this.tracer?.enterState('AUTO');
+        } // end of behavior for AUTO
         
-        // ACQUISITION behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms = 0; "); }
+        // AUTO behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoCalEnter();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "count_ms = 0; ");`
-            this.tracer?.log("⚡ FSM would execute action: " + "count_ms = 0; ");
-        } // end of behavior for ACQUISITION
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoCalEnter();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoCalEnter();");
+        } // end of behavior for AUTO
     }
     
-    #ACQUISITION_exit()
+    #AUTO_exit()
     {
-        // ACQUISITION behavior
-        // uml: exit / { this.tracer?.exitState('ACQUISITION'); }
+        // AUTO behavior
+        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "AutoCalExit();"); }
         {
-            // Step 1: execute action `this.tracer?.exitState('ACQUISITION');`
-            this.tracer?.exitState('ACQUISITION');
-        } // end of behavior for ACQUISITION
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoCalExit();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoCalExit();");
+        } // end of behavior for AUTO
+        
+        // AUTO behavior
+        // uml: exit / { this.tracer?.exitState('AUTO'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('AUTO');`
+            this.tracer?.exitState('AUTO');
+        } // end of behavior for AUTO
         
         this.stateId = PowerCalSm.StateId.ROOT;
     }
     
-    #ACQUISITION_do()
+    #AUTO_do()
     {
-        // ACQUISITION behavior
-        // uml: 1. do / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;"); }
+        // AUTO behavior
+        // uml: do / { this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;"); }
         {
             // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;");`
             this.tracer?.log("⚡ FSM would execute action: " + "count_ms++;");
-        } // end of behavior for ACQUISITION
+        } // end of behavior for AUTO
         
-        // ACQUISITION behavior
-        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= acquisitionDuration_ms") || this.evaluateGuard("ACQUISITION","do [count_ms >= acquisitionDuration_ms] TransitionTo(READ_AND_ADJUST)")] / { this.tracer?.edgeTransition("edge12"); } TransitionTo(READ_AND_ADJUST)
-        if (this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= acquisitionDuration_ms") || this.evaluateGuard("ACQUISITION","do [count_ms >= acquisitionDuration_ms] TransitionTo(READ_AND_ADJUST)"))
+        // No ancestor handles this event.
+    }
+    
+    #AUTO_reset()
+    {
+        // AUTO behavior
+        // uml: RESET / { this.tracer?.edgeTransition("edge9"); } TransitionTo(MANUAL)
         {
             // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#ACQUISITION_exit();
+            this.#exitUpToStateHandler(PowerCalSm.StateId.ROOT);
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
+            this.tracer?.edgeTransition("edge9");
+            
+            // Step 3: Enter/move towards transition target `MANUAL`.
+            this.#MANUAL_enter();
+            
+            // Finish transition by calling pseudo state transition function.
+            this.#MANUAL_InitialState_transition();
+            return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+        } // end of behavior for AUTO
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state BAND
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #BAND_enter()
+    {
+        this.stateId = PowerCalSm.StateId.BAND;
+        
+        // BAND behavior
+        // uml: enter / { this.tracer?.enterState('BAND'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('BAND');`
+            this.tracer?.enterState('BAND');
+        } // end of behavior for BAND
+        
+        // BAND behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoSelectBand(); count_ms = 0;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoSelectBand(); count_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoSelectBand(); count_ms = 0;");
+        } // end of behavior for BAND
+    }
+    
+    #BAND_exit()
+    {
+        // BAND behavior
+        // uml: exit / { this.tracer?.exitState('BAND'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('BAND');`
+            this.tracer?.exitState('BAND');
+        } // end of behavior for BAND
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #BAND_do()
+    {
+        let consume_event = false;
+        
+        // BAND behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= bandSettle_ms") || this.evaluateGuard("BAND","do [AutoServiceIdle() && count_ms >= bandSettle_ms] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge36"); } TransitionTo(POINT)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= bandSettle_ms") || this.evaluateGuard("BAND","do [AutoServiceIdle() && count_ms >= bandSettle_ms] TransitionTo(POINT)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#BAND_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge36");`.
+            this.tracer?.edgeTransition("edge36");
+            
+            // Step 3: Enter/move towards transition target `POINT`.
+            this.#POINT_enter();
+            
+            // Finish transition by calling pseudo state transition function.
+            this.#POINT_InitialState_transition();
+            return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+        } // end of behavior for BAND
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state BAND_DONE
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #BAND_DONE_enter()
+    {
+        this.stateId = PowerCalSm.StateId.BAND_DONE;
+        
+        // BAND_DONE behavior
+        // uml: enter / { this.tracer?.enterState('BAND_DONE'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('BAND_DONE');`
+            this.tracer?.enterState('BAND_DONE');
+        } // end of behavior for BAND_DONE
+        
+        // BAND_DONE behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); AutoFinishBand();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); AutoFinishBand();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); AutoFinishBand();");
+        } // end of behavior for BAND_DONE
+    }
+    
+    #BAND_DONE_exit()
+    {
+        // BAND_DONE behavior
+        // uml: exit / { this.tracer?.exitState('BAND_DONE'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('BAND_DONE');`
+            this.tracer?.exitState('BAND_DONE');
+        } // end of behavior for BAND_DONE
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #BAND_DONE_do()
+    {
+        let consume_event = false;
+        
+        // BAND_DONE behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("BAND_DONE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge26"); } TransitionTo(AUTO.<ChoicePoint>())
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("BAND_DONE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#BAND_DONE_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge26");`.
+            this.tracer?.edgeTransition("edge26");
+            
+            // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
+            // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 1. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreBands()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoMoreBands()] / { AutoNextBand(); } TransitionTo(BAND)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge27"); } TransitionTo(BAND)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreBands()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoMoreBands()] / { AutoNextBand(); } TransitionTo(BAND)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge27");`.
+                this.tracer?.log("⚡ FSM would execute action: " + "AutoNextBand();");this.tracer?.edgeTransition("edge27");
+                
+                // Step 3: Enter/move towards transition target `BAND`.
+                this.#BAND_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 2. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreStages()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMoreStages()] / { AutoNextStage(); } TransitionTo(PROMPT)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge28"); } TransitionTo(PROMPT)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMoreStages()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMoreStages()] / { AutoNextStage(); } TransitionTo(PROMPT)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge28");`.
+                this.tracer?.log("⚡ FSM would execute action: " + "AutoNextStage();");this.tracer?.edgeTransition("edge28");
+                
+                // Step 3: Enter/move towards transition target `PROMPT`.
+                this.#PROMPT_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: else / { this.tracer?.edgeTransition("edge29"); } TransitionTo(FIT_ALL)
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge29");`.
+                this.tracer?.edgeTransition("edge29");
+                
+                // Step 3: Enter/move towards transition target `FIT_ALL`.
+                this.#FIT_ALL_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+        } // end of behavior for BAND_DONE
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state DONE
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #DONE_enter()
+    {
+        this.stateId = PowerCalSm.StateId.DONE;
+        
+        // DONE behavior
+        // uml: enter / { this.tracer?.enterState('DONE'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('DONE');`
+            this.tracer?.enterState('DONE');
+        } // end of behavior for DONE
+    }
+    
+    #DONE_exit()
+    {
+        // DONE behavior
+        // uml: exit / { this.tracer?.exitState('DONE'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('DONE');`
+            this.tracer?.exitState('DONE');
+        } // end of behavior for DONE
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state FIT_ALL
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #FIT_ALL_enter()
+    {
+        this.stateId = PowerCalSm.StateId.FIT_ALL;
+        
+        // FIT_ALL behavior
+        // uml: enter / { this.tracer?.enterState('FIT_ALL'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('FIT_ALL');`
+            this.tracer?.enterState('FIT_ALL');
+        } // end of behavior for FIT_ALL
+        
+        // FIT_ALL behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoFitAndCheckAll();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoFitAndCheckAll();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoFitAndCheckAll();");
+        } // end of behavior for FIT_ALL
+    }
+    
+    #FIT_ALL_exit()
+    {
+        // FIT_ALL behavior
+        // uml: exit / { this.tracer?.exitState('FIT_ALL'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('FIT_ALL');`
+            this.tracer?.exitState('FIT_ALL');
+        } // end of behavior for FIT_ALL
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #FIT_ALL_do()
+    {
+        let consume_event = false;
+        
+        // FIT_ALL behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_ALL","do [AutoServiceIdle()] TransitionTo(REVIEW)")] / { this.tracer?.edgeTransition("edge30"); } TransitionTo(REVIEW)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_ALL","do [AutoServiceIdle()] TransitionTo(REVIEW)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#FIT_ALL_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge30");`.
+            this.tracer?.edgeTransition("edge30");
+            
+            // Step 3: Enter/move towards transition target `REVIEW`.
+            this.#REVIEW_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for FIT_ALL
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state FIT_FORWARD
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #FIT_FORWARD_enter()
+    {
+        this.stateId = PowerCalSm.StateId.FIT_FORWARD;
+        
+        // FIT_FORWARD behavior
+        // uml: enter / { this.tracer?.enterState('FIT_FORWARD'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('FIT_FORWARD');`
+            this.tracer?.enterState('FIT_FORWARD');
+        } // end of behavior for FIT_FORWARD
+        
+        // FIT_FORWARD behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); AutoFitForwardLine();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); AutoFitForwardLine();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); AutoFitForwardLine();");
+        } // end of behavior for FIT_FORWARD
+    }
+    
+    #FIT_FORWARD_exit()
+    {
+        // FIT_FORWARD behavior
+        // uml: exit / { this.tracer?.exitState('FIT_FORWARD'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('FIT_FORWARD');`
+            this.tracer?.exitState('FIT_FORWARD');
+        } // end of behavior for FIT_FORWARD
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #FIT_FORWARD_do()
+    {
+        let consume_event = false;
+        
+        // FIT_FORWARD behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_FORWARD","do [AutoServiceIdle()] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge25"); } TransitionTo(POINT)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("FIT_FORWARD","do [AutoServiceIdle()] TransitionTo(POINT)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#FIT_FORWARD_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge25");`.
+            this.tracer?.edgeTransition("edge25");
+            
+            // Step 3: Enter/move towards transition target `POINT`.
+            this.#POINT_enter();
+            
+            // Finish transition by calling pseudo state transition function.
+            this.#POINT_InitialState_transition();
+            return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+        } // end of behavior for FIT_FORWARD
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state POINT
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #POINT_enter()
+    {
+        this.stateId = PowerCalSm.StateId.POINT;
+        
+        // POINT behavior
+        // uml: enter / { this.tracer?.enterState('POINT'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('POINT');`
+            this.tracer?.enterState('POINT');
+        } // end of behavior for POINT
+        
+        // POINT behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoSetupPoint();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoSetupPoint();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoSetupPoint();");
+        } // end of behavior for POINT
+    }
+    
+    #POINT_exit()
+    {
+        // POINT behavior
+        // uml: exit / { this.tracer?.exitState('POINT'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('POINT');`
+            this.tracer?.exitState('POINT');
+        } // end of behavior for POINT
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #POINT_InitialState_transition()
+    {
+        // POINT.<InitialState> behavior
+        // uml: / { this.tracer?.edgeTransition("edge11"); } TransitionTo(KEYDOWN)
+        {
+            // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
+            this.tracer?.edgeTransition("edge11");
+            
+            // Step 3: Enter/move towards transition target `KEYDOWN`.
+            this.#KEYDOWN_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for POINT.<InitialState>
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state COLLECT
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #COLLECT_enter()
+    {
+        this.stateId = PowerCalSm.StateId.COLLECT;
+        
+        // COLLECT behavior
+        // uml: enter / { this.tracer?.enterState('COLLECT'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('COLLECT');`
+            this.tracer?.enterState('COLLECT');
+        } // end of behavior for COLLECT
+        
+        // COLLECT behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoStartCollect(); count_ms = 0;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoStartCollect(); count_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoStartCollect(); count_ms = 0;");
+        } // end of behavior for COLLECT
+    }
+    
+    #COLLECT_exit()
+    {
+        // COLLECT behavior
+        // uml: exit / { this.tracer?.exitState('COLLECT'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('COLLECT');`
+            this.tracer?.exitState('COLLECT');
+        } // end of behavior for COLLECT
+        
+        this.stateId = PowerCalSm.StateId.POINT;
+    }
+    
+    #COLLECT_do()
+    {
+        let consume_event = false;
+        
+        // COLLECT behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= collect_ms") || this.evaluateGuard("COLLECT","do [AutoServiceIdle() && count_ms >= collect_ms] TransitionTo(STORE)")] / { this.tracer?.edgeTransition("edge18"); } TransitionTo(STORE)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= collect_ms") || this.evaluateGuard("COLLECT","do [AutoServiceIdle() && count_ms >= collect_ms] TransitionTo(STORE)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#exitUpToStateHandler(PowerCalSm.StateId.AUTO);
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge18");`.
+            this.tracer?.edgeTransition("edge18");
+            
+            // Step 3: Enter/move towards transition target `STORE`.
+            this.#STORE_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for COLLECT
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state KEYDOWN
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #KEYDOWN_enter()
+    {
+        this.stateId = PowerCalSm.StateId.KEYDOWN;
+        
+        // KEYDOWN behavior
+        // uml: enter / { this.tracer?.enterState('KEYDOWN'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('KEYDOWN');`
+            this.tracer?.enterState('KEYDOWN');
+        } // end of behavior for KEYDOWN
+        
+        // KEYDOWN behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoKey(); count_ms = 0;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoKey(); count_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoKey(); count_ms = 0;");
+        } // end of behavior for KEYDOWN
+    }
+    
+    #KEYDOWN_exit()
+    {
+        // KEYDOWN behavior
+        // uml: exit / { this.tracer?.exitState('KEYDOWN'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('KEYDOWN');`
+            this.tracer?.exitState('KEYDOWN');
+        } // end of behavior for KEYDOWN
+        
+        this.stateId = PowerCalSm.StateId.POINT;
+    }
+    
+    #KEYDOWN_do()
+    {
+        let consume_event = false;
+        
+        // KEYDOWN behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= settle_ms") || this.evaluateGuard("KEYDOWN","do [AutoServiceIdle() && count_ms >= settle_ms] TransitionTo(POINT.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge12"); } TransitionTo(POINT.<ChoicePoint>())
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= settle_ms") || this.evaluateGuard("KEYDOWN","do [AutoServiceIdle() && count_ms >= settle_ms] TransitionTo(POINT.<ChoicePoint>())"))
+        {
+            // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
+            this.#KEYDOWN_exit();
             
             // Step 2: Transition action: `this.tracer?.edgeTransition("edge12");`.
             this.tracer?.edgeTransition("edge12");
             
-            // Step 3: Enter/move towards transition target `READ_AND_ADJUST`.
-            this.#READ_AND_ADJUST_enter();
+            // Step 3: Enter/move towards transition target `POINT.<ChoicePoint>()`.
+            // POINT.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+            
+            // POINT.<ChoicePoint>() behavior
+            // uml: [this.tracer?.log("🛡️ User evaluating guard: " + "AutoNeedsMeterEntry()") || this.evaluateGuard("POINT.<ChoicePoint>()","[AutoNeedsMeterEntry()] TransitionTo(METER_ENTRY)")] / { this.tracer?.edgeTransition("edge13"); } TransitionTo(METER_ENTRY)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoNeedsMeterEntry()") || this.evaluateGuard("POINT.<ChoicePoint>()","[AutoNeedsMeterEntry()] TransitionTo(METER_ENTRY)"))
+            {
+                // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
+                this.tracer?.edgeTransition("edge13");
+                
+                // Step 3: Enter/move towards transition target `METER_ENTRY`.
+                this.#METER_ENTRY_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for POINT.<ChoicePoint>()
+            
+            // POINT.<ChoicePoint>() behavior
+            // uml: else / { this.tracer?.edgeTransition("edge14"); } TransitionTo(COLLECT)
+            {
+                // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
+                this.tracer?.edgeTransition("edge14");
+                
+                // Step 3: Enter/move towards transition target `COLLECT`.
+                this.#COLLECT_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for POINT.<ChoicePoint>()
+        } // end of behavior for KEYDOWN
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state METER_ENTRY
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #METER_ENTRY_enter()
+    {
+        this.stateId = PowerCalSm.StateId.METER_ENTRY;
+        
+        // METER_ENTRY behavior
+        // uml: enter / { this.tracer?.enterState('METER_ENTRY'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('METER_ENTRY');`
+            this.tracer?.enterState('METER_ENTRY');
+        } // end of behavior for METER_ENTRY
+        
+        // METER_ENTRY behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoStartMeterEntry(); count_ms = 0;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoStartMeterEntry(); count_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoStartMeterEntry(); count_ms = 0;");
+        } // end of behavior for METER_ENTRY
+    }
+    
+    #METER_ENTRY_exit()
+    {
+        // METER_ENTRY behavior
+        // uml: exit / { this.tracer?.exitState('METER_ENTRY'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('METER_ENTRY');`
+            this.tracer?.exitState('METER_ENTRY');
+        } // end of behavior for METER_ENTRY
+        
+        this.stateId = PowerCalSm.StateId.POINT;
+    }
+    
+    #METER_ENTRY_do()
+    {
+        let consume_event = false;
+        
+        // METER_ENTRY behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= meterTimeout_ms") || this.evaluateGuard("METER_ENTRY","do [count_ms >= meterTimeout_ms] TransitionTo(METER_PAUSED)")] / { this.tracer?.edgeTransition("edge16"); } TransitionTo(METER_PAUSED)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "count_ms >= meterTimeout_ms") || this.evaluateGuard("METER_ENTRY","do [count_ms >= meterTimeout_ms] TransitionTo(METER_PAUSED)"))
+        {
+            // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
+            this.#METER_ENTRY_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge16");`.
+            this.tracer?.edgeTransition("edge16");
+            
+            // Step 3: Enter/move towards transition target `METER_PAUSED`.
+            this.#METER_PAUSED_enter();
             
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
-        } // end of behavior for ACQUISITION
+        } // end of behavior for METER_ENTRY
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    #METER_ENTRY_record_data_point()
+    {
+        // METER_ENTRY behavior
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge15"); } TransitionTo(COLLECT)
+        {
+            // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
+            this.#METER_ENTRY_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge15");`.
+            this.tracer?.edgeTransition("edge15");
+            
+            // Step 3: Enter/move towards transition target `COLLECT`.
+            this.#COLLECT_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for METER_ENTRY
         
         // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state METER_PAUSED
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #METER_PAUSED_enter()
+    {
+        this.stateId = PowerCalSm.StateId.METER_PAUSED;
+        
+        // METER_PAUSED behavior
+        // uml: enter / { this.tracer?.enterState('METER_PAUSED'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('METER_PAUSED');`
+            this.tracer?.enterState('METER_PAUSED');
+        } // end of behavior for METER_PAUSED
+        
+        // METER_PAUSED behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey();");
+        } // end of behavior for METER_PAUSED
+    }
+    
+    #METER_PAUSED_exit()
+    {
+        // METER_PAUSED behavior
+        // uml: exit / { this.tracer?.exitState('METER_PAUSED'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('METER_PAUSED');`
+            this.tracer?.exitState('METER_PAUSED');
+        } // end of behavior for METER_PAUSED
+        
+        this.stateId = PowerCalSm.StateId.POINT;
+    }
+    
+    #METER_PAUSED_record_data_point()
+    {
+        // METER_PAUSED behavior
+        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge17"); } TransitionTo(KEYDOWN)
+        {
+            // Step 1: Exit states until we reach `POINT` state (Least Common Ancestor for transition).
+            this.#METER_PAUSED_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge17");`.
+            this.tracer?.edgeTransition("edge17");
+            
+            // Step 3: Enter/move towards transition target `KEYDOWN`.
+            this.#KEYDOWN_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for METER_PAUSED
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state PROMPT
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #PROMPT_enter()
+    {
+        this.stateId = PowerCalSm.StateId.PROMPT;
+        
+        // PROMPT behavior
+        // uml: enter / { this.tracer?.enterState('PROMPT'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('PROMPT');`
+            this.tracer?.enterState('PROMPT');
+        } // end of behavior for PROMPT
+        
+        // PROMPT behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoPromptStandard();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoPromptStandard();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoPromptStandard();");
+        } // end of behavior for PROMPT
+    }
+    
+    #PROMPT_exit()
+    {
+        // PROMPT behavior
+        // uml: exit / { this.tracer?.exitState('PROMPT'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('PROMPT');`
+            this.tracer?.exitState('PROMPT');
+        } // end of behavior for PROMPT
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #PROMPT_record_data_point()
+    {
+        // PROMPT behavior
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge34"); } TransitionTo(BAND)
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#PROMPT_exit();
+            
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge34");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoFirstBand();");this.tracer?.edgeTransition("edge34");
+            
+            // Step 3: Enter/move towards transition target `BAND`.
+            this.#BAND_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for PROMPT
+        
+        // No ancestor handles this event.
+    }
+    
+    #PROMPT_skip()
+    {
+        // PROMPT behavior
+        // uml: SKIP [this.tracer?.log("🛡️ User evaluating guard: " + "AutoCanSkipStage()") || this.evaluateGuard("PROMPT","SKIP [AutoCanSkipStage()] / { AutoSkipStage(); } TransitionTo(PROMPT)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge35"); } TransitionTo(PROMPT)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoCanSkipStage()") || this.evaluateGuard("PROMPT","SKIP [AutoCanSkipStage()] / { AutoSkipStage(); } TransitionTo(PROMPT)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#PROMPT_exit();
+            
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge35");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoSkipStage();");this.tracer?.edgeTransition("edge35");
+            
+            // Step 3: Enter/move towards transition target `PROMPT`.
+            this.#PROMPT_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for PROMPT
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state REST
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #REST_enter()
+    {
+        this.stateId = PowerCalSm.StateId.REST;
+        
+        // REST behavior
+        // uml: enter / { this.tracer?.enterState('REST'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('REST');`
+            this.tracer?.enterState('REST');
+        } // end of behavior for REST
+        
+        // REST behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); count_ms = 0;"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); count_ms = 0;");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoUnkey(); count_ms = 0;");
+        } // end of behavior for REST
+    }
+    
+    #REST_exit()
+    {
+        // REST behavior
+        // uml: exit / { this.tracer?.exitState('REST'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('REST');`
+            this.tracer?.exitState('REST');
+        } // end of behavior for REST
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #REST_do()
+    {
+        let consume_event = false;
+        
+        // REST behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= rest_ms") || this.evaluateGuard("REST","do [AutoServiceIdle() && count_ms >= rest_ms] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge24"); } TransitionTo(POINT)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle() && count_ms >= rest_ms") || this.evaluateGuard("REST","do [AutoServiceIdle() && count_ms >= rest_ms] TransitionTo(POINT)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#REST_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge24");`.
+            this.tracer?.edgeTransition("edge24");
+            
+            // Step 3: Enter/move towards transition target `POINT`.
+            this.#POINT_enter();
+            
+            // Finish transition by calling pseudo state transition function.
+            this.#POINT_InitialState_transition();
+            return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+        } // end of behavior for REST
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state REVIEW
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #REVIEW_enter()
+    {
+        this.stateId = PowerCalSm.StateId.REVIEW;
+        
+        // REVIEW behavior
+        // uml: enter / { this.tracer?.enterState('REVIEW'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('REVIEW');`
+            this.tracer?.enterState('REVIEW');
+        } // end of behavior for REVIEW
+    }
+    
+    #REVIEW_exit()
+    {
+        // REVIEW behavior
+        // uml: exit / { this.tracer?.exitState('REVIEW'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('REVIEW');`
+            this.tracer?.exitState('REVIEW');
+        } // end of behavior for REVIEW
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #REVIEW_record_data_point()
+    {
+        // REVIEW behavior
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge31"); } TransitionTo(DONE)
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#REVIEW_exit();
+            
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge31");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoCommitResults();");this.tracer?.edgeTransition("edge31");
+            
+            // Step 3: Enter/move towards transition target `DONE`.
+            this.#DONE_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for REVIEW
+        
+        // No ancestor handles this event.
+    }
+    
+    #REVIEW_retry()
+    {
+        // REVIEW behavior
+        // uml: RETRY [this.tracer?.log("🛡️ User evaluating guard: " + "AutoAnyFailed()") || this.evaluateGuard("REVIEW","RETRY [AutoAnyFailed()] / { AutoRetryFailed(); } TransitionTo(SETUP)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge32"); } TransitionTo(SETUP)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoAnyFailed()") || this.evaluateGuard("REVIEW","RETRY [AutoAnyFailed()] / { AutoRetryFailed(); } TransitionTo(SETUP)"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#REVIEW_exit();
+            
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge32");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoRetryFailed();");this.tracer?.edgeTransition("edge32");
+            
+            // Step 3: Enter/move towards transition target `SETUP`.
+            this.#SETUP_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for REVIEW
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state SETUP
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #SETUP_enter()
+    {
+        this.stateId = PowerCalSm.StateId.SETUP;
+        
+        // SETUP behavior
+        // uml: enter / { this.tracer?.enterState('SETUP'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('SETUP');`
+            this.tracer?.enterState('SETUP');
+        } // end of behavior for SETUP
+    }
+    
+    #SETUP_exit()
+    {
+        // SETUP behavior
+        // uml: exit / { this.tracer?.exitState('SETUP'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('SETUP');`
+            this.tracer?.exitState('SETUP');
+        } // end of behavior for SETUP
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #SETUP_record_data_point()
+    {
+        // SETUP behavior
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge33"); } TransitionTo(PROMPT)
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#SETUP_exit();
+            
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge33");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoBeginSession();");this.tracer?.edgeTransition("edge33");
+            
+            // Step 3: Enter/move towards transition target `PROMPT`.
+            this.#PROMPT_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for SETUP
+        
+        // No ancestor handles this event.
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state STORE
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #STORE_enter()
+    {
+        this.stateId = PowerCalSm.StateId.STORE;
+        
+        // STORE behavior
+        // uml: enter / { this.tracer?.enterState('STORE'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('STORE');`
+            this.tracer?.enterState('STORE');
+        } // end of behavior for STORE
+        
+        // STORE behavior
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();"); }
+        {
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "AutoStorePoint();");
+        } // end of behavior for STORE
+    }
+    
+    #STORE_exit()
+    {
+        // STORE behavior
+        // uml: exit / { this.tracer?.exitState('STORE'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('STORE');`
+            this.tracer?.exitState('STORE');
+        } // end of behavior for STORE
+        
+        this.stateId = PowerCalSm.StateId.AUTO;
+    }
+    
+    #STORE_do()
+    {
+        let consume_event = false;
+        
+        // STORE behavior
+        // uml: do [this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("STORE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())")] / { this.tracer?.edgeTransition("edge37"); } TransitionTo(AUTO.<ChoicePoint>())
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoServiceIdle()") || this.evaluateGuard("STORE","do [AutoServiceIdle()] TransitionTo(AUTO.<ChoicePoint>())"))
+        {
+            // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition).
+            this.#STORE_exit();
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge37");`.
+            this.tracer?.edgeTransition("edge37");
+            
+            // Step 3: Enter/move towards transition target `AUTO.<ChoicePoint>()`.
+            // AUTO.<ChoicePoint>() is a pseudo state and cannot have an `enter` trigger.
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 1. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoOscillationDetected()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)")] / { this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge19"); } TransitionTo(BAND_DONE)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoOscillationDetected()") || this.evaluateGuard("AUTO.<ChoicePoint>()","1. [AutoOscillationDetected()] / { AutoAbortBandStage(); } TransitionTo(BAND_DONE)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge19");`.
+                this.tracer?.log("⚡ FSM would execute action: " + "AutoAbortBandStage();");this.tracer?.edgeTransition("edge19");
+                
+                // Step 3: Enter/move towards transition target `BAND_DONE`.
+                this.#BAND_DONE_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 2. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints() && AutoKeepKeyed()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)")] / { this.tracer?.edgeTransition("edge20"); } TransitionTo(POINT)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints() && AutoKeepKeyed()") || this.evaluateGuard("AUTO.<ChoicePoint>()","2. [AutoMorePoints() && AutoKeepKeyed()] TransitionTo(POINT)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge20");`.
+                this.tracer?.edgeTransition("edge20");
+                
+                // Step 3: Enter/move towards transition target `POINT`.
+                this.#POINT_enter();
+                
+                // Finish transition by calling pseudo state transition function.
+                this.#POINT_InitialState_transition();
+                return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 3. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints()") || this.evaluateGuard("AUTO.<ChoicePoint>()","3. [AutoMorePoints()] TransitionTo(REST)")] / { this.tracer?.edgeTransition("edge21"); } TransitionTo(REST)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoMorePoints()") || this.evaluateGuard("AUTO.<ChoicePoint>()","3. [AutoMorePoints()] TransitionTo(REST)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge21");`.
+                this.tracer?.edgeTransition("edge21");
+                
+                // Step 3: Enter/move towards transition target `REST`.
+                this.#REST_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: 4. [this.tracer?.log("🛡️ User evaluating guard: " + "AutoForwardFitDue()") || this.evaluateGuard("AUTO.<ChoicePoint>()","4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)")] / { this.tracer?.edgeTransition("edge22"); } TransitionTo(FIT_FORWARD)
+            if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoForwardFitDue()") || this.evaluateGuard("AUTO.<ChoicePoint>()","4. [AutoForwardFitDue()] TransitionTo(FIT_FORWARD)"))
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge22");`.
+                this.tracer?.edgeTransition("edge22");
+                
+                // Step 3: Enter/move towards transition target `FIT_FORWARD`.
+                this.#FIT_FORWARD_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+            
+            // AUTO.<ChoicePoint>() behavior
+            // uml: else / { this.tracer?.edgeTransition("edge23"); } TransitionTo(BAND_DONE)
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge23");`.
+                this.tracer?.edgeTransition("edge23");
+                
+                // Step 3: Enter/move towards transition target `BAND_DONE`.
+                this.#BAND_DONE_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<ChoicePoint>()
+        } // end of behavior for STORE
+        
+        // Check if event has been consumed before calling ancestor handler.
+        if (!consume_event)
+        {
+            this.#AUTO_do();
+        }
+    }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // event handlers for state MANUAL
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    #MANUAL_enter()
+    {
+        this.stateId = PowerCalSm.StateId.MANUAL;
+        
+        // MANUAL behavior
+        // uml: enter / { this.tracer?.enterState('MANUAL'); }
+        {
+            // Step 1: execute action `this.tracer?.enterState('MANUAL');`
+            this.tracer?.enterState('MANUAL');
+        } // end of behavior for MANUAL
+    }
+    
+    #MANUAL_exit()
+    {
+        // MANUAL behavior
+        // uml: exit / { this.tracer?.exitState('MANUAL'); }
+        {
+            // Step 1: execute action `this.tracer?.exitState('MANUAL');`
+            this.tracer?.exitState('MANUAL');
+        } // end of behavior for MANUAL
+        
+        this.stateId = PowerCalSm.StateId.ROOT;
+    }
+    
+    #MANUAL_auto()
+    {
+        // MANUAL behavior
+        // uml: AUTO [this.tracer?.log("🛡️ User evaluating guard: " + "AutoCalAllowed()") || this.evaluateGuard("MANUAL","AUTO [AutoCalAllowed()] TransitionTo(AUTO)")] / { this.tracer?.edgeTransition("edge2"); } TransitionTo(AUTO)
+        if (this.tracer?.log("🛡️ User evaluating guard: " + "AutoCalAllowed()") || this.evaluateGuard("MANUAL","AUTO [AutoCalAllowed()] TransitionTo(AUTO)"))
+        {
+            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            this.#exitUpToStateHandler(PowerCalSm.StateId.ROOT);
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge2");`.
+            this.tracer?.edgeTransition("edge2");
+            
+            // Step 3: Enter/move towards transition target `AUTO`.
+            this.#AUTO_enter();
+            
+            // AUTO.<InitialState> behavior
+            // uml: / { this.tracer?.edgeTransition("edge10"); } TransitionTo(SETUP)
+            {
+                // Step 1: Exit states until we reach `AUTO` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+                
+                // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
+                this.tracer?.edgeTransition("edge10");
+                
+                // Step 3: Enter/move towards transition target `SETUP`.
+                this.#SETUP_enter();
+                
+                // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+                return;
+            } // end of behavior for AUTO.<InitialState>
+        } // end of behavior for MANUAL
+        
+        // No ancestor handles this event.
+    }
+    
+    #MANUAL_reset()
+    {
+        // MANUAL behavior
+        // uml: RESET / { this.tracer?.edgeTransition("edge1"); } TransitionTo(PowerPoint1)
+        {
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition).
+            this.#exitUpToStateHandler(PowerCalSm.StateId.MANUAL);
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge1");`.
+            this.tracer?.edgeTransition("edge1");
+            
+            // Step 3: Enter/move towards transition target `PowerPoint1`.
+            this.#POWERPOINT1_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for MANUAL
+        
+        // No ancestor handles this event.
+    }
+    
+    #MANUAL_InitialState_transition()
+    {
+        // MANUAL.<InitialState> behavior
+        // uml: / { this.tracer?.edgeTransition("edge3"); } TransitionTo(PowerPoint1)
+        {
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition). Already at LCA, no exiting required.
+            
+            // Step 2: Transition action: `this.tracer?.edgeTransition("edge3");`.
+            this.tracer?.edgeTransition("edge3");
+            
+            // Step 3: Enter/move towards transition target `PowerPoint1`.
+            this.#POWERPOINT1_enter();
+            
+            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+            return;
+        } // end of behavior for MANUAL.<InitialState>
     }
     
     
@@ -672,40 +2200,13 @@ evaluateGuard = null;
     #MEASUREMENTCOMPLETE_exit()
     {
         // MeasurementComplete behavior
-        // uml: exit
-        {
-            // Step 1: execute action ``
-        } // end of behavior for MeasurementComplete
-        
-        // MeasurementComplete behavior
         // uml: exit / { this.tracer?.exitState('MeasurementComplete'); }
         {
             // Step 1: execute action `this.tracer?.exitState('MeasurementComplete');`
             this.tracer?.exitState('MeasurementComplete');
         } // end of behavior for MeasurementComplete
         
-        this.stateId = PowerCalSm.StateId.ROOT;
-    }
-    
-    #MEASUREMENTCOMPLETE_reset()
-    {
-        // MeasurementComplete behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge11"); } TransitionTo(PowerPoint1)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#MEASUREMENTCOMPLETE_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge11");`.
-            this.tracer?.edgeTransition("edge11");
-            
-            // Step 3: Enter/move towards transition target `PowerPoint1`.
-            this.#POWERPOINT1_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for MeasurementComplete
-        
-        // No ancestor handles this event.
+        this.stateId = PowerCalSm.StateId.MANUAL;
     }
     
     
@@ -735,19 +2236,13 @@ evaluateGuard = null;
     #POWERCOMPLETE_exit()
     {
         // PowerComplete behavior
-        // uml: exit
-        {
-            // Step 1: execute action ``
-        } // end of behavior for PowerComplete
-        
-        // PowerComplete behavior
         // uml: exit / { this.tracer?.exitState('PowerComplete'); }
         {
             // Step 1: execute action `this.tracer?.exitState('PowerComplete');`
             this.tracer?.exitState('PowerComplete');
         } // end of behavior for PowerComplete
         
-        this.stateId = PowerCalSm.StateId.ROOT;
+        this.stateId = PowerCalSm.StateId.MANUAL;
     }
     
     #POWERCOMPLETE_curve_complete()
@@ -755,7 +2250,7 @@ evaluateGuard = null;
         // PowerComplete behavior
         // uml: CURVE_COMPLETE / { this.tracer?.edgeTransition("edge7"); } TransitionTo(SSBPoint)
         {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition).
             this.#POWERCOMPLETE_exit();
             
             // Step 2: Transition action: `this.tracer?.edgeTransition("edge7");`.
@@ -763,27 +2258,6 @@ evaluateGuard = null;
             
             // Step 3: Enter/move towards transition target `SSBPoint`.
             this.#SSBPOINT_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for PowerComplete
-        
-        // No ancestor handles this event.
-    }
-    
-    #POWERCOMPLETE_reset()
-    {
-        // PowerComplete behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge8"); } TransitionTo(PowerPoint1)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#POWERCOMPLETE_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge8");`.
-            this.tracer?.edgeTransition("edge8");
-            
-            // Step 3: Enter/move towards transition target `PowerPoint1`.
-            this.#POWERPOINT1_enter();
             
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
@@ -819,53 +2293,25 @@ evaluateGuard = null;
     #POWERPOINT1_exit()
     {
         // PowerPoint1 behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");
-        } // end of behavior for PowerPoint1
-        
-        // PowerPoint1 behavior
         // uml: exit / { this.tracer?.exitState('PowerPoint1'); }
         {
             // Step 1: execute action `this.tracer?.exitState('PowerPoint1');`
             this.tracer?.exitState('PowerPoint1');
         } // end of behavior for PowerPoint1
         
-        this.stateId = PowerCalSm.StateId.ROOT;
-    }
-    
-    #POWERPOINT1_auto()
-    {
-        // PowerPoint1 behavior
-        // uml: AUTO / { this.tracer?.edgeTransition("edge2"); } TransitionTo(ACQUISITION)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#POWERPOINT1_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge2");`.
-            this.tracer?.edgeTransition("edge2");
-            
-            // Step 3: Enter/move towards transition target `ACQUISITION`.
-            this.#ACQUISITION_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for PowerPoint1
-        
-        // No ancestor handles this event.
+        this.stateId = PowerCalSm.StateId.MANUAL;
     }
     
     #POWERPOINT1_record_data_point()
     {
         // PowerPoint1 behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge1"); } TransitionTo(PowerPoint2)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge4"); } TransitionTo(PowerPoint2)
         {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition).
             this.#POWERPOINT1_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge1");`.
-            this.tracer?.edgeTransition("edge1");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge4");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge4");
             
             // Step 3: Enter/move towards transition target `PowerPoint2`.
             this.#POWERPOINT2_enter();
@@ -894,22 +2340,15 @@ evaluateGuard = null;
         } // end of behavior for PowerPoint2
         
         // PowerPoint2 behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "StartPowerPoint(); "); }
+        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "StartPowerPoint();"); }
         {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "StartPowerPoint(); ");`
-            this.tracer?.log("⚡ FSM would execute action: " + "StartPowerPoint(); ");
+            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "StartPowerPoint();");`
+            this.tracer?.log("⚡ FSM would execute action: " + "StartPowerPoint();");
         } // end of behavior for PowerPoint2
     }
     
     #POWERPOINT2_exit()
     {
-        // PowerPoint2 behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");
-        } // end of behavior for PowerPoint2
-        
         // PowerPoint2 behavior
         // uml: exit / { this.tracer?.exitState('PowerPoint2'); }
         {
@@ -917,43 +2356,22 @@ evaluateGuard = null;
             this.tracer?.exitState('PowerPoint2');
         } // end of behavior for PowerPoint2
         
-        this.stateId = PowerCalSm.StateId.ROOT;
+        this.stateId = PowerCalSm.StateId.MANUAL;
     }
     
     #POWERPOINT2_record_data_point()
     {
         // PowerPoint2 behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge3"); } TransitionTo(PowerPoint3)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge5"); } TransitionTo(PowerPoint3)
         {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition).
             this.#POWERPOINT2_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge3");`.
-            this.tracer?.edgeTransition("edge3");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge5");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge5");
             
             // Step 3: Enter/move towards transition target `PowerPoint3`.
             this.#POWERPOINT3_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for PowerPoint2
-        
-        // No ancestor handles this event.
-    }
-    
-    #POWERPOINT2_reset()
-    {
-        // PowerPoint2 behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge4"); } TransitionTo(PowerPoint1)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#POWERPOINT2_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge4");`.
-            this.tracer?.edgeTransition("edge4");
-            
-            // Step 3: Enter/move towards transition target `PowerPoint1`.
-            this.#POWERPOINT1_enter();
             
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
@@ -989,32 +2407,25 @@ evaluateGuard = null;
     #POWERPOINT3_exit()
     {
         // PowerPoint3 behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");
-        } // end of behavior for PowerPoint3
-        
-        // PowerPoint3 behavior
         // uml: exit / { this.tracer?.exitState('PowerPoint3'); }
         {
             // Step 1: execute action `this.tracer?.exitState('PowerPoint3');`
             this.tracer?.exitState('PowerPoint3');
         } // end of behavior for PowerPoint3
         
-        this.stateId = PowerCalSm.StateId.ROOT;
+        this.stateId = PowerCalSm.StateId.MANUAL;
     }
     
     #POWERPOINT3_record_data_point()
     {
         // PowerPoint3 behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge5"); } TransitionTo(PowerComplete)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge6"); } TransitionTo(PowerComplete)
         {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition).
             this.#POWERPOINT3_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge5");`.
-            this.tracer?.edgeTransition("edge5");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge6");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge6");
             
             // Step 3: Enter/move towards transition target `PowerComplete`.
             this.#POWERCOMPLETE_enter();
@@ -1022,105 +2433,6 @@ evaluateGuard = null;
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
         } // end of behavior for PowerPoint3
-        
-        // No ancestor handles this event.
-    }
-    
-    #POWERPOINT3_reset()
-    {
-        // PowerPoint3 behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge6"); } TransitionTo(PowerPoint1)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#POWERPOINT3_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge6");`.
-            this.tracer?.edgeTransition("edge6");
-            
-            // Step 3: Enter/move towards transition target `PowerPoint1`.
-            this.#POWERPOINT1_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for PowerPoint3
-        
-        // No ancestor handles this event.
-    }
-    
-    
-    ////////////////////////////////////////////////////////////////////////////////
-    // event handlers for state READ_AND_ADJUST
-    ////////////////////////////////////////////////////////////////////////////////
-    
-    #READ_AND_ADJUST_enter()
-    {
-        this.stateId = PowerCalSm.StateId.READ_AND_ADJUST;
-        
-        // READ_AND_ADJUST behavior
-        // uml: enter / { this.tracer?.enterState('READ_AND_ADJUST'); }
-        {
-            // Step 1: execute action `this.tracer?.enterState('READ_AND_ADJUST');`
-            this.tracer?.enterState('READ_AND_ADJUST');
-        } // end of behavior for READ_AND_ADJUST
-        
-        // READ_AND_ADJUST behavior
-        // uml: enter / { this.tracer?.log("⚡ FSM would execute action: " + "AdjustAttenuation();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "AdjustAttenuation();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "AdjustAttenuation();");
-        } // end of behavior for READ_AND_ADJUST
-    }
-    
-    #READ_AND_ADJUST_exit()
-    {
-        // READ_AND_ADJUST behavior
-        // uml: exit / { this.tracer?.exitState('READ_AND_ADJUST'); }
-        {
-            // Step 1: execute action `this.tracer?.exitState('READ_AND_ADJUST');`
-            this.tracer?.exitState('READ_AND_ADJUST');
-        } // end of behavior for READ_AND_ADJUST
-        
-        this.stateId = PowerCalSm.StateId.ROOT;
-    }
-    
-    #READ_AND_ADJUST_curve_complete()
-    {
-        // READ_AND_ADJUST behavior
-        // uml: CURVE_COMPLETE / { this.tracer?.edgeTransition("edge14"); } TransitionTo(SSBPoint)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#READ_AND_ADJUST_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge14");`.
-            this.tracer?.edgeTransition("edge14");
-            
-            // Step 3: Enter/move towards transition target `SSBPoint`.
-            this.#SSBPOINT_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for READ_AND_ADJUST
-        
-        // No ancestor handles this event.
-    }
-    
-    #READ_AND_ADJUST_next_point()
-    {
-        // READ_AND_ADJUST behavior
-        // uml: NEXT_POINT / { this.tracer?.edgeTransition("edge13"); } TransitionTo(ACQUISITION)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#READ_AND_ADJUST_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge13");`.
-            this.tracer?.edgeTransition("edge13");
-            
-            // Step 3: Enter/move towards transition target `ACQUISITION`.
-            this.#ACQUISITION_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for READ_AND_ADJUST
         
         // No ancestor handles this event.
     }
@@ -1152,56 +2464,28 @@ evaluateGuard = null;
     #SSBPOINT_exit()
     {
         // SSBPoint behavior
-        // uml: exit / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();"); }
-        {
-            // Step 1: execute action `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");`
-            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");
-        } // end of behavior for SSBPoint
-        
-        // SSBPoint behavior
         // uml: exit / { this.tracer?.exitState('SSBPoint'); }
         {
             // Step 1: execute action `this.tracer?.exitState('SSBPoint');`
             this.tracer?.exitState('SSBPoint');
         } // end of behavior for SSBPoint
         
-        this.stateId = PowerCalSm.StateId.ROOT;
+        this.stateId = PowerCalSm.StateId.MANUAL;
     }
     
     #SSBPOINT_record_data_point()
     {
         // SSBPoint behavior
-        // uml: RECORD_DATA_POINT / { this.tracer?.edgeTransition("edge9"); } TransitionTo(MeasurementComplete)
+        // uml: RECORD_DATA_POINT / { this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge8"); } TransitionTo(MeasurementComplete)
         {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+            // Step 1: Exit states until we reach `MANUAL` state (Least Common Ancestor for transition).
             this.#SSBPOINT_exit();
             
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge9");`.
-            this.tracer?.edgeTransition("edge9");
+            // Step 2: Transition action: `this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge8");`.
+            this.tracer?.log("⚡ FSM would execute action: " + "RecordPowerDataPoint();");this.tracer?.edgeTransition("edge8");
             
             // Step 3: Enter/move towards transition target `MeasurementComplete`.
             this.#MEASUREMENTCOMPLETE_enter();
-            
-            // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
-            return;
-        } // end of behavior for SSBPoint
-        
-        // No ancestor handles this event.
-    }
-    
-    #SSBPOINT_reset()
-    {
-        // SSBPoint behavior
-        // uml: RESET / { this.tracer?.edgeTransition("edge10"); } TransitionTo(PowerPoint1)
-        {
-            // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
-            this.#SSBPOINT_exit();
-            
-            // Step 2: Transition action: `this.tracer?.edgeTransition("edge10");`.
-            this.tracer?.edgeTransition("edge10");
-            
-            // Step 3: Enter/move towards transition target `PowerPoint1`.
-            this.#POWERPOINT1_enter();
             
             // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
             return;
@@ -1216,13 +2500,28 @@ evaluateGuard = null;
         switch (id)
         {
             case PowerCalSm.StateId.ROOT: return "ROOT";
-            case PowerCalSm.StateId.ACQUISITION: return "ACQUISITION";
+            case PowerCalSm.StateId.AUTO: return "AUTO";
+            case PowerCalSm.StateId.BAND: return "BAND";
+            case PowerCalSm.StateId.BAND_DONE: return "BAND_DONE";
+            case PowerCalSm.StateId.DONE: return "DONE";
+            case PowerCalSm.StateId.FIT_ALL: return "FIT_ALL";
+            case PowerCalSm.StateId.FIT_FORWARD: return "FIT_FORWARD";
+            case PowerCalSm.StateId.POINT: return "POINT";
+            case PowerCalSm.StateId.COLLECT: return "COLLECT";
+            case PowerCalSm.StateId.KEYDOWN: return "KEYDOWN";
+            case PowerCalSm.StateId.METER_ENTRY: return "METER_ENTRY";
+            case PowerCalSm.StateId.METER_PAUSED: return "METER_PAUSED";
+            case PowerCalSm.StateId.PROMPT: return "PROMPT";
+            case PowerCalSm.StateId.REST: return "REST";
+            case PowerCalSm.StateId.REVIEW: return "REVIEW";
+            case PowerCalSm.StateId.SETUP: return "SETUP";
+            case PowerCalSm.StateId.STORE: return "STORE";
+            case PowerCalSm.StateId.MANUAL: return "MANUAL";
             case PowerCalSm.StateId.MEASUREMENTCOMPLETE: return "MEASUREMENTCOMPLETE";
             case PowerCalSm.StateId.POWERCOMPLETE: return "POWERCOMPLETE";
             case PowerCalSm.StateId.POWERPOINT1: return "POWERPOINT1";
             case PowerCalSm.StateId.POWERPOINT2: return "POWERPOINT2";
             case PowerCalSm.StateId.POWERPOINT3: return "POWERPOINT3";
-            case PowerCalSm.StateId.READ_AND_ADJUST: return "READ_AND_ADJUST";
             case PowerCalSm.StateId.SSBPOINT: return "SSBPOINT";
             default: return "?";
         }
@@ -1236,9 +2535,10 @@ evaluateGuard = null;
             case PowerCalSm.EventId.AUTO: return "AUTO";
             case PowerCalSm.EventId.CURVE_COMPLETE: return "CURVE_COMPLETE";
             case PowerCalSm.EventId.DO: return "DO";
-            case PowerCalSm.EventId.NEXT_POINT: return "NEXT_POINT";
             case PowerCalSm.EventId.RECORD_DATA_POINT: return "RECORD_DATA_POINT";
             case PowerCalSm.EventId.RESET: return "RESET";
+            case PowerCalSm.EventId.RETRY: return "RETRY";
+            case PowerCalSm.EventId.SKIP: return "SKIP";
             default: return "?";
         }
     }
@@ -1277,39 +2577,113 @@ evaluateGuard = null;
             center: true
         });
 
-        const diagramEventNamesArray = ['do', 'AUTO', 'CURVE_COMPLETE', 'NEXT_POINT', 'RECORD_DATA_POINT', 'RESET', ];
+        const diagramEventNamesArray = ['do', 'AUTO', 'CURVE_COMPLETE', 'RECORD_DATA_POINT', 'RESET', 'RETRY', 'SKIP', ];
 
         // Mapping from state to available events
         const stateEventsMapping = {
+  "MANUAL": [
+    "AUTO",
+    "RESET"
+  ],
   "PowerPoint1": [
     "AUTO",
-    "RECORD_DATA_POINT"
+    "RECORD_DATA_POINT",
+    "RESET"
   ],
   "PowerPoint2": [
+    "AUTO",
     "RECORD_DATA_POINT",
     "RESET"
   ],
   "PowerPoint3": [
+    "AUTO",
     "RECORD_DATA_POINT",
     "RESET"
   ],
   "PowerComplete": [
+    "AUTO",
     "CURVE_COMPLETE",
     "RESET"
   ],
   "SSBPoint": [
+    "AUTO",
     "RECORD_DATA_POINT",
     "RESET"
   ],
   "MeasurementComplete": [
+    "AUTO",
     "RESET"
   ],
-  "ACQUISITION": [
-    "do"
+  "AUTO": [
+    "do",
+    "RESET"
   ],
-  "READ_AND_ADJUST": [
-    "CURVE_COMPLETE",
-    "NEXT_POINT"
+  "POINT": [
+    "do",
+    "RESET"
+  ],
+  "KEYDOWN": [
+    "do",
+    "RESET"
+  ],
+  "METER_ENTRY": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET"
+  ],
+  "METER_PAUSED": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET"
+  ],
+  "COLLECT": [
+    "do",
+    "RESET"
+  ],
+  "REST": [
+    "do",
+    "RESET"
+  ],
+  "FIT_FORWARD": [
+    "do",
+    "RESET"
+  ],
+  "BAND_DONE": [
+    "do",
+    "RESET"
+  ],
+  "FIT_ALL": [
+    "do",
+    "RESET"
+  ],
+  "REVIEW": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET",
+    "RETRY"
+  ],
+  "DONE": [
+    "do",
+    "RESET"
+  ],
+  "SETUP": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET"
+  ],
+  "PROMPT": [
+    "do",
+    "RECORD_DATA_POINT",
+    "RESET",
+    "SKIP"
+  ],
+  "BAND": [
+    "do",
+    "RESET"
+  ],
+  "STORE": [
+    "do",
+    "RESET"
   ]
 };
 

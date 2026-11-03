@@ -3,10 +3,10 @@ title: CAT Control (Kenwood emulation)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-07-31
+updated: 2026-10-24
 tags: [cat, kenwood, ts-480, ts-2000, serial, rig-control, usb]
 source_refs: []
-related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]"]
+related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]", "[[filter-board-electronics]]", "[[log-amp-power-detection]]"]
 ---
 
 # CAT Control (Kenwood emulation)
@@ -30,7 +30,7 @@ two share most commands so it works either way, but the docs should be reconcile
 
 ## Architecture: a command-dispatch table
 
-The core is a static table of `valid_command` entries (`NUM_SUPPORTED_COMMANDS = 32`,
+The core is a static table of `valid_command` entries (`NUM_SUPPORTED_COMMANDS = 35`,
 `CAT.cpp:104-136`):
 ```c
 typedef struct {
@@ -50,7 +50,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 > handler** — it becomes silently write-only. This is not hypothetical: it is exactly the bug
 > that made `FW;` unreadable for as long as `FW` has existed (see below).
 
-## Implemented commands (32)
+## Implemented commands (35)
 
 | Group | Commands |
 |---|---|
@@ -58,7 +58,8 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Mode / status | `MD` (mode), `IF` (transceiver status string), `ID` (radio id) |
 | Band | `BU`/`BD` (band up/down) |
 | Gain / audio | `AG` (AF gain), `MG` (mic gain), `PC` (power control) |
-| Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DS` (TX path counters, read-only) |
+| Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
+| SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
 | DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX) |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |
@@ -108,6 +109,31 @@ before every transmission, so treating a modulation change as a request to leave
 would make the mode impossible to hold. Only `DG0;` or the front panel leaves it.
 
 **`SR` is refused while in digital mode**, because that mode pins the sample rate.
+
+### Bridge-measurement commands (added 2026-10-24)
+
+Added for `code/tools/swr/swr_bench_measure.py`, which takes the SWR bridge calibration series
+under CAT control (`code/tools/swr/swr_calibration_50_open_short.ipynb`, Section 11). All three are
+non-Kenwood. Uncommitted as of 2026-10-24.
+
+- **`BR`** — raw SWR bridge statistics. `PerformSWRBridgeReading()` now also adds every raw
+  AD7991 pair to running sums (`LPFBoard.cpp`, `AccumulateSWRBridgeStats()`): the raw readings,
+  before the 0.1/0.9 running average, so a mean over a steady carrier carries no lag.
+  `BR0;` clears, `BR1;` reads both detectors once on demand (the bridge is not read while
+  receiving, so this is how a key-up floor reading is taken), and `BR;` returns
+  `BR<n>,<fwd mean>,<fwd sd>,<ref mean>,<ref sd>;` in mV to 0.1 mV. Failed I²C reads, which
+  `readADCsingle()` returns as 65535 or 65534, are left out. A growing `n` also proves the radio
+  really keyed, because `TX;` is silently ignored during the CW hang time.
+- **`XA`** — CW transmit attenuation override. `XAnnn;` forces nnn tenths of a dB (000–315) in
+  place of the power-curve value at the next key-down; `XA999;` returns to the power setting.
+  The PA selection still follows `powerOutCW`. Not saved. `XA;` returns `XAnnn,o;`: the
+  attenuator's *present* setting (31.5 dB while receiving, so read it keyed) and whether an
+  override is set. Needed because `PC` only takes whole watts, so it cannot reach the
+  attenuator's limits (the sheet's `min` and `full` rows). Implemented as
+  `SetCWAttenuationOverride()` in `HardwareSm.cpp`, applied in the `RFCWMark`/`RFCWSpace` normal
+  branch only, not in power calibration.
+- **`DD`** — the digital-mode transmit drive (`ED.digitalDriveLevel`, the "USB drive" menu item),
+  `DD000;`–`DD100;`, `DD;` reads. Previously menu-only.
 
 ### ⚠️ `TX` and `RX` are silent *writes* in both their forms
 
@@ -159,9 +185,17 @@ the fix go through `command_parser()`.
 `PC` (power) is the opposite case worth noting alongside it: `PC_write` *does* answer, echoing
 `PC%03d;`, so it is one of the few writes that is not silent.
 
-## Three fixes to pre-existing commands
+## Fixes to pre-existing commands
 
-All three affected CAT users on earlier releases:
+All of these affected CAT users on earlier releases:
+
+- **`PC` in digital mode set the CW power (fixed 2026-10-24).** `PC_write`/`PC_read` tested only
+  the SSB states, so in `DIGITAL_RECEIVE`/`DIGITAL_TRANSMIT` they fell through to
+  `ED.powerOutCW`. Digital mode transmits through the SSB chain, and `TXGain()` takes its level
+  from `ED.powerOutSSB`. A client setting power in digital mode therefore changed nothing on the
+  air. Both now use `UsesSSBPower()`, which includes the digital states.
+- **`PC` dropped the hundreds digit (fixed 2026-10-24).** `PC_write` parsed from `cmd[3]`, so
+  `PC100;` set 0 W. It now parses all three digits.
 
 - ⚠️ **`MD` inverted the receive filter.** `MD_write` set `bands[].mode` but never
   `ED.modulation[]`. `Demodulate()` switches on the *latter*, while `InitFilterMask()` *compares

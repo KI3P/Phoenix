@@ -56,6 +56,7 @@ void SaveDataToStorage(bool savetosd){
     // Assign the elements of ED to doc
     doc["agc"] = ED.agc;
     doc["audioVolume"] = ED.audioVolume;
+    doc["SWR_CouplerTurns"] = ED.SWR_CouplerTurns;
     doc["rfGainAllBands_dB"] = ED.rfGainAllBands_dB;
     doc["stepFineTune"] = ED.stepFineTune;
     doc["nrOptionSelect"] = ED.nrOptionSelect;
@@ -115,6 +116,8 @@ void SaveDataToStorage(bool savetosd){
         doc["SWR_R_SlopeAdj"][i] = ED.SWR_R_SlopeAdj[i];
         doc["SWR_R_Offset"][i] = ED.SWR_R_Offset[i];
         doc["SWR_F_Offset"][i] = ED.SWR_F_Offset[i];
+        doc["SWR_CalLevel"][i] = ED.SWR_CalLevel[i];
+        doc["SWR_CalDate"][i] = ED.SWR_CalDate[i];
 
         // Last frequencies array (3 values per band)
         for(int j = 0; j < 3; j++) {
@@ -131,6 +134,8 @@ void SaveDataToStorage(bool savetosd){
         doc["PowerCal_20W_kindex"][i] = ED.PowerCal_20W_kindex[i];
         doc["PowerCal_100W_Psat_mW"][i] = ED.PowerCal_100W_Psat_mW[i];
         doc["PowerCal_100W_kindex"][i] = ED.PowerCal_100W_kindex[i];
+        doc["PowerCal_20W_shape"][i] = ED.PowerCal_20W_shape[i];
+        doc["PowerCal_100W_shape"][i] = ED.PowerCal_100W_shape[i];
         doc["PowerCal_20W_DSP_Gain_correction_dB"][i] = ED.PowerCal_20W_DSP_Gain_correction_dB[i];
         doc["PowerCal_100W_DSP_Gain_correction_dB"][i] = ED.PowerCal_100W_DSP_Gain_correction_dB[i];
     }
@@ -265,6 +270,7 @@ void RestoreDataFromStorage(void){
     // Restore scalar values with defaults if not present
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
+    ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -404,6 +410,16 @@ void RestoreDataFromStorage(void){
             ED.SWR_F_Offset[i] = doc["SWR_F_Offset"][i] | ED.SWR_F_Offset[i];
         }
     }
+    if (doc["SWR_CalLevel"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalLevel[i] = doc["SWR_CalLevel"][i] | ED.SWR_CalLevel[i];
+        }
+    }
+    if (doc["SWR_CalDate"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalDate[i] = doc["SWR_CalDate"][i] | ED.SWR_CalDate[i];
+        }
+    }
 
     // Restore multi-dimensional lastFrequencies array
     if (doc["lastFrequencies"].is<JsonArray>()) {
@@ -438,6 +454,17 @@ void RestoreDataFromStorage(void){
     if (doc["PowerCal_100W_kindex"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
+        }
+    }
+    // A configuration saved before the shape existed keeps the plain tanh (s = 1)
+    if (doc["PowerCal_20W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_shape[i] = doc["PowerCal_20W_shape"][i] | ED.PowerCal_20W_shape[i];
+        }
+    }
+    if (doc["PowerCal_100W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_shape[i] = doc["PowerCal_100W_shape"][i] | ED.PowerCal_100W_shape[i];
         }
     }
     if (doc["PowerCal_20W_DSP_Gain_correction_dB"].is<JsonArray>()) {
@@ -493,6 +520,7 @@ void RestoreDataFromSDCard(void){
     // Restore scalar values with defaults if not present
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
+    ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -632,6 +660,16 @@ void RestoreDataFromSDCard(void){
             ED.SWR_F_Offset[i] = doc["SWR_F_Offset"][i] | ED.SWR_F_Offset[i];
         }
     }
+    if (doc["SWR_CalLevel"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalLevel[i] = doc["SWR_CalLevel"][i] | ED.SWR_CalLevel[i];
+        }
+    }
+    if (doc["SWR_CalDate"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalDate[i] = doc["SWR_CalDate"][i] | ED.SWR_CalDate[i];
+        }
+    }
 
     // Restore multi-dimensional lastFrequencies array
     if (doc["lastFrequencies"].is<JsonArray>()) {
@@ -668,6 +706,17 @@ void RestoreDataFromSDCard(void){
             ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
         }
     }
+    // A configuration saved before the shape existed keeps the plain tanh (s = 1)
+    if (doc["PowerCal_20W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_shape[i] = doc["PowerCal_20W_shape"][i] | ED.PowerCal_20W_shape[i];
+        }
+    }
+    if (doc["PowerCal_100W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_shape[i] = doc["PowerCal_100W_shape"][i] | ED.PowerCal_100W_shape[i];
+        }
+    }
     if (doc["PowerCal_20W_DSP_Gain_correction_dB"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.PowerCal_20W_DSP_Gain_correction_dB[i] = doc["PowerCal_20W_DSP_Gain_correction_dB"][i] | ED.PowerCal_20W_DSP_Gain_correction_dB[i];
@@ -684,6 +733,24 @@ void RestoreDataFromSDCard(void){
     // Save the data to flash/SD storage so that it matches
     SaveDataToStorage(false);
     Serial.println("Config data restored successfully");
+}
+
+/**
+ * @brief Print one per-band array of the stored configuration on one line
+ * @param name The field's name
+ * @param values NUMBER_OF_BANDS values
+ * @param decimals Decimal places: Serial.print(float) gives 2, too few for a slope adjustment
+ */
+static void PrintFloatArray(const char *name, const float32_t *values, int decimals){
+    char buff[24];
+    Serial.print(name);
+    Serial.print(": ");
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        snprintf(buff, sizeof(buff), "%.*f", decimals, values[i]);
+        Serial.print(buff);
+        if (i < NUMBER_OF_BANDS - 1) Serial.print(",");
+    }
+    Serial.println();
 }
 
 void PrintEDToSerial(void){
@@ -837,78 +904,38 @@ void PrintEDToSerial(void){
         Serial.println(ED.lastFrequencies[i][2]);
     }
 
-    Serial.print("PowerCal_20W_Psat_mW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_Psat_mW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_kindex: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_kindex[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_Psat_mW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_Psat_mW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_kindex: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_kindex[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_DSP_Gain_correction_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_DSP_Gain_correction_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_DSP_Gain_correction_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_DSP_Gain_correction_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
+    PrintFloatArray("PowerCal_20W_Psat_mW", ED.PowerCal_20W_Psat_mW, 1);
+    PrintFloatArray("PowerCal_20W_kindex", ED.PowerCal_20W_kindex, 3);
+    PrintFloatArray("PowerCal_100W_Psat_mW", ED.PowerCal_100W_Psat_mW, 1);
+    PrintFloatArray("PowerCal_100W_kindex", ED.PowerCal_100W_kindex, 3);
+    PrintFloatArray("PowerCal_20W_shape", ED.PowerCal_20W_shape, 3);
+    PrintFloatArray("PowerCal_100W_shape", ED.PowerCal_100W_shape, 3);
+    PrintFloatArray("PowerCal_20W_DSP_Gain_correction_dB", ED.PowerCal_20W_DSP_Gain_correction_dB, 3);
+    PrintFloatArray("PowerCal_100W_DSP_Gain_correction_dB", ED.PowerCal_100W_DSP_Gain_correction_dB, 3);
     Serial.print("PowerCal_20W_to_100W_threshold_W: ");
     Serial.println(ED.PowerCal_20W_to_100W_threshold_W);
 
-    Serial.print("SWR_F_SlopeAdj: ");
+    PrintFloatArray("SWR_F_SlopeAdj", ED.SWR_F_SlopeAdj, 3);
+    PrintFloatArray("SWR_R_SlopeAdj", ED.SWR_R_SlopeAdj, 3);
+    PrintFloatArray("SWR_R_Offset", ED.SWR_R_Offset, 3);
+    PrintFloatArray("SWR_F_Offset", ED.SWR_F_Offset, 3);
+    Serial.print("SWR_CalLevel: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_F_SlopeAdj[i]);
+        Serial.print(ED.SWR_CalLevel[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
 
-    Serial.print("SWR_R_SlopeAdj: ");
+    Serial.print("SWR_CalDate: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_R_SlopeAdj[i]);
+        Serial.print(ED.SWR_CalDate[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
 
-    Serial.print("SWR_R_Offset: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_R_Offset[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
 
-    Serial.print("SWR_F_Offset: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_F_Offset[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
+    Serial.print("SWR_CouplerTurns: ");
+    Serial.println(ED.SWR_CouplerTurns);
 
     Serial.println("=== End ED Struct ===");
 }

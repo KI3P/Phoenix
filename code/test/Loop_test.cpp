@@ -2141,6 +2141,20 @@ TEST(Loop, TimeSyncNewHeaderResetsCollection) {
     EXPECT_EQ(Teensy3Clock.lastSet, (time_t)1748476800);
 }
 
+TEST(Loop, TimeSyncRejectsNonDigitTimestamp) {
+    // Right length, wrong characters. atoll() alone would return 0 here and the
+    // sanity check would catch it, but the CAT reader feeds ApplyTimeSyncDigits()
+    // arbitrary newline-terminated bytes, so the digit check has to be explicit.
+    runSerialTimeSync("Tabcdefghij\n");
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
+TEST(Loop, TimeSyncRejectsSignedTimestamp) {
+    // atoll() would stop at the space and hand back a plausible-looking number.
+    runSerialTimeSync("T -174847680\n");
+    EXPECT_FALSE(Teensy3Clock.wasSet);
+}
+
 TEST(Loop, TimeSyncRejectsOverrunPacket) {
     // 11 digits then newline: tsidx hits TIME_SYNC_LEN before newline,
     // 11th digit triggers overrun branch, clock must not be set.

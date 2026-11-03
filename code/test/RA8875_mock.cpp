@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include <iostream>
 #include <iomanip>
+#include <vector>
 
 RA8875::RA8875(uint8_t cs, uint8_t rst) : _cs(cs), _rst(rst), _font_scale(1), _cursor_x(0), _cursor_y(0), _text_color(RA8875_WHITE), _custom_font(nullptr) {
 }
@@ -64,28 +65,49 @@ void RA8875::setFont(const void* font) {
     _custom_font = font;
 }
 
+// Log of every print() made, for tests that check which font text was drawn in
+static std::vector<RA8875PrintRecord> printLog;
+
+void RA8875ClearPrintLog() {
+    printLog.clear();
+}
+
+unsigned RA8875PrintLogSize() {
+    return (unsigned)printLog.size();
+}
+
+RA8875PrintRecord RA8875PrintLogEntry(unsigned index) {
+    if (index >= printLog.size())
+        return {0, 0, false, 0};
+    return printLog[index];
+}
+
+void RA8875::recordPrint() {
+    printLog.push_back({_cursor_x, _cursor_y, _custom_font != nullptr, _font_scale});
+}
+
 void RA8875::print(const char* text) {
-    // Mock implementation - could log the text if needed for testing
+    recordPrint();
 }
 
 void RA8875::print(const String& str) {
-    // Mock implementation - could log the text if needed for testing
+    recordPrint();
 }
 
 void RA8875::print(int value) {
-    // Mock implementation - could log the value if needed for testing
+    recordPrint();
 }
 
 void RA8875::print(int64_t value) {
-    // Mock implementation - could log the value if needed for testing
+    recordPrint();
 }
 
 void RA8875::print(float value) {
-    // Mock implementation - could log the value if needed for testing
+    recordPrint();
 }
 
 void RA8875::print(float value, int digits) {
-    // Mock implementation - could log the value if needed for testing
+    recordPrint();
 }
 
 void RA8875::setFontDefault() {

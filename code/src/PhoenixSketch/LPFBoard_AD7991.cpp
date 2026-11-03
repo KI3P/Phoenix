@@ -43,6 +43,7 @@ bool AD7991::begin(uint8_t i2c_addr, TwoWire *theWire) {
   }
 
   i2c_dev = new Adafruit_I2CDevice(i2c_addr, theWire);
+  lastChannel = AD7991_NO_CHANNEL;
 
   return i2c_dev->begin();
 }
@@ -50,12 +51,39 @@ bool AD7991::begin(uint8_t i2c_addr, TwoWire *theWire) {
 /**
  * @brief Read ADC value in single-ended mode.
  *
+ * When the channel differs from the previous conversion's, the channel is
+ * first converted getDiscardCount() times (default 2) and those results are
+ * thrown away. That costs that many extra I2C transactions per channel switch.
+ * See the class comment in LPFBoard_AD7991.h for why.
+ *
  * @param ch Channel to read from (0-2).
- * @return ADC value or 0 if read failed.
+ * @return ADC value; 0 for an invalid channel; 65535 (-1) if the I2C
+ *         transaction failed; 65534 (-2) if the wrong channel was returned.
  */
 uint16_t AD7991::readADCsingle(uint8_t ch) {
   if (ch > 2) {
     return 0; // Invalid channel
+  }
+  if (ch != lastChannel) {
+    for (uint8_t i = 0; i < discardCount; i++) {
+      uint16_t discarded = convert(ch);
+      if (discarded >= 0xFFFE) {
+        return discarded;    // the I2C error codes, -1 and -2
+      }
+    }
+  }
+  return convert(ch);
+}
+
+/**
+ * @brief One conversion of a channel, selected in the same I2C transaction.
+ *
+ * @param ch Channel to convert (0-2), already checked by the caller.
+ * @return ADC value, or the error codes listed under readADCsingle().
+ */
+uint16_t AD7991::convert(uint8_t ch) {
+  if (i2c_dev == nullptr) {
+    return -1;
   }
 
   uint8_t commandByte = 0;
@@ -76,8 +104,10 @@ uint16_t AD7991::readADCsingle(uint8_t ch) {
   
   uint8_t adcValue[2];
   if (!i2c_dev->write_then_read(&commandByte, 1, adcValue, 2)) {
+    lastChannel = AD7991_NO_CHANNEL; // the ADC's selection is now unknown
     return -1; // Write-then-read failed
   }
+  lastChannel = ch;
 
   // Confirm that the returned channel identifier matches what we specified
   // bits 5 and 4 of the first returned byte are the channel idenfier
@@ -87,6 +117,7 @@ uint16_t AD7991::readADCsingle(uint8_t ch) {
     Serial.print(ch);
     Serial.print(". Received ");
     Serial.println(CHid);
+    lastChannel = AD7991_NO_CHANNEL; // the ADC's selection is now unknown
     return -2; // wrong channel returned
   }
   return ((0b00001111 & adcValue[0]) << 8) | adcValue[1];

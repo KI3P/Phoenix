@@ -27,7 +27,31 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "SDT.h"
 
 PowerCalSm powerSM;
-static char buff[100];
+
+// True while the main loop is dispatching an event to powerSM. The 1 ms timer
+// skips its DO event then, so that it cannot run in the middle of a transition.
+static volatile bool powerSmDispatching = false;
+
+/**
+ * @brief Dispatch an event to the power calibration state machine from the main loop
+ * @param event The event
+ * @note Use this, not PowerCalSm_dispatch_event(), for every event except the
+ *       timer's DO. The timer interrupt skips DO while this runs; missing a 1 ms
+ *       tick is harmless. Interrupts stay enabled, because the manual flow's
+ *       actions use I2C and fit the power curve.
+ */
+void PowerCalDispatch(PowerCalSm_EventId event){
+    powerSmDispatching = true;
+    PowerCalSm_dispatch_event(&powerSM, event);
+    powerSmDispatching = false;
+}
+
+/**
+ * @brief True while the main loop is dispatching an event to powerSM
+ */
+bool PowerCalSmBusy(void){
+    return powerSmDispatching;
+}
 
 float32_t attenuations_dB[3];
 float32_t powers_W[3];
@@ -38,6 +62,7 @@ uint32_t Npoints = 0;
 float32_t measuredPower = 0.0;
 float32_t targetPower = 0.0;
 static float32_t powr_W; // SSB power point
+extern float32_t TXgainDSP; // DSP gain applied to the last transmitted block (DSP.cpp)
 uint8_t powerUnit = 1; // 1=W, 0=dBm
 
 /**
@@ -214,7 +239,7 @@ void ChangeCalibrationPASelection(void){
     // This ensures the PA selection gets applied to the hardware
     ForceUpdateRFHardwareState();
     // Force us back to start state
-    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RESET);
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
 }
 
 /**
@@ -234,10 +259,12 @@ void CalculatePowerCurveFit(void){
         f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 75000.0f,10.0f);
         ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+        ED.PowerCal_100W_shape[ED.currentBand[ED.activeVFO]] = f.shape;
     } else {
         f = FitPowerCurve(attenuations_dB, powers_mW, Npoints, 15000.0f,6.0f);
         ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
         ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
+        ED.PowerCal_20W_shape[ED.currentBand[ED.activeVFO]] = f.shape;
     }
     //Serial.println("| P_meas [W] | P_f [W] | P_r [W] | SWR |");
     //Serial.println("|------------|---------|---------|-----|");
@@ -250,141 +277,40 @@ void CalculatePowerCurveFit(void){
 
 /**
  * @brief Initialize power calibration state machine and reset all calibration parameters
- * @note Starts PowerCalSm state machine with 150ms acquisition duration
- * @note Resets all band attenuations and SWR adjustments to zero
+ * @note Starts PowerCalSm state machine in the manual flow
+ * @note Resets all band attenuations to zero. The SWR calibration is kept: the
+ *       manual flow does not use it, and the automatic flow replaces it per band.
  * @note Updates hardware state to apply settings
  */
 void InitializePowerCalibration(void){
+    // PowerCalSm_start() does not run AUTO's exit action, so clear it here
+    autoCal.active = false;
+    autoCal.keyed = false;
+    autoCal.servicePending = false;
+    powerSmDispatching = true;
     PowerCalSm_start(&powerSM);
-    powerSM.vars.acquisitionDuration_ms = 150;
+    powerSmDispatching = false;
     // Make all the attenuations zero so we start off right
-    // Make the SWR offset adjustments zero as well
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++){
         ED.XAttenCW[k] = 0.0;
-        ED.SWR_F_SlopeAdj[k] = 0.0;
-        ED.SWR_R_SlopeAdj[k] = 0.0;
-        ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
-        ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] = 0.0;
     }
     SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
     UpdateRFHardwareState();
 }
 
 
-static float32_t forwardPowerAtt_dB[40];
-static float32_t forwardPower_W[40];
-static float32_t reflectedPower_W[40];
-static float32_t forwardADC_mV[40];
-static float32_t reflectedADC_mV[40];
-static float32_t scaledForwardPower_mW[40];
-static uint32_t Nswrpoints = 0;
-
 /**
- * @brief Start automatic power calibration sequence
- * @note Only operates if in POWERPOINT1 state
- * @note Resets attenuation to 0dB and initiates PTT for transmit
- * @note Dispatches AUTO event to power calibration state machine
- */
-void StartPowerAutoCal(void){
-    if (powerSM.state_id == PowerCalSm_StateId_POWERPOINT1){
-        // Make sure attenuation is zero
-        ED.XAttenCW[ED.currentBand[ED.activeVFO]] = 0.0;
-        SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
-        Nswrpoints = 0;
-
-        // Issue a PTT event
-        SetInterrupt(iPTT_PRESSED);
-
-        // Change the state
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_AUTO);
-    }
-}
-
-/**
- * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement 
+ * Called by Loop.cpp when button 12 is pressed. Change from CALIBRATE_POWER measurement
  * to CALIBRATE_OFFSET measurement when curve fit is complete. If we are not in the
  * POWERCOMPLETE state, ignore this button press.
  */
 void ChangePowerCalibrationPhase(void){
-    if ((powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE) || 
-        (powerSM.state_id == PowerCalSm_StateId_READ_AND_ADJUST)){
+    if (powerSM.state_id == PowerCalSm_StateId_POWERCOMPLETE){
         // Issue the event that causes state to change to SSBPOINT measurement
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_CURVE_COMPLETE);
+        PowerCalDispatch(PowerCalSm_EventId_CURVE_COMPLETE);
         // Change to offset measurement mode
         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_START);
         UpdateRFHardwareState();
-    }
-}
-
-float32_t ReadADCFwdRaw(void);
-float32_t ReadADCRefRaw(void);
-
-/**
- * @brief Adjust transmit attenuation during automatic power calibration
- * @note Records forward/reflected power and ADC values at current attenuation
- * @note Increments attenuation by 1 dB and continues until 31.5 dB reached
- * @note Performs curve fit when complete and transitions to offset calibration
- * @note Used by automatic calibration mode
- */
-void AdjustAttenuation(void){
-    // Read the current forward power
-    forwardPowerAtt_dB[Nswrpoints] = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
-    forwardPower_W[Nswrpoints] = ReadForwardPower();
-    reflectedPower_W[Nswrpoints] = ReadReflectedPower();
-    forwardADC_mV[Nswrpoints] = ReadADCFwdRaw();
-    reflectedADC_mV[Nswrpoints] = ReadADCRefRaw();
-    Nswrpoints++;
-    // Change attenuation by 1 dB
-    ED.XAttenCW[ED.currentBand[ED.activeVFO]] += 1.0;
-    if (ED.XAttenCW[ED.currentBand[ED.activeVFO]] <= 31.5){
-        SetTXAttenuation(ED.XAttenCW[ED.currentBand[ED.activeVFO]]);
-        PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_NEXT_POINT);
-    } else {
-        // Leave this place
-        SetInterrupt(iPTT_RELEASED);
-
-        // Fit curve
-        // 1. Calculate power for each point
-        if (powerUnit == 0){
-            // Convert from dBm to W
-            measuredPower = pow(10.0f,measuredPower/10.0f)/1000.0f;
-        }
-        float32_t scale = measuredPower / forwardPower_W[0];
-
-        sprintf(buff,"External measured power at 0dB is %5.4fW",measuredPower);
-        Serial.println(buff);
-        sprintf(buff,"Internal measured power at 0dB is %5.4fW",forwardPower_W[0]);
-        Serial.println(buff);
-        sprintf(buff,"Scale factor %5.4f",scale);
-        Serial.println(buff);
-
-        Serial.println("| Att [dB] | ADCf | ADCr | Pfwd [W] | Pref [W] | Pscaled [W] |");
-        Serial.println("|----------|------|------|----------|----------|-------------|");
-        for (size_t k=0; k<Nswrpoints; k++){
-            scaledForwardPower_mW[k] = scale*forwardPower_W[k]*1000.0;
-            sprintf(buff,"| %3.2f | %5.4f | %5.4f | %5.4f | %5.4f | %5.4f |",
-                        forwardPowerAtt_dB[k],
-                        forwardADC_mV[k],reflectedADC_mV[k],
-                        forwardPower_W[k],reflectedPower_W[k],
-                        scaledForwardPower_mW[k]/1000.0);
-            Serial.println(buff);
-        }
-
-        // 2. Fit the curve
-        struct FitResult f;
-        if (ED.PA100Wactive){
-            f = FitPowerCurve(forwardPowerAtt_dB, scaledForwardPower_mW, Nswrpoints, 75000.0f,10.0f);
-            ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
-            ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
-        } else {
-            f = FitPowerCurve(forwardPowerAtt_dB, scaledForwardPower_mW, Nswrpoints, 15000.0f,6.0f);
-            ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]] = f.P_sat;
-            ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]] = f.k;
-        }
-        // Enqueue a button press in order to call the ChangePowerCalibrationPhase
-        // function *after* the iPTT_RELEASED event has been handled
-        SetButton(12);
-        SetInterrupt(iBUTTON_PRESSED);
     }
 }
 
@@ -394,7 +320,7 @@ void AdjustAttenuation(void){
  * invokes the Reset function.
  */
 void ResetPowerCal(void){
-    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RESET);
+    PowerCalDispatch(PowerCalSm_EventId_RESET);
 }
 
 /**
@@ -480,7 +406,8 @@ void CalculateSSBPoint(void){
     }
 
     Debug("SSB power ratio = " + String(factor));
-    float32_t corr = 10*log10f(factor);
+    // The measurement was made with TXgainDSP applied, so the correction is relative to it
+    float32_t corr = TXgainDSP + 10*log10f(factor);
     Debug("Therefore gain correction is [dB] = " + String(corr));
     if (ED.PA100Wactive)
         ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]] = corr;
@@ -493,7 +420,7 @@ void CalculateSSBPoint(void){
  * Called when the MENU SELECT button is pressed. Issues an event to the state machine
  */
 void RecordPowerButtonPressed(void){
-    PowerCalSm_dispatch_event(&powerSM,PowerCalSm_EventId_RECORD_DATA_POINT);
+    PowerCalDispatch(PowerCalSm_EventId_RECORD_DATA_POINT);
 }
 
 /**

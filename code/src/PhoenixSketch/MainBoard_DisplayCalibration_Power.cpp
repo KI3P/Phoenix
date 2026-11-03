@@ -203,6 +203,13 @@ void ChangePowerIncrement(void){
 }
 
 /**
+ * @brief Step of the measured power entry, in the entry's units (W or dB)
+ */
+float32_t GetPowerIncrement(void){
+    return powerincvals[incindexPower];
+}
+
+/**
  * @brief Increase measured power value during calibration
  * @note Increments by current step size (powerincvals[incindexPower])
  * @note Clamped to maximum 100.0
@@ -351,7 +358,9 @@ static void DrawPowerAdjustPane(void){
     tft.setCursor(x0,y0+delta);
     tft.print("Transmit:");
     tft.setCursor(x0+160,y0+delta);
-    if (modeSM.state_id == ModeSm_StateId_CALIBRATE_TX_IQ_MARK){
+    // Steps 1-3 transmit a CW carrier, step 4 transmits the SSB test tone
+    if ((modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK)){
         tft.setTextColor(RA8875_RED);
         tft.print("On");
     } else {
@@ -546,7 +555,7 @@ static void DrawPowerInstructionsPane(void){
     tft.print("by pressing SELECT(0) button.");
     
 
-    delta += 2*lineD;
+    delta += lineD + lineD/2;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("After step 3, press button 12 to");
@@ -560,7 +569,7 @@ static void DrawPowerInstructionsPane(void){
     tft.print("to re-measure data points.");
 
 
-    delta += 2*lineD;
+    delta += lineD + lineD/2;
     tft.setCursor(x0, y0+delta);
     //Limits:("                                 ");
     tft.print("* Volume encoder adjusts atten.");
@@ -599,6 +608,11 @@ static void DrawPowerInstructionsPane(void){
     tft.setCursor(x0, y0+delta);
     tft.print("* Press Home to save and exit.");
 
+    delta += lineD;
+    tft.setCursor(x0, y0+delta);
+    //Limits:("                                 ");
+    tft.print("* Button 1: automatic power+SWR.");
+
     PanePowerInstructions.stale = false;
 }
 
@@ -608,7 +622,17 @@ static void DrawPowerInstructionsPane(void){
  * @note Calibrates power adjustment and measurement circuitry
  */
 void DrawCalibratePower(void){
-        
+    // The automatic calibration has its own screen; redraw when switching
+    static bool autoScreen = false;
+    if (PowerCalAutoActive() != autoScreen){
+        autoScreen = PowerCalAutoActive();
+        uiSM.vars.clearScreen = true;
+    }
+    if (autoScreen){
+        DrawCalibratePowerAuto();
+        return;
+    }
+
     if (uiSM.vars.clearScreen){
         Debug("Entry to CALIBRATE_POWER state");
         tft.writeTo(L2);

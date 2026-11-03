@@ -389,7 +389,8 @@ void printUsage() {
 void timer1ms(void) {
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_DO);
     UISm_dispatch_event(&uiSM, UISm_EventId_DO);
-    PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
+    if (!PowerCalSmBusy()) // not while the main loop is dispatching
+        PowerCalSm_dispatch_event(&powerSM, PowerCalSm_EventId_DO);
     ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
     TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
     #ifdef DIRECT_COUPLED_TX

@@ -836,8 +836,9 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
     // After recording the third point, curve fit is automatically calculated
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
-    EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]],14790,50);
-    EXPECT_NEAR(ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
+    // The least-squares tanh fit in dB (FitPowerCurve, 2026-11-02; scipy agrees)
+    EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]],14743,50);
+    EXPECT_NEAR(ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]],17.30,0.5);
 
     // But we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
@@ -905,8 +906,9 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
     // After recording the third point, curve fit is automatically calculated
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
-    EXPECT_NEAR(ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]],77050,600);
-    EXPECT_NEAR(ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
+    // The least-squares tanh fit in dB (FitPowerCurve, 2026-11-02; scipy agrees)
+    EXPECT_NEAR(ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]],77373,600);
+    EXPECT_NEAR(ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]],17.30,0.5);
 
     // But we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);

@@ -1102,3 +1102,197 @@ first port. Also missing from the bug list: the `bands[].mode` sideband inversio
 Verified while checking: both firmware configurations compile clean (`usb=serial2` and
 `usb=serialmidiaudio`, 600 MHz, o1lto), and 779/779 unit tests pass — 776 committed plus 3
 uncommitted transmit-chain tests in the working tree.
+
+## [2026-10-22] query | SWR coupler placement and forward-path flatness
+Owner confirmed the directional coupler sits after the band LPF, so harmonics do not reach the
+AD8307s. Recorded in [[filter-board-electronics]] together with the forward-path frequency
+response from the owner's VNA files: coupler flat within 0.15 dB across HF, but the as-built
+J23 → forward-detector path rises 2.6 dB from 160 m to 10 m. Context: planning a calibration in
+which the bridge, once calibrated on one band, measures every band's PA curve automatically
+(`code/tools/swr_calibration_50_open_short.ipynb`, Section 10). The per-band forward offset
+would then be carried across bands with this VNA table. Its board-to-board spread is the open
+question, along with the AD8307's log conformance above the range where its slope is fitted.
+
+## [2026-10-23] query | AD8307 slope and offset versus frequency
+Asked whether the bridge's slope error term should be constant with frequency and the offset
+term frequency-dependent. Mostly yes. Everything ahead of each AD8307 is linear, and a linear
+gain is a pure offset in the log domain. Nothing loads the detector output, so the slope is
+the chip's own. The AD8307 datasheet (Rev. B, external, not ingested) shows the 10 MHz and
+100 MHz transfer curves overlapping. Above 100 MHz the line moves down but stays nearly
+parallel, and the datasheet gives no frequency condition for slope or intercept. Caveat: the
+conformance error depends on the detector input level, and the path loss differs by 6 dB
+across the bands. Top-end readings on 10 m and 6 m therefore reach the detector's +10 dBm
+conformance bump, so a slope fitted over a range that includes that top end will look
+band-dependent. Recorded in [[filter-board-electronics]].
+
+## [2026-10-23] query | Correction: AD8307 front end, OFS loop, diode option
+The owner put the AD8307 datasheet (Rev. F) into `raw/`, and the control-board schematic was
+net-traced around the detectors. Yesterday's note in [[filter-board-electronics]] had three
+errors, all corrected:
+- The 0.1 µF is on INM, not OUT.
+- OUT also carries a diode-detector stuffing option (D1/D2 peak detectors, RV19/RV27, R26/R29),
+  which appears to be the `USE_ANALOG_SWR` hardware.
+- The claim that the chip adds no frequency dependence across 1.8–54 MHz was wrong. OFS is
+  open, which puts the offset loop's high-pass corner at about 1.5 MHz, just below 160 m.
+
+The pad is frequency-compensated (10 pF across the series arm, 22 nH in the shunt arms), which
+likely explains the rise in the VNA path response. Full ingest of the datasheet (source page,
+index) is pending the owner's go-ahead, per the ingest procedure.
+
+## [2026-10-23] ingest | AD8307 datasheet (Analog Devices, Rev. F)
+Ingested `raw/AD8307.pdf` → [[ad8307-datasheet]]. Its spec table is identical to Rev. B.
+
+Owner confirmations:
+- Only the AD8307s are fitted. The D1/D2 diode-detector option is not.
+- Pad values (blank in the schematic): R17/R22 = 499 Ω, R16/R18/R24/R25 = 56.2 Ω.
+
+Pages:
+- **New [[log-amp-power-detection]].** The log law and the firmware's inverse; which error
+  term absorbs what; why the fitted slope can look band-dependent (conformance error vs
+  detector input level; the 1.5 MHz offset loop near 160 m); SWR needing only the slope
+  ratio and the offset difference; modulated signals reading low by the mean of the log
+  (two-tone ≈ 3 dB below average power, derived); 2f output ripple.
+- **[[filter-board-electronics]].** Rewrote the detector front end with the confirmed values.
+  A π-pad model plus the in-circuit coupler matches the J23 → forward-detector VNA sweep to
+  0.1 dB on every band (160 m −45.90 vs −45.89 dB; 6 m −39.96 vs −39.93 dB). The rise comes
+  from the 10 pF across the 499 Ω (zero at 32 MHz); the 22 nH barely matters. Board spread
+  is modelled as 0.38 dB/pF on 10 m and 0.59 dB/pF on 6 m, but negligible from 160 m to
+  20 m. The `…after_attenuator` VNA file does not fit this build, so it is probably an
+  earlier one.
+- **[[filter-boards]].** Calibration-term notes; corrected the `USE_ANALOG_SWR` paragraph,
+  because the diodes are a stuffing option on the same board.
+- **Cross-links:** [[t41-ep-schematics]], [[hardware-platform]],
+  [[calibration-state-machines]], and the index.
+
+Open questions:
+- Whether 160 m differs because of the open OFS pin. Test: compare the gain-step slope on
+  160 m with 40 m.
+- The 10 m / 6 m path spread across boards.
+
+## [2026-10-24] decision | CAT commands for the SWR bridge bench series
+Added three non-Kenwood CAT commands so `code/tools/swr/swr_bench_measure.py` can take the SWR
+bridge calibration series (`swr_bench_measurements.csv`, notebook Section 11) under CAT control:
+- `BR`: raw bridge statistics, accumulated from the unsmoothed AD7991 readings;
+- `XA`: CW attenuation override, for the attenuator-limit rows that `PC`'s whole watts cannot
+  reach;
+- `DD`: the digital transmit drive.
+
+Fixed two `PC` bugs found on the way: in digital mode it set the CW power, which that mode does
+not use, and it dropped the hundreds digit. Recorded in [[cat-control]]. 16 new unit tests, all
+passing. Committed in 583c4b5 without the owner's local KI3P prototype LPF remapping, which
+stays out of the repository; all 812 unit tests pass on that commit.
+
+## [2026-10-24] query | SWR bridge bench tests on two radios
+Measured radio 1 once and radio 2 twice with `code/tools/swr/swr_bench_measure.py`. Radio 2's
+second session is the "radio 3" sheet, with the loads moved from the external coupler's output
+to the radio's own connector. Findings are filed in [[swr-bridge-measured-behaviour]]:
+- **Forward power:** a per-band wattmeter calibration gives ±0.25 dB on radio 1 and ±0.5 dB on
+  radio 2, which shows AD8307 conformance curvature. It drifts 0.3–0.5 dB between sessions.
+- **Shortcuts fail.** Gain-step slopes read 2–7 % low, because the transmitter is not
+  dB-linear. VNA offset transfer between bands is off by up to 3.3 dB. This contradicts
+  [[filter-board-electronics]]; both claims are annotated there.
+- **SWR reads 30–90 % high on both radios.** The bridge leaks 10–20 dB more in the radio than on
+  the VNA bench, and magnitude-only detectors cannot calibrate that out. A same-radio A/B
+  showed the external coupler was not the cause on 40 m and 20 m. The shifted-balance-impedance
+  explanation (from radio 1) was rejected.
+- **Faults:**
+  - radio 2's PA oscillates into a short on 10 m;
+  - a stuck-DIGITAL-transmit fault (keyed, no tone) needed a power cycle;
+  - radio 1 rebooted on a static discharge.
+
+Script changes made along the way: rows grouped by the load on the connector, a tone check on
+every DIGITAL row, DIGITAL left before band changes, and oscillation detection that skips the
+load. Open: the source of the in-radio leak.
+
+## [2026-10-25] query | L44 coupler modelled from its winding
+The owner described L44's winding: a 1:10 current transformer and a 10:1 voltage transformer
+on one BN-43-202 binocular. They also confirmed that the diode-detector option is not
+populated (R20/R28, D1/D2, C149/C156, RV19/RV27, R26/R29), so each coupled port sees only its
+pad. Corrected [[filter-board-electronics]] and [[t41-ep-schematics]], which had both ports
+terminated in 52.3 Ω. Added `code/tools/swr/l44_coupler_model.py`, a nodal circuit model of the
+coupler. Findings are in [[swr-bridge-measured-behaviour]]:
+- each port's null depends on the other port's load and the turns ratio;
+- a correctly built L44 should leak −30 to −37 dB;
+- the radios' leak needs about 15 pF or 300 nH of stray coupling;
+- the out-of-circuit bench sweep of L44 leaks at radio 2's level, so the surroundings matter
+  more than the windings.
+
+## [2026-10-31] decision | L44 fixture re-measured; coupler wiring model
+Re-measured L44 alone in its perfboard fixture with the S-A-A-2 VNA (four paths, other ports on
+50 Ω; files in `023_SAAV2-VNA_MCP/data/fixture_2026-10-31_*`). It leaks −29.8/−25.0/−19.5 dB on
+40/20/10 m, 13–14 dB less than the original `RF_in_to_*.s2p` sweep, which is withdrawn with the
+results built on it (the 31 nH mutual fit, the 2.8 dB rms load fit). The owner gave L44's
+construction: radio 2 has 20 turns per core (explaining its 6 dB lower forward offset), radio 1
+10 turns with its core 20 mm up. Added `code/tools/swr/l44_peec_model.py` (core by turns, air by
+Neumann, capacitance per turn): it matches the fixture both ways and explains radio 2's leak and
+load readings as capacitance between its crowded windings and the thick wires. Radio 1 stays
+unexplained. Updated [[swr-bridge-measured-behaviour]]; the SWR technical report (Claude Doc,
+revision 77) and its local copy were updated to match.
+
+
+## [2026-11-01] decision | SWR error traced to AD7991 readout crosstalk; discarded-conversion fix
+Radio 1 re-measured after the owner rebuilt its L44 (flush, screened through lines grounded at
+one end): `code/tools/swr/swr_bench_measurements_radio1_l44_flush.csv`, loads on the connector
+(100/200 Ω re-taken after a first take on the external coupler). The bare 50 Ω load improved
+(40 m 1.35 → 1.10), but 100/200 Ω read as before. One return-loss factor, 0.666, fits all bands.
+- **AD2 test:** probes on U20 pins 3/4 (`code/tools/swr/detector_readout/`) showed the
+  detector voltages give correct SWR (100 Ω 1.94–2.02, 200 Ω 3.9–4.3 on 160–20 m). The radio's
+  ADC mixes the channels: ADC_F = 0.83 Vf + 0.14 Vr, ADC_R = 0.18 Vf + 0.80 Vr, so the
+  differential gain is 0.65. Bridge leaks at the pins are −42/−40/−31/−22 dB (160/40/20/10 m).
+- **Withdrawn:** the October "in-radio leak", radio 2's winding-capacitance fit and radio 1's
+  −9 dB extra leak. All were fitted to compressed readings.
+- **Fix:** `AD7991::readADCsingle()` discards the first conversion after a channel switch (9
+  new tests, 821/821 pass). Flashed to radio 1 (serialmidiaudio + the local KI3P patch);
+  verification at the pins is pending.
+- **Updated:** [[swr-bridge-measured-behaviour]], [[filter-board-electronics]], [[filter-boards]],
+  index. The SWR technical report (Claude Doc, revision 84) and its local copy were updated.
+
+## [2026-11-01] decision | AD7991 fix verified: two discarded conversions per channel switch
+Re-probed U20's pins on radio 1 with the new firmware.
+- **One discard:** the cross terms fell from 0.144/0.186 to 0.022/0.042, about their squares.
+- **Two discards** (now the default, `AD7991_DEFAULT_DISCARDS`): they fell to 0.007/−0.008, and
+  the Vf−Vr gain (0.972) equals the common-mode gain (0.971).
+- **Loads:** with the open/short reference, radio 1's ADC reads 100 Ω as 2.01–2.09 and 200 Ω
+  as 3.9–4.3 on 160–20 m, as the pins do. 10 m reads 2.17–2.26 / 4.07–4.22 from the bridge's
+  own −22 dB leak.
+- **Cost:** a bridge update now takes about 3 ms (Wire2 at 100 kHz), while transmitting only.
+- **Updated:** [[swr-bridge-measured-behaviour]], [[filter-board-electronics]], [[filter-boards]].
+  The SWR technical report (Claude Doc, revision 91) and its local copy were updated.
+
+## [2026-11-01] decision | Bench series on the fixed firmware: SWR calibrates
+Repeated radio 1's 144-row series with two discarded AD7991 conversions per channel switch
+(`code/tools/swr/swr_bench_measurements_radio1_adcfix.csv`).
+- **Loads:** with the wattmeter forward calibration and the open/short reflected calibration,
+  100 Ω reads 1.97–2.04 and 200 Ω 3.96–4.22 on 160–20 m, against 2.8–3.0 and 5.9–7.0 before
+  the fix. 10 m reads 2.26–2.42 / 4.29–4.73, within the bench-VNA range.
+- **Calibration:** the open and short agree within 0.04 dB on 160–20 m, and the drift checks
+  repeat within 0.08 dB.
+- **Open:** the 10 m forward fit stays poor (0.69 dB rms).
+- **Updated:** [[swr-bridge-measured-behaviour]]. The SWR technical report (Claude Doc,
+  revision 93) and its local copy were updated.
+
+## [2026-11-01] lint | Restructured swr-bridge-measured-behaviour around the current state
+Rewrote [[swr-bridge-measured-behaviour]] to match the restructured SWR technical report
+(Claude Doc revision 101).
+- **Current state first:** summary, the readout error and its fix, the calibration on the
+  fixed firmware with a pointer to `code/docs/swr_calibration_approach.md`, open issues (now
+  including the 10 m ceiling over-read) and implications.
+- **History:** the October measurement sections are kept verbatim under "History: the October
+  2026 investigation", with a note on what still holds.
+- **Index:** the entry was updated to match.
+
+## [2026-11-02] decision | Radio 2's L44 leak confirmed and removed by the rebuild
+Three bench series on radio 2 with the fixed firmware: original build, after removing
+C147/C154 and adding 100 pF across the detector inputs, and after rebuilding L44 with
+screened through lines (`code/tools/swr/swr_bench_measurements_radio2_{adcfix,c154_out,l44_shielded}.csv`).
+- **The leak was in L44:** the 50 Ω load read SWR 1.11/1.23/1.48 on 40/20/10 m, unchanged by
+  the capacitor step, and 1.02/1.03/1.07 after the L44 rebuild.
+- **The capacitor step moved the forward offsets** (+3.1 dB on 10 m), bringing the two
+  radios to an almost constant 1 dB apart; the L44 rebuild moved them by 0.4 dB at most.
+- **Radio 2's PA oscillates into a 10 m short** in every build.
+- **Partly reinstated:** the October explanation of radio 2's leak (capacitance from the
+  through line to its windings) fits the fix, though the leak was smaller than claimed then.
+- **Updated:** [[swr-bridge-measured-behaviour]] (new section "Radio 2's rework"),
+  [[filter-board-electronics]] (open questions), `code/docs/swr_calibration_approach.md`
+  (three calibration levels, defaults and accuracy recomputed from both rebuilt radios), and
+  the SWR technical report.

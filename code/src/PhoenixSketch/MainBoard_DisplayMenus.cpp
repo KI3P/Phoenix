@@ -590,10 +590,14 @@ void RestoreReceiveEQ(void){
     }
 }
 
-struct SecondaryMenuOption DiagnosticOptions[3] = {
+// "Buffer print" prints the last hardware register write (LPF and BPF bands, antenna,
+// TX/RX and VFO bits, attenuators) over Debug(); "Print stored data" prints every field of
+// the stored configuration (ED), calibrations included, over Serial
+struct SecondaryMenuOption DiagnosticOptions[4] = {
     "I2C BIT test", functionOption, NULL, (void *)GotoDisplayBIT, NULL,
     "Restore receive EQ", functionOption, NULL, (void *)RestoreReceiveEQ, NULL,
     "Buffer print", functionOption, NULL, (void *)buffer_pretty_print_last_entry, NULL,
+    "Print stored data", functionOption, NULL, (void *)PrintEDToSerial, NULL,
 };
 
 // Sample Rate Menu

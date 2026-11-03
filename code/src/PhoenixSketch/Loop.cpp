@@ -423,6 +423,22 @@ void ChangePowerCalibrationPhase(void); // forward declare from MainBoard_Displa
 void StartPowerAutoCal(void);
 
 /**
+ * @brief Change band during power calibration
+ * @param band Band to tune to, FIRST_BAND to LAST_BAND
+ * @note Tunes to the middle of the band in the band's default mode and
+ *       updates the RF hardware. Used by the band buttons and by the
+ *       automatic power calibration.
+ */
+void SetCalibrationBand(int32_t band){
+    ED.currentBand[ED.activeVFO] = band;
+    ED.centerFreq_Hz[ED.activeVFO] = (bands[band].fBandHigh_Hz+bands[band].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+    ED.modulation[ED.activeVFO] = bands[band].mode;
+    UpdateRFHardwareState();
+    Debug("Band is " + String(bands[band].name));
+}
+
+/**
  * Process button press events from the front panel.
  *
  * Routes button presses to appropriate handlers based on button ID. Handles:
@@ -441,8 +457,16 @@ void StartPowerAutoCal(void);
  * @param button Button ID from the front panel (defined in button constants)
  */
 void HandleButtonPress(int32_t button){
+    // The automatic power calibration keys the transmitter itself, and needs
+    // SELECT (wattmeter entry), ZOOM (abort), HOME, and the wattmeter entry's
+    // units (14) and increment (15) while it is keyed
+    bool autoCalButton = PowerCalAutoActive() &&
+                         (uiSM.state_id == UISm_StateId_CALIBRATE_POWER) &&
+                         ((button == MENU_OPTION_SELECT) || (button == ZOOM) ||
+                          (button == HOME_SCREEN) || (button == 14) || (button == 15));
     // Disable all buttons when in an active transmit mode
-    if ((modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
+    if (!autoCalButton && (
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT) ||
@@ -451,7 +475,7 @@ void HandleButtonPress(int32_t button){
         (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
-        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK))
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK)))
         return;
 
     switch (uiSM.state_id){
@@ -871,24 +895,28 @@ void HandleButtonPress(int32_t button){
                     RecordPowerButtonPressed();
                     break;
                 }
-                // Auto power cal is not ready for prime time
-                // The behavior of the SWR bridge needs to be
-                // better characterized.
-                //case (1):{
-                //    StartPowerAutoCal();
-                //    break;
-                //}
+                case (1):{
+                    // Automatic power and SWR bridge calibration
+                    StartPowerAutoCal();
+                    break;
+                }
                 case (ZOOM):{
-                    // Reset and begin again
+                    // Reset and begin again; aborts the automatic calibration
                     ResetPowerCal();
                     break;
                 }
                 case (12):{
-                    ChangePowerCalibrationPhase();
+                    if (PowerCalAutoActive())
+                        SkipPowerCalStage();
+                    else
+                        ChangePowerCalibrationPhase();
                     break;
                 }
                 case (14):{
-                    ChangePowerUnits();
+                    if (powerSM.state_id == PowerCalSm_StateId_REVIEW)
+                        RetryPowerCal();
+                    else
+                        ChangePowerUnits();
                     break;
                 }
                 case (15):{
@@ -897,11 +925,15 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case (16):{
-                    // Change PA selection
-                    ChangeCalibrationPASelection();
+                    // Change PA selection; not during the automatic calibration
+                    if (!PowerCalAutoActive())
+                        ChangeCalibrationPASelection();
                     break;
                 }
                 case HOME_SCREEN:{
+                    // Leave the automatic calibration first, so it unkeys
+                    if (PowerCalAutoActive())
+                        ResetPowerCal();
                     RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
@@ -909,33 +941,27 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case BAND_UP:{
-                    if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
-                        ED.currentBand[ED.activeVFO] = FIRST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
-                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    if (PowerCalAutoActive())
+                        break; // the automatic calibration chooses the bands
+                    int32_t band = ED.currentBand[ED.activeVFO] + 1;
+                    SetCalibrationBand((band > LAST_BAND) ? FIRST_BAND : band);
                     ResetPowerCal();
-                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
-                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 case BAND_DN:{
-                    if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
-                        ED.currentBand[ED.activeVFO] = LAST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
-                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    if (PowerCalAutoActive())
+                        break; // the automatic calibration chooses the bands
+                    int32_t band = ED.currentBand[ED.activeVFO] - 1;
+                    SetCalibrationBand((band < FIRST_BAND) ? LAST_BAND : band);
                     ResetPowerCal();
-                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
-                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 default:
@@ -1331,19 +1357,35 @@ void ConsumeInterrupt(void){
         case (UISm_StateId_CALIBRATE_POWER):{
             switch (interrupt){
                 case (iFILTER_INCREASE):{
-                    IncrementCalibrationPower();
+                    // On the automatic calibration's setup screen the filter
+                    // encoder sets the L44 turns; elsewhere the measured power
+                    if (powerSM.state_id == PowerCalSm_StateId_SETUP)
+                        ChangeAutoCalTurns(+1);
+                    else
+                        IncrementCalibrationPower();
                     break;
                 }
                 case (iFILTER_DECREASE):{
-                    DecrementCalibrationPower();
+                    if (powerSM.state_id == PowerCalSm_StateId_SETUP)
+                        ChangeAutoCalTurns(-1);
+                    else
+                        DecrementCalibrationPower();
                     break;
                 }
                 case (iVOLUME_INCREASE):{
-                    IncrementCalibrationTransmitAtt();
+                    // In the automatic calibration the firmware sets the
+                    // attenuation; the volume encoder chooses the level instead
+                    if (PowerCalAutoActive())
+                        ChangeAutoCalLevel(+1);
+                    else
+                        IncrementCalibrationTransmitAtt();
                     break;
                 }
                 case (iVOLUME_DECREASE):{
-                    DecrementCalibrationTransmitAtt();
+                    if (PowerCalAutoActive())
+                        ChangeAutoCalLevel(-1);
+                    else
+                        DecrementCalibrationTransmitAtt();
                     break;
                 }
                 default:
@@ -1384,10 +1426,15 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iPTT_PRESSED):{
+            // The automatic power calibration does its own keying; ignore the PTT
+            if (PowerCalAutoActive())
+                break;
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
             break;
         }
         case (iPTT_RELEASED):{
+            if (PowerCalAutoActive())
+                break;
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
             break;
         }
@@ -1525,8 +1572,56 @@ void ShutdownTeensy(void){
 // PC-side one-liner (Python 3):
 //   python -c "import serial,time; s=serial.Serial('COMx',115200); s.write(('T'+str(int(time.time()))+'\n').encode()); s.close()"
 // Replace COMx with the Teensy USB serial port (e.g. COM6).
+//
+// Which routine reads the packet depends on the USB type. Without a USB audio
+// interface there are two CDC ports and CheckForSerialTimeSync() below has
+// Serial to itself. With AUDIO_INTERFACE there is only one, CATSerial is Serial,
+// and CheckForCATSerialEvents() drains everything available before this could
+// run - so there the CAT reader recognises the packet by its newline terminator
+// and calls ApplyTimeSyncDigits() directly. The bytes on the wire are identical
+// either way; only the reader that sees them differs.
 #define TIME_SYNC_HEADER 'T'
 #define TIME_SYNC_LEN    10    // digits in a Unix timestamp until ~year 2286
+
+/**
+ * Set both clocks from the digit field of a PJRC time-sync packet.
+ *
+ * Shared by the two readers that can receive the packet so that a build with a
+ * USB audio interface and a build without accept exactly the same bytes.
+ *
+ * @param digits Timestamp digits alone - no 'T' header, no terminator
+ * @param count  Number of digits available
+ * @return true if the timestamp was valid and the clocks were set
+ */
+bool ApplyTimeSyncDigits(const char* digits, uint8_t count) {
+    if (count != TIME_SYNC_LEN) return false;
+
+    // atoll() would accept a leading sign or embedded spaces and quietly stop at
+    // the first non-digit, so vet every character before trusting the value. The
+    // CAT reader hands over whatever arrived newline-terminated, which is not
+    // necessarily a timestamp.
+    for (uint8_t i = 0; i < count; i++) {
+        if (digits[i] < '0' || digits[i] > '9') return false;
+    }
+
+    char tsbuf[TIME_SYNC_LEN + 1];
+    memcpy(tsbuf, digits, count);
+    tsbuf[count] = '\0';
+
+    time_t t = (time_t)atoll(tsbuf);
+    if (t <= 1000000000UL) return false;   // sanity: after ~2001
+
+    Teensy3Clock.set(t);
+    setTime(t);
+#ifndef AUDIO_INTERFACE
+    // Only safe on a two-port build. Where CAT shares this port the confirmation
+    // would land in the middle of the CAT client's response stream - the same
+    // reason Debug() is stubbed out in those builds (see SDT.h).
+    Serial.print("Time set: ");
+    Serial.println((int64_t)t);
+#endif
+    return true;
+}
 
 void CheckForSerialTimeSync(void) {
     static char tsbuf[TIME_SYNC_LEN + 2];
@@ -1541,15 +1636,7 @@ void CheckForSerialTimeSync(void) {
             memset(tsbuf, 0, sizeof(tsbuf));
         } else if (collecting) {
             if (c == '\n' || c == '\r') {
-                if (tsidx == TIME_SYNC_LEN) {
-                    time_t t = (time_t)atoll(tsbuf);
-                    if (t > 1000000000UL) {   // sanity: after ~2001
-                        Teensy3Clock.set(t);
-                        setTime(t);
-                        Serial.print("Time set: ");
-                        Serial.println((int64_t)t);
-                    }
-                }
+                ApplyTimeSyncDigits(tsbuf, tsidx);
                 collecting = false;
                 tsidx = 0;
             } else if (tsidx < TIME_SYNC_LEN) {
@@ -1573,8 +1660,15 @@ FASTRUN void loop(void){
     // Front-panel encoders/buttons are now drained by fpServiceTimer (1 ms, below
     // audio priority) instead of being polled here once per loop iteration.
     CheckForCATSerialEvents();
+#ifndef AUDIO_INTERFACE
+    // Only on a two-port build. With a USB audio interface CAT owns this port
+    // and has already drained it, so calling this could only steal the tail of a
+    // packet the CAT reader is handling; it recognises time packets itself.
     CheckForSerialTimeSync();
+#endif
     ConsumeInterrupt();
+    // Work posted by the automatic power calibration's state machine
+    PowerCalAutoService();
 
     // Step 2: Perform signal processing
     PerformSignalProcessing();

@@ -3,7 +3,7 @@ title: Hardware Platform (T41-EP)
 type: hardware
 status: stable
 created: 2026-06-14
-updated: 2026-07-29
+updated: 2026-10-23
 tags: [hardware, teensy, t41-ep, board-stack, codec, i2c, platform, sample-rate]
 source_refs: [sources/t41-ep-schematics]
 related: ["[[overview]]", "[[i2c-bus-map]]", "[[rf-board-electronics]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[filter-boards]]", "[[front-panel]]", "[[display-subsystem]]", "[[hardware-state-machine]]", "[[audio-io]]", "[[sample-rate-switching]]", "[[filter-hil-test]]"]
@@ -166,3 +166,5 @@ I²S/MCLK routing have all been traced — see Resolved below and the module pag
 - **Power/SWR = 2 AD8307 log detectors (U14 fwd, U19 rev) → AD7991 CH0/CH1**, ref = REF3440 on
   Vin3/Vref. Net-traced 2026-06-14; the default firmware log conversion is **correct** (no bug
   — the linear formula belongs to the unused analog-diode path). → [[filter-board-electronics]]
+  Detector behaviour (slope/intercept spread, frequency, conformance) → [[ad8307-datasheet]],
+  [[log-amp-power-detection]].
