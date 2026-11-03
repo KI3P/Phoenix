@@ -3,7 +3,7 @@ title: CAT Control (Kenwood emulation)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-10-24
+updated: 2026-11-03
 tags: [cat, kenwood, ts-480, ts-2000, serial, rig-control, usb]
 source_refs: []
 related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]", "[[filter-board-electronics]]", "[[log-amp-power-detection]]"]
@@ -20,6 +20,17 @@ logging/contest/digital software (WSJT-X, fldigi, hamlib, N1MM…) can drive the
 - **Baud:** 38400.
 - **Framing:** ASCII commands terminated by `;`. Polled each pass by `CheckForCATSerialEvents()`
   from [[main-loop]], which buffers until the terminator then parses.
+- **Newlines are not CAT (2026-08-05, commit ab69673).** In the `serial+midi+audio` build
+  there is only one CDC port, so CAT and the console share `Serial`. The CAT reader drained
+  that port before `CheckForSerialTimeSync()` ever saw it. As a result, the PJRC time packet
+  (`T<10-digit epoch>\n`) was swallowed: the clock was never set, and the leftover bytes made
+  the next command answer `?;`. No Kenwood command contains a newline, so the CAT reader now
+  treats a newline-terminated run of bytes as something other than CAT:
+  - a `T` prefix is passed to `ApplyTimeSyncDigits()` (`Loop.cpp`), shared with the two-port
+    build's reader;
+  - anything else is discarded. This also fixes clients that end their commands with CRLF.
+  
+  `code/tools/set_radio_time.py` and `Set-RadioTime.ps1` send the time packet from a PC.
 
 ## Protocol ⚠️ TS-480 vs TS-2000
 The implemented dialect is the **Kenwood** 2-letter command set. The two source docs
@@ -113,7 +124,8 @@ would make the mode impossible to hold. Only `DG0;` or the front panel leaves it
 ### Bridge-measurement commands (added 2026-10-24)
 
 Added for `code/tools/swr/swr_bench_measure.py`, which takes the SWR bridge calibration series
-under CAT control (`code/tools/swr/swr_calibration_50_open_short.ipynb`, Section 11). All three are
+under CAT control (`code/tools/swr/swr_calibration_50_open_short.ipynb`, Section 11; both on the
+`swr_cal_redux` branch, not in `nightly`). All three are
 non-Kenwood. Uncommitted as of 2026-10-24.
 
 - **`BR`** — raw SWR bridge statistics. `PerformSWRBridgeReading()` now also adds every raw

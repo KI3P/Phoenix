@@ -16,6 +16,7 @@ Some of the features of the T41 V12 hardware running the Phoenix firmware:
 * Noise reduction via a variety of algorithms.
 * Receive and transmit audio equalizers.
 * Automated calibration routines for receive IQ balance, transmit IQ balance, transmit carrier nulling, and PA output power.
+* Automatic power and SWR calibration of every band from a dummy load, an open and a short, with optional wattmeter readings.
 * Selectable sample rate: 192 or 176.4 ksps, chosen at run time and persisted, with the audio filters redesigned on each change so their frequencies do not move.
 * Digital mode: bi-directional USB audio for FT8 and the other WSJT-X modes, with no external sound card and no resampling.
 * CAT control.
@@ -60,6 +61,53 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 ![](images/Home_screen_button_map.png)
 
 # Version History
+
+## V1.5.0 Release Notes
+
+### Major New Features
+
+**Automatic Power and SWR Calibration**
+A single session now calibrates the PA power curve, the SSB gain and the SWR bridge on every band from 160 m to 6 m. Fit a 50 Ω load, then leave the connector open, then fit a short. The radio keys itself, steps the drive and measures every band on each standard in turn. A review screen then shows each band's result before anything is stored. There are three levels:
+
+| Level | Equipment | Wattmeter readings | Power display accuracy |
+|---|---|---|---|
+| 1 | 50 Ω dummy load, short | none | within about ±1.5 dB |
+| 2 (recommended) | wattmeter with its 50 Ω load, short | 2 per band | about ±0.3 dB, worst ±0.8 dB |
+| 3 | wattmeter with its 50 Ω load, short | 8 per band | about ±0.2 dB |
+
+The SWR reading is almost equally good at every level, because the reflected line is fitted from the open and the short against the forward line. Start it from the power calibration screen with button 1. The automatic calibration runs with the 20 W PA only. It has been run and validated on multiple radios. See [the operator's guide](code/docs/PowerCalibration/AutoCalibration.md) and, for developers, [the design](code/docs/PowerCalibration/AutoCalibrationDesign.md).
+
+The session protects the PA:
+- The open and short are measured with short bursts of SSB tone, with the radio in true receive between bursts.
+- A PA oscillating into the open or the short is detected, and that sweep is abandoned.
+- A missing or loose load fails the band instead of corrupting its PA curve.
+- ZOOM stops transmitting at once.
+
+**Accurate SWR Readings**
+SWR used to read 30–90 % high, and the cause was the radio's AD7991 ADC rather than the bridge: its sampling capacitor still held 15–19 % of the previous channel's voltage, which pulled the forward and reflected readings toward each other. The firmware now discards two conversions after each channel switch. After calibration, a bench radio reads a 2:1 load as 1.97–2.04 and a 4:1 load as 3.96–4.22 on 160 m to 20 m. A bridge reading now takes about 3 ms, while transmitting only.
+
+**More Accurate PA Power Curve**
+The PA's output is now modelled as P = P_sat·tanh((k·x)^s)^(1/s), where the new shape exponent s sets how sharp the knee is. The curve is fitted in dB by Levenberg–Marquardt in double precision. On measured sweeps the curve's rms miss fell from 0.69 dB (worst band 1.64 dB) to 0.16 dB (worst band 0.50 dB). A configuration saved by an earlier version loads with s = 1, its old curve. The manual power calibration, with only three points, still fits the plain tanh.
+
+**Measured Defaults for an Uncalibrated Radio**
+A radio with no saved configuration now starts on 160–6 m from a measured bridge calibration and PA curve, instead of zeros and one generic curve. Before this, an uncalibrated radio's power display read about 4 dB high. Radios with a saved configuration keep their own values.
+
+### Bug Fixes
+
+- **No SSB output after a CW transmit on the same frequency** (dual-VFO boards). The CW output and the SSB transmit outputs share the Si5351's PLLB, and setting the CW frequency retunes it. The SSB transmit VFO skipped what it thought was a repeated write and was left at the wrong frequency. This showed up as no output at step 4 of the manual power calibration.
+- **The manual power calibration's SSB step stored the wrong correction.** It ignored the DSP gain applied during the measurement, so with SSB power at 3 W the radio transmitted about 5 W.
+- **The power calibration screen's Transmit indicator always read Off.**
+- **Serial time sync with the Serial + MIDI + Audio USB type.** CAT and the time sync share the one serial port in this build. The CAT reader swallowed the time packet, so the clock was never set, and the next CAT command was answered `?;`. Newline-terminated input is now recognised as not being CAT. This also fixes CAT clients that end their commands with CRLF.
+- **The CW decoder text grew large** if the fine tune encoder was turned in CW mode with the decoder on *(reported by Rick Price, KN4AIE)*.
+
+### Under-the-Hood Changes
+
+- **New CAT commands**, bringing the table to 35, for taking bench measurements of the SWR bridge: `BR` (statistics of the raw bridge readings), `XA` (CW transmit attenuation override) and `DD` (USB drive level). `PC` now reads all three digits and sets the SSB power in DIGITAL mode. `BR` is refused while the automatic calibration runs.
+- **New stored settings:** the PA curve shape per band and PA, and per band the SWR calibration level and date, plus the number of turns on the coupler L44.
+- **Diagnostics → Print stored data** prints every stored setting over Serial, with the calibrations to 3 decimals.
+- **Cross-platform scripts** set the radio's clock from a PC: `code/tools/set_radio_time.py` (Python) and `code/tools/Set-RadioTime.ps1` (Windows PowerShell).
+- **Tests:** the unit tests have grown to 904. They include an end-to-end suite that runs the firmware's real timer and main loop against a simulated bench, operated only through the buttons and encoders. A monitor checks after every pass that the radio never transmits outside a measurement and never changes band while keyed.
+- **The wiki** has a new page on the automatic calibration and covers the other changes above.
 
 ## V1.4.1 Release Notes
 
@@ -371,16 +419,13 @@ This will compile and run the unit test programs. You should see an output that 
 
 ```bash
 ...
-776/779 Test #776: PowerCalibrationTest.FitPowerCurve_RealWorldData ..............................   Passed    0.01 sec
-        Start 777: PowerCalibrationWalkthroughTest.CompleteCalibrationAllBands
-777/779 Test #777: PowerCalibrationWalkthroughTest.CompleteCalibrationAllBands ...................   Passed    1.75 sec
-        Start 778: PowerCalibrationWalkthroughTest.RemeasuringDataPoints_StateRemainsCorrect
-778/779 Test #778: PowerCalibrationWalkthroughTest.RemeasuringDataPoints_StateRemainsCorrect .....   Passed    0.54 sec
-        Start 779: PowerCalibrationWalkthroughTest.StateTransitions_ResetBehavior
-779/779 Test #779: PowerCalibrationWalkthroughTest.StateTransitions_ResetBehavior ................   Passed    0.60 sec
+        Start 903: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio1
+903/904 Test #903: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio1 ......   Passed   35.35 sec
+        Start 904: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio2
+904/904 Test #904: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio2 ......   Passed   33.60 sec
 
-100% tests passed, 0 tests failed out of 779
+100% tests passed, 0 tests failed out of 904
 
-Total Test time (real) =  91.50 sec
+Total Test time (real) = 251.89 sec
 ```
 

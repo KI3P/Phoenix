@@ -3,7 +3,7 @@ title: Documentation TODOs & Open Questions
 type: roadmap
 status: draft
 created: 2026-06-08
-updated: 2026-07-29
+updated: 2026-11-03
 tags: [todo, open-questions, discrepancies, wiki-maintenance]
 source_refs: []
 related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]"]
@@ -206,7 +206,8 @@ is tagged **⚠ possible bug** so it stands out.
 - ~~**Built-in test (BIT)**~~ — **done** ([[built-in-test]]: startup I²C presence flags →
   status screen). Remaining: is it re-runnable / extensible to functional checks?
 - ~~**Calibration sub-state-machines**~~ — **done** ([[calibration-state-machines]]: 3 identical
-  minimize-sweep SMs + PowerCalSm curve-fit, with state/event maps). Remaining: per-SM `Vars`;
+  minimize-sweep SMs + PowerCalSm curve-fit, with state/event maps; PowerCalSm's MANUAL and AUTO
+  branches updated for V1.5.0). Remaining: per-SM `Vars`;
   whether the 3 identical SMs share one diagram.
 
 **All previously-listed "not yet written" pages are now drafts.**
@@ -215,7 +216,8 @@ is tagged **⚠ possible bug** so it stands out.
 - [[hardware-state-machine]]: full state maps of the 4 cal sub-SMs (above);
   `RFCalTransmitIQSingleVFO` external-analyzer flow.
 - [[rf-board]]: local Etherkit-Si5351 library modifications vs. upstream.
-- [[filter-boards]]: full LPF band↔BCD table; directional-coupler / per-band power calibration.
+- [[filter-boards]]: full LPF band↔BCD table. (Directional-coupler / per-band power calibration:
+  **done 2026-11-03**, [[automatic-power-swr-calibration]].)
 - [[front-panel]]: per-button id→physical-label map; measured latency win from the branch.
 - [[display-subsystem]]: waterfall colour-map / `psdnew`→pixel mapping; touch input;
   `primaryMenu[8]` contents.
@@ -243,7 +245,8 @@ is tagged **⚠ possible bug** so it stands out.
 - ~~[[rf-board]]~~ — **done** (Si5351 quadrature VFO incl. the <3.2 MHz timed-delay path,
   attenuators, T/R switching, cal loopback). Remaining: local Etherkit-lib modifications.
 - ~~[[filter-boards]]~~ — **done** (BPF/LPF/back-end relays via shared hardwareRegister, AD7991
-  SWR/power math). Remaining: full LPF band↔BCD table; coupler calibration.
+  SWR/power math). Remaining: full LPF band↔BCD table. Coupler calibration done
+  ([[automatic-power-swr-calibration]]).
 - ~~[[front-panel]]~~ — **done** (2×MCP23017, Rotary_V12 encoders, two-tier ISR+1ms-timer
   servicing = the encoder-i2c-speed branch design). Remaining: per-button id→label map.
 - ~~[[display-subsystem]]~~ — **done** (Pane dirty-flag model, 13 home panes enumerated,

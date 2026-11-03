@@ -3,10 +3,10 @@ title: Display Subsystem (RA8875, panes, menus, calibration screens)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-07-29
+updated: 2026-11-03
 tags: [display, ra8875, ui, spectrum, waterfall, menus, panes, stale-flags, sample-rate]
 source_refs: []
-related: ["[[overview]]", "[[ui-state-machine]]", "[[dsp-chain]]", "[[zoom-fft]]", "[[hardware-state-machine]]", "[[persistent-config]]", "[[spectrum-refresh-floor]]", "[[rapid-tune-mute-freeze]]", "[[sample-rate-switching]]", "[[cat-control]]"]
+related: ["[[overview]]", "[[ui-state-machine]]", "[[dsp-chain]]", "[[zoom-fft]]", "[[hardware-state-machine]]", "[[persistent-config]]", "[[spectrum-refresh-floor]]", "[[rapid-tune-mute-freeze]]", "[[sample-rate-switching]]", "[[cat-control]]", "[[automatic-power-swr-calibration]]"]
 ---
 
 # Display Subsystem (RA8875)
@@ -22,7 +22,10 @@ state.
 - `MainBoard_DisplayMenus.cpp` — main/secondary menu rendering
 - `MainBoard_DisplayDFE.cpp` — Direct Frequency Entry pad ([[ui-state-machine]])
 - `MainBoard_DisplayEqualizer.cpp` — 14-band TX/RX equalizer screen ([[audio-equalizer]])
-- Calibration screens: `MainBoard_DisplayCalibration_Frequency/Power/RXIQ/TXIQ.cpp`
+- Calibration screens: `MainBoard_DisplayCalibration_Frequency/Power/RXIQ/TXIQ.cpp`, plus
+  `MainBoard_DisplayCalibration_PowerAuto.cpp` (V1.5.0). This screen replaces the power
+  calibration screen while the automatic calibration runs. It shows the status, the last
+  point's readings and a per-band results table ([[automatic-power-swr-calibration]]).
 - Fonts: `FreeSansBold18pt7b.h`, `FreeSansBold24pt7b.h`
 
 ## The pane model — dirty-flag rendering

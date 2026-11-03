@@ -3,9 +3,10 @@ title: Phoenix Wiki Index
 type: index
 status: stub
 created: 2026-06-08
-updated: 2026-10-23
+updated: 2026-11-03
 ---
 
+<!-- updated 2026-11-03: V1.5.0. New firmware/automatic-power-swr-calibration (the AUTO branch of PowerCalSm: load/open/short session, three levels, validated on two radios). Updated calibration-state-machines, tune-frequency-control (shaped-tanh LM fit), hardware-state-machine, persistent-config, filter-boards, display-subsystem, rf-board (PLLB sharing fix), cat-control (newline/time-sync fix), swr-bridge-measured-behaviour (code/tools/swr lives on swr_cal_redux). -->
 <!-- updated 2026-10-23: ingested raw/AD8307.pdf → sources/ad8307-datasheet + new theory/log-amp-power-detection; detector front end of filter-board-electronics rewritten from a net trace (pad values and unfitted diode option owner-confirmed). 50 content pages + 2 sources. -->
 <!-- updated 2026-07-29 (2nd pass): 48 content pages (firmware 26, theory 12, hardware 4, roadmap 6) + 1 source (7 schematics). Added firmware/tx-filter-hil-test for the new transmit HIL suite; recorded the finding that the 48-tap FIR transmit stages are only rate-independent to ~1.2 % (vs 0.3 % for the IIR receive stages) in runtime-filter-design + multirate-decimation + filter-hil-test, since it bounds any rate-invariance tolerance. Also: TX;/RX; parameterless-write trap and the missing equalizerXmt command in cat-control; Hilbert-not-regenerated rationale + bench suppression measurement in ssb-phasing-method; TransmitProcessing ordering notes in dsp-chain; TX EQ testability corollary in audio-equalizer. -->
 <!-- updated 2026-07-31 (2nd pass): pre-release consistency lint. No new pages. Integrated digital mode into the pages whose code it changed but which had not mentioned it — hardware-state-machine (DIGITAL_STATES in both switch tables), persistent-config (the two new ED fields), overview (USBAudio.cpp, ModeSm role) — and closed out development-backlog #13. See log. -->
@@ -40,9 +41,10 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[mode-state-machine]] — ModeSm: SSB/CW × RX/TX, iambic keyer, calibration entry (generated). *(draft)*
 - [[digital-mode]] — DIGITAL (USB audio) mode for FT8/WSJT-X: DIGITAL_STATES composite, forced 176.4 ksps, 4:1 USB pacer. RX and TX verified on the bench. *(draft)*
 - [[ui-state-machine]] — UISm: splash→home→menu stack + tool screens (DFE/EQ/BIT/cal) (generated). *(draft)*
-- [[tune-frequency-control]] — Tune.cpp: frequency math (Fs/4 shift, fine tune, CW offset) + PA power-cal math. Not a state machine. *(draft)*
+- [[tune-frequency-control]] — Tune.cpp: frequency math (Fs/4 shift, fine tune, CW offset) + PA power-cal math (shaped-tanh curve, Levenberg–Marquardt fit). Not a state machine. *(draft)*
 - [[hardware-state-machine]] — HardwareSm (hand-written) maps mode→RF/tune hardware; drives 4 cal sub-machines. *(draft)*
-- [[calibration-state-machines]] — the 4 generated cal SMs: 3 identical minimize-sweeps + PowerCalSm curve-fit. *(draft)*
+- [[calibration-state-machines]] — the 4 generated cal SMs: 3 identical minimize-sweeps + PowerCalSm (MANUAL curve-fit + AUTO branch). *(draft)*
+- [[automatic-power-swr-calibration]] — V1.5.0: one session calibrates the PA curve, SSB gain and SWR bridge on 160–6 m from a load, an open and a short (+ 0/2/8 wattmeter readings per band); main-loop service keys the radio; validated on two radios. *(stable)*
 - [[built-in-test]] — startup I²C presence self-test (BIT struct → status screen). *(draft)*
 
 **Hardware-abstraction modules** _(the code; physical electronics live under Hardware below)_

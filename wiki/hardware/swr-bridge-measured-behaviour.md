@@ -3,10 +3,10 @@ title: SWR Bridge — Measured Behaviour (bench tests, Oct–Nov 2026)
 type: hardware
 status: draft
 created: 2026-10-24
-updated: 2026-11-02
+updated: 2026-11-03
 tags: [swr, ad8307, ad7991, bridge, directivity, calibration, power-sensing, pa, measurement]
 source_refs: [sources/ad8307-datasheet, sources/t41-ep-schematics]
-related: ["[[filter-board-electronics]]", "[[log-amp-power-detection]]", "[[filter-boards]]", "[[calibration-state-machines]]", "[[cat-control]]"]
+related: ["[[filter-board-electronics]]", "[[log-amp-power-detection]]", "[[filter-boards]]", "[[calibration-state-machines]]", "[[cat-control]]", "[[automatic-power-swr-calibration]]"]
 ---
 
 # SWR Bridge — Measured Behaviour
@@ -20,6 +20,11 @@ a short, radio 1 reads a 2:1 load as 1.97–2.04 and a 4:1 load as 3.96–4.22 o
 reads 1.97–2.08 and 3.87–4.31. The October 2026 investigation, which blamed a leak in the bridge, is kept at the end
 as history. The full write-up is the SWR technical report
 (`code/tools/swr/swr_bridge_technical_report.md`, the local copy of the Claude Doc).
+
+> **Where the bench files are.** The `code/tools/swr/` paths on this page (the report, the
+> bench CSVs, the notebooks and the scripts) are on the `swr_cal_redux` branch. They were
+> deliberately left out when the calibration was merged into `nightly` for V1.5.0. The
+> firmware that came out of this work is the [[automatic-power-swr-calibration]].
 
 ## Summary
 - **The readout was at fault.** At U20's pins, radio 1's detectors read 100 Ω and 200 Ω
@@ -131,13 +136,18 @@ falls inside the bench-VNA range:
 - **Open and short:** they agree within 0.04 dB on 160 m to 20 m.
 - **Drift checks:** each repeated its band's first reading within 0.08 dB.
 - **10 m forward fit:** 0.13 dB rms without the ceiling points (Open issues).
-- **Stored values:** the notebook's Section 11.7 gives the per-band values from this sheet;
-  they have not been loaded into radio 1 yet.
-- **Procedure:** `code/docs/swr_calibration_approach.md` sets out how the firmware should run
-  this calibration on every band with three connector changes at most, and what it should
-  store. It defines three levels: open and short only (power within about ±1.5 dB), one
-  wattmeter reading per band (±0.8 dB), and the full sweep above (0.1–0.2 dB rms). The SWR is
-  almost the same at all three, because the reflected line is fitted against the forward one.
+- **Stored values:** the notebook's Section 11.7 gives the per-band values from this sheet.
+  The firmware now measures and stores them itself (below).
+- **Procedure:** `code/docs/swr_calibration_approach.md` sets out how the firmware runs
+  this calibration. It is implemented in V1.5.0 as the [[automatic-power-swr-calibration]],
+  which was validated on both radios on 2026-11-02 and 11-03. The approach covers every band
+  with two connector changes, and what is stored. It defines three levels:
+  - level 1, the load, open and short only: power within about ±1.5 dB;
+  - level 2, two wattmeter readings per band: about ±0.3 dB, worst ±0.8 dB;
+  - level 3, the full sweep above: about 0.2 dB.
+
+  The SWR is almost the same at all three, because the reflected line is fitted against the
+  forward one.
 
 ## Radio 2's rework (2026-11-01 and 11-02)
 Radio 2 got radio 1's changes in two steps, with the full 144-row series on the fixed
@@ -241,7 +251,8 @@ Loads directly on ANT1, read against each band's open (uncalibrated, nominal 25 
   0 dB.
 
 ## Implications
-- **Firmware calibration:** follow `code/docs/swr_calibration_approach.md`.
+- **Firmware calibration:** implemented as the [[automatic-power-swr-calibration]]
+  (V1.5.0), following `code/docs/swr_calibration_approach.md`.
   - Always calibrate the reflected line from an open and a short (or the open alone where the
     PA oscillates into the short).
   - For power, a wattmeter sweep per band is best; one reading per band gives ±0.8 dB; per-band

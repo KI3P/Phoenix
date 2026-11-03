@@ -3,7 +3,7 @@ title: RF Board & Si5351 Quadrature VFO (RFBoard)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-06-16
+updated: 2026-11-03
 tags: [rf, si5351, vfo, quadrature, attenuator, tr-switch, hardware-abstraction]
 source_refs: [sources/t41-ep-schematics]
 related: ["[[overview]]", "[[rf-board-electronics]]", "[[tune-frequency-control]]", "[[hardware-state-machine]]", "[[filter-boards]]", "[[ssb-phasing-method]]", "[[iq-quadrature-sampling]]", "[[iq-imbalance-correction]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]"]
@@ -32,6 +32,15 @@ RX on **PLLA** and TX on **PLLB** lets the two run at independent frequencies si
 (`RFBoard.cpp:388,403`) — needed for the dual-VFO TX-spectrum monitor trick
 ([[tune-frequency-control]]). On single-VFO boards `SetTXVFOFrequency` just falls back to
 `SetRXVFOFrequency` (`RFBoard.cpp:535`), gated by `HasDualVFOs()`.
+
+**CW and TX share PLLB (fixed 2026-10-19, commit 5acf4b6).** On dual-VFO boards the CW output
+CLK6 is an integer-only divider. Setting the CW VFO therefore retunes PLLB, which also moves
+the TX quadrature outputs. `SetTXVFOFrequency()` and `SetCWVFOFrequency()` used to skip a
+write when the frequency matched their cached value. So after a CW transmit, the next SSB
+transmit on the same frequency left the TX LO at 62/44 of the intended frequency, which the LPF
+removed: there was no output at step 4 of power calibration. `RFBoard.cpp` now records which
+output last tuned PLLB (`pllbOwner`) and reprograms the other when it takes over. The TX VFO
+takes the full path, with a PLL reset to realign I and Q.
 
 The `HasDualVFOs()` fallback is the firmware accommodation for **older (pre-V12.8) single-Si5351
 boards**, where one shared quadrature pair (CLK0/CLK1) served both RX and TX mixers (CW still on

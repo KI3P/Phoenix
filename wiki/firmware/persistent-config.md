@@ -3,10 +3,10 @@ title: Persistent Configuration (ED struct, Storage, ParamSave)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-07-31
+updated: 2026-11-03
 tags: [config, ed-struct, littlefs, sdcard, json, persistence, globals, bands, sample-rate]
 source_refs: []
-related: ["[[overview]]", "[[main-loop]]", "[[tune-frequency-control]]", "[[hardware-state-machine]]", "[[iq-imbalance-correction]]", "[[dsp-chain]]", "[[sample-rate-switching]]"]
+related: ["[[overview]]", "[[main-loop]]", "[[tune-frequency-control]]", "[[hardware-state-machine]]", "[[iq-imbalance-correction]]", "[[dsp-chain]]", "[[sample-rate-switching]]", "[[automatic-power-swr-calibration]]"]
 ---
 
 # Persistent Configuration
@@ -26,14 +26,29 @@ operating configuration and calibration**, with sensible inline defaults. Field 
 | Modulation/CW | `modulation[2]`, `keyType`, `currentWPM`, `keyerFlip`, `CWToneIndex`, `CWFilterIndex`, `sidetoneVolume`, `decoderFlag` |
 | Spectrum/display | `spectrum_zoom`, `spectrumScale`, `spectrumNoiseFloor[band]`, `spectrumFloorAuto`, `dbm_calibration[band]` (S-meter) |
 | Equalizer | `equalizerRec[14]`, `equalizerXmt[14]` |
-| Power / PA | `powerOutCW[band]`, `powerOutSSB[band]`, `PA100Wactive`, `PowerCal_20W/100W_Psat_mW[band]`, `…_kindex[band]`, `…_threshold_W`, `…_DSP_Gain_correction_dB` |
-| Calibration | `IQAmp/PhaseCorrectionFactor[band]` (RX), `IQXAmp/XPhaseCorrectionFactor[band]` (TX), `DCOffsetI/Q[band]` (carrier null), `XAttenCW[band]`, `RAtten[band]`, `SWR_F/R_SlopeAdj/Offset[band]` |
+| Power / PA | `powerOutCW[band]`, `powerOutSSB[band]`, `PA100Wactive`, `PowerCal_20W/100W_Psat_mW[band]`, `…_kindex[band]`, `…_shape[band]` (V1.5.0), `…_threshold_W`, `…_DSP_Gain_correction_dB` |
+| Calibration | `IQAmp/PhaseCorrectionFactor[band]` (RX), `IQXAmp/XPhaseCorrectionFactor[band]` (TX), `DCOffsetI/Q[band]` (carrier null), `XAttenCW[band]`, `RAtten[band]`, `SWR_F/R_SlopeAdj/Offset[band]`, `SWR_CalLevel[band]`, `SWR_CalDate[band]`, `SWR_CouplerTurns` (V1.5.0) |
 | Routing | `antennaSelection[band]` |
 
 Many fields are **per-band arrays** (`NUMBER_OF_BANDS = 13`). The calibration arrays are
 written by the routines in [[hardware-state-machine]] / [[iq-imbalance-correction]] and the
-power-cal tanh fit in [[tune-frequency-control]]; the tuning fields by
+power-cal shaped-tanh fit in [[tune-frequency-control]] and the
+[[automatic-power-swr-calibration]]; the tuning fields by
 [[tune-frequency-control]]; the DSP fields by [[dsp-chain]].
+
+**Calibration fields added in V1.5.0.**
+- `PowerCal_20W/100W_shape[]` is the PA curve's knee shape. A value of 0 or less means the
+  plain tanh, which is how a configuration saved before V1.5.0 loads.
+- `SWR_CalLevel[]` holds 0 for an uncalibrated band, or 1–3, plus `SWR_CAL_OPEN_ONLY` (0x10) or
+  `SWR_CAL_SHORT_ONLY` (0x20) when the reflected line came from one standard alone.
+- `SWR_CalDate[]` is the time of the calibration, in seconds since 1970.
+- `SWR_CouplerTurns` (L44 turns per core, default 10) selects the level 1 forward offsets.
+
+**Uncalibrated defaults (V1.5.0).** On 160–6 m the inline defaults of
+`PowerCal_20W_Psat_mW/kindex/shape` and `SWR_F/R_*` are no longer zeros or a single generic
+curve. They are measured values: radio 2's PA curve and reflected line, and the level 1 forward
+offsets for 10 turns ([[automatic-power-swr-calibration]]). A radio that already has a saved
+configuration keeps its own values.
 
 > **Naming gotcha:** `ED` stands for "EEPROM Data" and the `.ino` says settings are saved to
 > "EEPROM" — but the Teensy 4.1 has no true EEPROM and the implementation actually uses

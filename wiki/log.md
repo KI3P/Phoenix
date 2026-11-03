@@ -1296,3 +1296,29 @@ screened through lines (`code/tools/swr/swr_bench_measurements_radio2_{adcfix,c1
   [[filter-board-electronics]] (open questions), `code/docs/swr_calibration_approach.md`
   (three calibration levels, defaults and accuracy recomputed from both rebuilt radios), and
   the SWR technical report.
+
+## [2026-11-03] lint | V1.5.0: the automatic power and SWR calibration, and the fixes since V1.4.1
+Brought the wiki up to date with `nightly` for V1.5.0. Since 2026-11-02 the automatic
+calibration has been completed, validated on both radios and merged into `nightly`. A few
+smaller fixes from main (PRs #32 and #34) came in with it.
+- **New page:** [[automatic-power-swr-calibration]]. It covers the code, the three levels, the
+  load/open/short session, how the main-loop service keys the radio, what is stored, the
+  uncalibrated defaults and open items. It summarises `code/docs/PowerCalibration/AutoCalibration.md`
+  and `AutoCalibrationDesign.md`, which stay authoritative.
+- **Updated:**
+  - [[calibration-state-machines]]: `PowerCalSm` now has MANUAL and AUTO branches, with new
+    events `RETRY`/`SKIP`. `ACQUISITION`, `READ_AND_ADJUST` and `NEXT_POINT` no longer exist.
+    The "SWR not correctable by calibration" claim is marked superseded.
+  - [[tune-frequency-control]]: the shaped tanh P = P_sat·tanh((k·x)^s)^(1/s), with a
+    Levenberg–Marquardt fit in dB replacing the Gauss–Newton fit in mW.
+  - [[hardware-state-machine]]: the fifth partial, `HardwareSm_PowerAutoCalibration.cpp`.
+  - [[persistent-config]]: `PowerCal_*_shape`, `SWR_CalLevel`, `SWR_CalDate`,
+    `SWR_CouplerTurns`, and the measured uncalibrated defaults.
+  - [[filter-boards]], [[display-subsystem]]: bridge statistics and the AUTO screen.
+  - [[rf-board]]: the shared-PLLB fix between CW and SSB transmit (5acf4b6).
+  - [[cat-control]]: newline-terminated bytes are not CAT, so the time-sync packet and CRLF
+    clients now work on the single-port audio build (ab69673).
+  - [[swr-bridge-measured-behaviour]], [[log-amp-power-detection]]: the procedure is now
+    implemented in firmware. The `code/tools/swr/` bench files cited there live on the
+    `swr_cal_redux` branch, not in `nightly`.
+  - [[documentation-todos]], index.

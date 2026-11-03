@@ -3,10 +3,10 @@ title: Filter Boards (BPF / LPF), RF Back-End & Power Sensing
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-01
+updated: 2026-11-03
 tags: [filters, bpf, lpf, relays, ad7991, swr, power-sensing, mcp23017, antenna, pa]
 source_refs: [sources/t41-ep-schematics, sources/ad8307-datasheet]
-related: ["[[overview]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[hardware-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]"]
+related: ["[[overview]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[hardware-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]", "[[automatic-power-swr-calibration]]"]
 ---
 
 # Filter Boards (BPF / LPF), RF Back-End & Power Sensing
@@ -150,7 +150,11 @@ display detect TX activity.
   `SelectAntenna` + the PA select **before** reprogramming the VFO ([[rf-board]]) — so filters
   settle before RF appears. See [[hardware-state-machine]].
 - **Power metering** feeds the front-panel power/SWR display and the **power calibration**
-  routine (`PowerCalSm`), which fits the tanh PA model in [[tune-frequency-control]].
+  routine (`PowerCalSm`), which fits the shaped-tanh PA model in [[tune-frequency-control]].
+  Since V1.5.0 the [[automatic-power-swr-calibration]] also calibrates the bridge itself
+  (`SWR_F/R_SlopeAdj/Offset`) from a load, an open and a short. It reads the bridge through
+  `AccumulateSWRBridgeStats()`/`GetSWRBridgeStats()`, which keep running statistics of every
+  key-down reading.
 
 ## Physical hardware
 The three boards this module drives — the BPF/exciter-filter board (MASWSS0179 switches,
