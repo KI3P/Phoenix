@@ -12,7 +12,7 @@ things on every band in one session:
 It follows the three-level approach in `code/docs/swr_calibration_approach.md`. The manual flow
 in `PowerCalibration.md` is unchanged and remains the default when power calibration starts.
 
-**Status (2026-11-02):** complete and unit-tested, but not yet run on a radio.
+**Status (2026-11-03):** complete, unit-tested, and run and validated on multiple radios.
 - **Code:** the session and its hardware are in `HardwareSm_PowerAutoCalibration.cpp`, the
   calculations in `SWRCalibration.cpp`, and the screen in
   `MainBoard_DisplayCalibration_PowerAuto.cpp`.
@@ -384,11 +384,6 @@ forward reading was then about 4 dB high, and the PA curve missed radio 2's swee
 
 ## Still to do
 
-- **Run it on a radio.** At level 1 on a dummy load, then the open and the short, check:
-  - the ZOOM abort while keyed;
-  - the T/R relay in RX during REST on the open;
-  - the stored values against the 2026-11 bench sheets;
-  - the SWR read on the 100 Ω and 200 Ω loads afterwards.
 - **Use `SWR_CalLevel` in the display:** mark an uncalibrated band's SWR, and show the power
   reading's expected accuracy.
 - **100 W PA:** AUTO runs with the 20 W PA only. The bridge calibration applies to both, but the
