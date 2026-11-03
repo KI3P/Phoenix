@@ -157,6 +157,7 @@ extern AutoCalSession autoCal;
 #define AUTO_FAIL_S50            (1u << 9)  // the load's SWR too high
 #define AUTO_FAIL_PA_CURVE       (1u << 10) // the PA curve or SSB gain could not be fitted
 #define AUTO_FAIL_NO_LOAD        (1u << 11) // a load point reflected everything: the 50 Ohm load was not fitted
+#define AUTO_FAIL_BIT_COUNT      12         // number of AUTO_FAIL_* bits
 
 /** Results of one band in the automatic calibration */
 struct AutoCalBandResult {
@@ -189,6 +190,29 @@ struct AutoCalBandResult {
  * @param band FIRST_BAND to LAST_BAND
  */
 const AutoCalBandResult *GetAutoCalResult(int32_t band);
+
+/**
+ * @brief Name of an AUTO_FAIL_* bit
+ * @param bit Bit number, 0 to AUTO_FAIL_BIT_COUNT - 1
+ * @param shortName true for the table's short name (at most 7 characters),
+ *        false for the review's and the log's full name
+ * @return The name, or "?" for a bit out of range
+ */
+const char *AutoCalFailName(uint32_t bit, bool shortName);
+
+/**
+ * @brief The lowest AUTO_FAIL_* bit set
+ * @param failBits AUTO_FAIL_* bits
+ * @return Its bit number, or 0 if none is set
+ */
+uint32_t AutoCalFirstFailBit(uint32_t failBits);
+
+/**
+ * @brief Print the session's results table over Debug(): the review's table
+ *        with the SSB gain, the standards the reflected line came from and
+ *        every fail reason. Called once the checks have run on every band.
+ */
+void PrintAutoCalTable(void);
 
 void PowerCalDispatch(PowerCalSm_EventId event);
 bool PowerCalSmBusy(void);

@@ -3216,6 +3216,69 @@ TEST_F(PowerCalAutoTest, AMissingLoadFailsTheBand) {
     EXPECT_EQ(ED.SWR_CalLevel[BAND_20M], 1);
 }
 
+TEST_F(PowerCalAutoTest, PrintsTheResultsTableWhenTheChecksFinish) {
+    EnterAuto(1);
+    radio.loadMissingBand = BAND_40M;
+    LogCapture log;
+    RunToReviewForLog();
+    EXPECT_EQ(log.Count({"Auto calibration results, level 1:"}), 1) << log.Text();
+    EXPECT_EQ(log.Count({"Band", "Status", "o_f", "s_f", "o_r", "s_r", "Psat W", "k", "shape", "S50",
+                         "SSB dB", "Reflected", "Fails"}), 1);
+    // One row for each band in the session, after its name
+    for (int32_t band = FIRST_BAND; band <= LAST_BAND; band++){
+        if (!GetAutoCalResult(band)->inSession) continue;
+        char name[12];
+        snprintf(name, sizeof(name), "%-5s ", bands[band].name);
+        EXPECT_EQ(log.Count({name}), 1) << bands[band].name;
+    }
+    // The four bridge values, slopes to 3 decimals
+    const AutoCalBandResult *r = GetAutoCalResult(BAND_20M);
+    char cells[80];
+    snprintf(cells, sizeof(cells), " %6.2f %7.3f %6.2f %7.3f", r->b_f + SWRCAL_OFFSET_CONSTANT_DB,
+             r->m_f - SWRCAL_NOMINAL_SLOPE_MV_PER_DB, r->b_r + SWRCAL_OFFSET_CONSTANT_DB,
+             r->m_r - SWRCAL_NOMINAL_SLOPE_MV_PER_DB);
+    EXPECT_EQ(log.Count({"20M   pass  ", cells, "open+short"}), 1);
+    snprintf(cells, sizeof(cells), " %7.2f %7.2f %6.3f", r->Psat_mW / 1000.0f, r->kindex, r->shape);
+    EXPECT_EQ(log.Count({"20M   pass  ", cells}), 1) << "the PA curve";
+    // A failed band names every reason in full
+    EXPECT_EQ(log.Count({"40M   FAIL  ", "50 Ohm load missing"}), 1);
+    EXPECT_EQ(log.Count({"o: offset dB; s_f, s_r: slope adjustment mV/dB"}), 1);
+}
+
+TEST(AutoCalFailNames, ShortAndLongNameForEveryBit) {
+    for (uint32_t k = 0; k < AUTO_FAIL_BIT_COUNT; k++){
+        EXPECT_LE(strlen(AutoCalFailName(k, true)), 7u) << "fits the screen's status column with a +";
+        EXPECT_GT(strlen(AutoCalFailName(k, false)), 0u);
+    }
+    EXPECT_STREQ(AutoCalFailName(11, false), "50 Ohm load missing");
+    EXPECT_STREQ(AutoCalFailName(AUTO_FAIL_BIT_COUNT, true), "?");
+    EXPECT_EQ(AutoCalFirstFailBit(AUTO_FAIL_GAP | AUTO_FAIL_S50), 8u);
+}
+
+extern struct SecondaryMenuOption DiagnosticOptions[4];
+
+TEST(DiagnosticsMenu, PrintsTheStoredData) {
+    EXPECT_STREQ(DiagnosticOptions[2].label, "Buffer print");
+    EXPECT_STREQ(DiagnosticOptions[3].label, "Print stored data");
+    EXPECT_EQ(DiagnosticOptions[3].action, functionOption);
+    EXPECT_EQ(DiagnosticOptions[3].func, (void *)PrintEDToSerial);
+}
+
+TEST(StoredDataPrint, PrintsTheCalibrationToThreeDecimals) {
+    // Serial.print(float) gives 2 decimals, which hides a slope adjustment under 0.01
+    float32_t slope = ED.SWR_R_SlopeAdj[BAND_40M];
+    float32_t shape = ED.PowerCal_20W_shape[BAND_40M];
+    ED.SWR_R_SlopeAdj[BAND_40M] = -0.004f;
+    ED.PowerCal_20W_shape[BAND_40M] = 0.5754f;
+    LogCapture log;
+    PrintEDToSerial();
+    ED.SWR_R_SlopeAdj[BAND_40M] = slope;
+    ED.PowerCal_20W_shape[BAND_40M] = shape;
+    EXPECT_EQ(log.Count({"SWR_R_SlopeAdj: ", ",-0.004,"}), 1) << log.Text();
+    EXPECT_EQ(log.Count({"PowerCal_20W_shape: ", ",0.575,"}), 1);
+    EXPECT_EQ(log.Count({"=== End ED Struct ==="}), 1);
+}
+
 TEST_F(PowerCalAutoTest, LoadPointsAreKeyedForAtMostOneAndAHalfSeconds) {
     // The 50 Ohm load runs hot: settle and collect are its whole key-down per point
     StartPowerAutoCal();

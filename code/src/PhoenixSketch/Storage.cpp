@@ -735,6 +735,24 @@ void RestoreDataFromSDCard(void){
     Serial.println("Config data restored successfully");
 }
 
+/**
+ * @brief Print one per-band array of the stored configuration on one line
+ * @param name The field's name
+ * @param values NUMBER_OF_BANDS values
+ * @param decimals Decimal places: Serial.print(float) gives 2, too few for a slope adjustment
+ */
+static void PrintFloatArray(const char *name, const float32_t *values, int decimals){
+    char buff[24];
+    Serial.print(name);
+    Serial.print(": ");
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        snprintf(buff, sizeof(buff), "%.*f", decimals, values[i]);
+        Serial.print(buff);
+        if (i < NUMBER_OF_BANDS - 1) Serial.print(",");
+    }
+    Serial.println();
+}
+
 void PrintEDToSerial(void){
     char buff[30];
     Serial.println("=== ED Struct Contents ===");
@@ -886,93 +904,21 @@ void PrintEDToSerial(void){
         Serial.println(ED.lastFrequencies[i][2]);
     }
 
-    Serial.print("PowerCal_20W_Psat_mW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_Psat_mW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_kindex: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_kindex[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_Psat_mW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_Psat_mW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_kindex: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_kindex[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_shape: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_shape[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_shape: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_shape[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_DSP_Gain_correction_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_DSP_Gain_correction_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_DSP_Gain_correction_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_DSP_Gain_correction_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
+    PrintFloatArray("PowerCal_20W_Psat_mW", ED.PowerCal_20W_Psat_mW, 1);
+    PrintFloatArray("PowerCal_20W_kindex", ED.PowerCal_20W_kindex, 3);
+    PrintFloatArray("PowerCal_100W_Psat_mW", ED.PowerCal_100W_Psat_mW, 1);
+    PrintFloatArray("PowerCal_100W_kindex", ED.PowerCal_100W_kindex, 3);
+    PrintFloatArray("PowerCal_20W_shape", ED.PowerCal_20W_shape, 3);
+    PrintFloatArray("PowerCal_100W_shape", ED.PowerCal_100W_shape, 3);
+    PrintFloatArray("PowerCal_20W_DSP_Gain_correction_dB", ED.PowerCal_20W_DSP_Gain_correction_dB, 3);
+    PrintFloatArray("PowerCal_100W_DSP_Gain_correction_dB", ED.PowerCal_100W_DSP_Gain_correction_dB, 3);
     Serial.print("PowerCal_20W_to_100W_threshold_W: ");
     Serial.println(ED.PowerCal_20W_to_100W_threshold_W);
 
-    Serial.print("SWR_F_SlopeAdj: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_F_SlopeAdj[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("SWR_R_SlopeAdj: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_R_SlopeAdj[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("SWR_R_Offset: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_R_Offset[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("SWR_F_Offset: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_F_Offset[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
+    PrintFloatArray("SWR_F_SlopeAdj", ED.SWR_F_SlopeAdj, 3);
+    PrintFloatArray("SWR_R_SlopeAdj", ED.SWR_R_SlopeAdj, 3);
+    PrintFloatArray("SWR_R_Offset", ED.SWR_R_Offset, 3);
+    PrintFloatArray("SWR_F_Offset", ED.SWR_F_Offset, 3);
     Serial.print("SWR_CalLevel: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
         Serial.print(ED.SWR_CalLevel[i]);
@@ -986,6 +932,7 @@ void PrintEDToSerial(void){
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
+
 
     Serial.print("SWR_CouplerTurns: ");
     Serial.println(ED.SWR_CouplerTurns);

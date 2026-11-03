@@ -256,6 +256,79 @@ static void LogSkip(int32_t band, const char *stage, const char *what, const cha
     Debug(line);
 }
 
+// Names of the AUTO_FAIL_* bits, short for the screen's table and long for the review and the log
+static const char *failShort[] = {"few rdg", "fwd fit", "fwd slp", "drift", "L2 offs", "no refl",
+                                  "ref fit", "ref slp", "gap", "S50", "PA fit", "no load"};
+static const char *failLong[] = {"too few readings", "forward fit", "forward slope", "drift",
+                                 "level 2 offset", "open and short abandoned", "reflected fit",
+                                 "reflected slope", "open/short gap", "load SWR too high",
+                                 "PA curve fit", "50 Ohm load missing"};
+static_assert(sizeof(failShort) / sizeof(failShort[0]) == AUTO_FAIL_BIT_COUNT, "a short name per fail bit");
+static_assert(sizeof(failLong) / sizeof(failLong[0]) == AUTO_FAIL_BIT_COUNT, "a long name per fail bit");
+
+const char *AutoCalFailName(uint32_t bit, bool shortName){
+    if (bit >= AUTO_FAIL_BIT_COUNT)
+        return "?";
+    return shortName ? failShort[bit] : failLong[bit];
+}
+
+uint32_t AutoCalFirstFailBit(uint32_t failBits){
+    for (uint32_t k = 0; k < AUTO_FAIL_BIT_COUNT; k++)
+        if (failBits & (1u << k)) return k;
+    return 0;
+}
+
+/** Append a value to a table row, or a dash in its place when the band has none */
+static void AppendCell(char *row, size_t size, bool has, const char *format, float32_t value, int width){
+    size_t used = strlen(row);
+    if (used >= size - 1)
+        return;
+    if (has)
+        snprintf(row + used, size - used, format, value);
+    else
+        snprintf(row + used, size - used, " %*s", width, "-");
+}
+
+void PrintAutoCalTable(void){
+    char row[256];
+    snprintf(row, sizeof(row), "Auto calibration results, level %u:", autoCal.level);
+    Debug(row);
+    snprintf(row, sizeof(row), "%-5s %-6s %6s %7s %6s %7s %7s %7s %6s %5s %7s  %-10s  %s",
+             "Band", "Status", "o_f", "s_f", "o_r", "s_r", "Psat W", "k", "shape", "S50", "SSB dB",
+             "Reflected", "Fails");
+    Debug(row);
+    for (int32_t band = FIRST_BAND; band <= LAST_BAND; band++){
+        const AutoCalBandResult *r = &results[band];
+        if (!r->inSession)
+            continue;
+        const char *status = !r->checked ? "-" : (r->failBits ? "FAIL" : "pass");
+        snprintf(row, sizeof(row), "%-5s %-6s", bands[band].name, status);
+        AppendCell(row, sizeof(row), r->hasForward, " %6.2f", r->b_f + SWRCAL_OFFSET_CONSTANT_DB, 6);
+        AppendCell(row, sizeof(row), r->hasForward, " %7.3f", r->m_f - SWRCAL_NOMINAL_SLOPE_MV_PER_DB, 7);
+        AppendCell(row, sizeof(row), r->hasReflected, " %6.2f", r->b_r + SWRCAL_OFFSET_CONSTANT_DB, 6);
+        AppendCell(row, sizeof(row), r->hasReflected, " %7.3f", r->m_r - SWRCAL_NOMINAL_SLOPE_MV_PER_DB, 7);
+        AppendCell(row, sizeof(row), r->hasPACurve, " %7.2f", r->Psat_mW / 1000.0f, 7);
+        AppendCell(row, sizeof(row), r->hasPACurve, " %7.2f", r->kindex, 7);
+        AppendCell(row, sizeof(row), r->hasPACurve, " %6.3f", r->shape > 0.0f ? r->shape : 1.0f, 6);
+        AppendCell(row, sizeof(row), r->hasS50, " %5.2f", r->S50, 5);
+        AppendCell(row, sizeof(row), r->hasPACurve, " %7.2f", r->ssbCorrection_dB, 7);
+        size_t used = strlen(row);
+        snprintf(row + used, sizeof(row) - used, "  %-10s ",
+                 !r->hasReflected ? "-" : (r->openOnly ? "open only" : (r->shortOnly ? "short only" : "open+short")));
+        // Every reason the band failed, in full
+        const char *separator = " ";
+        for (uint32_t k = 0; k < AUTO_FAIL_BIT_COUNT; k++){
+            if (!(r->failBits & (1u << k)))
+                continue;
+            used = strlen(row);
+            snprintf(row + used, sizeof(row) - used, "%s%s", separator, failLong[k]);
+            separator = ", ";
+        }
+        Debug(row);
+    }
+    Debug("o: offset dB; s_f, s_r: slope adjustment mV/dB; P = Psat tanh((k x)^shape)^(1/shape), x = drive");
+}
+
 /** A point's name for the log, such as "cw 3.00 dB" */
 static const char *PointName(const char *kind, float32_t drive_dB){
     static char name[32];
@@ -709,6 +782,7 @@ static void FitAndCheckAll(void){
                  r->hasPACurve ? r->shape : 0.0f, r->hasPACurve ? r->ssbCorrection_dB : 0.0f, r->openOnly ? "open only" : (r->shortOnly ? "short only" : "open+short"));
         Debug(line);
     }
+    PrintAutoCalTable();
     autoCal.resultsVersion++;
 }
 

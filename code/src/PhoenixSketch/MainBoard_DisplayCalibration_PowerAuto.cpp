@@ -75,21 +75,6 @@ static void PrintAt(int16_t x, int16_t y, const char *text, uint16_t color = RA8
     tft.setTextColor(RA8875_WHITE);
 }
 
-// Names of the AUTO_FAIL_* bits, short for the table and long for the review
-static const char *failShort[] = {"few rdg", "fwd fit", "fwd slp", "drift", "L2 offs", "no refl",
-                                  "ref fit", "ref slp", "gap", "S50", "PA fit", "no load"};
-static const char *failLong[] = {"too few readings", "forward fit", "forward slope", "drift",
-                                 "level 2 offset", "open and short abandoned", "reflected fit",
-                                 "reflected slope", "open/short gap", "load SWR too high",
-                                 "PA curve fit", "50 Ohm load missing"};
-static const uint32_t NUMBER_OF_FAIL_BITS = sizeof(failShort) / sizeof(failShort[0]);
-
-static uint32_t FirstFailBit(uint32_t failBits){
-    for (uint32_t k = 0; k < NUMBER_OF_FAIL_BITS; k++)
-        if (failBits & (1u << k)) return k;
-    return 0;
-}
-
 /**
  * @brief True in the states that measure a band, where the band, point and
  *        drive mean something
@@ -201,7 +186,10 @@ static void DrawAutoReadingsPane(void){
 
 static uint32_t oldResultsVersion = 0xFFFFFFFF;
 /**
- * @brief One row per band: status, the four bridge values, P_sat and S50
+ * @brief One row per band: status, the four bridge values, the PA curve's
+ *        P_sat, k and shape, and S50. The pane is 64 characters wide in the
+ *        small font, which this fills, so a failed band shows its first fail
+ *        reason in red in the status column; the review lists them all
  */
 static void DrawAutoTablePane(void){
     if (oldResultsVersion != autoCal.resultsVersion)
@@ -210,18 +198,27 @@ static void DrawAutoTablePane(void){
     if (!PaneAutoTable.stale) return;
     const Pane *p = &PaneAutoTable;
     StartPane(p);
-    PrintAt(p->x0, p->y0, "Band  Status     o_f   s_f   o_r   s_r  Psat W   S50", RA8875_CYAN);
+    // Columns (characters of 8 px): band 0, status 6, o_f 17, s_f 23, o_r 29,
+    // s_r 35, Psat 41, k 47, shape 53, S50 58
+    sprintf(buff, "%-5s %-10s %5s %5s %5s %5s %5s %5s %4s %4s",
+            "Band", "Status", "o_f", "s_f", "o_r", "s_r", "Psat", "k", "shp", "S50");
+    PrintAt(p->x0, p->y0, buff, RA8875_CYAN);
     int16_t y = p->y0 + 22;
     for (int32_t band = BAND_160M; band <= BAND_6M; band++){
         const AutoCalBandResult *r = GetAutoCalResult(band);
         const char *status = "-";
+        char failStatus[12];
         uint16_t color = RA8875_LIGHT_GREY;
         if (r->inSession){
             if (!r->checked){
                 status = "measuring";
                 color = RA8875_WHITE;
             } else if (r->failBits){
-                status = "FAIL";
+                // The first reason, and a + when there are more
+                uint32_t k = AutoCalFirstFailBit(r->failBits);
+                snprintf(failStatus, sizeof(failStatus), "%s%s", AutoCalFailName(k, true),
+                         (r->failBits & ~(1u << k)) ? "+" : "");
+                status = failStatus;
                 color = RA8875_RED;
             } else {
                 status = r->openOnly ? "pass(open)" : (r->shortOnly ? "pass(shrt)" : "pass");
@@ -239,22 +236,18 @@ static void DrawAutoTablePane(void){
             PrintAt(p->x0 + 232, y, buff);
         }
         if (r->hasPACurve){
-            sprintf(buff, "%6.1f", r->Psat_mW / 1000.0f);
+            sprintf(buff, "%5.1f %5.1f %4.2f", r->Psat_mW / 1000.0f, r->kindex,
+                    r->shape > 0.0f ? r->shape : 1.0f);
             PrintAt(p->x0 + 328, y, buff);
         }
         if (r->hasS50){
-            sprintf(buff, "%5.2f", r->S50);
-            PrintAt(p->x0 + 392, y, buff);
-        }
-        if (r->checked && r->failBits){
-            // The first reason, and a + when there are more
-            uint32_t k = FirstFailBit(r->failBits);
-            sprintf(buff, "%s%s", failShort[k], (r->failBits & ~(1u << k)) ? "+" : "");
-            PrintAt(p->x0 + 448, y, buff, RA8875_RED);
+            sprintf(buff, "%4.2f", r->S50);
+            PrintAt(p->x0 + 464, y, buff);
         }
         y += 22;
     }
     PrintAt(p->x0, y + 4, "o: offset dB, s: slope adjustment mV/dB", RA8875_LIGHT_GREY);
+    PrintAt(p->x0, y + 22, "P = Psat tanh((k x)^shp)^(1/shp) W, x = drive", RA8875_LIGHT_GREY);
     PaneAutoTable.stale = false;
 }
 
@@ -365,10 +358,10 @@ static void DrawAutoPromptPane(void){
             for (int32_t band = BAND_160M; band <= BAND_6M; band++){
                 const AutoCalBandResult *r = GetAutoCalResult(band);
                 if (!r->inSession || !r->checked || !r->failBits) continue;
-                for (uint32_t k = 0; k < NUMBER_OF_FAIL_BITS; k++){
+                for (uint32_t k = 0; k < AUTO_FAIL_BIT_COUNT; k++){
                     if (!(r->failBits & (1u << k))) continue;
                     if (y > last) break;
-                    sprintf(buff, "%-4s %s", bands[band].name, failLong[k]);
+                    sprintf(buff, "%-4s %s", bands[band].name, AutoCalFailName(k, false));
                     PrintAt(x, y, buff, RA8875_RED); y += line;
                 }
             }

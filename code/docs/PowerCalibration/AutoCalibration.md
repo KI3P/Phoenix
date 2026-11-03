@@ -191,12 +191,29 @@ AUTOCAL-SKIP,<band>,<load|open|short|band>,<what>,<reason (units)>,<value>,<limi
 | The band | each failed check, with its value and limit |
 | The band at storage | failed its checks, so the previous calibration is kept (fail bits) |
 
+Once the checks have run on every band (`FIT_ALL`, so on entering the review, and again after
+a retry), `PrintAutoCalTable()` prints the review's table through `Debug()` for reading by eye:
+the screen's columns with the slope adjustments to 3 decimals, the SSB gain correction, the
+standards the reflected line came from, and every fail reason in full:
+```
+Auto calibration results, level 1:
+Band  Status    o_f     s_f    o_r     s_r  Psat W       k  shape   S50  SSB dB  Reflected   Fails
+40M   FAIL    -3.68   0.000      -       -       -       -      -     -       -  -           open and short abandoned
+20M   pass    -4.73   0.000  -2.14   0.711   12.70    6.33  0.857  1.07    1.63  open+short
+o: offset dB; s_f, s_r: slope adjustment mV/dB; P = Psat tanh((k x)^shape)^(1/shape), x = drive
+```
+`Debug()` is silent in a build with USB audio (`usb=serialmidiaudio`). In any build,
+Diagnostics → Print stored data (or EEPROM → Print data to Serial) prints every stored field
+over Serial, the calibrations to 3 decimals; in the audio build that is the CAT port.
+
 ### The screen
 
 The AUTO screen replaces the manual one while AUTO runs:
 - **Status:** level, standard, band, point, drive, and KEYED while transmitting.
 - **Readings:** the last point's V_f and V_r with their standard deviations, and n.
-- **Table:** one row per band with status, o_f, s_f, o_r, s_r, P_sat, S50 and any failure bits.
+- **Table:** one row per band with status, o_f, s_f, o_r, s_r, P_sat, k, the shape s and S50. A
+  failed band's status is its first fail reason in red, with a + if there are more; the review
+  lists them all.
 - **Prompt:** what to do now.
 
 On SETUP, the volume encoder sets the level and the filter encoder sets the L44 turns.
