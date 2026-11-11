@@ -213,12 +213,41 @@ void DrawBIT(void){
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
+ * Run the LPSPI peripheral from an in-spec clock root.
+ *
+ * Teensyduino 1.59's SPI.begin() clocks the LPSPI from PLL3 PFD0 / 3 = 240 MHz.
+ * At that rate the LPSPI occasionally loses the received byte of a transfer
+ * (check the i.MX RT1062 datasheet's LPSPI_CLK_ROOT limit); SPIClass::transfer()
+ * then spins forever waiting for it, freezing the main loop inside an RA8875
+ * call while interrupts (USB, audio) keep running. Measured on the bench at
+ * 528 MHz / -Os LTO: 8 such hangs in 10 min at 240 MHz, none at 132 MHz.
+ *
+ * Must run after SPI.begin() (called from tft.begin()), which sets CBCMR.
+ */
+static void SetSPIClockRootInSpec(void){
+#if defined(__IMXRT1062__)
+    __disable_irq();
+    LPSPI4_CR = 0;  // the LPSPI must be disabled while its clock changes
+    CCM_CBCMR = (CCM_CBCMR & ~(CCM_CBCMR_LPSPI_PODF_MASK | CCM_CBCMR_LPSPI_CLK_SEL_MASK))
+              | CCM_CBCMR_LPSPI_PODF(3) | CCM_CBCMR_LPSPI_CLK_SEL(2);  // PLL2 528 MHz / 4
+    LPSPI4_CR = LPSPI_CR_MEN;
+    __enable_irq();
+    // SPIClass caches the divider for the last clock it was asked for, computed
+    // from the old root. Ask for a different clock once so the next RA8875
+    // transaction recomputes its divider from the new root.
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE3));
+    SPI.endTransaction();
+#endif
+}
+
+/**
  * Initialize the RA8875 TFT display hardware and configure layers.
  */
 void InitializeDisplay(void){
     pinMode(TFT_CS, OUTPUT);
     digitalWrite(TFT_CS, HIGH);
     tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);
+    SetSPIClockRootInSpec();
     tft.setRotation(0);
     tft.useLayers(true);
     tft.layerEffect(OR);
