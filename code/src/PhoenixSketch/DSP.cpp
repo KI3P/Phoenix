@@ -188,7 +188,9 @@ void ClearAudioBuffers(void){
  */
 void IQPhaseCorrection(float32_t *I_buffer, float32_t *Q_buffer, 
                         float32_t factor, uint32_t blocksize) {
-    float32_t temp_buffer[blocksize];
+    // Scratch in OCRAM rather than an 8 KB VLA on the stack (see ZoomFFTExe).
+    static float32_t DMAMEM temp_buffer[READ_BUFFER_SIZE];
+    if (blocksize > READ_BUFFER_SIZE) return;
     if (factor < 0.0) {  // mix a bit of I into Q
         arm_scale_f32(I_buffer, factor, temp_buffer, blocksize);
         arm_add_f32(Q_buffer, temp_buffer, Q_buffer, blocksize);
