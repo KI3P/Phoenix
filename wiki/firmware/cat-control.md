@@ -3,10 +3,10 @@ title: CAT Control (Kenwood emulation)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-03
+updated: 2026-11-11
 tags: [cat, kenwood, ts-480, ts-2000, serial, rig-control, usb]
 source_refs: []
-related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]", "[[filter-board-electronics]]", "[[log-amp-power-detection]]"]
+related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]", "[[filter-board-electronics]]", "[[log-amp-power-detection]]", "[[spi-display-hang]]"]
 ---
 
 # CAT Control (Kenwood emulation)
@@ -208,6 +208,15 @@ All of these affected CAT users on earlier releases:
   air. Both now use `UsesSSBPower()`, which includes the digital states.
 - **`PC` dropped the hundreds digit (fixed 2026-10-24).** `PC_write` parsed from `cmd[3]`, so
   `PC100;` set 0 W. It now parses all three digits.
+- **`FA;`, `FB;` and `IF;` replies were garbled on the radio (fixed 2026-11-11, `38b26c3`).**
+  They formatted `GetTXRXFreq()`'s `int64_t` with `%lld`. The Teensy's printf has no
+  `long long` support: it printed a literal `ld` (`FA;` → `FA0000000000ld;`), and in `IF;`
+  every later field shifted. They now cast to `long` (32 bits, ample for Hz) and use `%ld`.
+  The host unit tests could not catch this, because the PC's printf handles `%lld`. Two
+  display labels had the same bug: the home screen FT Inc value and the power-cal Freq line
+  (`ebe42f7`). No `%lld` remains in the sketch.
+- **CAT going silent with USB still connected** was the display SPI hang, not a CAT fault
+  ([[spi-display-hang]]).
 
 - ⚠️ **`MD` inverted the receive filter.** `MD_write` set `bands[].mode` but never
   `ED.modulation[]`. `Demodulate()` switches on the *latter*, while `InitFilterMask()` *compares

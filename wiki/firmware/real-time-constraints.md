@@ -3,10 +3,10 @@ title: Real-Time Constraints & Timing Budget
 type: concept
 status: draft
 created: 2026-06-08
-updated: 2026-06-09
+updated: 2026-11-11
 tags: [real-time, timing, audio-buffers, loop-budget, spectrum]
 source_refs: []
-related: ["[[overview]]", "[[main-loop]]", "[[dsp-chain]]", "[[display-subsystem]]"]
+related: ["[[overview]]", "[[main-loop]]", "[[dsp-chain]]", "[[display-subsystem]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]"]
 ---
 
 # Real-Time Constraints & Timing Budget
@@ -26,6 +26,13 @@ The timing rules (from the `.ino` header) that constrain the whole design:
   independent of loop jitter ([[mode-state-machine]]).
 - **State-machine transitions**: deterministic and low-latency by construction
   ([[state-machine-architecture]]).
+- **Stack**: the stack is the DTCM left over after variables. It can be as little as
+  ~17.5 KB, depending on the Optimize setting, so large local arrays on the main-loop path
+  are unsafe. Put scratch in `static DMAMEM` instead. Peak use is ~3.5 KB since 2026-11-11
+  ([[memory-layout-and-stack]]).
+- **No unbounded waits on hardware**: `SPIClass::transfer()` spins with no timeout. A lost
+  SPI byte (LPSPI clocked at 240 MHz) froze the whole loop while interrupts kept running
+  ([[spi-display-hang]]).
 
 ## Why it matters for changes
 Any new work in the loop path (DSP, display, CAT, front-panel polling) spends part of the

@@ -3,10 +3,10 @@ title: Documentation TODOs & Open Questions
 type: roadmap
 status: draft
 created: 2026-06-08
-updated: 2026-11-03
+updated: 2026-11-11
 tags: [todo, open-questions, discrepancies, wiki-maintenance]
 source_refs: []
-related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]"]
+related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]"]
 ---
 
 # Documentation TODOs & Open Questions
@@ -20,6 +20,21 @@ This is a planning surface, not a defect tracker — but anything that looks lik
 is tagged **⚠ possible bug** so it stands out.
 
 ## Code/comment discrepancies & possible bugs
+
+### Build settings & platform (2026-11-11)
+- ~~⚠ Some Optimize settings reboot the radio every ~8 s.~~ **Fixed (`7e3c8d9`).** Stack
+  overflow from 16 KB of VLAs in `ZoomFFTExe()`. See [[memory-layout-and-stack]].
+- ~~⚠ Radio freezes (CAT silent, no reboot).~~ **Fixed (`fbdd06f`).** LPSPI at 240 MHz lost an
+  SPI byte. See [[spi-display-hang]].
+- ⚠ **Debug (`-Og`) builds hang hard.** USB disappears, there is no `CrashReport`, and
+  recovery needs the PROGRAM button. Not a stack problem: it still hangs with 50 KB of stack.
+  Undiagnosed.
+- **Teensyduino's SPI clock root (240 MHz)** is probably worth reporting to PJRC: it affects
+  any Teensy 4 SPI user. Not reported yet. Also confirm the datasheet's LPSPI_CLK_ROOT limit,
+  which [[spi-display-hang]] assumes rather than quotes.
+- **`code/.vscode/arduino.json` says 600 MHz / Fast with LTO**, but every post-fix check was
+  at 528 MHz. Re-run the 45 s CAT liveness check at 600 MHz before relying on it.
+- **Untested:** whether the SPI hang rate depended on CPU speed through core voltage.
 
 ### Hardware (from T41-EP schematics, ingested 2026-06-14)
 - ~~⚠ AD8307 (log) vs linear power math.~~ — **RESOLVED, not a bug (2026-06-14).** Net trace +

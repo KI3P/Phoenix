@@ -3,9 +3,10 @@ title: Phoenix Wiki Index
 type: index
 status: stub
 created: 2026-06-08
-updated: 2026-11-03
+updated: 2026-11-11
 ---
 
+<!-- updated 2026-11-11: two new decision pages, firmware/memory-layout-and-stack (the ~8 s reboot loop on some Optimize settings = stack overflow; FlexRAM bank split; ZoomFFTExe VLAs moved to DMAMEM) and firmware/spi-display-hang (freeze with USB alive = LPSPI at 240 MHz losing a byte; root moved to 132 MHz). Updated hardware-platform, display-subsystem, zoom-fft, real-time-constraints, cat-control (%lld fix), documentation-todos. -->
 <!-- updated 2026-11-03: V1.5.0. New firmware/automatic-power-swr-calibration (the AUTO branch of PowerCalSm: load/open/short session, three levels, validated on two radios). Updated calibration-state-machines, tune-frequency-control (shaped-tanh LM fit), hardware-state-machine, persistent-config, filter-boards, display-subsystem, rf-board (PLLB sharing fix), cat-control (newline/time-sync fix), swr-bridge-measured-behaviour (code/tools/swr lives on swr_cal_redux). -->
 <!-- updated 2026-10-23: ingested raw/AD8307.pdf → sources/ad8307-datasheet + new theory/log-amp-power-detection; detector front end of filter-board-electronics rewritten from a net trace (pad values and unfitted diode option owner-confirmed). 50 content pages + 2 sources. -->
 <!-- updated 2026-07-29 (2nd pass): 48 content pages (firmware 26, theory 12, hardware 4, roadmap 6) + 1 source (7 schematics). Added firmware/tx-filter-hil-test for the new transmit HIL suite; recorded the finding that the 48-tap FIR transmit stages are only rate-independent to ~1.2 % (vs 0.3 % for the IIR receive stages) in runtime-filter-design + multirate-decimation + filter-hil-test, since it bounds any rate-invariance tolerance. Also: TX;/RX; parameterless-write trap and the missing equalizerXmt command in cat-control; Hilbert-not-regenerated rationale + bench suppression measurement in ssb-phasing-method; TransmitProcessing ordering notes in dsp-chain; TX EQ testability corollary in audio-equalizer. -->
@@ -30,6 +31,8 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[spectrum-refresh-floor]] — why refresh ≈ NCHUNKS×T_loop; the 11.7→18.8 fps optimization. *(draft)*
 - [[rapid-tune-mute-freeze]] — `MUTE_ON_RAPID_TUNE`: mute audio + freeze spectrum on fast tuning; Fine Tune keeps only the blue bar moving. *(draft)*
 - [[code-heritage]] — lineage from DD4WH Teensy Convolution SDR; contributor list; GPLv3.
+- [[memory-layout-and-stack]] — why some Optimize settings rebooted every ~8 s: the stack is the DTCM left after 32 KB code banks (~17.5 KB on 11-bank builds) and `ZoomFFTExe` put 16 KB of VLAs on it; now DMAMEM, peak 3.5 KB. Per-setting results at 528 MHz. *(stable)*
+- [[spi-display-hang]] — freeze with USB alive and CAT silent: the LPSPI at Teensyduino's 240 MHz clock root lost a byte and `SPI.transfer()` spun forever in an RA8875 call; 8 hangs/10 min → 0 at 132 MHz. How it was located; hypotheses ruled out. *(stable)*
 
 **Sample rate & filter design** _(V1.4.0)_
 - [[sample-rate-switching]] — 192 / 176.4 ksps selectable at run time and persisted; `ChangeSampleRate()`, the Fs/4 dial compensation, menu + `SR` CAT paths. *(draft)*
@@ -60,7 +63,7 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 
 **Control flow & config**
 - [[main-loop]] — Loop.cpp: `loop()` sequence + interrupt FIFO + CW key/PTT handling.
-- [[cat-control]] — CAT.cpp: Kenwood (TS-480) emulation, **29**-command dispatch table on SerialUSB1; custom ED/PR dumps + SR/CF/EQ/FL DSP settings; the `MD` sideband-mirroring fix. *(draft)*
+- [[cat-control]] — CAT.cpp: Kenwood (TS-480) emulation, **29**-command dispatch table on SerialUSB1; custom ED/PR dumps + SR/CF/EQ/FL DSP settings; the `MD` sideband-mirroring fix; the `%lld` → `ld` reply fix (2026-11-11). *(draft)*
 - [[persistent-config]] — the `ED` struct (single source of truth) → JSON on LittleFS+SD; Config.h/Globals/ParamSave. *(draft)*
 
 ## Theory

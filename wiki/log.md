@@ -1322,3 +1322,24 @@ smaller fixes from main (PRs #32 and #34) came in with it.
     implemented in firmware. The `code/tools/swr/` bench files cited there live on the
     `swr_cal_redux` branch, not in `nightly`.
   - [[documentation-todos]], index.
+
+## [2026-11-11] decision | Stack overflow and SPI hang behind the "bad optimiser settings"
+Investigated why some Arduino Optimize / CPU speed settings made the radio misbehave. All
+measurements were made on the bench radio with fixes committed to `nightly` (`7e3c8d9`,
+`fbdd06f`, `38b26c3`, `ebe42f7`). There were two separate faults:
+- **Reboot every ~8 s** was a stack overflow into the MPU guard at `_ebss`. FlexRAM is
+  allocated in 32 KB banks, so 11-bank builds (`-O1`, `-O2`, `-O2 LTO`, `-Og`) had ~17.5 KB of
+  stack, against a measured 17.1–17.6 KB peak. The peak was almost all `ZoomFFTExe()`'s 16 KB
+  of VLAs. `-O2 LTO` was 184 B over. The VLAs moved to `static DMAMEM`, cutting peak use to
+  3,552 B. CPU speed did not change the layout. New page [[memory-layout-and-stack]].
+- **Freeze with USB alive** was the main loop spinning in `SPIClass::transfer()` inside an
+  RA8875 call, waiting for a byte the LPSPI lost. It was located with a GPT2 PC-sampling
+  interrupt. Pushing one byte from that interrupt recovered it every time. Clock root
+  240 MHz: 8 hangs in 10 min; 132 MHz: 0. The per-transaction CR toggle, the `REF` flag and
+  the stack fix were ruled out by measurement. New page [[spi-display-hang]].
+- **Also:** CAT `FA;`/`FB;`/`IF;` and two display labels used `%lld`, which the Teensy's
+  printf does not support. They are now cast to `long` and printed with `%ld`
+  ([[cat-control]]).
+- **Updated:** [[hardware-platform]], [[display-subsystem]], [[zoom-fft]],
+  [[real-time-constraints]], [[cat-control]], [[documentation-todos]] (open: the `-Og` hard
+  hang, a PJRC report, re-checking at 600 MHz), index.

@@ -3,10 +3,10 @@ title: Display Subsystem (RA8875, panes, menus, calibration screens)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-03
+updated: 2026-11-11
 tags: [display, ra8875, ui, spectrum, waterfall, menus, panes, stale-flags, sample-rate]
 source_refs: []
-related: ["[[overview]]", "[[ui-state-machine]]", "[[dsp-chain]]", "[[zoom-fft]]", "[[hardware-state-machine]]", "[[persistent-config]]", "[[spectrum-refresh-floor]]", "[[rapid-tune-mute-freeze]]", "[[sample-rate-switching]]", "[[cat-control]]", "[[automatic-power-swr-calibration]]"]
+related: ["[[overview]]", "[[ui-state-machine]]", "[[dsp-chain]]", "[[zoom-fft]]", "[[hardware-state-machine]]", "[[persistent-config]]", "[[spectrum-refresh-floor]]", "[[rapid-tune-mute-freeze]]", "[[sample-rate-switching]]", "[[cat-control]]", "[[automatic-power-swr-calibration]]", "[[spi-display-hang]]"]
 ---
 
 # Display Subsystem (RA8875)
@@ -118,6 +118,15 @@ Three things that used to assume 192 ksps now derive from `SR[SampleRate].rate`
 - A secondary option may also carry a **`postUpdateFunc`**, run after the value changes — e.g.
   "Sidetone volume" calls `UpdateSidetoneOscillator` so the change is applied to the running
   oscillator rather than only stored.
+
+## SPI bus and clock
+
+`InitializeDisplay()` (`MainBoard_Display.cpp`) starts the RA8875 with 20 MHz writes and
+4 MHz reads (`tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL)`). It then calls
+`SetSPIClockRootInSpec()`, which moves the LPSPI clock root from Teensyduino's 240 MHz to
+132 MHz. At 240 MHz the LPSPI occasionally lost a received byte, and
+`SPIClass::transfer()` waited for it forever, freezing the main loop inside a draw call. Writes
+now run at 18.9 MHz. Full investigation: [[spi-display-hang]] (2026-11-11, commit `fbdd06f`).
 
 ## Open questions
 - Waterfall scroll/colour-map implementation and how `psdnew` bins map to pixel columns.

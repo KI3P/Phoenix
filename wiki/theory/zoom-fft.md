@@ -3,10 +3,10 @@ title: Zoom FFT (Spectrum Display)
 type: concept
 status: draft
 created: 2026-06-08
-updated: 2026-07-29
+updated: 2026-11-11
 tags: [fft, zoom, spectrum, waterfall, decimation, display, psd, sample-rate]
 source_refs: []
-related: ["[[theory-overview]]", "[[fast-convolution-filtering]]", "[[multirate-decimation]]", "[[display-subsystem]]", "[[dsp-chain]]", "[[real-time-constraints]]", "[[sample-rate-switching]]", "[[runtime-filter-design]]"]
+related: ["[[theory-overview]]", "[[fast-convolution-filtering]]", "[[multirate-decimation]]", "[[display-subsystem]]", "[[dsp-chain]]", "[[real-time-constraints]]", "[[sample-rate-switching]]", "[[runtime-filter-design]]", "[[memory-layout-and-stack]]"]
 ---
 
 # Zoom FFT (Spectrum Display)
@@ -63,7 +63,10 @@ than from a fixed pixel table ([[display-subsystem]]).
    `decimate_f32` by `zoom_M` (`DSP_FFT.cpp:591-595`). The code notes it deliberately uses an
    **IIR** filter, not the FIR decimator used in the audio chain — for a *magnitude* PSD
    display, the IIR's non-linear phase doesn't matter, and it's cheaper. Per-zoom cutoff
-   coefficients come from `mag_coeffs[spectrum_zoom]` (`DSP_FFT.cpp:552`).
+   coefficients come from `mag_coeffs[spectrum_zoom]` (`DSP_FFT.cpp:552`). The filtered I/Q
+   go into two 2048-float scratch buffers, `zoom_scratch_x/y`. These are `static DMAMEM`
+   since 2026-11-11 (commit `7e3c8d9`). They used to be stack VLAs: 16 KB that overflowed
+   the stack in some Optimize settings and rebooted the radio ([[memory-layout-and-stack]]).
 3. **Amplitude compensation**: each decimated sample is scaled by
    `zoomMultiplierCoeff[spectrum_zoom]` (`DSP_FFT.cpp:604`) to keep PSD amplitude stable as
    zoom changes (decimation + filtering otherwise alter the level).
