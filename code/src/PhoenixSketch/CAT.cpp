@@ -303,7 +303,9 @@ char *FA_write( char* cmd ){
  * @return Response string with current VFO A frequency
  */
 char *FA_read(  char* cmd  ){
-    sprintf( obuf, "FA%011lld;", GetTXRXFreq(VFO_A) );
+    // Not %lld: the Teensy's printf has no long long support and prints "ld",
+    // shifting every later argument. long is 32 bits there, ample for Hz.
+    sprintf( obuf, "FA%011ld;", (long)GetTXRXFreq(VFO_A) );
     return obuf;
 }
 
@@ -325,7 +327,7 @@ char *FB_write( char* cmd  ){
  * @return Response string with current VFO B frequency
  */
 char *FB_read(  char* cmd  ){
-    sprintf( obuf, "FB%011lld;", GetTXRXFreq(VFO_B) );
+    sprintf( obuf, "FB%011ld;", (long)GetTXRXFreq(VFO_B) );
     return obuf;
 }
 
@@ -488,8 +490,8 @@ char *IF_read(  char* cmd ){
     sprintf( obuf,
             //  P1     P2   P3   P4P5P6P7  P8P9P10 P12 P14 P15
             //                                   P11 P13
-             "IF%011lld     %+05d%d%d%d%02d%d%d%d%d%d%d%02d ;",
-             GetTXRXFreq(ED.activeVFO),  // P1: frequency
+             "IF%011ld     %+05d%d%d%d%02d%d%d%d%d%d%d%02d ;",
+             (long)GetTXRXFreq(ED.activeVFO),  // P1: frequency
              // P2 is 5 spaces
              0, // P3: rit/xit frequency
              0, // P4: rit enabled
