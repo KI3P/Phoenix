@@ -1502,7 +1502,7 @@ void UpdateIncrementSetting(void) {
         tft.setFontDefault();
         tft.setFontScale((enum RA8875tsize)0);
         char valueText[8];
-        sprintf(valueText,"%lld",ED.stepFineTune);
+        sprintf(valueText,"%ld",(long)ED.stepFineTune); // no %lld on Teensy
         UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
                     (char *)"FT Inc:", 7,
                     valueText, 4,

@@ -351,7 +351,7 @@ static void DrawPowerAdjustPane(void){
     tft.setCursor(x0,y0+delta);
     tft.print("Freq:");
     tft.setCursor(x0+120,y0+delta);
-    sprintf(buff,"%lldkHz",GetTXRXFreq(ED.activeVFO)/1000);
+    sprintf(buff,"%ldkHz",(long)(GetTXRXFreq(ED.activeVFO)/1000)); // no %lld on Teensy
     tft.print(buff);
 
     delta += lineD;
