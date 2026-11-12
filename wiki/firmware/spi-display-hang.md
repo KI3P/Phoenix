@@ -6,7 +6,7 @@ created: 2026-11-11
 updated: 2026-11-11
 tags: [spi, lpspi, ra8875, display, hang, clock, teensy, cat]
 source_refs: []
-related: ["[[memory-layout-and-stack]]", "[[display-subsystem]]", "[[hardware-platform]]", "[[main-loop]]", "[[cat-control]]", "[[real-time-constraints]]"]
+related: ["[[memory-layout-and-stack]]", "[[display-subsystem]]", "[[hardware-platform]]", "[[main-loop]]", "[[cat-control]]", "[[real-time-constraints]]", "[[build-toolchain]]"]
 ---
 
 # SPI Display Hang (LPSPI Clock Root)
@@ -51,7 +51,8 @@ byte had gone missing.
 
 Teensyduino 1.59's `SPI.begin()` sets `CCM_CBCMR` to LPSPI_CLK_SEL = 1 (PLL3 PFD0, 720 MHz),
 LPSPI_PODF = 2 (÷3). That gives a **240 MHz** LPSPI functional clock; the source comment
-mentions 132 MHz (`SPI.cpp:1274-1281`). The decisive measurement used the same diagnostic
+mentions 132 MHz (`SPI.cpp:1274-1281`). Teensyduino 1.62 is the same, so the fix is still
+needed there ([[build-toolchain]]). The decisive measurement used the same diagnostic
 build (Smallest Code with LTO, 528 MHz), 10 minutes each, counting hangs that the probe
 recovered:
 

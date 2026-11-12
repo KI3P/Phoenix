@@ -6,7 +6,7 @@ created: 2026-11-11
 updated: 2026-11-11
 tags: [memory, stack, itcm, dtcm, dmamem, optimiser, build, reboot, teensy]
 source_refs: []
-related: ["[[spi-display-hang]]", "[[hardware-platform]]", "[[zoom-fft]]", "[[iq-imbalance-correction]]", "[[real-time-constraints]]", "[[dsp-chain]]", "[[main-loop]]"]
+related: ["[[spi-display-hang]]", "[[hardware-platform]]", "[[zoom-fft]]", "[[iq-imbalance-correction]]", "[[real-time-constraints]]", "[[dsp-chain]]", "[[main-loop]]", "[[og-startup-hang]]", "[[build-toolchain]]"]
 ---
 
 # Memory Layout, Stack Headroom and Build Settings
@@ -87,7 +87,9 @@ Each build was flashed and polled with the read-only CAT `FA;` every 2 s for 45 
 |---|---|
 | `oslto`, `osstd`, `o1lto`, `o1std`, `o2std`, `o2lto` | pass (`oslto` also ran 10 min with no missed reply) |
 | `o3std`, `o3lto` | do not fit in RAM1; cannot be flashed |
-| `ogstd` (Debug) | **hangs hard and leaves no `CrashReport`**. Not a stack problem: it still hangs with 50 KB of stack. Recovering needs the PROGRAM button. Undiagnosed. |
+| `ogstd` (Debug) | **never starts; USB never appears.** Not a stack problem: it hangs the same way with 50 KB of stack. It is a Teensyduino 1.59 core startup bug, fixed in 1.60: see [[og-startup-hang]]. Passes on 1.62. |
+
+These results are for Teensyduino 1.59. For 1.62, at 528 and 600 MHz, see [[build-toolchain]].
 
 The "pass" results need **both** this fix and the SPI clock fix in [[spi-display-hang]].
 Earlier checks that only watched for USB re-enumeration passed `o1std` and `oslto`, because

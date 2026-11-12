@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-11-11
 tags: [todo, open-questions, discrepancies, wiki-maintenance]
 source_refs: []
-related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]"]
+related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]", "[[og-startup-hang]]", "[[build-toolchain]]"]
 ---
 
 # Documentation TODOs & Open Questions
@@ -26,14 +26,19 @@ is tagged **⚠ possible bug** so it stands out.
   overflow from 16 KB of VLAs in `ZoomFFTExe()`. See [[memory-layout-and-stack]].
 - ~~⚠ Radio freezes (CAT silent, no reboot).~~ **Fixed (`fbdd06f`).** LPSPI at 240 MHz lost an
   SPI byte. See [[spi-display-hang]].
-- ⚠ **Debug (`-Og`) builds hang hard.** USB disappears, there is no `CrashReport`, and
-  recovery needs the PROGRAM button. Not a stack problem: it still hangs with 50 KB of stack.
-  Undiagnosed.
+- ~~⚠ Debug (`-Og`) builds hang hard.~~ **Diagnosed; core bug, not Phoenix.** Teensyduino
+  1.59's `reset_PFD()` gates the clock to the flash, then reads a constant from flash. Fixed
+  upstream in Teensyduino 1.60. See [[og-startup-hang]].
+- ~~Consider upgrading Teensyduino 1.59 → 1.62.~~ **Done 2026-11-11.** Every setting that fits
+  passes at 528 and 600 MHz, `-Og` included; the SPI fix is still needed and still works. Two
+  GCC 15 warnings were fixed (Si5351 `new[]`/`delete`, zoom label buffer). See
+  [[build-toolchain]].
 - **Teensyduino's SPI clock root (240 MHz)** is probably worth reporting to PJRC: it affects
   any Teensy 4 SPI user. Not reported yet. Also confirm the datasheet's LPSPI_CLK_ROOT limit,
   which [[spi-display-hang]] assumes rather than quotes.
-- **`code/.vscode/arduino.json` says 600 MHz / Fast with LTO**, but every post-fix check was
-  at 528 MHz. Re-run the 45 s CAT liveness check at 600 MHz before relying on it.
+- ~~`code/.vscode/arduino.json` says 600 MHz / Fast with LTO, untested after the fixes.~~
+  **Tested on 1.62:** 45 s pass for every setting at 600 MHz, plus a 10 min soak of Fast with
+  LTO ([[build-toolchain]]). 720 MHz and above were not re-tested.
 - **Untested:** whether the SPI hang rate depended on CPU speed through core voltage.
 
 ### Hardware (from T41-EP schematics, ingested 2026-06-14)

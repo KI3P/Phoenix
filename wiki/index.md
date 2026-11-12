@@ -6,6 +6,8 @@ created: 2026-06-08
 updated: 2026-11-11
 ---
 
+<!-- updated 2026-11-11 (3rd): new decision page firmware/build-toolchain (upgrade to Teensyduino 1.62 / GCC 15.2.1; isolated trial method; per-setting results at 528 and 600 MHz; GCC 15 warning fixes). Updated og-startup-hang, memory-layout-and-stack, spi-display-hang, hardware-platform, documentation-todos. -->
+<!-- updated 2026-11-11 (2nd): new decision page firmware/og-startup-hang (Debug -Og builds never start: Teensyduino 1.59 reset_PFD gates the FlexSPI clock then reads a flash literal; HardFault; fixed in TD 1.60). Updated memory-layout-and-stack, hardware-platform, documentation-todos. -->
 <!-- updated 2026-11-11: two new decision pages, firmware/memory-layout-and-stack (the ~8 s reboot loop on some Optimize settings = stack overflow; FlexRAM bank split; ZoomFFTExe VLAs moved to DMAMEM) and firmware/spi-display-hang (freeze with USB alive = LPSPI at 240 MHz losing a byte; root moved to 132 MHz). Updated hardware-platform, display-subsystem, zoom-fft, real-time-constraints, cat-control (%lld fix), documentation-todos. -->
 <!-- updated 2026-11-03: V1.5.0. New firmware/automatic-power-swr-calibration (the AUTO branch of PowerCalSm: load/open/short session, three levels, validated on two radios). Updated calibration-state-machines, tune-frequency-control (shaped-tanh LM fit), hardware-state-machine, persistent-config, filter-boards, display-subsystem, rf-board (PLLB sharing fix), cat-control (newline/time-sync fix), swr-bridge-measured-behaviour (code/tools/swr lives on swr_cal_redux). -->
 <!-- updated 2026-10-23: ingested raw/AD8307.pdf → sources/ad8307-datasheet + new theory/log-amp-power-detection; detector front end of filter-board-electronics rewritten from a net trace (pad values and unfitted diode option owner-confirmed). 50 content pages + 2 sources. -->
@@ -33,6 +35,8 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[code-heritage]] — lineage from DD4WH Teensy Convolution SDR; contributor list; GPLv3.
 - [[memory-layout-and-stack]] — why some Optimize settings rebooted every ~8 s: the stack is the DTCM left after 32 KB code banks (~17.5 KB on 11-bank builds) and `ZoomFFTExe` put 16 KB of VLAs on it; now DMAMEM, peak 3.5 KB. Per-setting results at 528 MHz. *(stable)*
 - [[spi-display-hang]] — freeze with USB alive and CAT silent: the LPSPI at Teensyduino's 240 MHz clock root lost a byte and `SPI.transfer()` spun forever in an RA8875 call; 8 hangs/10 min → 0 at 132 MHz. How it was located; hypotheses ruled out. *(stable)*
+- [[og-startup-hang]] — why Debug (`-Og`) builds never reach USB: Teensyduino 1.59's `reset_PFD()` gates PLL3 PFD0, the flash clock, then loads a literal from flash → HardFault. Fixed in TD 1.60. OCRAM breadcrumbs and the PROGRAM-button reflash trap. *(stable)*
+- [[build-toolchain]] — Teensyduino 1.62 / GCC 15.2.1 since 2026-11-11: how the upgrade was trialled in isolation, which Optimize settings pass at 528 and 600 MHz, the two GCC 15 warning fixes. *(stable)*
 
 **Sample rate & filter design** _(V1.4.0)_
 - [[sample-rate-switching]] — 192 / 176.4 ksps selectable at run time and persisted; `ChangeSampleRate()`, the Fs/4 dial compensation, menu + `SR` CAT paths. *(draft)*

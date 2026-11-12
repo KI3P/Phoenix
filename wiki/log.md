@@ -1343,3 +1343,38 @@ measurements were made on the bench radio with fixes committed to `nightly` (`7e
 - **Updated:** [[hardware-platform]], [[display-subsystem]], [[zoom-fft]],
   [[real-time-constraints]], [[cat-control]], [[documentation-todos]] (open: the `-Og` hard
   hang, a PJRC report, re-checking at 600 MHz), index.
+
+## [2026-11-11] decision | Debug (-Og) builds hang in Teensyduino 1.59 startup
+The open `-Og` item from the entry above is now diagnosed. It is a core bug, not Phoenix, and
+nothing in the repo changed.
+- **Symptom:** the kernel log shows no USB device at all after upload, which places the hang
+  in `ResetHandler2()` before `usb_init()`.
+- **Ruled out:** the forum theory blaming the `configure_cache()` `SCB_CCR` write's cache-line
+  position. Adding `dsb`/`isb` and aligning the write with `.balign 32` both still hung.
+- **Located:** OCRAM breadcrumbs at `0x2027FF40`, which survive a reflash, in a scratchpad
+  copy of the core. They showed a HardFault at the literal-pool load in `reset_PFD()`.
+  `CCM_CSCMR1` confirms FlexSPI is clocked from PLL3 PFD0, which that function gates.
+- **Fix:** making `reset_PFD()` `FASTRUN` booted `-Og` and passed the 45 s CAT check (23/23).
+  Upstream fixed it in commits `2b87070`, `f4d7aa6` and `a78bc7c`, first released in
+  Teensyduino 1.60 (1.62 is current).
+- **Also:** the Teensy Loader's Auto mode re-flashes the last hex on a PROGRAM press. That
+  explains the earlier "needs two presses".
+- **New page:** [[og-startup-hang]].
+- **Updated:** [[memory-layout-and-stack]], [[hardware-platform]], [[documentation-todos]]
+  (new item: upgrade to 1.62 and re-test), index.
+
+## [2026-11-11] decision | Upgrade to Teensyduino 1.62 (GCC 15.2.1)
+Following [[og-startup-hang]], the development machine moved from Teensyduino 1.59 / GCC 11.3.1
+to 1.62 / GCC 15.2.1.
+- **Trial first:** 1.62 was installed into a separate `arduino-cli` data directory and every
+  Optimize setting built and flashed from there, before `~/.arduino15` was touched.
+- **Results:** every setting that fits passed the 45 s CAT check at both 528 and 600 MHz, `-Og`
+  included. Fast with LTO also passed 10 min (300/300) at each speed. `-O3` is still ~48 KB
+  over RAM1. Stack headroom is within a few hundred bytes of 1.59. The SPI library still sets
+  240 MHz, so the 132 MHz fix stays.
+- **GCC 15 warnings fixed:** the Si5351 register arrays (`new[]` freed with `delete`) are now
+  local arrays, and the zoom label buffer went from 4 to 5 bytes. Unit tests are unchanged:
+  873/903, the same 30 failures from the uncommitted KI3P prototype edits.
+- **New page:** [[build-toolchain]].
+- **Updated:** [[og-startup-hang]], [[memory-layout-and-stack]], [[spi-display-hang]],
+  [[hardware-platform]], [[documentation-todos]] (the upgrade and 600 MHz items closed), index.
