@@ -1616,7 +1616,7 @@ void UpdateZoomSetting(void){
         return;
     oldZoom = ED.spectrum_zoom;
     tft.setFontScale((enum RA8875tsize)0);
-    char valueText[4];
+    char valueText[5]; // room for "255x" plus the nul
     sprintf(valueText,"%dx",(uint8_t)(1<<ED.spectrum_zoom));
     UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
         (char *)"Zoom:", 5,
