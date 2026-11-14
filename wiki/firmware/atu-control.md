@@ -15,6 +15,15 @@ Phase 1 of ATU support gives **manual control only**. You set the relays from a 
 CAT, key up, and read the SWR. Nothing switches the tuner automatically; that is
 [[atu-auto-tuning]]. The hardware is described in [[atu-board]].
 
+**Verified on hardware 2026-11-14.** With the ATU installed in the radio and `ATU_PRESENT`
+enabled, both expanders were found at boot, `AT;` read the bypassed boot state with readback
+equal to the register, and every menu item switched its relays as expected. `atu_cat.py`
+then walked K1–K20 one at a time, plus full masks and a combined LC/CL setting: 49 writes,
+readback equal to the register on every one. The readback also confirms the real MCP23017
+returns GPIOA in the low byte of `readGPIOAB()`, so the test mock is the one that is wrong.
+With a dummy load on the KI3P prototype, keying with `TX;` made `AT` writes return `?;`, and the
+relay state held through RX→TX→RX and a band change up and back.
+
 ## Build flag
 - **`Config.h`:** `//#define ATU_PRESENT`, commented out by default. Uncomment it when the ATU
   control board is on the BANDS connector.

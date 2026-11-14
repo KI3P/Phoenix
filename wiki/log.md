@@ -1402,3 +1402,14 @@ Phase 2.
 - **New pages:** [[atu-board]], [[atu-control]], [[atu-auto-tuning]].
 - **Updated:** [[filter-boards]], [[cat-control]], [[built-in-test]], [[i2c-bus-map]],
   [[documentation-todos]], index.
+
+## [2026-11-14] decision | ATU Phase 1 verified on hardware
+The radio was flashed with `ATU_PRESENT` enabled and the ATU installed. Both expanders were
+found at boot. `AT;` read the bypassed state with readback equal to the register, and the owner
+confirmed that every ATU menu item switched its relays as expected. Phase 1 (manual control) is
+done; next is [[atu-auto-tuning]]. Updated [[atu-control]].
+  CAT check: `atu_cat.py` walked every relay plus full masks and an LC/CL setting, 49/49 with
+  readback = register.
+  Transmit interlock (KI3P prototype build, dummy load, SSB keyed by `TX;` with no audio): `AT`
+  writes were refused (`?;`) while transmitting. The relay state (network in line) survived
+  RX→TX→RX and a band change up and back. 13/13 checks passed.
