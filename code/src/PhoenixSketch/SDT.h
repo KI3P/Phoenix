@@ -764,6 +764,7 @@ struct AGCConfig {
 #include "LPFBoard.h"
 #include "BPFBoard.h"
 #include "ATUBoard.h"
+#include "ATUModel.h"
 #include "CAT.h"
 #include "Storage.h"
 

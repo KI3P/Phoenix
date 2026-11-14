@@ -102,6 +102,8 @@ char *FL_write( char* cmd );
 char *FL_read(  char* cmd );
 char *AT_write( char* cmd );
 char *AT_read(  char* cmd );
+char *AX_write( char* cmd );
+char *AX_read(  char* cmd );
 
 typedef struct  {
     char name[3];   //two chars plus zero terminator
@@ -122,7 +124,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 36
+#define NUM_SUPPORTED_COMMANDS 37
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
@@ -168,7 +170,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "DD", 3+3,3, DD_write, DD_read }, // digital transmit drive level 000-100 -- NOT a Kenwood keyword
         { "BR", 3+1,3, BR_write, BR_read }, // raw SWR bridge readings: clear, sample, statistics -- NOT a Kenwood keyword
         { "XA", 3+3,3, XA_write, XA_read },  // CW transmit attenuation override -- NOT a Kenwood keyword
-        { "AT", 3+9,3, AT_write, AT_read }   // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
+        { "AT", 3+9,3, AT_write, AT_read },  // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
+        { "AX", 3+1,3, AX_write, AX_read }   // ATU tuner diagnostics (needs ATU_PRESENT) -- NOT a Kenwood keyword
     };
 
 /**
@@ -1223,6 +1226,57 @@ char *AT_read( char* cmd ){
     sprintf( obuf, "?;");
     return obuf;
 #endif
+}
+
+/**
+ * CAT command AX - ATU tuner diagnostics (non-standard Kenwood command)
+ *
+ * "AX1;" times the tuner model on the Teensy at the current transmit frequency:
+ * the per-frequency precompute, a search of all 131,072 settings for a sample load
+ * (30+j40 ohm), and robust selection over its best ATU_TOPK candidates. It blocks
+ * the main loop for the time it reports, so use it for bench work only.
+ *
+ * @param cmd CAT command string
+ * @return "AX1,<f_kHz>,<prepare_us>,<search_us>,<robust_us>,<topo><LLL><CCC>,<g x 1000>;"
+ *         with the robust choice and its nominal |Gamma|; "?;" for any other argument,
+ *         while transmitting, or without ATU_PRESENT
+ */
+char *AX_write( char* cmd ){
+#ifdef ATU_PRESENT
+    if( (cmd[2] != '1') || !ATUChangeAllowed() ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ATUModelCache *cache = ATUSharedModelCache();
+    ATUTopK *topk = ATUSharedTopK();
+    double f_Hz = (double)GetTXRXFreq_cHz() / 100.0;
+    atu_cf zl = { 30.0f, 40.0f };
+    uint32_t t0 = micros();
+    ATUModelPrepare( cache, &ATUModelDefaultParams, f_Hz );
+    uint32_t t1 = micros();
+    ATUModelSearchAll( cache, zl, topk );
+    uint32_t t2 = micros();
+    ATURobustChoice pick = ATUModelRobustPick( cache, zl, topk );
+    uint32_t t3 = micros();
+    sprintf( obuf, "AX1,%lu,%lu,%lu,%lu,%d%03d%03d,%d;",
+             (unsigned long)(f_Hz / 1000.0), (unsigned long)(t1 - t0),
+             (unsigned long)(t2 - t1), (unsigned long)(t3 - t2),
+             pick.best.topo, pick.best.l, pick.best.c, (int)lroundf( pick.best.g * 1000.0f ) );
+    return obuf;
+#else
+    sprintf( obuf, "?;");
+    return obuf;
+#endif
+}
+
+/**
+ * CAT command AX - read the last ATU tune result (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return "?;" until the automatic tuner exists
+ */
+char *AX_read( char* cmd ){
+    sprintf( obuf, "?;");
+    return obuf;
 }
 
 /**

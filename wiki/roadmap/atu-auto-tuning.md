@@ -24,6 +24,17 @@ in `code/tools/atu_vna/tuning_sim.py`.
   models carries over to builds with different hand-wound coils. On 10 m that is essential:
   median SWR 1.09 robust against 1.78 plain best.
 
+## Progress
+- **Stage A done (2026-11-14): the model runs in firmware.**
+  - `ATUModel.cpp` ports `model.py`. It matches the Python to 3×10⁻⁷ in Γ on 432 golden cases
+    (`test/atu_golden.h`).
+  - Parameters come from `fits.json` through `tools/atu_vna/export_c.py`.
+  - On the Teensy (600 MHz, `AX1;`): precompute 4.9 ms, full 131,072-setting search
+    17.8–18.7 ms, robust selection 0.02–0.14 ms. That is well below the report's "tens of ms"
+    estimate. The engine will run the search in chunks of about 6 ms per loop pass.
+  - Cross-check: for 30+j40 Ω at 7.1 MHz the firmware picks LC/15/32, the setting the report
+    gives (SWR 1.17).
+
 ## Proposed algorithm (§6.5)
 memory → bypass check (SWR ≤ 1.3 stays bypassed) → 4 probes (empty LC, one L ≈ 50 Ω, one C ≈
 1/50 S, both in CL) → estimate Z_ant by least squares → robust jump (top 300 by model, 6 models

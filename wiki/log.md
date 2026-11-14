@@ -1413,3 +1413,13 @@ done; next is [[atu-auto-tuning]]. Updated [[atu-control]].
   Transmit interlock (KI3P prototype build, dummy load, SSB keyed by `TX;` with no audio): `AT`
   writes were refused (`?;`) while transmitting. The relay state (network in line) survived
   RX→TX→RX and a band change up and back. 13/13 checks passed.
+
+## [2026-11-14] decision | ATU Phase 2 stage A: tuner model in firmware, benchmarked
+`ATUModel.cpp` ports `tools/atu_vna/model.py`: a per-frequency precompute (double) of the line
+products for every L code and the bank admittance for every C code, a chunked search of all
+131,072 settings into a top-300 heap, and robust selection over 6 fixed perturbed coil sets.
+- **Accuracy:** matches the Python model to 3×10⁻⁷ in Γ on 432 golden cases.
+- **Speed** (`AX1;`, KI3P prototype at 600 MHz): precompute 4.9 ms, search 18 ms, robust pick
+  ≤ 0.14 ms.
+- **Cross-check:** 30+j40 Ω at 7.1 MHz → LC/15/32, as in the report.
+- **Plan:** Phase 2 is planned in [[atu-auto-tuning]] as stages A–F.
