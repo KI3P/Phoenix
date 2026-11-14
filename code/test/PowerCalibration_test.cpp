@@ -178,7 +178,7 @@ void SelectRFMenu(void) {
 
     // Verify we're on the RF secondary menu
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SECONDARY_MENU);
-    extern struct PrimaryMenuOption primaryMenu[9];
+    extern struct PrimaryMenuOption primaryMenu[NUM_PRIMARY_MENUS];
     extern size_t primaryMenuIndex;
     EXPECT_STREQ(primaryMenu[primaryMenuIndex].label, "RF Options");
 }

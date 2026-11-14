@@ -3,8 +3,10 @@ title: Phoenix Wiki Index
 type: index
 status: stub
 created: 2026-06-08
-updated: 2026-11-11
+updated: 2026-11-14
 ---
+
+<!-- updated 2026-11-14: ATU support, Phase 1 (manual control). New pages hardware/atu-board, firmware/atu-control, roadmap/atu-auto-tuning. Updated filter-boards (64-bit register mask fix), cat-control (AT command), built-in-test, i2c-bus-map, documentation-todos (MCP23X17 mock byte order). -->
 
 <!-- updated 2026-11-11 (3rd): new decision page firmware/build-toolchain (upgrade to Teensyduino 1.62 / GCC 15.2.1; isolated trial method; per-setting results at 528 and 600 MHz; GCC 15 warning fixes). Updated og-startup-hang, memory-layout-and-stack, spi-display-hang, hardware-platform, documentation-todos. -->
 <!-- updated 2026-11-11 (2nd): new decision page firmware/og-startup-hang (Debug -Og builds never start: Teensyduino 1.59 reset_PFD gates the FlexSPI clock then reads a flash literal; HardFault; fixed in TD 1.60). Updated memory-layout-and-stack, hardware-platform, documentation-todos. -->
@@ -57,6 +59,7 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 **Hardware-abstraction modules** _(the code; physical electronics live under Hardware below)_
 - [[rf-board]] — `RFBoard.cpp` API: Si5351 3-VFO quadrature LO (phase-reg vs <3.2 MHz timed-delay), attenuators, T/R, cal loopback → electronics in [[rf-board-electronics]]. *(draft)*
 - [[filter-boards]] — `BPFBoard`/`LPFBoard` API: BPF + LPF/RF-back-end relays via shared hardwareRegister; AD7991 SWR/power math → electronics in [[filter-board-electronics]]. *(draft)*
+- [[atu-control]] — `ATUBoard.cpp` behind `ATU_PRESENT`: manual control of the K9HZ tuner from the ATU menu and the `AT` CAT command; boots bypassed; no relay changes while transmitting → hardware in [[atu-board]]. *(draft)*
 - [[front-panel]] — 2×MCP23017 encoders/buttons/LEDs; two-tier ISR+1ms-timer I²C servicing (encoder-i2c-speed branch). *(draft)*
 
 **Signal processing & UI**
@@ -101,6 +104,9 @@ the firmware/ module pages (which describe the code). Derived from `Config.h` + 
 - [[filter-board-electronics]] — BPF/LPF/PA back-end chips: MASWSS switches, CD74HC4514/74HC237
   decoders + ULN2803/HF41F relays, external per-band LPF board, AD8307/AD7991 SWR sensing
   (detector front end, compensated pad modelled against the VNA, unfitted diode option). *(draft)*
+- [[atu-board]] — K9HZ 100 W antenna tuner: relay-switched L-network (8 L, 8 C, LC/CL, balun,
+  bypass), control board on Wire2 at 0x20/0x21, register bits 33–51, and the VNA
+  characterisation (strays, lead inductance, coil self-resonances). *(draft)*
 - [[swr-bridge-measured-behaviour]] — bench tests of two radios (Oct–Nov 2026): the SWR error
   was AD7991 readout crosstalk, fixed by discarding two conversions per channel switch; radio 1
   then calibrates (100 Ω 1.97–2.04, 200 Ω 3.96–4.22 on 160–20 m) and its bridge leaks
@@ -114,6 +120,8 @@ _Plans for future development, proposals, open questions._
 
 - [[documentation-todos]] — running list of wiki pages to write + code/comment discrepancies
   and possible bugs found while documenting (incl. a ⚠ possible NR channel-routing bug).
+- [[atu-auto-tuning]] — Phase 2 of ATU support: the probe → estimate → robust-jump tuning
+  algorithm from the characterisation report, and how it would fit the firmware. *(draft)*
 - [[development-backlog]] — software-dev tasks mirroring the open GitHub issues (index).
   - [[transmit-spectrum]] (#10) — see the TX spectrum; largely built, needs verify.
   - [[manual-notch]] (#11) — 3-way notch (off/auto/manual); manual mode is new work.

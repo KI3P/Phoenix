@@ -73,7 +73,9 @@ struct BIT bit_results = {
   false,
   false,
   false,
-  0
+  0,
+  false,   // ATU_MCP23017_present
+  false    // ATU_MCP23008_present
 };
 
 const struct SR_Descriptor SR[18] = {
@@ -430,7 +432,43 @@ void pretty_print_line(BufferEntry entry){
   line += " ";
   line += regtostring(entry.register_value,RXATTMSB,RXATTLSB);
   line += " |";
+#ifdef ATU_PRESENT
+  line += " ";
+  line += regtostring(entry.register_value,ATUNETWORKBIT,ATUNETWORKBIT);
+  line += " ";
+  line += regtostring(entry.register_value,ATUBALANCEDBIT,ATUBALANCEDBIT);
+  line += " ";
+  line += regtostring(entry.register_value,ATUCAPINPUTBIT,ATUCAPINPUTBIT);
+  line += " ";
+  line += regtostring(entry.register_value,ATULMSB,ATULLSB);
+  line += " ";
+  line += regtostring(entry.register_value,ATUCMSB,ATUCLSB);
+  line += " |";
+#endif
   Debug(line);
+}
+
+// The ATU section of the decoded table: N = network in line, B = balun output,
+// S = capacitor bank at the input side (C-L), then the inductor and capacitor masks.
+#ifdef ATU_PRESENT
+#define ATU_HDR_BLANK  "                         |"
+#define ATU_HDR_LABEL  " N B S ATU-L    ATU-C    |"
+#define ATU_HDR_RULE   "-------------------------|"
+#else
+#define ATU_HDR_BLANK  ""
+#define ATU_HDR_LABEL  ""
+#define ATU_HDR_RULE   ""
+#endif
+
+/**
+ * Print the column header for the decoded register table.
+ */
+static void pretty_print_header(void) {
+  Debug("|               |              X 1     R   M   C R T               |" ATU_HDR_BLANK);
+  Debug("|               |           A  V 0 T R X   O C V V V               |" ATU_HDR_BLANK);
+  Debug("|               |           n  T 0 X X T C D A F F F               |" ATU_HDR_BLANK);
+  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |" ATU_HDR_LABEL);
+  Debug("|---------------|--------------------------------------------------|" ATU_HDR_RULE);
 }
 
 /**
@@ -439,11 +477,7 @@ void pretty_print_line(BufferEntry entry){
  * Useful for quickly checking current hardware state.
  */
 void buffer_pretty_print_last_entry(void) {
-  Debug("|               |              X 1     R   M   C R T               |");
-  Debug("|               |           A  V 0 T R X   O C V V V               |");
-  Debug("|               |           n  T 0 X X T C D A F F F               |");
-  Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |");
-  Debug("|---------------|--------------------------------------------------|");
+  pretty_print_header();
   BufferEntry entry;
   if (buffer.head > 0) entry = buffer.entries[buffer.head-1];
   else entry = buffer.entries[REGISTER_BUFFER_SIZE-1];
@@ -467,11 +501,7 @@ void buffer_pretty_buffer_array(void) {
     }
 
     Debug("Entries (oldest to newest):");
-    Debug("|               |              X 1     R   M   C R T               |");
-    Debug("|               |           A  V 0 T R X   O C V V V               |");
-    Debug("|               |           n  T 0 X X T C D A F F F               |");
-    Debug("| Timestamp(μs) | LPF  BPF  t  R W B B X W E L O O O TXATT  RXATT  |");
-    Debug("|---------------|--------------------------------------------------|");
+    pretty_print_header();
 
     // Calculate starting index for oldest entry
     size_t start_idx;

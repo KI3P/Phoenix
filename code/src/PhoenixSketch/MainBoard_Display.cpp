@@ -204,6 +204,33 @@ void DrawBIT(void){
         }
         yoff += 30;
         #endif  //V12_LPF_SWR_AD7991
+
+        #ifdef ATU_PRESENT
+        // Both ATU expanders are on Wire2 (the front panel's 0x20/0x21 are on Wire1)
+        const bool atuPresent[2] = {bit_results.ATU_MCP23017_present,
+                                    bit_results.ATU_MCP23008_present};
+        const char *atuChip[2] = {"MCP23017", "MCP23008"};
+        const uint8_t atuAddr[2] = {ATU_MCP23017_ADDR, ATU_MCP23008_ADDR};
+        for (int i = 0; i < 2; i++){
+            tft.setCursor(5 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
+            if (!atuPresent[i]) {
+                tft.setTextColor(RA8875_RED);
+                sprintf(tmpbuf, "K9HZ ATU %s I2C not found at 0x%02X", atuChip[i], atuAddr[i]);
+                tft.print(tmpbuf);
+            } else {
+                tft.setTextColor(RA8875_GREEN);
+                tft.setCursor(4 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
+                sprintf(tmpbuf, "K9HZ ATU %s I2C:", atuChip[i]);
+                tft.print(tmpbuf);
+                sprintf(tmpbuf, "0x%02X", atuAddr[i]);
+                tft.setCursor(col1, WINDOW_HEIGHT/10 + yoff);
+                tft.print(tmpbuf);
+                tft.setCursor(col2, WINDOW_HEIGHT/10 + yoff);
+                tft.print("PASS");
+            }
+            yoff += 30;
+        }
+        #endif  // ATU_PRESENT
     }
 }
 

@@ -51,15 +51,12 @@ If not, see <https://www.gnu.org/licenses/>.
  * takes the network OUT of bypass: K19/K20 route through their NC contacts
  * when de-energised. ATUNETWORKBIT is named for what it does.
  *
- * Integration notes (for when this moves into PhoenixSketch/):
- * ------------------------------------------------------------
- * - Move the bit map and addresses from this folder's SDT.h stand-in into
- *   PhoenixSketch/SDT.h and Config.h, and the ATU_*_present flags into struct BIT.
- * - The SET_LPF_* macros in LPFBoard.cpp and the SET_RF_GPx_* macros in RFBoard.cpp
- *   clear their fields with 32-bit literal masks (e.g. 0xFFFFFFF0). These widen to
- *   0x00000000FFFFFFF0 and so also clear bits 32-63 of hardwareRegister, which
- *   would wipe the ATU state. Fix them to 64-bit masks before integrating.
- * - Add ATUBoard_test.cpp and an Adafruit_MCP23X08 mock to code/test.
+ * Relationship to Phoenix:
+ * ------------------------
+ * This is a standalone copy for the TestATUBoard sketch. The master copy is
+ * code/src/PhoenixSketch/ATUBoard.cpp, which adds SetATUState() and
+ * ATUChangeAllowed() and is compiled only when Config.h defines ATU_PRESENT.
+ * Make driver fixes there first.
  */
 
 #include "SDT.h"

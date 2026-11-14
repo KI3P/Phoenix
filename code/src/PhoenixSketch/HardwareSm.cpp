@@ -144,6 +144,11 @@ errno_t InitializeRFHardware(void){
     errno_t val = InitializeLPFBoard();
     val += InitializeBPFBoard();
     val += InitializeRFBoard();
+#ifdef ATU_PRESENT
+    // Boots bypassed. Not added to val: a missing tuner is not an RF board fault,
+    // and its absence is reported on the BIT screen.
+    InitializeATUBoard();
+#endif
     return val;
 }
 

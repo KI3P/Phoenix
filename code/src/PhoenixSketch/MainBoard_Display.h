@@ -369,6 +369,14 @@ void ChangeFrequencyCorrectionFactorIncrement(void);
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;
-extern struct PrimaryMenuOption primaryMenu[9];
+// The ATU menu is appended to the primary menu only when ATU_PRESENT is defined.
+// The definition in MainBoard_DisplayMenus.cpp must have exactly this many entries:
+// a mismatch is a compile error against this declaration.
+#ifdef ATU_PRESENT
+#define NUM_PRIMARY_MENUS 10
+#else
+#define NUM_PRIMARY_MENUS 9
+#endif
+extern struct PrimaryMenuOption primaryMenu[NUM_PRIMARY_MENUS];
 
 #endif

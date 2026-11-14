@@ -1,0 +1,96 @@
+---
+title: ATU Control (manual, Phase 1)
+type: module
+status: draft
+created: 2026-11-14
+updated: 2026-11-14
+tags: [firmware, atu, antenna-tuner, cat, menu, config-flag]
+source_refs: []
+related: ["[[atu-board]]", "[[atu-auto-tuning]]", "[[cat-control]]", "[[built-in-test]]", "[[hardware-state-machine]]", "[[display-subsystem]]"]
+---
+
+# ATU Control (manual, Phase 1)
+
+Phase 1 of ATU support gives **manual control only**. You set the relays from a menu or over
+CAT, key up, and read the SWR. Nothing switches the tuner automatically; that is
+[[atu-auto-tuning]]. The hardware is described in [[atu-board]].
+
+## Build flag
+- **`Config.h`:** `//#define ATU_PRESENT`, commented out by default. Uncomment it when the ATU
+  control board is on the BANDS connector.
+- **What it compiles in:**
+  - the driver body (`ATUBoard.cpp`)
+  - the init call in `InitializeRFHardware()`
+  - two BIT-screen rows
+  - the ATU menu and its decoding in the register print
+  - a working `AT` CAT command
+- **With it off:** `AT` replies `?;` and the firmware is otherwise unchanged.
+- **Declarations:** `ATUBoard.h` declares the API unconditionally, so a call left unguarded
+  fails at link time rather than silently doing nothing.
+
+## Driver: `ATUBoard.cpp`
+- **Pattern:** follows the `LPFBoard` conventions: state kept in `hardwareRegister`, `SET_*`
+  macros with 64-bit masks, and expanders written only when a port's value changes.
+- **API:**
+  - `InitializeATUBoard()`
+  - `SetATUInductors` / `SetATUCapacitors` / `SetATULC`
+  - `SetATUState(network, balun, capsAtInput, L, C)`, which sets everything with one update
+  - `ATUEngageNetwork` / `ATUBypassNetwork`
+  - `ATUSelectCapsAtInput` / `…AtOutput`
+  - `ATUSelectBalancedOutput` / `…Unbalanced`
+  - `SetATURelay(k)` for K1–K20
+  - `ResetATUBoard()` (safe state)
+  - `GetATUMCPRegisters()` (I²C readback)
+- **Boot:** the tuner starts **bypassed**. `InitializeATUBoard()` runs from
+  `InitializeRFHardware()`. A missing tuner is not added to that function's error sum; it is
+  reported on the [[built-in-test]] screen as two rows (MCP23017 0x20, MCP23008 0x21).
+- **TX interlock:** `ATUChangeAllowed()` is true only in `RFReceive`. The menu and CAT paths
+  check it, because relays must not switch with RF present. The low-level setters do not
+  check it, so tests and the future tuning state machine can drive them. The relay state
+  persists through RX↔TX.
+- **Standalone copy:** `code/src/BoardTest/TestATUBoard` keeps a copy of the driver for
+  bench-testing without Phoenix. The PhoenixSketch copy is the master.
+
+## Menu: Main menu → ATU (last entry)
+| Item | Type | Effect |
+|---|---|---|
+| Network in line | bool | K19+K20 |
+| Caps at input (CL) | bool | K17 |
+| Balun output | bool | K18 |
+| L mask | 0–255 | K1–K8 |
+| C mask | 0–255 | K9–K16 |
+| Bypass all (safe) | action | every relay off |
+
+- **Editing:** items are variable options, so the encoder stays on the item. Each edits a
+  shadow variable whose post-update callback applies it.
+- **Shadows:** refreshed from the register in `UpdateArrayVariables()`, so CAT changes show up
+  the next time the menu is drawn. A change attempted while transmitting is refused and the
+  shadow reverts.
+- **Sizing:** `NUM_PRIMARY_MENUS` in `MainBoard_Display.h` is 9 or 10 depending on the flag. A
+  mismatch with the table is a compile error. Tests rely on RF Options staying at index 0 and
+  Calibration at index 6.
+
+## CAT: `AT` (not a Kenwood command)
+| Form | Meaning |
+|---|---|
+| `ATnbsLLLCCC;` | set: n = network in line, b = balun, s = caps at input (0/1); LLL/CCC = masks 000–255. Writes the expanders once. `AT000000000;` = safe state |
+| `AT;` | read → `ATnbsLLLCCC,RRRRR,HHHHHH,p;`: RRRRR = register field (hex, bit 0 = L1 … bit 18 = network); HHHHHH = I²C readback (bits 0–7 L, 8–15 C, 16–23 mode); p = both expanders present |
+
+- **Errors:** `?;` for malformed input, a mask above 255, while transmitting, or without
+  `ATU_PRESENT`.
+- **Readback in the reply:** it goes in the reply, not through `Debug()`, because `Debug()` is
+  silent in USB-audio builds (see [[cat-control]]).
+- **Reserved:** Kenwood's own tuner command, `AC`, is kept for the automatic tuner.
+- **Script:** `code/tools/atu_vna/atu_cat.py` takes the same command vocabulary as `atu.py`
+  (`ALL0 IN "LM 32" "CM 16"` …). It applies each command with one `AT` write and checks
+  readback = register.
+
+## Tests
+- **Target:** `all_ATU_tests` (`code/test/ATUBoard_test.cpp`) is the only target built with
+  `ATU_PRESENT`. It covers the driver, `AT`, the menu and the TX interlock.
+- **Mock:** `test/Adafruit_MCP23X08.h`.
+- **Known mock issue:** the `Adafruit_MCP23X17` mock returns GPIOA in the *high* byte of
+  `readGPIOAB()`. The real library returns it in the low byte, which `FrontPanel.cpp` relies
+  on. `CheckThatHardwareRegisterMatchesActualHardware()` in `Radio_test.cpp` and
+  `Calibration_test.cpp` encodes the mock's order. The ATU tests avoid depending on it. Listed
+  in [[documentation-todos]].

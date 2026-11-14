@@ -12,7 +12,7 @@
  * Open the serial monitor at 115200 baud, type a command and hit enter.
  * The WALK command energises each relay in turn so you can listen for the clicks.
  *
- * ATUBoard.cpp/.h is the library that will later be moved into PhoenixSketch/.
+ * ATUBoard.cpp/.h is a standalone copy of the driver in PhoenixSketch/ (the master).
  * SDT.h in this folder is a minimal stand-in for PhoenixSketch/SDT.h.
  */
 

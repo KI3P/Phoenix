@@ -24,12 +24,8 @@ If not, see <https://www.gnu.org/licenses/>.
  * This file supplies just enough of the real header for it to compile here, so
  * ATUBoard.cpp/.h can later be copied into PhoenixSketch/ without change.
  *
- * When integrating into Phoenix:
- *  - the ATU bit map below goes into PhoenixSketch/SDT.h next to the existing
- *    hardwareRegister bit map (bits 0-32 are already used there)
- *  - ATU_MCP23017_ADDR / ATU_MCP23008_ADDR go into PhoenixSketch/Config.h
- *  - the two ATU_*_present flags are added to struct BIT in PhoenixSketch/SDT.h
- *  - everything else in this file already exists in PhoenixSketch/SDT.h
+ * The definitions below marked "To be added" are now in PhoenixSketch/SDT.h and
+ * Config.h; keep the two in step if the bit map or addresses change.
  */
 
 #ifndef SDT_H

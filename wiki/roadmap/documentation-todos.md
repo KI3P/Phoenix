@@ -3,7 +3,7 @@ title: Documentation TODOs & Open Questions
 type: roadmap
 status: draft
 created: 2026-06-08
-updated: 2026-11-11
+updated: 2026-11-14
 tags: [todo, open-questions, discrepancies, wiki-maintenance]
 source_refs: []
 related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]", "[[og-startup-hang]]", "[[build-toolchain]]"]
@@ -20,6 +20,14 @@ This is a planning surface, not a defect tracker — but anything that looks lik
 is tagged **⚠ possible bug** so it stands out.
 
 ## Code/comment discrepancies & possible bugs
+
+### Unit-test mocks (2026-11-14)
+- **⚠ The `Adafruit_MCP23X17` mock has GPIOA and GPIOB swapped in `readGPIOAB()`.** It returns
+  GPIOA in the high byte. The real library (`Adafruit_BusIO_Register`, LSB first) and
+  `FrontPanel.cpp:134` put it in the low byte, and `GetRFMCPRegisters()`'s own comment agrees.
+  `CheckThatHardwareRegisterMatchesActualHardware()` in `Radio_test.cpp` and
+  `Calibration_test.cpp` encodes the mock's order ("a is upper half"). Fixing the mock means
+  fixing those two helpers too. Found while adding [[atu-control]], whose tests avoid the issue.
 
 ### Build settings & platform (2026-11-11)
 - ~~⚠ Some Optimize settings reboot the radio every ~8 s.~~ **Fixed (`7e3c8d9`).** Stack

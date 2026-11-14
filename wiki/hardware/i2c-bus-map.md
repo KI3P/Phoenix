@@ -3,7 +3,7 @@ title: I²C Bus Map & Addresses
 type: hardware
 status: stable
 created: 2026-06-14
-updated: 2026-06-15
+updated: 2026-11-14
 tags: [hardware, i2c, wire, mcp23017, si5351, ad7991, addresses, bus-topology]
 source_refs: [sources/t41-ep-schematics]
 related: ["[[hardware-platform]]", "[[rf-board]]", "[[filter-boards]]", "[[front-panel]]", "[[built-in-test]]", "[[hardware-state-machine]]"]
@@ -31,6 +31,8 @@ board schematic as the net pairs **`SDA/SCL` (Wire), `SDA1/SCL1` (Wire1), `SDA2/
 | **Wire2** | BPF-board MCP23017 | `0x24` | Band-pass filter relay bank | `BPFBoard.cpp:29` |
 | | LPF-board MCP23017 | `0x25` | Low-pass filter + back-end relays | `LPFBoard.cpp:238` |
 | | AD7991 4-ch ADC | `0x28` or `0x29` | SWR / forward & reverse power | `LPFBoard.cpp:747,754` |
+| | ATU MCP23017 (U5) | `0x20` | ATU L and C relays (only with `ATU_PRESENT`) | `ATUBoard.cpp` |
+| | ATU MCP23008 (U6) | `0x21` | ATU mode relays (only with `ATU_PRESENT`) | `ATUBoard.cpp` |
 
 ## Why three buses
 
@@ -44,6 +46,9 @@ board schematic as the net pairs **`SDA/SCL` (Wire), `SDA1/SCL1` (Wire1), `SDA2/
   both audio codecs.
 
 ## Address quirks
+- **0x20/0x21 are used twice.** The front panel uses them on `Wire1` and the ATU
+  ([[atu-board]]) uses them on `Wire2`. Different buses, so no clash. With every address
+  jumper open, the two ATU expanders would both sit at 0x27 and clash with each other.
 - **AD7991 dual address.** The part ships with one of two fixed addresses depending on the
   ordering code, so the driver **probes `0x28` then `0x29`** (`LPFBoard.cpp:747-754`,
   `Config.h:70-72`). Not user-configurable.

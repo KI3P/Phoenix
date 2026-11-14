@@ -620,9 +620,121 @@ struct SecondaryMenuOption SampleRateOptions[2] = {
     "176.4 ksps", functionOption, NULL, (void *)SelectSampleRate176, NULL,
 };
 
+#ifdef ATU_PRESENT
+// ATU menu: manual control of the antenna tuner relays (see ATUBoard.cpp).
+// Each item edits a shadow variable and its post-update callback applies it to
+// the hardware. The shadows are refreshed from the hardware register in
+// UpdateArrayVariables(), so changes made over CAT (AT) show up the next time
+// the menu is drawn. Relays never switch while transmitting: a change made then
+// is refused and the shadow reverts.
+static bool atuNetworkIn = false;
+static bool atuBalancedOut = false;
+static bool atuCapsAtInput = false;
+static int32_t atuLMask = 0;
+static int32_t atuCMask = 0;
 
-// Primary menu structure
-struct PrimaryMenuOption primaryMenu[9] = {
+VariableParameter atuNetwork = {
+    .variable = &atuNetworkIn,
+    .type = TYPE_BOOL,
+    .limits = {.b = {.min = false, .max = true, .step = 1}}
+};
+
+VariableParameter atuBalanced = {
+    .variable = &atuBalancedOut,
+    .type = TYPE_BOOL,
+    .limits = {.b = {.min = false, .max = true, .step = 1}}
+};
+
+VariableParameter atuCapsInput = {
+    .variable = &atuCapsAtInput,
+    .type = TYPE_BOOL,
+    .limits = {.b = {.min = false, .max = true, .step = 1}}
+};
+
+VariableParameter atuL = {
+    .variable = &atuLMask,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = 255, .step = 1}}
+};
+
+VariableParameter atuC = {
+    .variable = &atuCMask,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = 255, .step = 1}}
+};
+
+/**
+ * Copy the ATU relay state from the hardware register into the menu variables.
+ */
+void SyncATUMenuVariables(void){
+    atuNetworkIn = ATUNetworkEngaged();
+    atuBalancedOut = ATUBalancedOutput();
+    atuCapsAtInput = ATUCapsAtInput();
+    atuLMask = GetATUInductors();
+    atuCMask = GetATUCapacitors();
+}
+
+/**
+ * Post-update callback: put the L/C network in line or bypass it.
+ */
+void UpdateATUNetwork(void){
+    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
+    if (atuNetworkIn) ATUEngageNetwork(); else ATUBypassNetwork();
+}
+
+/**
+ * Post-update callback: select the balun or the coax output.
+ */
+void UpdateATUBalanced(void){
+    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
+    if (atuBalancedOut) ATUSelectBalancedOutput(); else ATUSelectUnbalancedOutput();
+}
+
+/**
+ * Post-update callback: put the capacitor bank at the input (C-L) or output (L-C) side.
+ */
+void UpdateATUCapsInput(void){
+    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
+    if (atuCapsAtInput) ATUSelectCapsAtInput(); else ATUSelectCapsAtOutput();
+}
+
+/**
+ * Post-update callback: apply the inductor mask.
+ */
+void UpdateATUInductors(void){
+    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
+    SetATUInductors((uint8_t)atuLMask);
+}
+
+/**
+ * Post-update callback: apply the capacitor mask.
+ */
+void UpdateATUCapacitors(void){
+    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
+    SetATUCapacitors((uint8_t)atuCMask);
+}
+
+/**
+ * Menu callback: return the tuner to its safe state (bypassed, no L, no C).
+ */
+void ATUMenuReset(void){
+    if (ATUChangeAllowed()) ResetATUBoard();
+    SyncATUMenuVariables();
+}
+
+struct SecondaryMenuOption ATUOptions[6] = {
+    "Network in line", variableOption, &atuNetwork, NULL, (void *)UpdateATUNetwork,
+    "Caps at input (CL)", variableOption, &atuCapsInput, NULL, (void *)UpdateATUCapsInput,
+    "Balun output", variableOption, &atuBalanced, NULL, (void *)UpdateATUBalanced,
+    "L mask", variableOption, &atuL, NULL, (void *)UpdateATUInductors,
+    "C mask", variableOption, &atuC, NULL, (void *)UpdateATUCapacitors,
+    "Bypass all (safe)", functionOption, NULL, (void *)ATUMenuReset, NULL,
+};
+#endif // ATU_PRESENT
+
+// Primary menu structure. NUM_PRIMARY_MENUS (MainBoard_Display.h) must match.
+// Keep the order: tests rely on RF Options at 0 and Calibration at 6.
+struct PrimaryMenuOption primaryMenu[] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
@@ -632,6 +744,9 @@ struct PrimaryMenuOption primaryMenu[9] = {
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
     "Diagnostics", DiagnosticOptions, sizeof(DiagnosticOptions)/sizeof(DiagnosticOptions[0]),
     "Sample Rate", SampleRateOptions, sizeof(SampleRateOptions)/sizeof(SampleRateOptions[0]),
+#ifdef ATU_PRESENT
+    "ATU", ATUOptions, sizeof(ATUOptions)/sizeof(ATUOptions[0]),
+#endif
 };
 
 /**
@@ -646,6 +761,9 @@ void UpdateArrayVariables(void){
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
+#ifdef ATU_PRESENT
+    SyncATUMenuVariables();
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -41,6 +41,9 @@ If not, see <https://www.gnu.org/licenses/>.
 #endif
 
 #include <Adafruit_MCP23X17.h>         // Installed via Arduino library manager
+#ifdef ATU_PRESENT
+#include <Adafruit_MCP23X08.h>         // Part of the same Adafruit MCP23017 library
+#endif
 #include <OpenAudio_ArduinoLibrary.h>  // https://github.com/chipaudette/OpenAudio_ArduinoLibrary
 #include <utility/imxrt_hw.h>
 #include <arm_math.h>
@@ -102,6 +105,14 @@ extern uint64_t hardwareRegister;
 #define BPFBAND2BIT  30
 #define BPFBAND3BIT  31
 #define TXVFOBIT     32
+// ATU board (see ATUBoard.cpp). Bits 33-51.
+#define ATULLSB         33  // L1 (K1)  ... MCP23017 GPA0
+#define ATULMSB         40  // L8 (K8)  ... MCP23017 GPA7
+#define ATUCLSB         41  // C1 (K9)  ... MCP23017 GPB0
+#define ATUCMSB         48  // C8 (K16) ... MCP23017 GPB7
+#define ATUCAPINPUTBIT  49  // K17, schematic "LC-CL":   MCP23008 GP0
+#define ATUBALANCEDBIT  50  // K18, schematic "BAL OUT": MCP23008 GP1
+#define ATUNETWORKBIT   51  // K19+K20, schematic "BYPASS": MCP23008 GP2
 
 #define BAND_NF_BCD   0b1111
 #define BAND_6M_BCD   0b1010
@@ -388,6 +399,8 @@ struct BIT {
     bool V12_LPF_AD7991_present;
     bool FRONT_PANEL_I2C_present;
     uint8_t AD7991_I2C_ADDR;
+    bool ATU_MCP23017_present;
+    bool ATU_MCP23008_present;
 };
 
 enum BandType {
@@ -750,6 +763,7 @@ struct AGCConfig {
 #include "RFBoard.h"
 #include "LPFBoard.h"
 #include "BPFBoard.h"
+#include "ATUBoard.h"
 #include "CAT.h"
 #include "Storage.h"
 

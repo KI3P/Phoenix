@@ -3,7 +3,7 @@ title: CAT Control (Kenwood emulation)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-11
+updated: 2026-11-14
 tags: [cat, kenwood, ts-480, ts-2000, serial, rig-control, usb]
 source_refs: []
 related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]", "[[filter-board-electronics]]", "[[log-amp-power-detection]]", "[[spi-display-hang]]"]
@@ -61,7 +61,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 > handler** — it becomes silently write-only. This is not hypothetical: it is exactly the bug
 > that made `FW;` unreadable for as long as `FW` has existed (see below).
 
-## Implemented commands (35)
+## Implemented commands (36)
 
 | Group | Commands |
 |---|---|
@@ -71,6 +71,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Gain / audio | `AG` (AF gain), `MG` (mic gain), `PC` (power control) |
 | Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
 | SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
+| Antenna tuner | `AT` (raw ATU relay state; needs `ATU_PRESENT`; see [[atu-control]]) |
 | DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX) |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |
@@ -144,6 +145,11 @@ non-Kenwood. Uncommitted as of 2026-10-24.
   attenuator's limits (the sheet's `min` and `full` rows). Implemented as
   `SetCWAttenuationOverride()` in `HardwareSm.cpp`, applied in the `RFCWMark`/`RFCWSpace` normal
   branch only, not in power calibration.
+- **`AT`** (added 2026-11-14) — the ATU relay state, for testing the tuner. `ATnbsLLLCCC;` sets
+  network/balun/caps-at-input and the L and C masks in one expander update. `AT;` returns the
+  state plus the register field and the I²C readback in hex. It is refused (`?;`) while
+  transmitting and in builds without `ATU_PRESENT`. Full format in [[atu-control]]. Kenwood's
+  `AC` (internal tuner) is left for the automatic tuner, [[atu-auto-tuning]].
 - **`DD`** — the digital-mode transmit drive (`ED.digitalDriveLevel`, the "USB drive" menu item),
   `DD000;`–`DD100;`, `DD;` reads. Previously menu-only.
 

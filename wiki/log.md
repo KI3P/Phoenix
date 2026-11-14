@@ -1378,3 +1378,27 @@ to 1.62 / GCC 15.2.1.
 - **New page:** [[build-toolchain]].
 - **Updated:** [[og-startup-hang]], [[memory-layout-and-stack]], [[spi-display-hang]],
   [[hardware-platform]], [[documentation-todos]] (the upgrade and 600 MHz items closed), index.
+
+## [2026-11-14] decision | ATU support, Phase 1: manual control
+The K9HZ antenna tuner's standalone driver moved into PhoenixSketch, behind a new `Config.h`
+flag `ATU_PRESENT` (off by default). Phase 1 is manual control only; automatic tuning is
+Phase 2.
+- **Prerequisite fix (commit `c25c602`):** the LPF, BPF and attenuator setters masked
+  `hardwareRegister` with 32-bit literals, which cleared bits 32–63 on every band change. That
+  already reset `TXVFOBIT`, and would have wiped the ATU bits 33–51. They now use 64-bit masks,
+  with a regression test per board.
+- **Added:**
+  - the driver, with init at boot (bypassed)
+  - two BIT rows
+  - an ATU menu (network, caps position, balun, L and C masks, bypass all)
+  - the `AT` CAT command
+  - a TX interlock (`ATUChangeAllowed`)
+  - `code/tools/atu_vna/atu_cat.py`
+- **Tests:** `all_ATU_tests` (18 tests) is the only target built with `ATU_PRESENT`. All 925
+  tests pass with the flag off and with it on. The Teensy build compiles both ways; the flag
+  adds about 1.9 kB of code.
+- **Found:** the `Adafruit_MCP23X17` test mock swaps GPIOA/GPIOB in `readGPIOAB()`. Recorded in
+  [[documentation-todos]] and left unchanged.
+- **New pages:** [[atu-board]], [[atu-control]], [[atu-auto-tuning]].
+- **Updated:** [[filter-boards]], [[cat-control]], [[built-in-test]], [[i2c-bus-map]],
+  [[documentation-todos]], index.

@@ -100,6 +100,8 @@ char *EQ_write( char* cmd );
 char *EQ_read(  char* cmd );
 char *FL_write( char* cmd );
 char *FL_read(  char* cmd );
+char *AT_write( char* cmd );
+char *AT_read(  char* cmd );
 
 typedef struct  {
     char name[3];   //two chars plus zero terminator
@@ -120,7 +122,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 35
+#define NUM_SUPPORTED_COMMANDS 36
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
@@ -165,7 +167,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "DS", 0,  3, unsupported_cmd, DS_read }, // digital TX path stats, read-only -- NOT a Kenwood keyword
         { "DD", 3+3,3, DD_write, DD_read }, // digital transmit drive level 000-100 -- NOT a Kenwood keyword
         { "BR", 3+1,3, BR_write, BR_read }, // raw SWR bridge readings: clear, sample, statistics -- NOT a Kenwood keyword
-        { "XA", 3+3,3, XA_write, XA_read }  // CW transmit attenuation override -- NOT a Kenwood keyword
+        { "XA", 3+3,3, XA_write, XA_read },  // CW transmit attenuation override -- NOT a Kenwood keyword
+        { "AT", 3+9,3, AT_write, AT_read }   // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
     };
 
 /**
@@ -1143,6 +1146,83 @@ char *XA_read( char* cmd ){
     sprintf( obuf, "XA%03ld,%d;", (long)lroundf( GetTXAttenuation() * 10.0f ),
              GetCWAttenuationOverride() >= 0 ? 1 : 0 );
     return obuf;
+}
+
+/**
+ * CAT command AT - set every ATU relay at once (non-standard Kenwood command)
+ *
+ * Format "ATnbsLLLCCC;":
+ *   n   1 = L/C network in line (K19+K20), 0 = bypassed
+ *   b   1 = balun (balanced) output (K18), 0 = coax output
+ *   s   1 = capacitor bank at the input side, C-L (K17), 0 = output side, L-C
+ *   LLL inductor mask 000-255, bit k = L(k+1) in series (K1-K8)
+ *   CCC capacitor mask 000-255, bit k = C(k+1) connected (K9-K16)
+ * "AT000000000;" returns the tuner to its safe state. The expanders are written
+ * once, after the whole state is set. Kenwood's own tuner command, AC, is left
+ * for the automatic tuner.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success; "?;" for a malformed command, a mask above
+ *         255, while transmitting (relays must not switch with RF present), or
+ *         when the firmware is built without ATU_PRESENT
+ */
+char *AT_write( char* cmd ){
+#ifdef ATU_PRESENT
+    for( int i = 2; i < 11; i++ ){
+        if( cmd[i] < '0' || cmd[i] > '9' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    for( int i = 2; i < 5; i++ ){
+        if( cmd[i] > '1' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    int32_t lMask = (cmd[5]-'0')*100 + (cmd[6]-'0')*10 + (cmd[7]-'0');
+    int32_t cMask = (cmd[8]-'0')*100 + (cmd[9]-'0')*10 + (cmd[10]-'0');
+    if( (lMask > 255) || (cMask > 255) || !ATUChangeAllowed() ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    SetATUState( cmd[2] == '1', cmd[3] == '1', cmd[4] == '1', (uint8_t)lMask, (uint8_t)cMask );
+    return empty_string_p;
+#else
+    sprintf( obuf, "?;");
+    return obuf;
+#endif
+}
+
+/**
+ * CAT command AT - read the ATU relay state (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "ATnbsLLLCCC,RRRRR,HHHHHH,p;": nbsLLLCCC as for AT_write;
+ *         RRRRR is the ATU part of the hardware register in hex (bit 0 = L1 ...
+ *         bit 18 = network in line); HHHHHH is the I/O expander outputs read back
+ *         over I2C in hex (bits 0-7 L, 8-15 C, 16-23 mode relays); p is 1 if both
+ *         expanders answered at startup. With both present, the low 19 bits of
+ *         HHHHHH equal RRRRR. "?;" when built without ATU_PRESENT.
+ */
+char *AT_read( char* cmd ){
+#ifdef ATU_PRESENT
+    bool present = bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present;
+    // Never touch an expander that did not answer at startup
+    uint32_t readback = present ? GetATUMCPRegisters() : 0;
+    sprintf( obuf, "AT%d%d%d%03u%03u,%05lX,%06lX,%d;",
+             ATUNetworkEngaged() ? 1 : 0,
+             ATUBalancedOutput() ? 1 : 0,
+             ATUCapsAtInput() ? 1 : 0,
+             (unsigned)GetATUInductors(),
+             (unsigned)GetATUCapacitors(),
+             (unsigned long)GetATURegisterState(),
+             (unsigned long)readback,
+             present ? 1 : 0 );
+    return obuf;
+#else
+    sprintf( obuf, "?;");
+    return obuf;
+#endif
 }
 
 /**

@@ -59,6 +59,12 @@ If not, see <https://www.gnu.org/licenses/>.
 // Default uses AD7991 digital SWR.
 //#define USE_ANALOG_SWR
 
+// K9HZ 100W antenna tuner (ATU). Uncomment if the ATU control board is connected
+// to the BANDS connector (I2C bus Wire2). Compiles in the ATU driver, its BIT
+// rows, the ATU menu and the AT; CAT command. The tuner boots bypassed.
+// Address jumpers on the control board: see ATU_MCP23017_ADDR below.
+//#define ATU_PRESENT
+
 
 // CW configuration
 #define CW_TRANSMIT_SPACE_TIMEOUT_MS            200 // how long to wait for another key press before exiting CW transmit state
@@ -79,6 +85,9 @@ If not, see <https://www.gnu.org/licenses/>.
 // This is not a parameter you need to change
 #define AD7991_I2C_ADDR1 0x28
 #define AD7991_I2C_ADDR2 0x29
+// ATU control board, on Wire2 (the front panel's 0x20/0x21 are on Wire1, so no clash)
+#define ATU_MCP23017_ADDR 0x20  // U5, L and C relays: close J4, J5, J6 (A0=A1=A2=0)
+#define ATU_MCP23008_ADDR 0x21  // U6, mode relays: close J8, J9, leave J7 open (A0=1)
 
 // Front panel button functions
 #define MENU_OPTION_SELECT  0

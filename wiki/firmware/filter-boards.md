@@ -3,7 +3,7 @@ title: Filter Boards (BPF / LPF), RF Back-End & Power Sensing
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-03
+updated: 2026-11-14
 tags: [filters, bpf, lpf, relays, ad7991, swr, power-sensing, mcp23017, antenna, pa]
 source_refs: [sources/t41-ep-schematics, sources/ad8307-datasheet]
 related: ["[[overview]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[hardware-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]", "[[ad8307-datasheet]]", "[[log-amp-power-detection]]", "[[automatic-power-swr-calibration]]"]
@@ -37,6 +37,16 @@ each owning a bitfield (`SDT.h:69-83`):
 | CW / MODE / CAL | keying / mode / cal feedback | RF |
 | CWVFO / RXVFO | VFO enables | RF |
 | BPFBAND0..3 (bit 28+) | BPF band | BPF |
+| TXVFO (bit 32) | TX VFO enable | RF |
+| ATU… (bits 33–51) | ATU relays, when `ATU_PRESENT` | ATU ([[atu-board]]) |
+
+**Fixed 2026-11-14 (commit `c25c602`): the setters cleared bits 32–63.** `SET_LPF_GPA/GPB/BAND`,
+`SET_ANTENNA`, `SetLPFRegisterState`, `SET_RF_GPA_RXATT`/`SET_RF_GPB_TXATT` and `SET_BPF_BAND`
+masked the register with 32-bit literals such as `0xFFFFFFF0`. Those zero-extend to 64 bits,
+so every band, antenna or attenuator change also cleared bits 32–63. That reset `TXVFOBIT` in
+the register record, and would have wiped the ATU state. The masks are now built from the field
+position, e.g. `~(0xFULL << BPFBAND0BIT)`, with a regression test per board. Any new setter
+must do the same.
 
 Setting a field calls `buffer_add()` (`Globals.cpp:246`), which queues the register to be
 flushed to the **MCP23017 I²C GPIO expanders** that drive the relays. `UpdateMCPRegisters()`
