@@ -160,6 +160,14 @@ struct SWRReflectedFit SWRCalFitReflected(const float32_t *Vf_open, const float3
 float32_t SWRCalSWR(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b_f,
                     float32_t m_r, float32_t b_r);
 
+/**
+ * @brief |Gamma| from one pair of readings
+ * @return |Gamma| = 10^((Pr - Pf)/20), limited to 0.999 when the reflected power
+ *         is not below the forward power
+ */
+float32_t SWRCalGamma(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b_f,
+                      float32_t m_r, float32_t b_r);
+
 /** What the oscillation check found at one open or short point */
 enum SWRCalOscillationRule {
     SWRCAL_OSC_NONE = 0,          // V_f fell with the drive

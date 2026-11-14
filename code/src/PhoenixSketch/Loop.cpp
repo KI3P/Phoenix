@@ -1084,6 +1084,16 @@ void ConsumeInterrupt(void){
     InterruptType interrupt = GetInterrupt();
     if ( interrupt == iNONE ) return;
 
+#ifdef ATU_PRESENT
+    // Any front-panel action (other than volume) stops a running ATU program,
+    // and is not acted on: the radio is keyed, and the band, frequency or mode
+    // must not change under the tuner
+    if (ATUTuneActive() && ATUTuneAbortsOn(interrupt)){
+        ATUTuneAbort();
+        return;
+    }
+#endif
+
     // Handle the interrupts created by the encoders slightly differently. The outcome
     // of these events depends on the UI state. All other interrupts are ignored by this
     // switch block and are handled by the switch block below.
@@ -1669,6 +1679,10 @@ FASTRUN void loop(void){
     ConsumeInterrupt();
     // Work posted by the automatic power calibration's state machine
     PowerCalAutoService();
+#ifdef ATU_PRESENT
+    // The ATU tuner's readings and relay changes
+    ATUTuneService();
+#endif
 
     // Step 2: Perform signal processing
     PerformSignalProcessing();

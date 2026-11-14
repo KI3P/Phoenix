@@ -1423,3 +1423,12 @@ products for every L code and the bank admittance for every C code, a chunked se
   ≤ 0.14 ms.
 - **Cross-check:** 30+j40 Ω at 7.1 MHz → LC/15/32, as in the report.
 - **Plan:** Phase 2 is planned in [[atu-auto-tuning]] as stages A–F.
+
+## [2026-11-14] decision | ATU Phase 2 stage B: tune engine and carrier states
+New ModeSm states `ATU_TUNE_SPACE` / `ATU_TUNE_MARK`, entered from SSB or CW receive and
+returning there. `ATUTune.cpp` is a non-blocking engine run from `loop()`: relays switch only
+with the carrier off, and the T/R relay is held in TX for the whole program. CAT `AX0` aborts,
+`AX2` runs the READ diagnostic, and `AX;` reports.
+- **Bench:** repeatability ±0.001 in |Γ|; bypass 0.047 against 0.04 on the VNA.
+- **Bridge against model:** within 0.02 above |Γ| 0.6, up to 0.07 high near a match (bridge leak
+  plus load mismatch). Details in [[atu-auto-tuning]].

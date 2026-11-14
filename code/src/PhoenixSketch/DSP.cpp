@@ -70,6 +70,7 @@ void PerformSignalProcessing(void){
     }
     // Read the SWR in all the possible transmit states
     switch (modeSM.state_id){
+        case (ModeSm_StateId_ATU_TUNE_MARK):
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):

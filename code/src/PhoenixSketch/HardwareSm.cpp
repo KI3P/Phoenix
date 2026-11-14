@@ -401,6 +401,11 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                     // In power calibration mode, use manual attenuation setting
                     // and don't override PA selection
                     att_dB = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+#ifdef ATU_PRESENT
+                } else if (modeSM.state_id == ModeSm_StateId_ATU_TUNE_MARK) {
+                    // The ATU tuner transmits at its own low power
+                    att_dB = ATUTuneAttenuation_dB();
+#endif
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
@@ -452,6 +457,12 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                     // In power calibration mode, use manual attenuation setting
                     // and don't override PA selection
                     att_dB = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+#ifdef ATU_PRESENT
+                } else if (modeSM.state_id == ModeSm_StateId_ATU_TUNE_SPACE) {
+                    // The ATU tuner transmits at its own low power. Entering
+                    // ATU_TUNE_SPACE sets it up, as the carrier only toggles after.
+                    att_dB = ATUTuneAttenuation_dB();
+#endif
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
@@ -592,6 +603,7 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFTransmit;
             break;
         }
+        case (ModeSm_StateId_ATU_TUNE_MARK):
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
@@ -599,6 +611,9 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFCWMark;
             break;
         }
+        // ATU tuning: carrier off with the T/R relay held in TX, so the tuner can
+        // switch its relays between readings without cycling the T/R relay
+        case (ModeSm_StateId_ATU_TUNE_SPACE):
         case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
@@ -778,6 +793,8 @@ void UpdateTuneState(void){
             tuneState = TuneSSBTX;
             break;
         }
+        case (ModeSm_StateId_ATU_TUNE_SPACE):
+        case (ModeSm_StateId_ATU_TUNE_MARK):
         case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):

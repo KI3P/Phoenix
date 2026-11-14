@@ -974,6 +974,10 @@ void ChangeAutoCalTurns(int32_t delta){
  * @brief Guard: the automatic calibration runs with the 20 W PA only
  */
 bool AutoCalAllowed(void){
+#ifdef ATU_PRESENT
+    // The ATU tuner keys the radio and uses the bridge statistics too
+    if (ATUTuneActive()) return false;
+#endif
     return !ED.PA100Wactive;
 }
 

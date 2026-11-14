@@ -277,6 +277,11 @@ void SetATUState(bool networkEngaged, bool balancedOutput, bool capsAtInput,
  *
  * @return true if the RF hardware is in the receive state
  */
+void SetATUPacked(uint32_t state){
+    SET_ATU_STATE(state);
+    UpdateATURegisters();
+}
+
 bool ATUChangeAllowed(void){
     return GetRFHardwareState() == RFReceive;
 }

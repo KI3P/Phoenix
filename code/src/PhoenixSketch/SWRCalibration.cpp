@@ -231,6 +231,13 @@ float32_t SWRCalSWR(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b
     return (swr > SWRCAL_UNCALIBRATED_SWR) ? SWRCAL_UNCALIBRATED_SWR : swr;
 }
 
+float32_t SWRCalGamma(float32_t Vf_mV, float32_t Vr_mV, float32_t m_f, float32_t b_f,
+                      float32_t m_r, float32_t b_r){
+    float32_t ratio_dB = SWRCalPower_dBm(Vr_mV, m_r, b_r) - SWRCalPower_dBm(Vf_mV, m_f, b_f);
+    float32_t gamma = powf(10.0f, ratio_dB / 20.0f);
+    return (gamma > 0.999f) ? 0.999f : gamma;
+}
+
 enum SWRCalOscillationRule SWRCalOscillationCheck(bool hasPrevious, float32_t Vf_previous, float32_t drop_dB,
                                                   float32_t Vf, bool hasReference, float32_t Vf_reference,
                                                   float32_t VfSD_previous, float32_t VfSD){

@@ -39,6 +39,21 @@ void ModeCWTransmitSpaceEnter(void);
  */
 bool IsTxAllowed(void);
 
+// ATU tuning (ATU_TUNE_STATES). The tuner is entered from SSB_RECEIVE or CW_RECEIVE
+// and must return to the same one; ModeSm records which on the way in.
+
+/**
+ * @brief Record which receive state ATU tuning was started from
+ * @param cw true if from CW_RECEIVE, false if from SSB_RECEIVE
+ * @note Transition action of ATU_TUNE_START
+ */
+void SetATUTuneReturnCW(bool cw);
+
+/**
+ * @brief Guard of ATU_TUNE_END: true if tuning started from CW_RECEIVE
+ */
+bool ATUTuneReturnCW(void);
+
 /**
  * @brief Checks if the radio is transmitting through the SSB transmit path
  * @return true in SSB_TRANSMIT or DIGITAL_TRANSMIT

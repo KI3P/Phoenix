@@ -34,6 +34,37 @@ in `code/tools/atu_vna/tuning_sim.py`.
     estimate. The engine will run the search in chunks of about 6 ms per loop pass.
   - Cross-check: for 30+j40 Ω at 7.1 MHz the firmware picks LC/15/32, the setting the report
     gives (SWR 1.17).
+- **Stage B done (2026-11-14): the tune engine keys and reads.**
+  - ModeSm has new states `ATU_TUNE_SPACE` / `ATU_TUNE_MARK` in an `ATU_TUNE_STATES` composite
+    (`ModeSm.drawio`, regenerated with `ss.cli run -h -b --no-ask`; that reproduced the old
+    output exactly before the edit).
+    - Entry is from SSB or CW receive only. Digital is excluded because its enter and exit
+      actions change the sample rate.
+    - They return to the receive state they came from.
+    - They use their own carrier events (`ATU_CARRIER_ON` / `OFF`), so an operator's PTT can't
+      key them.
+  - `ATUTune.cpp` runs from `loop()`. Each reading: relays (carrier off) → 15 ms → carrier → 25 ms
+    → collect at least 60 ms and 5 bridge samples → carrier off → |Γ| with the band's
+    calibration. The T/R relay stays in TX for the whole program.
+  - Any front-panel action, CAT `TX;`/`RX;` or `AX0;` aborts. BR and the power calibration are
+    locked out while it runs.
+  - **Bench, dummy load, 14.2 MHz, 2 W:** the READ diagnostic (`AX2;`) took 6 readings in
+    0.69 s. Repeatability ±0.001 in |Γ|; bypass |Γ| 0.047, against 0.04 on the VNA.
+  - **Bridge against model** (dummy load):
+
+    | Setting | Bridge \|Γ\| | Model \|Γ\| |
+    |---|---|---|
+    | empty LC | 0.101 | 0.031 |
+    | L3 | 0.196 | 0.153 |
+    | C4 | 0.322 | 0.259 |
+    | L5 | 0.699 | 0.695 |
+    | C7 | 0.968 | 0.959 |
+
+    Above 0.6 they agree within 0.02. Near a match the bridge reads up to about 0.07 high. That
+    fits the bridge leak (about −28 dB on 20 m) plus a load that isn't exactly 50 Ω through the
+    output coax and TR switch, both about 0.04, adding as vectors. The tuning algorithm absorbs
+    the load error into its impedance estimate. It has to tolerate about ±0.04 from the bridge
+    leak near a match.
 
 ## Proposed algorithm (§6.5)
 memory → bypass check (SWR ≤ 1.3 stays bypassed) → 4 probes (empty LC, one L ≈ 50 Ω, one C ≈

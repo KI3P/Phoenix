@@ -173,8 +173,6 @@ TEST(ATUModel, CatAX1RunsTheBenchmark) {
     int commas = 0;
     for (char ch : reply) commas += (ch == ',');
     EXPECT_EQ(commas, 6);
-    char bad[] = "AX2;";
+    char bad[] = "AX9;";
     EXPECT_STREQ(command_parser(bad), "?;");
-    char rd[] = "AX;";
-    EXPECT_STREQ(command_parser(rd), "?;");
 }

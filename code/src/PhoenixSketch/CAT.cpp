@@ -793,6 +793,12 @@ char *PS_read(  char* cmd ){
  * @return Response "RX0;" after releasing PTT or key depending on current mode
  */
 char *RX_write( char* cmd ){
+#ifdef ATU_PRESENT
+    if (ATUTuneActive()){
+        ATUTuneAbort();
+        return empty_string_p;
+    }
+#endif
     switch (modeSM.state_id){
         case (ModeSm_StateId_DIGITAL_TRANSMIT):
         case (ModeSm_StateId_SSB_TRANSMIT):{
@@ -815,6 +821,13 @@ char *RX_write( char* cmd ){
  * @return Response "TX0;" after pressing PTT or key depending on current mode
  */
 char *TX_write( char* cmd ){
+#ifdef ATU_PRESENT
+    // Keying stops a running ATU program (and does not key)
+    if (ATUTuneActive()){
+        ATUTuneAbort();
+        return empty_string_p;
+    }
+#endif
     switch (modeSM.state_id){
         case (ModeSm_StateId_DIGITAL_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
@@ -1072,8 +1085,12 @@ char *DD_read( char* cmd ){
  * @return Empty string on success, "?;" if the parameter is not 0 or 1
  */
 char *BR_write( char* cmd ){
-    // The automatic power calibration uses the same statistics
-    if (PowerCalAutoActive()){
+    // The automatic power calibration and the ATU tuner use the same statistics
+    bool bridgeBusy = PowerCalAutoActive();
+#ifdef ATU_PRESENT
+    bridgeBusy = bridgeBusy || ATUTuneActive();
+#endif
+    if (bridgeBusy){
         sprintf( obuf, "?;");
         return obuf;
     }
@@ -1229,54 +1246,94 @@ char *AT_read( char* cmd ){
 }
 
 /**
- * CAT command AX - ATU tuner diagnostics (non-standard Kenwood command)
+ * CAT command AX - ATU tuner control and diagnostics (non-standard Kenwood command)
  *
- * "AX1;" times the tuner model on the Teensy at the current transmit frequency:
- * the per-frequency precompute, a search of all 131,072 settings for a sample load
- * (30+j40 ohm), and robust selection over its best ATU_TOPK candidates. It blocks
- * the main loop for the time it reports, so use it for bench work only.
+ *   AX0;  stop a running tuner program
+ *   AX1;  time the tuner model at the current frequency: the per-frequency
+ *         precompute, a search of all 131,072 settings for a sample load (30+j40 ohm)
+ *         and robust selection. Blocks the main loop for that long; bench use only.
+ *         Replies "AX1,<f_kHz>,<prepare_us>,<search_us>,<robust_us>,<topo><LLL><CCC>,<g x 1000>;"
+ *   AX2;  run the READ diagnostic: |Gamma| with the network bypassed, then with the
+ *         present setting, three readings each, at the tune power. Result with AX;
+ *   AX3;  tune (ATU_PROG_TUNE). Result with AX;
+ *
+ * AX2 and AX3 reply nothing if the program started, "AX<code>;" with an
+ * ATUResultCode if it was refused. Everything else, or a build without
+ * ATU_PRESENT, replies "?;".
  *
  * @param cmd CAT command string
- * @return "AX1,<f_kHz>,<prepare_us>,<search_us>,<robust_us>,<topo><LLL><CCC>,<g x 1000>;"
- *         with the robust choice and its nominal |Gamma|; "?;" for any other argument,
- *         while transmitting, or without ATU_PRESENT
  */
 char *AX_write( char* cmd ){
 #ifdef ATU_PRESENT
-    if( (cmd[2] != '1') || !ATUChangeAllowed() ){
-        sprintf( obuf, "?;");
-        return obuf;
+    switch( cmd[2] ){
+        case '0':
+            ATUTuneAbort();
+            return empty_string_p;
+        case '1':{
+            if( !ATUChangeAllowed() || ATUTuneActive() ) break;
+            ATUModelCache *cache = ATUSharedModelCache();
+            ATUTopK *topk = ATUSharedTopK();
+            double f_Hz = (double)GetTXRXFreq_cHz() / 100.0;
+            atu_cf zl = { 30.0f, 40.0f };
+            uint32_t t0 = micros();
+            ATUModelPrepare( cache, &ATUModelDefaultParams, f_Hz );
+            uint32_t t1 = micros();
+            ATUModelSearchAll( cache, zl, topk );
+            uint32_t t2 = micros();
+            ATURobustChoice pick = ATUModelRobustPick( cache, zl, topk );
+            uint32_t t3 = micros();
+            sprintf( obuf, "AX1,%lu,%lu,%lu,%lu,%d%03d%03d,%d;",
+                     (unsigned long)(f_Hz / 1000.0), (unsigned long)(t1 - t0),
+                     (unsigned long)(t2 - t1), (unsigned long)(t3 - t2),
+                     pick.best.topo, pick.best.l, pick.best.c,
+                     (int)lroundf( pick.best.g * 1000.0f ) );
+            return obuf;
+        }
+        case '2':
+        case '3':{
+            ATUResultCode rc = ATUTuneStart( cmd[2] == '2' ? ATU_PROG_READ : ATU_PROG_TUNE );
+            if( rc == ATU_OK ) return empty_string_p;
+            sprintf( obuf, "AX%d;", (int)rc );
+            return obuf;
+        }
+        default:
+            break;
     }
-    ATUModelCache *cache = ATUSharedModelCache();
-    ATUTopK *topk = ATUSharedTopK();
-    double f_Hz = (double)GetTXRXFreq_cHz() / 100.0;
-    atu_cf zl = { 30.0f, 40.0f };
-    uint32_t t0 = micros();
-    ATUModelPrepare( cache, &ATUModelDefaultParams, f_Hz );
-    uint32_t t1 = micros();
-    ATUModelSearchAll( cache, zl, topk );
-    uint32_t t2 = micros();
-    ATURobustChoice pick = ATUModelRobustPick( cache, zl, topk );
-    uint32_t t3 = micros();
-    sprintf( obuf, "AX1,%lu,%lu,%lu,%lu,%d%03d%03d,%d;",
-             (unsigned long)(f_Hz / 1000.0), (unsigned long)(t1 - t0),
-             (unsigned long)(t2 - t1), (unsigned long)(t3 - t2),
-             pick.best.topo, pick.best.l, pick.best.c, (int)lroundf( pick.best.g * 1000.0f ) );
+#endif
+    sprintf( obuf, "?;");
+    return obuf;
+}
+
+/**
+ * CAT command AX - read the running or last ATU program's record (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return "AX<prog>,<code>,<active>,<n>,<ms>,<final nbsLLLCCC>,<final g>,<predicted g>,
+ *          <R>,<X>,<fwd W x 10>[,<g1>,<g2>...];"
+ *         with |Gamma| values x 1000 (-1 if none), the load estimate R + jX in ohm,
+ *         and the first 24 readings' |Gamma|. "?;" without ATU_PRESENT.
+ */
+char *AX_read( char* cmd ){
+#ifdef ATU_PRESENT
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    uint32_t f = r->finalSetting;
+    int len = sprintf( obuf, "AX%d,%d,%d,%d,%lu,%d%d%d%03d%03d,%d,%d,%ld,%ld,%d",
+                       (int)r->program, (int)r->code, r->active ? 1 : 0, (int)r->n,
+                       (unsigned long)r->elapsed_ms,
+                       (int)ATU_PACKED_NET(f), (int)ATU_PACKED_BAL(f), (int)ATU_PACKED_CAPSIN(f),
+                       (int)ATU_PACKED_L(f), (int)ATU_PACKED_C(f),
+                       (int)lroundf( r->finalGamma * 1000.0f ),
+                       (int)lroundf( r->predictedGamma * 1000.0f ),
+                       (long)lroundf( r->zRe ), (long)lroundf( r->zIm ),
+                       (int)lroundf( r->fwd_W * 10.0f ) );
+    for( int i = 0; (i < r->n) && (i < 24); i++ ){
+        len += sprintf( obuf + len, ",%d", (int)lroundf( r->gamma[i] * 1000.0f ) );
+    }
+    sprintf( obuf + len, ";" );
     return obuf;
 #else
     sprintf( obuf, "?;");
     return obuf;
 #endif
-}
-
-/**
- * CAT command AX - read the last ATU tune result (non-standard Kenwood command)
- * @param cmd CAT command string
- * @return "?;" until the automatic tuner exists
- */
-char *AX_read( char* cmd ){
-    sprintf( obuf, "?;");
-    return obuf;
 }
 
 /**

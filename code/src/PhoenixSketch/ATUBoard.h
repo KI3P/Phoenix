@@ -95,6 +95,13 @@ void SetATUState(bool networkEngaged, bool balancedOutput, bool capsAtInput,
 bool ATUChangeAllowed(void);
 
 /**
+ * @brief Set every ATU relay from a packed state, with a single hardware update
+ * @param state Bit 0-7 L mask, 8-15 C mask, 16 caps at input, 17 balun, 18 network in line
+ *        (the format of GetATURegisterState())
+ */
+void SetATUPacked(uint32_t state);
+
+/**
  * @brief Put the capacitor bank on the input (transmitter) side of the inductors (C-L)
  * @note Energises K17
  */
