@@ -1,0 +1,54 @@
+[
+ {
+  "tag": "match_LC_3p6MHz_12p5",
+  "topology": "LC",
+  "f0": 3655000.0,
+  "R_target": 12.5,
+  "lmask": 14,
+  "cmask": 95,
+  "predicted_zin": [
+   12.713983287759083,
+   -0.2566943568000362
+  ],
+  "predicted_swr": 1.0268627024564734
+ },
+ {
+  "tag": "match_CL_3p6MHz_200",
+  "topology": "CL",
+  "f0": 3655000.0,
+  "R_target": 200.0,
+  "lmask": 63,
+  "cmask": 24,
+  "predicted_zin": [
+   191.6527667493329,
+   -3.826731491164416
+  ],
+  "predicted_swr": 1.048015002946843
+ },
+ {
+  "tag": "match_LC_14p2MHz_12p5",
+  "topology": "LC",
+  "f0": 14275000.0,
+  "R_target": 12.5,
+  "lmask": 1,
+  "cmask": 22,
+  "predicted_zin": [
+   12.03754792907324,
+   -0.9006749108925077
+  ],
+  "predicted_swr": 1.086014584823677
+ },
+ {
+  "tag": "match_CL_14p2MHz_200",
+  "topology": "CL",
+  "f0": 14275000.0,
+  "R_target": 200.0,
+  "lmask": 16,
+  "cmask": 2,
+  "predicted_zin": [
+   268.2911854480337,
+   -9.584356038785215
+  ],
+  "predicted_swr": 1.3452954221476683
+ }
+]

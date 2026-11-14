@@ -1,0 +1,23 @@
+
+=== 6. Proposed algorithm end to end (other builds, sigma 5 %; SWR readings +-3 %) ===
+  SWR columns: median / 90th percentile / max over 40 loads (SWR <= 10) on 10 random builds
+   3.65 MHz  best achievable (median / 90% / max SWR) 1.03 / 1.26 / 1.84
+     reference model, jump only     : SWR 1.17 / 1.38 / 1.86  readings median 5 (90% 5, max 6)  fallback hill-climb 0/40
+     calibrated 2 %, jump only      : SWR 1.19 / 1.31 / 1.85  readings median 5 (90% 5, max 6)  fallback hill-climb 0/40
+     reference model, jump + polish : SWR 1.12 / 1.30 / 1.85  readings median 5 (90% 37, max 61)  fallback hill-climb 0/40
+     calibrated 2 %, jump + polish  : SWR 1.11 / 1.26 / 1.88  readings median 5 (90% 37, max 69)  fallback hill-climb 0/40
+   7.10 MHz  best achievable (median / 90% / max SWR) 1.07 / 1.70 / 2.04
+     reference model, jump only     : SWR 1.17 / 1.72 / 2.04  readings median 5 (90% 6, max 7)  fallback hill-climb 0/40
+     calibrated 2 %, jump only      : SWR 1.15 / 1.70 / 2.04  readings median 5 (90% 6, max 7)  fallback hill-climb 0/40
+     reference model, jump + polish : SWR 1.15 / 1.70 / 2.04  readings median 5 (90% 29, max 53)  fallback hill-climb 0/40
+     calibrated 2 %, jump + polish  : SWR 1.11 / 1.71 / 2.04  readings median 5 (90% 30, max 85)  fallback hill-climb 0/40
+  14.20 MHz  best achievable (median / 90% / max SWR) 1.27 / 2.06 / 4.14
+     reference model, jump only     : SWR 1.28 / 2.07 / 4.16  readings median 5 (90% 5, max 6)  fallback hill-climb 0/40
+     calibrated 2 %, jump only      : SWR 1.30 / 2.06 / 4.14  readings median 5 (90% 5, max 6)  fallback hill-climb 0/40
+     reference model, jump + polish : SWR 1.27 / 2.11 / 4.38  readings median 13 (90% 30, max 45)  fallback hill-climb 0/40
+     calibrated 2 %, jump + polish  : SWR 1.27 / 2.06 / 4.22  readings median 12 (90% 29, max 37)  fallback hill-climb 0/40
+  28.40 MHz  best achievable (median / 90% / max SWR) 1.03 / 1.06 / 1.06
+     reference model, jump only     : SWR 1.11 / 1.31 / 1.35  readings median 5 (90% 5, max 7)  fallback hill-climb 0/40
+     calibrated 2 %, jump only      : SWR 1.07 / 1.13 / 1.14  readings median 5 (90% 5, max 5)  fallback hill-climb 0/40
+     reference model, jump + polish : SWR 1.07 / 1.18 / 1.23  readings median 5 (90% 29, max 45)  fallback hill-climb 0/40
+     calibrated 2 %, jump + polish  : SWR 1.07 / 1.14 / 1.16  readings median 5 (90% 5, max 19)  fallback hill-climb 0/40
