@@ -273,3 +273,193 @@ TEST_F(ATUTuneTest, CatStartsReportsAndStops) {
     ED.SWR_CalLevel[BAND_20M] = 0;
     EXPECT_EQ(Cat("AX2;"), "AX5;");
 }
+
+// ====================================================================== tuning
+
+namespace {
+
+ATUModelParams plantParams;
+atu_cf bridgeLeak = {0.0f, 0.0f};   // added to every reading, like the bridge's directivity
+
+/// Coils of another build: L and Cp each off by about sigma (deterministic)
+void MakePlant(double sigma, uint32_t seed){
+    plantParams = ATUModelDefaultParams;
+    uint32_t x = seed * 2654435761u + 1;
+    auto uni = [&x]() { x = x * 1664525u + 1013904223u; return (x >> 8) / 16777216.0; };
+    for (int n = 0; n < ATU_NUM_COILS; n++){
+        double g1 = sqrt(-2 * log(uni() + 1e-12)) * cos(2 * M_PI * uni());
+        double g2 = sqrt(-2 * log(uni() + 1e-12)) * cos(2 * M_PI * uni());
+        plantParams.ind[n].L_nH *= 1 + sigma * g1;
+        plantParams.ind[n].Cp_pF *= 1 + sigma * g2;
+    }
+    // The capacitors' lead inductance differs too, so settings near a series
+    // resonance disagree with the model, as they do on the board
+    for (int n = 0; n < ATU_NUM_CAPS; n++){
+        double g1 = sqrt(-2 * log(uni() + 1e-12)) * cos(2 * M_PI * uni());
+        double g2 = sqrt(-2 * log(uni() + 1e-12)) * cos(2 * M_PI * uni());
+        plantParams.cap[n].Llead_nH *= 1 + sigma * g1;
+        plantParams.cap[n].C_pF *= 1 + 0.4 * sigma * g2;
+    }
+}
+
+float TrueGammaOf(uint32_t s){
+    if (!ATU_PACKED_NET(s)){
+        float dr = plantLoad.re - 50.0f, sr = plantLoad.re + 50.0f, x = plantLoad.im;
+        return sqrtf((dr * dr + x * x) / (sr * sr + x * x));
+    }
+    return ATUCAbs(ATUModelGamma(&plantCache, ATU_PACKED_CAPSIN(s) ? ATU_TOPO_CL : ATU_TOPO_LC,
+                                 ATU_PACKED_L(s), ATU_PACKED_C(s), plantLoad));
+}
+
+uint16_t LeakyPlantADC(uint8_t channel){
+    if (!Keyed() || channel == 0) return PlantADC(channel);
+    uint32_t s = GetATURegisterState();
+    atu_cf g;
+    if (!ATU_PACKED_NET(s)){
+        float den = (plantLoad.re + 50) * (plantLoad.re + 50) + plantLoad.im * plantLoad.im;
+        float nr = plantLoad.re - 50, ni = plantLoad.im, dr = plantLoad.re + 50, di = plantLoad.im;
+        g = {(nr * dr + ni * di) / den, (ni * dr - nr * di) / den};
+    } else {
+        g = ATUModelGamma(&plantCache, ATU_PACKED_CAPSIN(s) ? ATU_TOPO_CL : ATU_TOPO_LC,
+                          ATU_PACKED_L(s), ATU_PACKED_C(s), plantLoad);
+    }
+    g.re += bridgeLeak.re;
+    g.im += bridgeLeak.im;
+    float mag = fmaxf(ATUCAbs(g), 1e-4f);
+    float mV = Volts_mV(plantFwd_dBm + 20.0f * log10f(mag), false);
+    return (uint16_t)lroundf(fminf(fmaxf(mV, 0.0f), 4095.0f));
+}
+
+float Swr(float g){ g = fminf(g, 0.999f); return (1 + g) / (1 - g); }
+
+}  // namespace
+
+class ATUTuneAlgoTest : public ATUTuneTest {
+protected:
+    uint8_t savedCal[NUMBER_OF_BANDS];
+    void SetUp() override {
+        ATUTuneTest::SetUp();
+        for (int b = 0; b < NUMBER_OF_BANDS; b++){ savedCal[b] = ED.SWR_CalLevel[b]; ED.SWR_CalLevel[b] = 1; }
+        Adafruit_I2CDevice::setMockADCProvider(LeakyPlantADC);
+        bridgeLeak = {0.0f, 0.0f};
+    }
+    void TearDown() override {
+        for (int b = 0; b < NUMBER_OF_BANDS; b++) ED.SWR_CalLevel[b] = savedCal[b];
+        ATUTuneTest::TearDown();
+    }
+    /// Tune to a frequency, on a plant whose coils differ from the model
+    void SetFrequency(const char *fa){
+        Cat(fa);                                // FA echoes the frequency
+        ASSERT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+        ASSERT_EQ(GetTXRXFreq_cHz() / 100, atoll(fa + 2)) << fa;
+        ATUModelPrepare(&plantCache, &plantParams, (double)GetTXRXFreq_cHz() / 100.0);
+    }
+};
+
+// ====================================================================== memory
+
+class ATUMemoryTest : public ATUTuneAlgoTest {
+protected:
+    void SetUp() override {
+        ATUTuneAlgoTest::SetUp();
+        for (int b = 0; b < NUMBER_OF_BANDS; b++)
+            for (int a = 0; a < ATU_NUM_ANTENNAS; a++) ED.ATU_State[b][a] = 0;
+        ED.ATU_AutoApply = true;
+        ATUMemoryResetHook();
+    }
+    void SetBand(int32_t band){
+        ED.currentBand[ED.activeVFO] = band;
+        UpdateTuneState();
+    }
+};
+
+TEST_F(ATUMemoryTest, StoreGetForget) {
+    uint32_t s; int32_t f; float swr;
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, &s, &f, &swr));
+    ATUMemoryStore(BAND_20M, 0, ATU_PACK(1, 0, 1, 12, 34), 14200, 1.15f);
+    ASSERT_TRUE(ATUMemoryGet(BAND_20M, 0, &s, &f, &swr));
+    EXPECT_EQ(s, ATU_PACK(1, 0, 1, 12, 34));
+    EXPECT_EQ(f, 14200);
+    EXPECT_FLOAT_EQ(swr, 1.15f);
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 1, &s, &f, &swr));   // per antenna
+    // A stored bypass is a valid entry
+    ATUMemoryStore(BAND_40M, 0, ATU_PACKED_BYPASS, 7100, 1.1f);
+    ASSERT_TRUE(ATUMemoryGet(BAND_40M, 0, &s, NULL, NULL));
+    EXPECT_EQ(s, ATU_PACKED_BYPASS);
+    ATUMemoryForget(BAND_20M, 0);
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, &s, &f, &swr));
+    EXPECT_FALSE(ATUMemoryGet(-1, 0, &s, &f, &swr));
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 4, &s, &f, &swr));
+    // CAT AX5 forgets the current band and antenna
+    ED.currentBand[ED.activeVFO] = BAND_40M;
+    EXPECT_EQ(Cat("AX5;"), "");
+    EXPECT_FALSE(ATUMemoryGet(BAND_40M, 0, &s, NULL, NULL));
+}
+
+TEST_F(ATUMemoryTest, BandChangeAppliesTheStoredSettingOnlyOnChange) {
+    const uint32_t x = ATU_PACK(1, 0, 0, 0x21, 0x05);
+    ATUMemoryStore(BAND_20M, 0, x, 14200, 1.2f);
+    SetBand(BAND_40M);                          // nothing stored: bypass
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    SetBand(BAND_20M);
+    EXPECT_EQ(GetATURegisterState(), x);
+    // A manual change survives later tune updates on the same band
+    const uint32_t manual = ATU_PACK(1, 0, 1, 3, 3);
+    SetATUPacked(manual);
+    UpdateTuneState();
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), manual);
+    // An antenna change counts as a change
+    ED.antennaSelection[BAND_20M] = 1;
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    ED.antennaSelection[BAND_20M] = 0;
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), x);
+}
+
+TEST_F(ATUMemoryTest, NeverSwitchesWhileTransmittingAndCatchesUpInReceive) {
+    const uint32_t x = ATU_PACK(1, 0, 0, 0x08, 0x02);
+    ATUMemoryStore(BAND_40M, 0, x, 7100, 1.3f);
+    SetBand(BAND_20M);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
+    SetBand(BAND_40M);                          // band changes while keyed
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    EXPECT_EQ(GetATURegisterState(), x);        // applied on the way back to receive
+}
+
+TEST_F(ATUMemoryTest, AutoApplyOffLeavesTheRelaysAlone) {
+    ATUMemoryStore(BAND_20M, 0, ATU_PACK(1, 0, 0, 1, 1), 14200, 1.2f);
+    ED.ATU_AutoApply = false;
+    const uint32_t manual = ATU_PACK(1, 0, 1, 7, 7);
+    SetATUPacked(manual);
+    SetBand(BAND_40M);
+    SetBand(BAND_20M);
+    EXPECT_EQ(GetATURegisterState(), manual);
+}
+
+TEST_F(ATUMemoryTest, MemoryAndSettingsRoundTripThroughStorage) {
+    InitializeStorage();
+    ATUMemoryStore(BAND_15M, 2, ATU_PACK(1, 0, 1, 200, 17), 21200, 1.44f);
+    ED.ATU_TunePower_W = 3.5f;
+    ED.ATU_AutoApply = false;
+    SaveDataToStorage(false);
+    ED.ATU_State[BAND_15M][2] = 0;
+    ED.ATU_Freq_kHz[BAND_15M][2] = 0;
+    ED.ATU_SWR[BAND_15M][2] = 0;
+    ED.ATU_TunePower_W = 2.0f;
+    ED.ATU_AutoApply = true;
+    RestoreDataFromStorage();
+    uint32_t s; int32_t f; float swr;
+    ASSERT_TRUE(ATUMemoryGet(BAND_15M, 2, &s, &f, &swr));
+    EXPECT_EQ(s, ATU_PACK(1, 0, 1, 200, 17));
+    EXPECT_EQ(f, 21200);
+    EXPECT_NEAR(swr, 1.44f, 1e-4f);
+    EXPECT_FLOAT_EQ(ED.ATU_TunePower_W, 3.5f);
+    EXPECT_FALSE(ED.ATU_AutoApply);
+    ED.ATU_TunePower_W = 2.0f;
+    ED.ATU_AutoApply = true;
+}

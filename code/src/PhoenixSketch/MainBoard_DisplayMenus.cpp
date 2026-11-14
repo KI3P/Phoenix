@@ -722,13 +722,53 @@ void ATUMenuReset(void){
     SyncATUMenuVariables();
 }
 
-struct SecondaryMenuOption ATUOptions[6] = {
+/**
+ * Menu callback: run the automatic tuner (ATU_PROG_TUNE) at the tune power.
+ * The result is stored in the memory for this band and antenna.
+ */
+void ATUMenuTune(void){
+    ATUTuneStart(ATU_PROG_TUNE);
+}
+
+/**
+ * Menu callback: store the present relay setting for this band and antenna.
+ */
+void ATUMenuSaveToMemory(void){
+    ATUMemoryStore(ATUCurrentBand(), ATUCurrentAntenna(), GetATURegisterState(),
+                   (int32_t)(GetTXRXFreq_cHz() / 100000), 0.0f);
+}
+
+/**
+ * Menu callback: forget the stored setting for this band and antenna.
+ */
+void ATUMenuForget(void){
+    ATUMemoryForget(ATUCurrentBand(), ATUCurrentAntenna());
+}
+
+VariableParameter atuTunePower = {
+    .variable = &ED.ATU_TunePower_W,
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.5f, .max = 10.0f, .step = 0.5f}}
+};
+
+VariableParameter atuAutoApply = {
+    .variable = &ED.ATU_AutoApply,
+    .type = TYPE_BOOL,
+    .limits = {.b = {.min = false, .max = true, .step = 1}}
+};
+
+struct SecondaryMenuOption ATUOptions[11] = {
+    "Tune", functionOption, NULL, (void *)ATUMenuTune, NULL,
     "Network in line", variableOption, &atuNetwork, NULL, (void *)UpdateATUNetwork,
     "Caps at input (CL)", variableOption, &atuCapsInput, NULL, (void *)UpdateATUCapsInput,
     "Balun output", variableOption, &atuBalanced, NULL, (void *)UpdateATUBalanced,
     "L mask", variableOption, &atuL, NULL, (void *)UpdateATUInductors,
     "C mask", variableOption, &atuC, NULL, (void *)UpdateATUCapacitors,
     "Bypass all (safe)", functionOption, NULL, (void *)ATUMenuReset, NULL,
+    "Save to memory", functionOption, NULL, (void *)ATUMenuSaveToMemory, NULL,
+    "Forget band", functionOption, NULL, (void *)ATUMenuForget, NULL,
+    "Auto-apply memory", variableOption, &atuAutoApply, NULL, NULL,
+    "Tune power (W)", variableOption, &atuTunePower, NULL, NULL,
 };
 #endif // ATU_PRESENT
 

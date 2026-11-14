@@ -1252,6 +1252,9 @@ char *AT_read( char* cmd ){
  *   AX2;  run the READ diagnostic: |Gamma| with the network bypassed, then with the
  *         present setting, three readings each, at the tune power. Result with AX;
  *   AX3;  tune (ATU_PROG_TUNE). Result with AX;
+ *   AX4;  the relay setting of each of the last program's first 24 readings:
+ *         "AX4,<s1>,<s2>...;" with each setting as nbsLLLCCC (as for AT)
+ *   AX5;  forget the stored ATU setting for the current band and antenna
  *
  * AX2 and AX3 reply nothing if the program started, "AX<code>;" with an
  * ATUResultCode if it was refused. Everything else, or a build without
@@ -1265,6 +1268,22 @@ char *AX_write( char* cmd ){
         case '0':
             ATUTuneAbort();
             return empty_string_p;
+        case '5':
+            if( ATUTuneActive() ) break;
+            ATUMemoryForget( ATUCurrentBand(), ATUCurrentAntenna() );
+            return empty_string_p;
+        case '4':{
+            const ATUTuneRecord *r = ATUTuneLastRecord();
+            int len = sprintf( obuf, "AX4" );
+            for( int i = 0; (i < r->n) && (i < 24); i++ ){
+                uint32_t q = r->setting[i];
+                len += sprintf( obuf + len, ",%d%d%d%03d%03d",
+                                (int)ATU_PACKED_NET(q), (int)ATU_PACKED_BAL(q), (int)ATU_PACKED_CAPSIN(q),
+                                (int)ATU_PACKED_L(q), (int)ATU_PACKED_C(q) );
+            }
+            sprintf( obuf + len, ";" );
+            return obuf;
+        }
         case '2':
         case '3':{
             ATUResultCode rc = ATUTuneStart( cmd[2] == '2' ? ATU_PROG_READ : ATU_PROG_TUNE );

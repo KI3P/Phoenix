@@ -160,6 +160,48 @@ float ATUTuneAttenuation_dB(void);
  */
 bool ATUTuneAbortsOn(int interrupt);
 
+///////////////////////////////////////////////////////////////////////////////
+// Memory: one setting per band and antenna, in ED (ATU_State, ATU_Freq_kHz, ATU_SWR)
+///////////////////////////////////////////////////////////////////////////////
+
+/// A stored setting is reused by a tune if within this fraction of its frequency
+#define ATU_MEMORY_FREQ_FRACTION 0.01f
+
+/**
+ * @brief The stored setting for a band and antenna
+ * @return false if nothing is stored (or band/antenna out of range)
+ */
+bool ATUMemoryGet(int32_t band, int32_t antenna, uint32_t *state, int32_t *f_kHz, float *swr);
+
+/**
+ * @brief Store a setting for a band and antenna
+ * @param swr SWR measured with it, or 0 if not measured
+ * @note Saves the configuration to flash
+ */
+void ATUMemoryStore(int32_t band, int32_t antenna, uint32_t state, int32_t f_kHz, float swr);
+
+/// Forget the stored setting for a band and antenna (saves the configuration)
+void ATUMemoryForget(int32_t band, int32_t antenna);
+
+/// The current band and antenna (ED.currentBand, ED.antennaSelection)
+int32_t ATUCurrentBand(void);
+int32_t ATUCurrentAntenna(void);
+
+/**
+ * @brief Apply the stored setting if the band or antenna has changed
+ *
+ * Called from HandleTuneState() on every tune update. It acts only when the band or
+ * antenna differs from the last one applied, so a manual change made from the menu
+ * or over CAT stays until the next band or antenna change. It only switches relays
+ * in receive (ATUChangeAllowed()); a change seen while transmitting is applied on
+ * the next call in receive. With nothing stored it bypasses the network. Does
+ * nothing while a tuner program runs, or with ED.ATU_AutoApply off.
+ */
+void ATUApplyStoredIfChanged(int32_t band, int32_t antenna);
+
+/// Forget which band and antenna were last applied, so the next call applies (tests)
+void ATUMemoryResetHook(void);
+
 /// Planner for ATU_PROG_TUNE, in ATUTuneAlgo.cpp
 extern const ATUPlanner ATUTunePlanner;
 

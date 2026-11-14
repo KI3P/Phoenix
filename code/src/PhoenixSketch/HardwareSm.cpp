@@ -702,6 +702,10 @@ void HandleTuneState(TuneState tuneState){
     SelectLPFBand(ED.currentBand[ED.activeVFO]);
     SelectBPFBand(ED.currentBand[ED.activeVFO]);
     SelectAntenna(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
+#ifdef ATU_PRESENT
+    // The stored ATU setting for this band and antenna, when either changes
+    ATUApplyStoredIfChanged(ED.currentBand[ED.activeVFO], ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
+#endif
     UpdateFIRFilterMask(&RXfilters);
     switch (tuneState){
         case TuneReceive:{

@@ -198,6 +198,8 @@ errno_t InitializeATUBoard(void){
  * Called after any change to the ATU bits of hardwareRegister.
  */
 void UpdateATURegisters(void){
+    // Never touch an expander that did not answer: the Adafruit object has no device
+    if (!ATUinitialized) return;
     if (mcpA_old != ATU_GPA_STATE){
         mcpATU_LC.writeGPIOA(ATU_GPA_STATE);
         mcpA_old = ATU_GPA_STATE;

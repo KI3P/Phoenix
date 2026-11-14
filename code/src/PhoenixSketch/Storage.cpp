@@ -44,6 +44,40 @@ void InitializeStorage(void){
 }
 
 /**
+ * PRIVATE: Add the ATU memory and settings to the configuration document.
+ */
+static void SaveATUFields(JsonDocument &doc){
+    doc["ATU_TunePower_W"] = ED.ATU_TunePower_W;
+    doc["ATU_AutoApply"] = ED.ATU_AutoApply;
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            doc["ATU_State"][i][j] = ED.ATU_State[i][j];
+            doc["ATU_Freq_kHz"][i][j] = ED.ATU_Freq_kHz[i][j];
+            doc["ATU_SWR"][i][j] = ED.ATU_SWR[i][j];
+        }
+    }
+}
+
+/**
+ * PRIVATE: Read the ATU memory and settings back. A file saved before these fields
+ * existed leaves the defaults (memory empty, 2 W, auto-apply on).
+ */
+static void RestoreATUFields(JsonDocument &doc){
+    ED.ATU_TunePower_W = doc["ATU_TunePower_W"] | ED.ATU_TunePower_W;
+    ED.ATU_AutoApply = doc["ATU_AutoApply"] | ED.ATU_AutoApply;
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            if (doc["ATU_State"][i].is<JsonArray>())
+                ED.ATU_State[i][j] = doc["ATU_State"][i][j] | ED.ATU_State[i][j];
+            if (doc["ATU_Freq_kHz"][i].is<JsonArray>())
+                ED.ATU_Freq_kHz[i][j] = doc["ATU_Freq_kHz"][i][j] | ED.ATU_Freq_kHz[i][j];
+            if (doc["ATU_SWR"][i].is<JsonArray>())
+                ED.ATU_SWR[i][j] = doc["ATU_SWR"][i][j] | ED.ATU_SWR[i][j];
+        }
+    }
+}
+
+/**
  * Save config_t struct to flash memory as a file using the LittleFS.h
  * file system. This also saves the file to the SD card, if it is present,
  * if the parameter is set to true
@@ -57,6 +91,7 @@ void SaveDataToStorage(bool savetosd){
     doc["agc"] = ED.agc;
     doc["audioVolume"] = ED.audioVolume;
     doc["SWR_CouplerTurns"] = ED.SWR_CouplerTurns;
+    SaveATUFields(doc);
     doc["rfGainAllBands_dB"] = ED.rfGainAllBands_dB;
     doc["stepFineTune"] = ED.stepFineTune;
     doc["nrOptionSelect"] = ED.nrOptionSelect;
@@ -271,6 +306,7 @@ void RestoreDataFromStorage(void){
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
     ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
+    RestoreATUFields(doc);
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -521,6 +557,7 @@ void RestoreDataFromSDCard(void){
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
     ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
+    RestoreATUFields(doc);
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -936,6 +973,20 @@ void PrintEDToSerial(void){
 
     Serial.print("SWR_CouplerTurns: ");
     Serial.println(ED.SWR_CouplerTurns);
+
+    sprintf(buff, "%4.1f", ED.ATU_TunePower_W);
+    Serial.print("ATU_TunePower_W: "); Serial.println(buff);
+    Serial.print("ATU_AutoApply: "); Serial.println((int)ED.ATU_AutoApply);
+    Serial.println("ATU memory (band: antenna 0-3 as state/kHz/SWR):");
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        Serial.print("  "); Serial.print(i); Serial.print(":");
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            sprintf(buff, " %lX/%ld/%4.2f", (unsigned long)ED.ATU_State[i][j],
+                    (long)ED.ATU_Freq_kHz[i][j], ED.ATU_SWR[i][j]);
+            Serial.print(buff);
+        }
+        Serial.println();
+    }
 
     Serial.println("=== End ED Struct ===");
 }

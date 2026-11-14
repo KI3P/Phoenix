@@ -11,7 +11,7 @@
 #endif
 
 extern char *command_parser(char *command);
-extern struct SecondaryMenuOption ATUOptions[6];
+extern struct SecondaryMenuOption ATUOptions[11];
 extern void SyncATUMenuVariables(void);
 
 // The whole ATU field: bits 33-51 of hardwareRegister
@@ -237,7 +237,7 @@ TEST_F(ATUBoardTest, MenuIsLastPrimaryEntry) {
     EXPECT_EQ(NUM_PRIMARY_MENUS, 10);
     EXPECT_STREQ(primaryMenu[NUM_PRIMARY_MENUS - 1].label, "ATU");
     EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].secondary, ATUOptions);
-    EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].length, 6u);
+    EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].length, 11u);
     // Existing positions that other tests rely on are unchanged
     EXPECT_STREQ(primaryMenu[0].label, "RF Options");
     EXPECT_STREQ(primaryMenu[6].label, "Calibration");
@@ -252,42 +252,42 @@ static void Step(int item, bool up) {
 
 TEST_F(ATUBoardTest, MenuItemsDriveTheRelays) {
     SyncATUMenuVariables();
-    Step(0, true);                        // Network in line
+    Step(1, true);                        // Network in line
     EXPECT_TRUE(ATUNetworkEngaged());
-    Step(1, true);                        // Caps at input
+    Step(2, true);                        // Caps at input
     EXPECT_TRUE(ATUCapsAtInput());
-    Step(2, true);                        // Balun output
+    Step(3, true);                        // Balun output
     EXPECT_TRUE(ATUBalancedOutput());
-    Step(3, true); Step(3, true);         // L mask 0 -> 2
+    Step(4, true); Step(4, true);         // L mask 0 -> 2
     EXPECT_EQ(GetATUInductors(), 2);
-    Step(4, true);                        // C mask 0 -> 1
+    Step(5, true);                        // C mask 0 -> 1
     EXPECT_EQ(GetATUCapacitors(), 1);
-    Step(4, false); Step(4, false);       // clamps at 0
+    Step(5, false); Step(5, false);       // clamps at 0
     EXPECT_EQ(GetATUCapacitors(), 0);
 
     // Bypass all
-    ((void (*)(void))ATUOptions[5].func)();
+    ((void (*)(void))ATUOptions[6].func)();
     EXPECT_EQ(GetATURegisterState(), 0u);
-    EXPECT_EQ(*(int32_t *)ATUOptions[3].varPam->variable, 0);
+    EXPECT_EQ(*(int32_t *)ATUOptions[4].varPam->variable, 0);
 }
 
 TEST_F(ATUBoardTest, MenuPicksUpChangesMadeOverCat) {
     Cat("AT100077000;");
     UpdateArrayVariables();
-    EXPECT_TRUE(*(bool *)ATUOptions[0].varPam->variable);
-    EXPECT_EQ(*(int32_t *)ATUOptions[3].varPam->variable, 77);
+    EXPECT_TRUE(*(bool *)ATUOptions[1].varPam->variable);
+    EXPECT_EQ(*(int32_t *)ATUOptions[4].varPam->variable, 77);
 }
 
 TEST_F(ATUBoardTest, MenuChangesRefusedWhileTransmitting) {
     SyncATUMenuVariables();
     PutInTransmit();
-    Step(0, true);
-    Step(3, true);
+    Step(1, true);
+    Step(4, true);
     EXPECT_FALSE(ATUNetworkEngaged());
     EXPECT_EQ(GetATUInductors(), 0);
     // The shadow values revert to the hardware state
-    EXPECT_FALSE(*(bool *)ATUOptions[0].varPam->variable);
-    EXPECT_EQ(*(int32_t *)ATUOptions[3].varPam->variable, 0);
-    ((void (*)(void))ATUOptions[5].func)();   // Bypass all is refused too
+    EXPECT_FALSE(*(bool *)ATUOptions[1].varPam->variable);
+    EXPECT_EQ(*(int32_t *)ATUOptions[4].varPam->variable, 0);
+    ((void (*)(void))ATUOptions[6].func)();   // Bypass all is refused too
     PutInReceive();
 }

@@ -50,7 +50,6 @@ static struct {
 } eng = {PH_IDLE, NULL, 0, 0, 0, 0};
 
 static ATUTuneRecord record;
-static float tunePower_W = ATU_DEFAULT_TUNE_POWER_W;
 
 ///////////////////////////////////////////////////////////////////////////////
 // The READ program: bypass three times, then the operator's setting three times
@@ -89,16 +88,83 @@ bool ATUTuneRelaysAllowed(void){
     return modeSM.state_id == ModeSm_StateId_ATU_TUNE_SPACE;
 }
 
-float ATUTunePower_W(void){ return tunePower_W; }
+float ATUTunePower_W(void){ return ED.ATU_TunePower_W; }
 
 void SetATUTunePower_W(float power_W){
     if (power_W < 0.5f) power_W = 0.5f;
     if (power_W > 10.0f) power_W = 10.0f;
-    tunePower_W = power_W;
+    ED.ATU_TunePower_W = power_W;
 }
 
 float ATUTuneAttenuation_dB(void){
-    return CalculateCWAttenuation(tunePower_W, &ED.PA100Wactive);
+    float p = ED.ATU_TunePower_W;
+    if ((p < 0.5f) || (p > 10.0f)) p = ATU_DEFAULT_TUNE_POWER_W;
+    return CalculateCWAttenuation(p, &ED.PA100Wactive);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Memory
+///////////////////////////////////////////////////////////////////////////////
+
+static inline bool MemoryIndexOK(int32_t band, int32_t antenna){
+    return (band >= 0) && (band < NUMBER_OF_BANDS) && (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS);
+}
+
+int32_t ATUCurrentBand(void){ return ED.currentBand[ED.activeVFO]; }
+
+int32_t ATUCurrentAntenna(void){
+    int32_t b = ATUCurrentBand();
+    return ((b >= 0) && (b < NUMBER_OF_BANDS)) ? ED.antennaSelection[b] : 0;
+}
+
+bool ATUMemoryGet(int32_t band, int32_t antenna, uint32_t *state, int32_t *f_kHz, float *swr){
+    if (!MemoryIndexOK(band, antenna)) return false;
+    uint32_t s = ED.ATU_State[band][antenna];
+    if (!(s & ATU_MEMORY_VALID)) return false;
+    if (state) *state = s & ~ATU_MEMORY_VALID;
+    if (f_kHz) *f_kHz = ED.ATU_Freq_kHz[band][antenna];
+    if (swr) *swr = ED.ATU_SWR[band][antenna];
+    return true;
+}
+
+void ATUMemoryStore(int32_t band, int32_t antenna, uint32_t state, int32_t f_kHz, float swr){
+    if (!MemoryIndexOK(band, antenna)) return;
+    ED.ATU_State[band][antenna] = (state & 0x7FFFFu) | ATU_MEMORY_VALID;
+    ED.ATU_Freq_kHz[band][antenna] = f_kHz;
+    ED.ATU_SWR[band][antenna] = swr;
+    SaveDataToStorage(false);
+}
+
+void ATUMemoryForget(int32_t band, int32_t antenna){
+    if (!MemoryIndexOK(band, antenna)) return;
+    ED.ATU_State[band][antenna] = 0;
+    ED.ATU_Freq_kHz[band][antenna] = 0;
+    ED.ATU_SWR[band][antenna] = 0;
+    SaveDataToStorage(false);
+}
+
+static int32_t appliedBand = -1;
+static int32_t appliedAntenna = -1;
+
+void ATUMemoryResetHook(void){
+    appliedBand = -1;
+    appliedAntenna = -1;
+}
+
+void ATUApplyStoredIfChanged(int32_t band, int32_t antenna){
+    if ((band == appliedBand) && (antenna == appliedAntenna)) return;
+    if (ATUTuneActive() || PowerCalAutoActive()) return;
+    if (!ED.ATU_AutoApply || !MemoryIndexOK(band, antenna) ||
+        !(bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present)){
+        appliedBand = band;
+        appliedAntenna = antenna;
+        return;
+    }
+    if (!ATUChangeAllowed()) return;            // transmitting: try again in receive
+    uint32_t s;
+    SetATUPacked(ATUMemoryGet(band, antenna, &s, NULL, NULL) ? s : ATU_PACKED_BYPASS);
+    appliedBand = band;
+    appliedAntenna = antenna;
 }
 
 bool ATUTuneActive(void){ return eng.phase != PH_IDLE; }

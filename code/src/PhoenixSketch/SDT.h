@@ -294,6 +294,8 @@ enum MorseStates { state0,
 #define CW_100W_CAL_POWER_POINT_W 75.0f
 #define SWR_CAL_OPEN_ONLY 0x10 // ED.SWR_CalLevel flag: reflected line from the open alone
 #define SWR_CAL_SHORT_ONLY 0x20 // ED.SWR_CalLevel flag: reflected line from the short alone
+#define ATU_NUM_ANTENNAS 4          // ED.antennaSelection is 0 to 3
+#define ATU_MEMORY_VALID 0x80000000u // ED.ATU_State flag: an entry is stored
 
 
 /** Radio configuration parameters that are kept in persistent storage */
@@ -388,6 +390,12 @@ extern struct config_t {
     uint8_t SWR_CalLevel[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration level: 0 uncalibrated, else 1 to 3; SWR_CAL_OPEN_ONLY or SWR_CAL_SHORT_ONLY set if the reflected line is from one standard alone */
     uint32_t SWR_CalDate[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Time of the SWR calibration (seconds since 1970) */
     uint8_t SWR_CouplerTurns = 10; /** L44 turns per core; selects the level 1 forward offsets */
+    // ATU memory, per band and antenna (used only with ATU_PRESENT)
+    uint32_t ATU_State[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** Packed ATU relays (GetATURegisterState()); ATU_MEMORY_VALID set if stored */
+    int32_t ATU_Freq_kHz[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** Frequency the ATU setting was stored at */
+    float32_t ATU_SWR[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** SWR measured when stored; 0 if not measured */
+    float32_t ATU_TunePower_W = 2.0f; /** Carrier power the ATU tunes with */
+    bool ATU_AutoApply = true; /** Apply the stored ATU setting on a band or antenna change */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine
