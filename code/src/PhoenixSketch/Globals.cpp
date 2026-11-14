@@ -269,6 +269,26 @@ void buffer_flush(void) {
 }
 
 /**
+ * Convert a 64-bit unsigned value to a decimal string.
+ *
+ * String(value, DEC) has no 64-bit overload on every platform, and a cast to
+ * unsigned int drops bits 32-63 of the register (TXVFOBIT and the ATU bits).
+ *
+ * @param value The value to convert
+ * @return Decimal representation
+ */
+static String U64ToDecString(uint64_t value){
+    char digits[21];
+    int pos = 20;
+    digits[pos] = '\0';
+    do {
+        digits[--pos] = (char)('0' + (value % 10));
+        value /= 10;
+    } while (value > 0);
+    return String(&digits[pos]);
+}
+
+/**
  * Print the hardware register buffer in a human-readable table format.
  * Displays all entries with timestamp, register value in decimal, binary, and hex.
  * Entries are shown from oldest to newest.
@@ -317,7 +337,7 @@ void buffer_pretty_print(void) {
         while (line.length() < 23) line += " ";
         line += " | ";
 
-        line += String((unsigned int)entry.register_value, DEC);
+        line += U64ToDecString(entry.register_value);
         // Pad register value
         while (line.length() < 40) line += " ";
         line += " | ";

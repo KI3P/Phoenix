@@ -250,3 +250,16 @@ TEST_F(BPFBoardTest, HardwareRegisterPreservation) {
     // Verify that the band was set correctly in upper 4 bits
     EXPECT_EQ(GET_BPF_BAND, 7);
 }
+// ================== 64-BIT REGISTER PRESERVATION ==================
+
+// SET_BPF_BAND must not clear bits 32-63 of hardwareRegister (TXVFOBIT and
+// the ATU bits). It used to, because its mask was a 32-bit literal.
+TEST_F(BPFBoardTest, SelectBPFBandPreservesUpperRegisterBits) {
+    const uint64_t upper = 0x000FFFFF00000000ULL;   // bits 32-51
+    hardwareRegister = upper;
+
+    SelectBPFBand(BAND_20M);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    SelectBPFBand(-1);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+}

@@ -471,3 +471,17 @@ TEST(RFBoard, CWoff_Test) {
     EXPECT_EQ(getPinMode(CW_ON_OFF), OUTPUT);
     EXPECT_EQ(digitalRead(CW_ON_OFF),0);
 }
+
+// The attenuator setters must not clear bits 32-63 of hardwareRegister
+// (TXVFOBIT and the ATU bits). They used to, because their masks were 32-bit literals.
+TEST(RFBoard, AttenuatorSettersPreserveUpperRegisterBits) {
+    const uint64_t upper = 0x000FFFFF00000000ULL;   // bits 32-51
+    hardwareRegister |= upper;
+
+    SetRXAttenuation(10.5);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    SetTXAttenuation(20.0);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+
+    hardwareRegister &= ~upper;
+}

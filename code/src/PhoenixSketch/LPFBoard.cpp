@@ -78,10 +78,10 @@ static AD7991 swrADC;
 #define LPF_GPA_STATE (uint8_t)((hardwareRegister >> 8) & 0x00000003)   // Bits 8 & 9
 #define LPF_GPB_STATE (uint8_t)(hardwareRegister & 0x000000FF)          // Lowest byte
 
-#define SET_LPF_GPA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFCFF) | (((uint64_t)val & 0x00000003) << 8));buffer_add()
-#define SET_LPF_GPB(val) (hardwareRegister = (hardwareRegister & 0xFFFFFF00) | ((uint64_t)val  & 0x000000FF));buffer_add()
-#define SET_LPF_BAND(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFF0) | ((uint64_t)val & 0x0000000F));buffer_add()
-#define SET_ANTENNA(val) (hardwareRegister = (hardwareRegister & 0xFFFFFFCF) | (((uint64_t)val & 0x00000003) << 4));buffer_add()
+#define SET_LPF_GPA(val) (hardwareRegister = (hardwareRegister & ~(0x3ULL << 8)) | (((uint64_t)val & 0x00000003) << 8));buffer_add()
+#define SET_LPF_GPB(val) (hardwareRegister = (hardwareRegister & ~0xFFULL) | ((uint64_t)val  & 0x000000FF));buffer_add()
+#define SET_LPF_BAND(val) (hardwareRegister = (hardwareRegister & ~0xFULL) | ((uint64_t)val & 0x0000000F));buffer_add()
+#define SET_ANTENNA(val) (hardwareRegister = (hardwareRegister & ~(0x3ULL << 4)) | (((uint64_t)val & 0x00000003) << 4));buffer_add()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Unit Testing Helper Functions
@@ -107,7 +107,7 @@ uint16_t GetLPFRegisterState(void) {
  * @param value The 10-bit value to set (only lower 10 bits used)
  */
 void SetLPFRegisterState(uint16_t value) {
-    hardwareRegister = (hardwareRegister & 0xFFFFFC00) | (value & 0x03FF);
+    hardwareRegister = (hardwareRegister & ~0x3FFULL) | (value & 0x03FF);
 }
 
 /**

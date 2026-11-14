@@ -1672,3 +1672,27 @@ TEST_F(AD7991Test, BeginForgetsTheLastChannel) {
     adc.readADCsingle(0);
     EXPECT_EQ(Adafruit_I2CDevice::getWriteThenReadCount(), 6);
 }
+
+// ================== 64-BIT REGISTER PRESERVATION ==================
+
+// The LPF setters must not clear bits 32-63 of hardwareRegister (TXVFOBIT and
+// the ATU bits). They used to, because their masks were 32-bit literals.
+TEST_F(LPFBoardTest, SettersPreserveUpperRegisterBits) {
+    const uint64_t upper = 0x000FFFFF00000000ULL;   // bits 32-51
+    hardwareRegister |= upper;
+
+    SelectLPFBand(BAND_40M);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    SelectAntenna(2);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    TXSelectBPF();
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    SelectXVTR();
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    Select100WPA();
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    SetLPFRegister(0x0155);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+
+    hardwareRegister &= ~upper;
+}
