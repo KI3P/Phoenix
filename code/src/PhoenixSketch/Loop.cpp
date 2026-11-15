@@ -656,6 +656,16 @@ void HandleButtonPress(int32_t button){
                     // Add this later
                     break;
                 }
+#ifdef ATU_PRESENT
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case ATU_TUNE_BUTTON:{
+                    // Retune the ATU: a fresh search, stored for this band and
+                    // antenna. A refusal is shown by the SWR pane. Pressing any
+                    // button again while it runs stops it (ConsumeInterrupt).
+                    ATUTuneStart(ATU_PROG_TUNE);
+                    break;
+                }
+#endif
                 // You are in UISm_StateId_[HOME,UPDATE] states
                 case VFO_TOGGLE:{
                     if (ED.activeVFO == 0)

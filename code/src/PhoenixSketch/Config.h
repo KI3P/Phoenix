@@ -106,7 +106,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #define DECODER_TOGGLE      13
 #define DFE                 14
 #define BEARING             15
-#define SPARE               16
+#define ATU_TUNE_BUTTON     16  // retune the ATU (ATU_PRESENT builds; otherwise unassigned)
 #define HOME_SCREEN         17
 #define VOLUME_BUTTON       18
 #define FILTER_BUTTON       19

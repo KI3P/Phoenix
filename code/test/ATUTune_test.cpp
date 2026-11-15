@@ -615,6 +615,66 @@ TEST_F(ATUTuneAlgoTest, NoMatchKeepsTheBestSettingAndSaysSo) {
     ExpectBackInReceive();
 }
 
+namespace {
+/// A front-panel button pressed on the home screen
+void PressButton(int32_t button){
+    uiSM.state_id = UISm_StateId_HOME;
+    while (GetInterrupt() != iNONE) {}          // drop anything earlier tests left queued
+    SetButton(button);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+}
+}  // namespace
+
+TEST_F(ATUTuneAlgoTest, Button16StartsARetuneAndStoresIt) {
+    MakePlant(0.05, 9);
+    SetFrequency("FA00007100000;");
+    plantLoad = {200.0f, 0.0f};
+    ATUMemoryStore(BAND_40M, 0, ATU_PACK(1, 0, 0, 1, 1), 7100, 1.1f);
+    PressButton(ATU_TUNE_BUTTON);
+    ASSERT_TRUE(ATUTuneActive());
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    EXPECT_EQ(r->program, ATU_PROG_TUNE);
+    EXPECT_EQ(r->code, ATU_OK);
+    EXPECT_GT(r->n, 1);                         // a fresh search, not the stored setting
+    uint32_t s; int32_t f; float swr;
+    ASSERT_TRUE(ATUMemoryGet(BAND_40M, 0, &s, &f, &swr));
+    EXPECT_EQ(s, r->finalSetting);
+    EXPECT_EQ(GetATURegisterState(), r->finalSetting);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUTuneAlgoTest, Button16AgainStopsTheTune) {
+    MakePlant(0.05, 10);
+    SetFrequency("FA00014200000;");
+    plantLoad = {25.0f, 60.0f};
+    const uint32_t op = ATU_PACK(1, 0, 1, 7, 9);
+    SetATUPacked(op);
+    PressButton(ATU_TUNE_BUTTON);
+    ASSERT_TRUE(RunUntilKeyed());
+    PressButton(ATU_TUNE_BUTTON);
+    EXPECT_FALSE(ATUTuneActive());
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_ABORTED);
+    EXPECT_EQ(GetATURegisterState(), op);
+    ExpectBackInReceive();
+    // The press that stopped it did not start another one
+    for (int i = 0; i < 50; i++){ ATUTuneService(); AddMillisTime(5); }
+    EXPECT_FALSE(ATUTuneActive());
+}
+
+TEST_F(ATUTuneAlgoTest, Button16IsRefusedWhenTheTunerCannotRun) {
+    SetFrequency("FA00014200000;");
+    ED.SWR_CalLevel[BAND_20M] = 0;              // bridge not calibrated on 20 m
+    const uint32_t op = ATU_PACK(1, 0, 0, 3, 3);
+    SetATUPacked(op);
+    PressButton(ATU_TUNE_BUTTON);
+    EXPECT_FALSE(ATUTuneActive());
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_REFUSED_UNCALIBRATED);
+    EXPECT_EQ(GetATURegisterState(), op);
+    ExpectBackInReceive();
+}
+
 TEST_F(ATUTuneAlgoTest, AbortMidSearchUnkeysAndRestoresTheOperatorSetting) {
     MakePlant(0.05, 5);
     SetFrequency("FA00014200000;");
