@@ -71,7 +71,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Gain / audio | `AG` (AF gain), `MG` (mic gain), `PC` (power control) |
 | Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
 | SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
-| Antenna tuner | `AT` (raw ATU relay state; needs `ATU_PRESENT`; see [[atu-control]]) |
+| Antenna tuner | `AC` (Kenwood: start/stop tuning, network in/thru), `AT` (raw ATU relay state), `AX`/`AY` (tuner diagnostics); need `ATU_PRESENT` except `AC`, which reads `AC000;` without it; see [[atu-control]] |
 | DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX) |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |

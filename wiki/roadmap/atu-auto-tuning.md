@@ -104,7 +104,8 @@ and TR switch). Each cell is SWR, readings and time:
 | Model tuner, 100 Ω | 1.08 | 1.18 | 1.21 | — | 1.42 |
 | Model tuner, 200 Ω | 1.21 | 1.06 | 1.6–2.0 | 5.1 | 1.30 |
 
-- **Memory:** a re-tune takes 1 reading (0.2 s), and band changes re-apply stored settings.
+- **Memory:** band changes re-apply stored settings. (At this commit a re-tune read the
+  stored setting first and took 1 reading; stage F made every tune a fresh search.)
 - **Trade-off:** a first tune takes 3–6 s, against 0.7 s for the model tuner on 80/40 m. In
   return there is no characterisation and no calibration, results are better on 20 and 15 m,
   and repeat tunes come from memory.
@@ -122,7 +123,30 @@ and TR switch). Each cell is SWR, readings and time:
 - Power handling and contact life at 100 W are untested.
 - Switching relays with the carrier on at 2 W would cut a reading to about 40 ms; that is a
   relay-wear decision.
-- Stage F: the Kenwood `AC` command and a status line.
+
+### Stage F done (2026-11-15): button 16, the home screen and `AC`
+Asked for by the user: L and C on the home screen, settings that are antenna-specific, and a
+tune button that retunes and stores the result.
+
+| Commit | What |
+|---|---|
+| `02700ef` | A tune always searches: the stored setting is already applied when a band or antenna is selected, so the memory-first step only kept what was on the relays. "Forget band" → "Forget band/antenna". |
+| `6e0d3cc` | Front-panel button 16 (`SPARE` → `ATU_TUNE_BUTTON`) starts a retune; any button stops it. |
+| `2c39d77` | Two lines right of SWR/PWR: `ATU BYP`, or topology and nominal µH/pF; `TUNING n…` in yellow; refusals and failures in red for 3 s. |
+| `cbee6ec` | Kenwood `AC P1P2P3;`: start/stop tuning, network in/thru. |
+
+- **Per-antenna settings** already existed (stage D, 13 bands × 4 antennas). Stage F adds a test
+  that a tune on one antenna leaves the others' entries alone.
+- **Bench (KI3P prototype, 200 Ω, 2026-11-15):**
+  - The screen showed `CL 0.15uH` / `110pF` for the stored 10 m setting (CL L3 C9).
+  - Button 16 showed `TUNING` with the count, then the result. A second press aborted the
+    tune.
+  - Retunes over `AC001;`: 10 m 42 readings / 3.7 s → SWR 1.30, and 20 m 68 readings / 6.0 s →
+    SWR 1.25. Both found the same settings as before, so the screen didn't change.
+  - 20 → 40 → 20 m recalled each band's setting.
+  - Button 16 in Digital mode showed `TUNE` / `MODE` in red.
+  - Antenna 1 on 20 m showed `ATU BYP`, and antenna 0 its stored setting again.
+- **Build:** RAM1 free for local variables is 14.2 KB with `ATU_PRESENT` and 16.5 KB without.
 
 ## Why the report proposed a model (superseded)
 - **SWR alone can't identify a setting.** One |Γ| reading puts the antenna on a circle of
@@ -233,7 +257,8 @@ Stages B (engine) and D (memory) carry over to `ATU_search`.
     change seen while keyed is applied on the return to receive. Manual changes survive tuning
     steps.
   - **In a tune:** a stored setting within 1 % of the frequency is read first and kept if it is
-    within 0.1 of its stored SWR and within 1.5. Each tune stores its result.
+    within 0.1 of its stored SWR and within 1.5. Each tune stores its result. *(Removed in
+    stage F: every tune is now a fresh search.)*
   - **Menu:** Tune, Save to memory, Forget band, Auto-apply memory, Tune power. **CAT** `AX5;`
     forgets an entry.
   - **Bench (200 Ω):** stored settings re-applied on 80 ↔ 40 m changes, a manual bypass survived

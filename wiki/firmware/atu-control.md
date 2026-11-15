@@ -81,15 +81,56 @@ relay state held through RX→TX→RX and a band change up and back.
 
 ## Automatic tuning and memory (Phase 2)
 See [[atu-auto-tuning]] for the algorithm and the bench results. In brief:
-- **Menu:** ATU → **Tune** runs the tuner at **Tune power (W)** (default 2 W) and stores the
-  result for the band and antenna.
-- **Auto-apply memory:** stored settings are re-applied on band or antenna changes, in receive
-  only.
-- **Memory items:** **Save to memory** stores a manual setting; **Forget band** clears one.
+- **Selecting a band or antenna** puts the setting stored for that band and antenna on the
+  relays (**Auto-apply memory**, on by default), in receive only. With nothing stored the
+  network is bypassed. Settings are kept per band *and* antenna (13 × 4), so a setting tuned
+  on one antenna is never used on another.
+- **Tuning is always a retune:** a fresh search from bypass at **Tune power (W)** (default
+  2 W), whose result is stored for the band and antenna. It does not re-read the stored
+  setting first: that is already on the relays, and asking for a tune means it no longer
+  suits. A tune takes about 30–75 readings (3–6 s at 99 ms each).
+- **Starting a tune:**
+  - **Front-panel button 16** (`ATU_TUNE_BUTTON`, formerly `SPARE`) on the home screen.
+    Pressing any button while it runs stops it and restores the previous setting.
+  - **Menu:** ATU → **Tune**.
+  - **CAT:** `AC001;` (Kenwood) or `AX3;`.
+- **Refusals:** the tuner only starts from SSB or CW receive, on a band where transmit is
+  allowed and the SWR bridge is calibrated.
+- **Memory items:** **Save to memory** stores a manual setting; **Forget band/antenna** clears
+  one.
 - **Search:** the tuner is a measured search with no model or calibration
-  (`ATUTuneAlgo.cpp`, branch `ATU_search`). A first tune takes about 30–75 readings (3–6 s at
-  99 ms each); a re-tune from memory takes 1.
-- **CAT** (`AX` and `AY`, not Kenwood):
+  (`ATUTuneAlgo.cpp`, branch `ATU_search`).
+
+### Home screen
+With the board detected, two lines sit to the right of SWR and PWR (`DrawSWRPane`, x0 + 88;
+the pane is 170 px wide). `ATUStatusText()` in `ATUTune.cpp` builds them:
+
+| State | Shows | Colour |
+|---|---|---|
+| Network bypassed | `ATU BYP` | white |
+| Network in line | topology and **nominal** values: `CL 0.82uH` / `157pF` | white |
+| Tuning | `TUNING` / `n 23` (readings so far) | yellow |
+| 3 s after a refusal or failure | `TUNE` / `MODE`, `NO TX`, `NO CAL`, `BUSY`, `NO RF`, `ANT FAULT`, `TIMEOUT` … | red |
+| 3 s after a poor match (`ATU_FAIL_NO_MATCH`) | the setting kept | yellow |
+
+- **Nominal values:** the design values summed by `ATUNominalInductance_uH()` /
+  `ATUNominalCapacitance_pF()` (`ATUBoard.cpp`): L1–L8 = 0.05 … 8.8 µH, C1–C8 = 10 … 2000 pF.
+  A hand-wound build differs by 10–15 %, so they are a guide, not a measurement.
+
+### CAT: `AC` (Kenwood TS-480)
+| Form | Meaning |
+|---|---|
+| `AC;` | read → `AC0<P2><P3>;`: P2 = 1 if the network is in line, P3 = 1 while a tuner program runs |
+| `ACp1p2p3;` with P3 = 1 | start a retune (as button 16); `?;` if refused |
+| `ACp1p2p3;` with P3 = 0 | stop a running tune, then P2 = 0 bypasses the network, P2 = 1 puts the stored setting in line (a network already in line is left alone; nothing stored → stays bypassed) |
+
+- **P1** (RX-AT) is ignored.
+- **Errors:** `?;` when a relay change isn't allowed (transmitting) or for anything other than
+  0/1.
+- **Without `ATU_PRESENT`:** `AC;` reads `AC000;` and settings are accepted and ignored, like a
+  radio with no tuner.
+
+### CAT diagnostics (`AX` and `AY`, not Kenwood)
 
   | Command | Effect |
   |---|---|
@@ -113,7 +154,7 @@ See [[atu-auto-tuning]] for the algorithm and the bench results. In brief:
   `ATU_PRESENT`.
 - **Readback in the reply:** it goes in the reply, not through `Debug()`, because `Debug()` is
   silent in USB-audio builds (see [[cat-control]]).
-- **Reserved:** Kenwood's own tuner command, `AC`, is kept for the automatic tuner.
+- **Automatic tuner:** Kenwood's own tuner command, `AC`, drives it (above).
 - **Script:** `code/tools/atu_vna/atu_cat.py` takes the same command vocabulary as `atu.py`
   (`ALL0 IN "LM 32" "CM 16"` …). It applies each command with one `AT` write and checks
   readback = register.

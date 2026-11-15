@@ -1498,3 +1498,12 @@ failing where the model was wrong (CL above 15 MHz).
 - **CAT:** `AY` pages the readings. `AX1`, `AX4` and `AX6`–`AX9` are gone.
 
 Details in [[atu-auto-tuning]]; CAT table in [[atu-control]].
+
+## [2026-11-15] decision | ATU stage F: button 16 retunes, status on the home screen, Kenwood AC
+The user asked for L and C beside SWR/PWR, antenna-specific settings, and button 16 (SPARE) to
+tune and store. The stored setting is applied on band or antenna selection (stage D already
+did this per band × antenna), so a tune is now always a retune: a fresh search, with no
+memory-first step. Commits on `ATU_search`: `02700ef` (always search), `6e0d3cc` (button 16),
+`2c39d77` (display: nominal µH/pF, `TUNING n…`, red refusal reasons for 3 s), `cbee6ec`
+(Kenwood `AC`). Verified on the KI3P prototype into 200 Ω. Updated [[atu-control]] and
+[[atu-auto-tuning]].
