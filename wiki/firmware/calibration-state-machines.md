@@ -3,7 +3,7 @@ title: Calibration Sub-State-Machines (the 4 generated cal SMs)
 type: module
 status: draft
 created: 2026-06-09
-updated: 2026-11-03
+updated: 2026-11-15
 tags: [state-machine, calibration, statesmith, iq, carrier, power, sweep]
 source_refs: []
 related: ["[[overview]]", "[[hardware-state-machine]]", "[[state-machine-architecture]]", "[[iq-imbalance-correction]]", "[[tx-carrier-null]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[log-amp-power-detection]]", "[[automatic-power-swr-calibration]]"]
@@ -53,6 +53,32 @@ STANDBY ──AUTO──▶ BAND_ADJUST            // set up the current band's 
 
 This is the narrowing **coordinate-descent sweep** documented in detail (the amp/phase passes)
 in [[iq-imbalance-correction]]; the carrier version sweeps `DCOffsetI`/`DCOffsetQ` instead.
+
+**A pass with no valid reading keeps its setting.** READ keeps a value only if it beats the
+running best, which starts each pass at 0 dB. Each pass now also starts its "best parameter"
+at the setting it sweeps around (`AdjustRXIQCalSetting` & co., at `step == 0`), so a pass in
+which no reading beats 0 dB (a broken or mirrored loopback) leaves the setting alone. Before
+2026-11-15 such a pass wrote the best value of the *previous* pass (a phase into the amplitude
+or vice versa, e.g. amplitude −0.049), silently corrupting every band.
+
+**Leaving with HOME.** HOME on the Receive IQ or Transmit IQ screen calls
+`AbortRXIQCalibration()` / `AbortTXIQCalibration()` / `AbortTXCarrierCalibration()` before
+saving. If an automatic run is in progress (state not `STANDBY`), the band being swept gets back
+the settings it had when the run reached it (snapshotted in `Adjust*Band`), bands already
+completed keep their results, and the TX runs queue the `iPTT_RELEASED` they owe. ModeSm's
+`CALIBRATE_TX_IQ_MARK` handles `CALIBRATE_EXIT` itself, so HOME with the PTT held also returns
+the mode machine to receive. `TXIQCalibrationAutoActive()` / `RXIQCalibrationAutoActive()`
+report whether a run is in progress.
+
+**Single vs dual VFO.** Only Transmit IQ differs. Dual-VFO boards loop the TX back into the
+receiver (`RFCalTransmitIQ`, 31.5 dB) and measure IRR/dBc themselves; button 16 runs the sweep,
+and on `DIRECT_COUPLED_TX` builds button 14 the carrier null. Single-VFO boards
+(`RFCalTransmitIQSingleVFO`) transmit through the PA to the antenna connector, read nothing,
+and are adjusted by hand against an external analyser; every key-down applies the screen's
+attenuation (`GetTXIQAttenuation()`, starts at 31.5 dB), and buttons 14/16 do nothing.
+
+The operator's procedure for all of this is the calibration guide,
+`code/docs/CalibrationGuide/Calibration_Guide.html`.
 
 ## PowerCalSm is different: curve fitting, not minimum-finding
 

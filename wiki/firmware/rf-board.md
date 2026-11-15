@@ -3,7 +3,7 @@ title: RF Board & Si5351 Quadrature VFO (RFBoard)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-03
+updated: 2026-11-15
 tags: [rf, si5351, vfo, quadrature, attenuator, tr-switch, hardware-abstraction]
 source_refs: [sources/t41-ep-schematics]
 related: ["[[overview]]", "[[rf-board-electronics]]", "[[tune-frequency-control]]", "[[hardware-state-machine]]", "[[filter-boards]]", "[[ssb-phasing-method]]", "[[iq-quadrature-sampling]]", "[[iq-imbalance-correction]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[t41-ep-schematics]]"]
@@ -81,7 +81,11 @@ used a `_dHz`/"decihertz" naming, which was a misnomer; all uses have since been
 agree (0 `_dHz` / 46 `_cHz` occurrences in `code/src/PhoenixSketch/`).
 
 `SetFrequencyCorrectionFactor()` applies the crystal ppb correction (from frequency
-calibration, [[hardware-state-machine]]) via the Si5351 `set_correction`.
+calibration, [[hardware-state-machine]]). It resets and re-initialises the Si5351, which leaves
+every output without a frequency, so it calls `ResetVFOState()` first: all three cached VFO
+frequencies, the multiples and `pllbOwner` are cleared, and the next `Set*VFOFrequency` call
+reprograms the chip even at an unchanged frequency. Until 2026-11-15 only the RX cache was
+cleared, so the TX/CW LO could stay off after a frequency calibration until the frequency moved.
 
 ## Other hardware controls
 - **Step attenuators** — independent TX and RX, **0–31.5 dB in 0.5 dB steps**, clamped/rounded

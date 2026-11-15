@@ -1542,3 +1542,37 @@ the test `ATUTuneAlgoTest.DocFigureData` (skipped unless `ATU_DOC_DIR` is set), 
 each reading with `ATUTuneAlgoPhase()`. Also committed: the user's re-laid-out `ModeSm.drawio`
 and `UISm.drawio` (the generated code is unchanged) and the regenerated `ModeSm.sim.html`,
 which now has the ATU states. See [[atu-control]].
+
+## [2026-11-15] doc | Calibration guide for builders, and the calibration fixes it needed
+Added `code/docs/CalibrationGuide/Calibration_Guide.html`: a step-by-step operator's guide to
+calibrating a finished radio, in order (frequency → receive IQ → transmit IQ → power and SWR →
+S-meter), with the equipment for each step, a front-panel button map per screen (inline SVG
+from `make_button_maps.py`) and simulator screenshots (`make_screenshots.sh`, which runs the new
+`calguide_screenshots` target and `autocal_screenshots`). It covers single- and dual-VFO RF
+boards: only Transmit IQ differs (dual: internal loop and button 16; single: by hand against an
+external analyser). Linked from the README.
+
+Firmware fixes made first, each with unit tests:
+- Frequency calibration reset the Si5351 but cleared only the RX VFO cache, so the TX/CW LO
+  could stay off until the frequency moved; it now calls `ResetVFOState()` ([[rf-board]]).
+- HOME while keyed in Transmit IQ left ModeSm in calibration: `CALIBRATE_TX_IQ_MARK` now handles
+  `CALIBRATE_EXIT` (ModeSm.drawio regenerated). HOME also stops a running automatic RX IQ, TX IQ
+  or carrier-null run, restores the band in progress and releases the PTT the run engaged.
+- Single-VFO Transmit IQ keyed at 0 dB attenuation first, then at 31.5 dB whatever the screen
+  said; it now starts at 31.5 dB and every key-down applies the screen's value.
+- Button 14 (carrier null, `DIRECT_COUPLED_TX`) now needs a dual-VFO radio.
+- A sweep pass with no reading above 0 dB wrote the previous pass's best value (e.g. amplitude
+  −0.049) into every band; each pass now starts from the setting it sweeps around.
+- The Receive IQ screen's "Current Band" pane did not redraw on Band +/− when the bands had
+  equal settings (as on an uncalibrated radio), so it showed the old band.
+See [[calibration-state-machines]].
+
+Simulator: the RX IQ test tone and the TX loopback were mirrored relative to the firmware, so
+both automatic IQ runs failed in simulation (Delta/IRR about −26 dB). The user confirmed the
+automatic IQ calibration works on hardware, so the simulator was corrected: RX IQ now uses the
+`RXIQ_USB` tone, and the mock's TX loopback no longer swaps I and Q. Both runs now converge
+(RX amplitude ≈ 1.11, Delta 52–65 dB; TX amplitude ≈ 0.906, IRR 71–76 dB).
+
+Observed, not changed: the Transmit IQ automatic run starts from the band on the screen
+(the band buttons call `SetTXIQCurrentBand`), whereas Receive IQ always does every band. The
+guide tells the operator to select 160 m first.

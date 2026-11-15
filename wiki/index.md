@@ -52,7 +52,7 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[ui-state-machine]] — UISm: splash→home→menu stack + tool screens (DFE/EQ/BIT/cal) (generated). *(draft)*
 - [[tune-frequency-control]] — Tune.cpp: frequency math (Fs/4 shift, fine tune, CW offset) + PA power-cal math (shaped-tanh curve, Levenberg–Marquardt fit). Not a state machine. *(draft)*
 - [[hardware-state-machine]] — HardwareSm (hand-written) maps mode→RF/tune hardware; drives 4 cal sub-machines. *(draft)*
-- [[calibration-state-machines]] — the 4 generated cal SMs: 3 identical minimize-sweeps + PowerCalSm (MANUAL curve-fit + AUTO branch). *(draft)*
+- [[calibration-state-machines]] — the 4 generated cal SMs: 3 identical minimize-sweeps + PowerCalSm (MANUAL curve-fit + AUTO branch); HOME aborts, single vs dual VFO; operator guide in `code/docs/CalibrationGuide/`. *(draft)*
 - [[automatic-power-swr-calibration]] — V1.5.0: one session calibrates the PA curve, SSB gain and SWR bridge on 160–6 m from a load, an open and a short (+ 0/2/8 wattmeter readings per band); main-loop service keys the radio; validated on two radios. *(stable)*
 - [[built-in-test]] — startup I²C presence self-test (BIT struct → status screen). *(draft)*
 

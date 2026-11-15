@@ -3,7 +3,7 @@ title: I/Q Imbalance Correction & Image Rejection
 type: concept
 status: draft
 created: 2026-06-08
-updated: 2026-07-29
+updated: 2026-11-15
 tags: [iq, imbalance, image-rejection, calibration, amplitude, phase, sample-rate]
 source_refs: []
 related: ["[[theory-overview]]", "[[iq-quadrature-sampling]]", "[[ssb-phasing-method]]", "[[hardware-state-machine]]", "[[dsp-chain]]", "[[persistent-config]]", "[[sample-rate-switching]]"]
@@ -108,7 +108,9 @@ amplitude (even iterations) and phase (odd):
 | Fine | 4, 5 | 0.001 / 0.001 | ± steps about the medium optimum |
 
 Each pass **re-centers** on the previous optimum (`center[nextIndex] = maxSBS_parameter`,
-line 154) and shrinks the step — a classic narrowing grid/coordinate descent. During the
+line 154) and shrinks the step — a classic narrowing grid/coordinate descent. A pass keeps
+only readings above 0 dB, and starts from the setting it sweeps around, so a pass in which
+nothing beats 0 dB leaves the setting unchanged ([[calibration-state-machines]]). During the
 search, measurements are IIR-smoothed (0.5/0.5) to fight noise; a final un-smoothed
 measurement is taken at the optimum (line 198-204). The machine **auto-advances through all
 bands** (`AdjustRXIQBand`, line 112), ~60 ms acquisition per point (line 98).
