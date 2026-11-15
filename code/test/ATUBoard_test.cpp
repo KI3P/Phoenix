@@ -279,7 +279,7 @@ TEST_F(ATUMenuTest, MenuIsLastPrimaryEntryWithTheSimpleItems) {
     EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].length, (size_t)ATU_MENU_ITEMS);
     EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Bypass ATU");
     EXPECT_STREQ(ATUOptions[ITEM_TABLE].label, "Tuning status table");
-    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 0");
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, ant 0");
     EXPECT_STREQ(ATUOptions[ITEM_TUNE].label, "Tune");
     EXPECT_STREQ(ATUOptions[ITEM_POWER].label, "Tune power (W)");
     EXPECT_EQ(ATUOptions[ITEM_POWER].varPam->variable, &ED.ATU_TunePower_W);
@@ -308,7 +308,7 @@ TEST_F(ATUMenuTest, BypassAndEnableArePerAntenna) {
     ED.antennaSelection[ED.currentBand[ED.activeVFO]] = 2;
     ATUMenuRefreshLabels();
     EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Enable ATU");
-    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 2");
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, ant 2");
 }
 
 TEST_F(ATUMenuTest, OutputSwitchesTheBalunRelayForThisAntenna) {
@@ -347,7 +347,7 @@ TEST_F(ATUMenuTest, ClearNeedsASecondPressAndClearsOnlyThisAntenna) {
     EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
     EXPECT_FALSE(ATUMemoryGet(BAND_40M, 0, NULL, NULL, NULL));
     EXPECT_TRUE(ATUMemoryGet(BAND_20M, 1, NULL, NULL, NULL));
-    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 0");
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, ant 0");
 }
 
 TEST_F(ATUMenuTest, MovingOffOrWaitingCancelsAClear) {

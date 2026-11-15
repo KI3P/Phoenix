@@ -643,7 +643,7 @@ void ATUMenuRefreshLabels(void){
     if (atuClearArmed)
         snprintf(atuClearLabel, sizeof(atuClearLabel), "Press again to clear");
     else
-        snprintf(atuClearLabel, sizeof(atuClearLabel), "Clear memory, antenna %ld", (long)ant);
+        snprintf(atuClearLabel, sizeof(atuClearLabel), "Clear memory, ant %ld", (long)ant);
     snprintf(atuOutputLabel, sizeof(atuOutputLabel), "Output: %s", ATUAntennaBalun(ant) ? "balun" : "coax");
 }
 
