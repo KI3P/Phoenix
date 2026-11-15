@@ -37,12 +37,15 @@ If not, see <https://www.gnu.org/licenses/>.
  *      L, then a short descent from the previous L's best C), and stop once that
  *      valley floor has risen twice. The elements step by about 2.3x in value, so
  *      the single-element codes are a log-spaced grid whatever the coils' values.
- *   4. Refine from the lowest point of the better topology's valley: pattern search
- *      in code space. Read the four steps along the axes; if none gains, the four
- *      diagonals; move to the best that gains, then keep going the same way with a
- *      doubling step while that gains. When nothing gains, halve both steps. The
- *      steps start at half each code's top set bit (2 for a code below 8). If that
- *      ends short of the target, refine from the other topology's valley too.
+ *   4. Refine from the lowest point of a valley: pattern search in code space. Read
+ *      the four steps along the axes; if none gains, the four diagonals; move to the
+ *      best that gains, then keep going the same way with a doubling step while that
+ *      gains. When nothing gains, halve both steps. The steps start at half each
+ *      code's top set bit (2 for a code below 8).
+ *      If LC's valley already reaches the target SWR, it is refined at once, and CL
+ *      is walked only if that ends short of the target. Otherwise both valleys are
+ *      walked and the lower one refined first; the other is refined too if the first
+ *      ends short of the target.
  *   5. Stop at SRCH_GOOD_SWR, when refining is done, or after SRCH_MAX_READINGS, and
  *      leave the best setting read. Store it.
  *
@@ -109,6 +112,7 @@ static struct {
     uint32_t seed[2];               // lowest point of each topology's valley
     float seedG[2];
     bool refined[2];
+    bool walked[2];
 
     // Refine
     uint8_t l, c, sL, sC;
@@ -349,11 +353,19 @@ static ATUStep TuneNext(ATUTuneRecord *rec){
                     break;
                 }
                 // End of this topology's walk
+                srch.walked[srch.topo] = true;
                 if (srch.topo == 0){
-                    StartWalk(1);
+                    // A valley that already reaches the target: refine it before walking CL
+                    if (srch.seedG[0] <= SwrToGamma(SRCH_TARGET_SWR)) StartRefine(0);
+                    else StartWalk(1);
                     break;
                 }
-                StartRefine((srch.seedG[1] < srch.seedG[0]) ? 1 : 0);
+                if (srch.refined[0]){
+                    if (srch.seedG[1] < 1.0f) StartRefine(1);
+                    else return DoneBest(rec);
+                } else {
+                    StartRefine((srch.seedG[1] < srch.seedG[0]) ? 1 : 0);
+                }
                 break;
             }
             case S_REFINE:{
@@ -406,12 +418,16 @@ static ATUStep TuneNext(ATUTuneRecord *rec){
                     srch.sC = (srch.sC > 1) ? (uint8_t)(srch.sC >> 1) : 1;
                     srch.group = 0;
                 } else {
-                    // Refined as far as it goes. Try the other topology if short of the target.
+                    // Refined as far as it goes. Short of the target, try the other topology.
                     float best;
                     BestRead(rec, &best);
+                    if (best <= SwrToGamma(SRCH_TARGET_SWR)) return DoneBest(rec);
+                    if (!srch.walked[1]){
+                        StartWalk(1);
+                        break;
+                    }
                     uint8_t other = srch.topo ? 0 : 1;
-                    if ((best > SwrToGamma(SRCH_TARGET_SWR)) && !srch.refined[other] &&
-                        (srch.seedG[other] < 1.0f)){
+                    if (!srch.refined[other] && (srch.seedG[other] < 1.0f)){
                         StartRefine(other);
                         break;
                     }

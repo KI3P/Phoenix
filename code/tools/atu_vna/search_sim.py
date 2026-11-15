@@ -9,10 +9,11 @@ fitted model (tuning_sim.Build, every setting of both topologies at once), so a
 change to the search can be tried on many loads and builds in seconds before it
 is ported to the firmware. It mirrors the firmware planner:
 
-  bypass -> walk the valley in LC and CL (for each coarse L, the best coarse C;
-  stop when the valley floor has risen twice) -> pattern-search refine from the
-  better valley (axis steps, then diagonals, doubling repeats, halving) -> the
-  other valley too if still above SWR 1.5. Stop at SWR 1.2 or after the budget.
+  bypass -> walk the valley in LC (for each coarse L, the best coarse C; stop
+  when the valley floor has risen twice) -> if it reaches SWR 1.5, refine it at
+  once (pattern search: axis steps, then diagonals, doubling repeats, halving)
+  -> otherwise, or if that ends above 1.5, walk CL and refine the lower valley
+  not yet refined, then the other. Stop at SWR 1.2 or after the budget.
 
 80-15 m are scored against the best setting of each simulated build. On 10 m that
 best usually relies on the largest elements far past resonance, where the model is
@@ -150,10 +151,20 @@ def tune(read):
     g = read("BY", 0, 0)
     if g <= BYPASS_OK or g > FAULT:
         return
-    seeds = sorted(walk(read, t) for t in ("LC", "CL"))
-    refine(read, *seeds[0][1:])
-    if read.best()[1] > TARGET and seeds[1][0] < 1.0:
-        refine(read, *seeds[1][1:])
+    first = walk(read, "LC")
+    if first[0] <= TARGET:
+        refine(read, *first[1:])
+        if read.best()[1] <= TARGET:
+            return
+    second = walk(read, "CL")
+    for sd in sorted([first, second]):
+        if sd is first and first[0] <= TARGET:
+            continue                            # already refined
+        if sd[0] >= 1.0:
+            return
+        refine(read, *sd[1:])
+        if read.best()[1] <= TARGET:
+            return
 
 
 def run(sigma, leak_hf, leak_10m, budget=120, seed=1, show_bad=False):

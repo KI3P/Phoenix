@@ -654,7 +654,7 @@ TEST_F(ATUTuneAlgoTest, TunesOtherBuildsCloseToTheirBestOnEveryBand) {
     //
     // The limits hold the performance this search reached when it was written
     // (5 % build: 50/51 reachable loads within SWR 1.5, 90th percentile shortfall
-    // 0.18; 12 % build with a leaky bridge: 46/51, 0.56; median 58-60 readings),
+    // 0.18; 12 % build with a leaky bridge: 46/51, 0.56; median 55-56 readings),
     // so a change that makes it worse fails here.
     struct Variant { const char *name; double sigma; float leakHF, leak10m; float minReached, maxP90; };
     const Variant variants[] = {{"5 % build, no leak", 0.05, 0.0f, 0.0f, 0.9f, 0.3f},
