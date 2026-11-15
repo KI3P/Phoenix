@@ -3463,3 +3463,14 @@ TEST(CAT, StrayNewlineTerminatedBytesAreDiscarded) {
     ED.centerFreq_Hz[VFO_A] = savedFreq;
     ED.currentBand[VFO_A] = savedBand;
 }
+
+TEST(CAT, ACWithoutTheTunerAnswersLikeARadioWithNoTuner) {
+    // Kenwood's antenna tuner command: a build without ATU_PRESENT reads "thru,
+    // not tuning" and accepts settings without acting on them
+    char cmd1[] = "AC;";
+    EXPECT_STREQ(command_parser(cmd1), "AC000;");
+    char cmd2[] = "AC011;";
+    EXPECT_STREQ(command_parser(cmd2), "");
+    char cmd3[] = "AC020;";
+    EXPECT_STREQ(command_parser(cmd3), "?;");
+}

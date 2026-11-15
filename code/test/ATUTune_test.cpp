@@ -730,6 +730,55 @@ TEST_F(ATUTuneAlgoTest, StatusTextShowsTheSettingAndTheTuner) {
     EXPECT_EQ(std::string(l1).substr(0, 3), "LC ");
 }
 
+TEST_F(ATUTuneAlgoTest, CatACStartsStopsAndSwitchesTheTuner) {
+    MakePlant(0.05, 12);
+    SetFrequency("FA00014200000;");
+    plantLoad = {25.0f, 60.0f};
+    SetATUPacked(ATU_PACKED_BYPASS);
+    EXPECT_EQ(Cat("AC;"), "AC000;");
+    // P3 = 1 starts a retune, reported as tuning; P3 = 0 stops it
+    EXPECT_EQ(Cat("AC001;"), "");
+    EXPECT_TRUE(ATUTuneActive());
+    EXPECT_EQ(Cat("AC;"), "AC001;");
+    ASSERT_TRUE(RunUntilKeyed());
+    EXPECT_EQ(Cat("AC000;"), "");
+    EXPECT_FALSE(ATUTuneActive());
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_ABORTED);
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    ExpectBackInReceive();
+    // P2 = 1 with nothing stored: stays thru
+    ATUMemoryForget(BAND_20M, 0);
+    EXPECT_EQ(Cat("AC010;"), "");
+    EXPECT_EQ(Cat("AC;"), "AC000;");
+    // P2 = 1 puts the stored setting in line; P2 = 0 bypasses, keeping the memory
+    const uint32_t stored = ATU_PACK(1, 0, 1, 0x12, 0x34);
+    ATUMemoryStore(BAND_20M, 0, stored, 14200, 1.3f);
+    EXPECT_EQ(Cat("AC010;"), "");
+    EXPECT_EQ(GetATURegisterState(), stored);
+    EXPECT_EQ(Cat("AC;"), "AC010;");
+    // ...but leaves a network already in line alone
+    const uint32_t manual = ATU_PACK(1, 0, 0, 3, 3);
+    SetATUPacked(manual);
+    EXPECT_EQ(Cat("AC110;"), "");
+    EXPECT_EQ(GetATURegisterState(), manual);
+    EXPECT_EQ(Cat("AC000;"), "");
+    EXPECT_FALSE(ATU_PACKED_NET(GetATURegisterState()));   // network out (L/C relays as they were)
+    uint32_t s;
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, &s, NULL, NULL));
+    // Refused tune and malformed commands
+    ED.SWR_CalLevel[BAND_20M] = 0;
+    EXPECT_EQ(Cat("AC011;"), "?;");
+    ED.SWR_CalLevel[BAND_20M] = 1;
+    EXPECT_EQ(Cat("AC200;"), "?;");
+    EXPECT_EQ(Cat("AC0x0;"), "?;");
+    // Not while transmitting
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    EXPECT_EQ(Cat("AC010;"), "?;");
+    EXPECT_FALSE(ATU_PACKED_NET(GetATURegisterState()));
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+    ExpectBackInReceive();
+}
+
 TEST_F(ATUTuneAlgoTest, AbortMidSearchUnkeysAndRestoresTheOperatorSetting) {
     MakePlant(0.05, 5);
     SetFrequency("FA00014200000;");

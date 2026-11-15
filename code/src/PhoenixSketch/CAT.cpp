@@ -100,6 +100,8 @@ char *EQ_write( char* cmd );
 char *EQ_read(  char* cmd );
 char *FL_write( char* cmd );
 char *FL_read(  char* cmd );
+char *AC_write( char* cmd );
+char *AC_read(  char* cmd );
 char *AT_write( char* cmd );
 char *AT_read(  char* cmd );
 char *AX_write( char* cmd );
@@ -125,9 +127,10 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 38
+#define NUM_SUPPORTED_COMMANDS 39
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
+        { "AC", 3+3,3, AC_write, AC_read },  // antenna tuner: TX-AT in/thru, start/stop tuning
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
         { "AI", 3+1,3, AI_write, AI_read },  //auto information
         { "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
@@ -1171,6 +1174,66 @@ char *XA_read( char* cmd ){
 }
 
 /**
+ * CAT command AC - set the antenna tuner (Kenwood TS-480 "AC P1 P2 P3;")
+ *
+ *   P1 RX-AT: ignored (Phoenix's tuner is in line for receive and transmit alike)
+ *   P2 TX-AT: 0 = thru (bypass the network), 1 = in (the stored setting for this
+ *      band and antenna; left alone if the network is already in line)
+ *   P3 tuning: 1 = start a retune (as front-panel button 16), 0 = stop one
+ *
+ * With P3 = 1, P2 is not acted on: the tuner decides whether the network ends up in
+ * line. With P3 = 0 a running tune is stopped first, then P2 applies. Without
+ * ATU_PRESENT it is accepted and does nothing, as on a radio with no tuner.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success; "?;" for a malformed command, a tune that was
+ *         refused, or a relay change that is not allowed now (transmitting)
+ */
+char *AC_write( char* cmd ){
+    for( int i = 2; i < 5; i++ ){
+        if( cmd[i] != '0' && cmd[i] != '1' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+#ifdef ATU_PRESENT
+    if( cmd[4] == '1' ){
+        if( ATUTuneStart( ATU_PROG_TUNE ) == ATU_OK ) return empty_string_p;
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    if( ATUTuneActive() ) ATUTuneAbort();
+    if( !ATUChangeAllowed() ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    if( cmd[3] == '0' ){
+        if( ATUNetworkEngaged() ) ATUBypassNetwork();
+    } else if( !ATUNetworkEngaged() ){
+        uint32_t s;
+        if( ATUMemoryGet( ATUCurrentBand(), ATUCurrentAntenna(), &s, NULL, NULL ) )
+            SetATUPacked( s );
+    }
+#endif
+    return empty_string_p;
+}
+
+/**
+ * CAT command AC - read the antenna tuner (Kenwood TS-480)
+ * @param cmd CAT command string
+ * @return "AC0<P2><P3>;": P2 1 if the network is in line, P3 1 while a tuner
+ *         program runs. "AC000;" without ATU_PRESENT.
+ */
+char *AC_read( char* cmd ){
+#ifdef ATU_PRESENT
+    sprintf( obuf, "AC0%d%d;", ATUNetworkEngaged() ? 1 : 0, ATUTuneActive() ? 1 : 0 );
+#else
+    sprintf( obuf, "AC000;");
+#endif
+    return obuf;
+}
+
+/**
  * CAT command AT - set every ATU relay at once (non-standard Kenwood command)
  *
  * Format "ATnbsLLLCCC;":
@@ -1180,8 +1243,8 @@ char *XA_read( char* cmd ){
  *   LLL inductor mask 000-255, bit k = L(k+1) in series (K1-K8)
  *   CCC capacitor mask 000-255, bit k = C(k+1) connected (K9-K16)
  * "AT000000000;" returns the tuner to its safe state. The expanders are written
- * once, after the whole state is set. Kenwood's own tuner command, AC, is left
- * for the automatic tuner.
+ * once, after the whole state is set. Kenwood's own tuner command, AC, drives
+ * the automatic tuner.
  *
  * @param cmd CAT command string
  * @return Empty string on success; "?;" for a malformed command, a mask above
