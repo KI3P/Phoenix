@@ -14,7 +14,7 @@
 #ifndef BUILDINFO_H
 #define BUILDINFO_H
 
-#define GIT_COMMIT_HASH "421815e"
+#define GIT_COMMIT_HASH "abe7327"
 #define BUILD_TIMESTAMP "2026-11-15 08:33:42"
 
 #endif // BUILDINFO_H

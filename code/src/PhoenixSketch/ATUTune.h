@@ -50,9 +50,9 @@ If not, see <https://www.gnu.org/licenses/>.
 // Timing (ms)
 #define ATU_TR_SETTLE_MS        30      // T/R relay, on entering ATU_TUNE_SPACE
 #define ATU_RELAY_SETTLE_MS     15      // ATU relays (HF41F operate time <= 10 ms)
-#define ATU_CARRIER_SETTLE_MS   25      // carrier on to the first bridge reading
-#define ATU_COLLECT_MIN_MS      60      // collect for at least this long...
-#define ATU_COLLECT_MIN_SAMPLES 5       // ...and at least this many bridge readings
+#define ATU_CARRIER_SETTLE_MS   15      // carrier on to the first bridge reading
+#define ATU_COLLECT_MIN_MS      40      // collect for at least this long...
+#define ATU_COLLECT_MIN_SAMPLES 4       // ...and at least this many bridge readings
 #define ATU_COLLECT_TIMEOUT_MS  300     // give up on a reading after this long keyed
 #define ATU_TUNE_TIMEOUT_MS     20000   // whole program (a search is at most 120 readings)
 #define ATU_MIN_FWD_W           0.1f    // below this the reading is not valid
