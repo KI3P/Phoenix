@@ -60,6 +60,11 @@ static int8_t iteration = 0;
 static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static int32_t currentBand = -1;
+// The band the automatic run is working on, and its offsets before the run
+// started on it, so that an aborted run can put them back
+static int32_t savedBand = -1;
+static int32_t savedI = 0;
+static int32_t savedQ = 0;
 
 /**
  * @brief Calculate parameter value for given iteration and step
@@ -104,10 +109,27 @@ void ResetTXCarrierCalBand(void){
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
     currentBand = FIRST_BAND;
+    savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
     iteration = 0;
     maxDBC = 0;
+}
+
+/**
+ * @brief Stop an automatic carrier null run, if one is in progress
+ * @note Restores the I/Q offsets of the band being swept and releases the PTT
+ *       the run engaged. Bands already completed keep their new values.
+ */
+void AbortTXCarrierCalibration(void){
+    if (txcarrSM.state_id != TransmitCarrierCalSm_StateId_STANDBY){
+        if ((savedBand >= FIRST_BAND) && (savedBand <= LAST_BAND) && !bandCompleted[savedBand]){
+            ED.DCOffsetI[savedBand] = savedI;
+            ED.DCOffsetQ[savedBand] = savedQ;
+        }
+        SetInterrupt(iPTT_RELEASED);
+    }
+    InitializeTXCarrierCalibration();
 }
 
 void AdjustTXCarrierBand(void){
@@ -130,6 +152,12 @@ void AdjustTXCarrierBand(void){
     UpdateRFHardwareState();
 
     Debug(String("Calibrating TX Carrier band ") + String(bands[currentBand].name));
+    // Remember this band's offsets in case the run is aborted
+    if (savedBand != currentBand){
+        savedBand = currentBand;
+        savedI = ED.DCOffsetI[currentBand];
+        savedQ = ED.DCOffsetQ[currentBand];
+    }
     // Start by setting the Q offset to 0
     ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = 0;
     // Go to find minimum loop

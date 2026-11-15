@@ -93,6 +93,8 @@ static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm);
 
 static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm);
 
+static void CALIBRATE_TX_IQ_MARK_calibrate_exit(ModeSm* sm);
+
 static void CALIBRATE_TX_IQ_MARK_do(ModeSm* sm);
 
 static void CALIBRATE_TX_IQ_MARK_ptt_released(ModeSm* sm);
@@ -377,6 +379,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             switch (event_id)
             {
                 case ModeSm_EventId_DO: CALIBRATE_TX_IQ_MARK_do(sm); break;
+                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_TX_IQ_MARK_calibrate_exit(sm); break;
                 case ModeSm_EventId_PTT_RELEASED: CALIBRATE_TX_IQ_MARK_ptt_released(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
@@ -1243,6 +1246,27 @@ static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm)
 static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm)
 {
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
+}
+
+static void CALIBRATE_TX_IQ_MARK_calibrate_exit(ModeSm* sm)
+{
+    // CALIBRATE_TX_IQ_MARK behavior
+    // uml: CALIBRATE_EXIT TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_TX_IQ_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATION_STATES.<ExitPoint>(done)`.
+        // CALIBRATION_STATES.<ExitPoint>(done) is a pseudo state and cannot have an `enter` trigger.
+        
+        // Finish transition by calling pseudo state transition function.
+        CALIBRATION_STATES_ExitPoint_done__transition(sm);
+        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+    } // end of behavior for CALIBRATE_TX_IQ_MARK
+    
+    // No ancestor handles this event.
 }
 
 static void CALIBRATE_TX_IQ_MARK_do(ModeSm* sm)

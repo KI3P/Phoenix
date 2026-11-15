@@ -814,6 +814,8 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_RX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Stop an automatic run, putting back the band it was sweeping
+                    AbortRXIQCalibration();
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -856,6 +858,11 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Stop an automatic run, putting back the band it was sweeping
+                    // and releasing the PTT it engaged. Leaving while the PTT is
+                    // held is handled by the mode state machine.
+                    AbortTXIQCalibration();
+                    AbortTXCarrierCalibration();
                     RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);

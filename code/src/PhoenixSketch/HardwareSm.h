@@ -226,6 +226,8 @@ void RetryPowerCal(void);
 
 // Receive IQ calibration routines
 void InitializeRXIQCalibration(void);
+void AbortRXIQCalibration(void);
+bool RXIQCalibrationAutoActive(void);
 void ResetRXIQCalBand(void);
 void AdjustRXIQBand(void);
 void ResetRXIQCalSettings(void);
@@ -235,6 +237,9 @@ void UpdateRXDeltaVal(void);
 float32_t GetRXDeltaVals(int32_t band);
 void InitializeTXIQCalibration(void);
 void InitializeTXCarrierCalibration(void);
+void AbortTXIQCalibration(void);
+bool TXIQCalibrationAutoActive(void);
+void AbortTXCarrierCalibration(void);
 float32_t GetTXDeltaVals(int32_t band);
 float32_t GetTXCarrierVals(int32_t band);
 void SetTXIQCurrentBand(int32_t band);

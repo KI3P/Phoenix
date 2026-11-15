@@ -1078,6 +1078,110 @@ TEST_F(CalibrationTest, CalibrateTransmitIQState) {
 
 }
 
+// HOME while the PTT is held in Transmit IQ calibration: the radio must leave
+// calibration and return to receive, not stay keyed in a calibration state
+TEST_F(CalibrationTest, HomeWhileKeyedInTXIQExitsToReceive) {
+    SetDualVFOs(true);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    SetInterrupt(iPTT_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    CheckThatRegisterStateIsReceive();
+}
+
+// HOME during the automatic Transmit IQ run (button 16): the run stops, the PTT
+// it engaged is released, and the band it was sweeping gets its settings back
+TEST_F(CalibrationTest, HomeDuringTXIQAutoRunRestoresBandAndUnkeys) {
+    SetDualVFOs(true);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    ED.IQXAmpCorrectionFactor[FIRST_BAND] = 1.07f;
+    ED.IQXPhaseCorrectionFactor[FIRST_BAND] = 0.03f;
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+    EXPECT_TRUE(TXIQCalibrationAutoActive());
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+
+    // Let the sweep run for a while on the first band
+    for (int k=0; k<500; k++){
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+        if (k % 20 == 0){ loop(); }
+    }
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_TRUE((ED.IQXAmpCorrectionFactor[FIRST_BAND] != 1.07f) ||
+                (ED.IQXPhaseCorrectionFactor[FIRST_BAND] != 0.03f));
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    EXPECT_FALSE(TXIQCalibrationAutoActive());
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    CheckThatRegisterStateIsReceive();
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[FIRST_BAND], 0.03f);
+
+    // The stopped run does not touch the settings any more
+    for (int k=0; k<200; k++)
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[FIRST_BAND], 0.03f);
+}
+
+// HOME during the automatic Receive IQ run (button 16): the run stops and the
+// band it was sweeping gets its settings back
+TEST_F(CalibrationTest, HomeDuringRXIQAutoRunRestoresBand) {
+    ScrollAndSelectCalibrateReceiveIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    ED.IQAmpCorrectionFactor[FIRST_BAND] = 0.93f;
+    ED.IQPhaseCorrectionFactor[FIRST_BAND] = -0.02f;
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_TRUE(RXIQCalibrationAutoActive());
+
+    for (int k=0; k<500; k++){
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+        if (k % 20 == 0){ loop(); }
+    }
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_TRUE((ED.IQAmpCorrectionFactor[FIRST_BAND] != 0.93f) ||
+                (ED.IQPhaseCorrectionFactor[FIRST_BAND] != -0.02f));
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    EXPECT_FALSE(RXIQCalibrationAutoActive());
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    EXPECT_FLOAT_EQ(ED.IQAmpCorrectionFactor[FIRST_BAND], 0.93f);
+    EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], -0.02f);
+
+    for (int k=0; k<200; k++)
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+    EXPECT_FLOAT_EQ(ED.IQAmpCorrectionFactor[FIRST_BAND], 0.93f);
+    EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], -0.02f);
+}
+
 TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 

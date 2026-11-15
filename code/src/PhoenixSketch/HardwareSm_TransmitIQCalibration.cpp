@@ -68,6 +68,11 @@ static float32_t dBcVals[NUMBER_OF_BANDS];  // Carrier suppression values for ea
 static float32_t sideband_separation = 0.0;
 static float32_t carrier_suppression = 0.0;
 static int32_t currentBand = -1;
+// The band the automatic run is working on, and its settings before the run
+// started on it, so that an aborted run can put them back
+static int32_t savedBand = -1;
+static float32_t savedAmp = 1.0f;
+static float32_t savedPhase = 0.0f;
 
 /**
  * @brief Calculate parameter value for given iteration and step
@@ -112,10 +117,32 @@ void ResetTXIQCalBand(void){
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
     currentBand = FIRST_BAND;
+    savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
     iteration = 0;
     maxSBS = 0;
+}
+
+/**
+ * @brief Stop an automatic TX IQ run, if one is in progress
+ * @note The band being swept is left with a trial amplitude or phase, so its
+ *       settings from before the run are restored. Bands already completed keep
+ *       their new values. Releases the PTT the run engaged.
+ */
+void AbortTXIQCalibration(void){
+    if (txiqSM.state_id != TransmitIQCalSm_StateId_STANDBY){
+        if ((savedBand >= FIRST_BAND) && (savedBand <= LAST_BAND) && !bandCompleted[savedBand]){
+            ED.IQXAmpCorrectionFactor[savedBand] = savedAmp;
+            ED.IQXPhaseCorrectionFactor[savedBand] = savedPhase;
+        }
+        SetInterrupt(iPTT_RELEASED);
+    }
+    InitializeTXIQCalibration();
+}
+
+bool TXIQCalibrationAutoActive(void){
+    return txiqSM.state_id != TransmitIQCalSm_StateId_STANDBY;
 }
 
 void AdjustTXIQBand(void){
@@ -138,6 +165,12 @@ void AdjustTXIQBand(void){
     UpdateRFHardwareState();
 
     Debug(String("Calibrating TXIQ band ") + String(bands[currentBand].name));
+    // Remember this band's settings in case the run is aborted
+    if (savedBand != currentBand){
+        savedBand = currentBand;
+        savedAmp = ED.IQXAmpCorrectionFactor[currentBand];
+        savedPhase = ED.IQXPhaseCorrectionFactor[currentBand];
+    }
     // Start by setting the phase to 0
     ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0f;
     // Go to find minimum loop
