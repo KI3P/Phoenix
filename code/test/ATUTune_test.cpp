@@ -467,7 +467,7 @@ TEST_F(ATUMemoryTest, MemoryAndSettingsRoundTripThroughStorage) {
     ED.ATU_AutoApply = true;
 }
 
-TEST_F(ATUMemoryTest, TuneStoresItsResultAndTheNextTuneReusesIt) {
+TEST_F(ATUMemoryTest, ARetuneSearchesAfreshAndStoresAgain) {
     MakePlant(0.05, 7);
     SetFrequency("FA00007100000;");
     plantLoad = {120.0f, -60.0f};
@@ -480,20 +480,44 @@ TEST_F(ATUMemoryTest, TuneStoresItsResultAndTheNextTuneReusesIt) {
     EXPECT_EQ(s, r->finalSetting);
     EXPECT_EQ(f, 7100);
     EXPECT_NEAR(swr, Swr(r->finalGamma), 1e-4f);
-    // Tuning again nearby: the stored setting is read first and kept
-    SetATUPacked(ATU_PACKED_BYPASS);
+    // Tuning again searches from bypass; it does not just keep the stored setting
     Cat("FA00007150000;");
+    ATUModelPrepare(&plantCache, &plantParams, 7.15e6);
     ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
     ASSERT_TRUE(Run());
-    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_OK);
-    EXPECT_EQ(ATUTuneLastRecord()->n, 1);
-    EXPECT_EQ(GetATURegisterState(), s);
-    // Far away on the band (more than 1 %), it tunes afresh
-    Cat("FA00007250000;");
-    ATUModelPrepare(&plantCache, &plantParams, 7.25e6);
+    r = ATUTuneLastRecord();
+    EXPECT_EQ(r->code, ATU_OK);
+    EXPECT_GT(r->n, 1);
+    EXPECT_EQ(r->setting[0], ATU_PACKED_BYPASS);
+    ASSERT_TRUE(ATUMemoryGet(BAND_40M, 0, &s, &f, &swr));
+    EXPECT_EQ(s, r->finalSetting);
+    EXPECT_EQ(f, 7150);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUMemoryTest, TuneOnOneAntennaLeavesTheOtherAntennasAlone) {
+    MakePlant(0.05, 8);
+    SetFrequency("FA00014200000;");
+    const uint32_t onAnt0 = ATU_PACK(1, 0, 0, 0x21, 0x05);
+    ATUMemoryStore(BAND_20M, 0, onAnt0, 14200, 1.2f);
+    ED.antennaSelection[BAND_20M] = 1;
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);   // nothing stored on antenna 1
+    plantLoad = {200.0f, 50.0f};
     ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
     ASSERT_TRUE(Run());
-    EXPECT_GT(ATUTuneLastRecord()->n, 1);
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    ASSERT_EQ(r->code, ATU_OK);
+    uint32_t s; int32_t f; float swr;
+    ASSERT_TRUE(ATUMemoryGet(BAND_20M, 1, &s, &f, &swr));
+    EXPECT_EQ(s, r->finalSetting);
+    ASSERT_TRUE(ATUMemoryGet(BAND_20M, 0, &s, &f, &swr));
+    EXPECT_EQ(s, onAnt0);                                  // antenna 0 is untouched
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 2, &s, &f, &swr));
+    // Back on antenna 0, its own setting goes on the relays
+    ED.antennaSelection[BAND_20M] = 0;
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), onAnt0);
     ExpectBackInReceive();
 }
 

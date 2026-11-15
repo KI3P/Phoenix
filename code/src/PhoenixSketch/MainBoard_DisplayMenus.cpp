@@ -723,8 +723,8 @@ void ATUMenuReset(void){
 }
 
 /**
- * Menu callback: run the automatic tuner (ATU_PROG_TUNE) at the tune power.
- * The result is stored in the memory for this band and antenna.
+ * Menu callback: retune (ATU_PROG_TUNE, a fresh search at the tune power), as
+ * front-panel button 16 does. The result is stored for this band and antenna.
  */
 void ATUMenuTune(void){
     ATUTuneStart(ATU_PROG_TUNE);
@@ -766,7 +766,7 @@ struct SecondaryMenuOption ATUOptions[11] = {
     "C mask", variableOption, &atuC, NULL, (void *)UpdateATUCapacitors,
     "Bypass all (safe)", functionOption, NULL, (void *)ATUMenuReset, NULL,
     "Save to memory", functionOption, NULL, (void *)ATUMenuSaveToMemory, NULL,
-    "Forget band", functionOption, NULL, (void *)ATUMenuForget, NULL,
+    "Forget band/antenna", functionOption, NULL, (void *)ATUMenuForget, NULL,
     "Auto-apply memory", variableOption, &atuAutoApply, NULL, NULL,
     "Tune power (W)", variableOption, &atuTunePower, NULL, NULL,
 };

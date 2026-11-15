@@ -164,9 +164,6 @@ bool ATUTuneAbortsOn(int interrupt);
 // Memory: one setting per band and antenna, in ED (ATU_State, ATU_Freq_kHz, ATU_SWR)
 ///////////////////////////////////////////////////////////////////////////////
 
-/// A stored setting is reused by a tune if within this fraction of its frequency
-#define ATU_MEMORY_FREQ_FRACTION 0.01f
-
 /**
  * @brief The stored setting for a band and antenna
  * @return false if nothing is stored (or band/antenna out of range)

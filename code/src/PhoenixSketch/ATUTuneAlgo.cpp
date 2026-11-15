@@ -24,12 +24,9 @@ If not, see <https://www.gnu.org/licenses/>.
  * beyond its relay codes: no model, no element values, no calibration. It ranks
  * settings by measured |Gamma| and keeps the best one it has read:
  *
- *   1. Memory: a setting stored for this band and antenna near this frequency is
- *      read first, and kept if it reads within 0.1 of the SWR it was stored with and
- *      within the target.
- *   2. Bypass: read with the network out. A good enough match stays bypassed; a
+ *   1. Bypass: read with the network out. A good enough match stays bypassed; a
  *      nearly total reflection (an open or a short) is an antenna fault.
- *   3. Walk the valley, in each topology (LC, then CL). An L-network's |Gamma| has
+ *   2. Walk the valley, in each topology (LC, then CL). An L-network's |Gamma| has
  *      a long, narrow valley in (L, C) that starts near small L and climbs towards
  *      the match; with C fixed, L alone usually just makes things worse, so a sweep
  *      of one element at a time misses it. Instead, for each coarse L code
@@ -37,7 +34,7 @@ If not, see <https://www.gnu.org/licenses/>.
  *      L, then a short descent from the previous L's best C), and stop once that
  *      valley floor has risen twice. The elements step by about 2.3x in value, so
  *      the single-element codes are a log-spaced grid whatever the coils' values.
- *   4. Refine from the lowest point of a valley: pattern search in code space. Read
+ *   3. Refine from the lowest point of a valley: pattern search in code space. Read
  *      the four steps along the axes; if none gains, the four diagonals; move to the
  *      best that gains, then keep going the same way with a doubling step while that
  *      gains. When nothing gains, halve both steps. The steps start at half each
@@ -46,8 +43,12 @@ If not, see <https://www.gnu.org/licenses/>.
  *      is walked only if that ends short of the target. Otherwise both valleys are
  *      walked and the lower one refined first; the other is refined too if the first
  *      ends short of the target.
- *   5. Stop at SRCH_GOOD_SWR, when refining is done, or after SRCH_MAX_READINGS, and
- *      leave the best setting read. Store it.
+ *   4. Stop at SRCH_GOOD_SWR, when refining is done, or after SRCH_MAX_READINGS, and
+ *      leave the best setting read. Store it for this band and antenna.
+ *
+ * A tune always searches. The stored setting for a band and antenna is already put
+ * on the relays when the band or antenna is selected (ATUApplyStoredIfChanged), so
+ * asking for a tune means that setting is not good enough any more: a retune.
  *
  * A setting is never read twice: every reading is in the record, and the planner
  * looks a setting up there before asking for it. An element used past its own
@@ -75,7 +76,6 @@ If not, see <https://www.gnu.org/licenses/>.
 #define SRCH_FLOOR_RISES        2       // stop walking after this many rises
 #define SRCH_SWEEP_RISES        2       // stop a C sweep after this many rises
 #define SRCH_MAX_READINGS       120     // about 13 s at today's reading time
-#define SRCH_MEMORY_SWR_MARGIN  0.1f    // keep a stored setting reading within this of its SWR
 #define SRCH_COARSE_ITEMS       9       // codes 0, 1, 2, 4, ..., 128
 
 static inline float SwrToGamma(float swr){ return (swr - 1.0f) / (swr + 1.0f); }
@@ -84,7 +84,7 @@ static inline float GammaToSwr(float g){
     return (1.0f + gc) / (1.0f - gc);
 }
 
-enum SearchPhase { S_MEMORY, S_BYPASS, S_WALK, S_REFINE, S_DONE };
+enum SearchPhase { S_BYPASS, S_WALK, S_REFINE, S_DONE };
 enum InnerMode { IN_SWEEP, IN_DESCEND };
 
 #define MAX_CAND 4
@@ -92,8 +92,6 @@ enum InnerMode { IN_SWEEP, IN_DESCEND };
 static struct {
     SearchPhase phase;
     int32_t band, antenna, f_kHz;   // where the result is stored
-    uint32_t memSetting;            // the stored setting tried first
-    float memSwr;                   // its stored SWR (0 if not measured)
 
     // Valley walk, one topology at a time
     uint8_t topo;                   // 0 = LC, 1 = CL
@@ -294,11 +292,6 @@ static void TuneBegin(ATUTuneRecord *rec, uint32_t operatorSetting, double f_Hz)
     srch.band = ATUCurrentBand();
     srch.antenna = ATUCurrentAntenna();
     srch.f_kHz = (int32_t)lround(f_Hz / 1000.0);
-    int32_t memF_kHz;
-    if (ATUMemoryGet(srch.band, srch.antenna, &srch.memSetting, &memF_kHz, &srch.memSwr) &&
-        (fabsf((float)(memF_kHz - srch.f_kHz)) <= ATU_MEMORY_FREQ_FRACTION * (float)srch.f_kHz)){
-        srch.phase = S_MEMORY;
-    }
 }
 
 static ATUStep TuneNext(ATUTuneRecord *rec){
@@ -314,15 +307,6 @@ static ATUStep TuneNext(ATUTuneRecord *rec){
     // logic error.
     for (int guard = 0; guard < 8 * ATU_MAX_READINGS; guard++){
         switch (srch.phase){
-            case S_MEMORY:{
-                if (!Lookup(rec, srch.memSetting, &g)) return Measure(srch.memSetting);
-                float swr = GammaToSwr(g);
-                bool keep = (swr <= SRCH_TARGET_SWR) &&
-                            ((srch.memSwr <= 0) || (swr <= srch.memSwr + SRCH_MEMORY_SWR_MARGIN));
-                if (keep) return Done(rec, srch.memSetting, g);
-                srch.phase = S_BYPASS;
-                break;
-            }
             case S_BYPASS:{
                 if (!Lookup(rec, ATU_PACKED_BYPASS, &g)) return Measure(ATU_PACKED_BYPASS);
                 if (g <= SwrToGamma(SRCH_BYPASS_SWR)) return Done(rec, ATU_PACKED_BYPASS, g);
