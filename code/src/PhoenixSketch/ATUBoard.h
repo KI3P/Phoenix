@@ -69,6 +69,21 @@ void SetATUCapacitors(uint8_t mask);
 uint8_t GetATUCapacitors(void);
 
 /**
+ * @brief Nominal series inductance of an inductor mask (the design values above)
+ * @param lMask As for SetATUInductors
+ * @return Sum of the selected inductors' nominal values in uH. A hand-wound build
+ *         differs by 10-15 %, so this is for display only.
+ */
+float ATUNominalInductance_uH(uint8_t lMask);
+
+/**
+ * @brief Nominal shunt capacitance of a capacitor mask (the design values above)
+ * @param cMask As for SetATUCapacitors
+ * @return Sum of the selected capacitors' nominal values in pF (display only)
+ */
+float ATUNominalCapacitance_pF(uint8_t cMask);
+
+/**
  * @brief Set inductors and capacitors together, with a single hardware update
  * @param lMask Inductor mask, as for SetATUInductors
  * @param cMask Capacitor mask, as for SetATUCapacitors

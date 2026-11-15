@@ -244,6 +244,21 @@ uint8_t GetATUCapacitors(void){
     return ATU_GPB_STATE;
 }
 
+static const float nominalL_uH[ATU_NUM_INDUCTORS] = {0.05f, 0.1f, 0.22f, 0.45f, 1.0f, 2.2f, 4.4f, 8.8f};
+static const float nominalC_pF[ATU_NUM_CAPACITORS] = {10, 22, 47, 100, 220, 470, 1000, 2000};
+
+float ATUNominalInductance_uH(uint8_t lMask){
+    float sum = 0;
+    for (int n = 0; n < ATU_NUM_INDUCTORS; n++) if (lMask & (1u << n)) sum += nominalL_uH[n];
+    return sum;
+}
+
+float ATUNominalCapacitance_pF(uint8_t cMask){
+    float sum = 0;
+    for (int n = 0; n < ATU_NUM_CAPACITORS; n++) if (cMask & (1u << n)) sum += nominalC_pF[n];
+    return sum;
+}
+
 void SetATULC(uint8_t lMask, uint8_t cMask){
     SET_ATU_L(lMask);
     SET_ATU_C(cMask);

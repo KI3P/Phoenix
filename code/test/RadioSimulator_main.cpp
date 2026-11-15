@@ -237,7 +237,7 @@ SimulatorAction processEvents() {
                     case SDLK_t: simulateButtonPress(DECODER_TOGGLE); break;
                     case SDLK_y: simulateButtonPress(DFE); break;
                     case SDLK_u: simulateButtonPress(BEARING); break;
-                    case SDLK_o: simulateButtonPress(SPARE); break;
+                    case SDLK_o: simulateButtonPress(ATU_TUNE_BUTTON); break;
                     case SDLK_h: simulateButtonPress(HOME_SCREEN); break;
 
                     // ---- Additional Buttons ----

@@ -214,6 +214,7 @@ static void Finish(ATUResultCode code, uint32_t setting){
     record.finalSetting = GetATURegisterState();
     record.active = false;
     record.elapsed_ms = millis() - eng.start_ms;
+    record.end_ms = millis();
     eng.phase = PH_IDLE;
     Debug("ATU: program " + String((int)record.program) + " ended, code " + String((int)code)
           + ", " + String(record.n) + " readings, " + String(record.elapsed_ms) + " ms");
@@ -269,6 +270,7 @@ ATUResultCode ATUTuneStart(ATUProgram program){
         if (!ATUTuneActive()){
             record.program = program;
             record.code = refuse;
+            record.end_ms = millis();
         }
         Debug("ATU: program " + String((int)program) + " refused, code " + String((int)refuse));
         return refuse;
@@ -387,6 +389,53 @@ void ATUTuneService(void){
         default:
             break;
     }
+}
+
+/**
+ * The short reason shown for a refused or failed program, or NULL if there is none
+ */
+static const char *StatusReason(ATUResultCode code){
+    switch (code){
+        case ATU_REFUSED_BUSY:          return "BUSY";
+        case ATU_REFUSED_MODE:          return "MODE";
+        case ATU_REFUSED_BAND:          return "NO TX";
+        case ATU_REFUSED_UNCALIBRATED:  return "NO CAL";
+        case ATU_REFUSED_NO_BOARD:      return "NO BOARD";
+        case ATU_FAIL_NO_RF:            return "NO RF";
+        case ATU_FAIL_STATE:            return "STATE";
+        case ATU_FAIL_TIMEOUT:          return "TIMEOUT";
+        case ATU_FAIL_ANTENNA:          return "ANT FAULT";
+        default:                        return NULL;   // OK, aborted, no match
+    }
+}
+
+ATUTextColour ATUStatusText(char *line1, char *line2, size_t n){
+    if (record.active){
+        snprintf(line1, n, "TUNING");
+        snprintf(line2, n, "n %u", (unsigned)record.n);
+        return ATU_TEXT_BUSY;
+    }
+    bool recent = (record.program != ATU_PROG_NONE) &&
+                  ((uint32_t)(millis() - record.end_ms) < ATU_STATUS_HOLD_MS);
+    const char *reason = StatusReason(record.code);
+    if (recent && reason){
+        snprintf(line1, n, "TUNE");
+        snprintf(line2, n, "%s", reason);
+        return ATU_TEXT_ALERT;
+    }
+    uint32_t s = GetATURegisterState();
+    if (!ATU_PACKED_NET(s)){
+        snprintf(line1, n, "ATU BYP");
+        line2[0] = 0;
+    } else {
+        float L = ATUNominalInductance_uH(ATU_PACKED_L(s));
+        float C = ATUNominalCapacitance_pF(ATU_PACKED_C(s));
+        const char *topo = ATU_PACKED_CAPSIN(s) ? "CL" : "LC";
+        if (L < 9.995f) snprintf(line1, n, "%s %.2fuH", topo, (double)L);
+        else            snprintf(line1, n, "%s %.1fuH", topo, (double)L);
+        snprintf(line2, n, "   %.0fpF", (double)C);
+    }
+    return (recent && (record.code == ATU_FAIL_NO_MATCH)) ? ATU_TEXT_BUSY : ATU_TEXT_NORMAL;
 }
 
 #endif // ATU_PRESENT

@@ -83,7 +83,7 @@ static Pane PaneFreqBandMod = {5,60,310,30,DrawFreqBandModPane,1};
 Pane PaneSpectrum =    {5,95,520,345,DrawSpectrumPane,1}; // this one is updated by menus
 static Pane PaneStateOfHealth={5,445,260,30,DrawStateOfHealthPane,1};
 static Pane PaneTime =        {270,445,260,30,DrawTimePane,1};
-static Pane PaneSWR =         {535,15,150,40,DrawSWRPane,1};
+static Pane PaneSWR =         {535,15,170,40,DrawSWRPane,1}; // ends at 705, before TX/RX
 static Pane PaneTXRXStatus =  {710,20,60,30,DrawTXRXStatusPane,1};
 static Pane PaneSMeter =      {515,60,260,50,DrawSMeterPane,1};
 static Pane PaneAudioSpectrum={535,115,260,150,DrawAudioSpectrumPane,1};
@@ -1160,6 +1160,20 @@ void DrawSWRPane(void) {
     tft.print("PWR ");
     tft.print(pf, 1);
     tft.print("W");
+
+#ifdef ATU_PRESENT
+    // The ATU setting (nominal values) or the tuner's status, to the right
+    if (bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present){
+        char line1[16], line2[16];
+        ATUTextColour c = ATUStatusText(line1, line2, sizeof(line1));
+        tft.setTextColor((c == ATU_TEXT_ALERT) ? RA8875_RED :
+                         (c == ATU_TEXT_BUSY) ? RA8875_YELLOW : RA8875_WHITE);
+        tft.setCursor(PaneSWR.x0 + 88, PaneSWR.y0);
+        tft.print(line1);
+        tft.setCursor(PaneSWR.x0 + 88, PaneSWR.y0 + 12);
+        tft.print(line2);
+    }
+#endif
 }
 
 

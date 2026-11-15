@@ -95,6 +95,7 @@ typedef struct {
     float zRe, zIm;                             // the AX; reply keeps its format (0)
     float fwd_W;                                // forward power of the last reading
     uint32_t elapsed_ms;
+    uint32_t end_ms;                            // millis() when it ended or was refused
 } ATUTuneRecord;
 
 /// One step a program asks the engine for
@@ -198,6 +199,31 @@ void ATUApplyStoredIfChanged(int32_t band, int32_t antenna);
 
 /// Forget which band and antenna were last applied, so the next call applies (tests)
 void ATUMemoryResetHook(void);
+
+///////////////////////////////////////////////////////////////////////////////
+// Home-screen status (the two lines to the right of SWR and PWR)
+///////////////////////////////////////////////////////////////////////////////
+
+/// How long a refusal, failure or poor match stays on the home screen
+#define ATU_STATUS_HOLD_MS 3000
+
+typedef enum { ATU_TEXT_NORMAL, ATU_TEXT_BUSY, ATU_TEXT_ALERT } ATUTextColour;
+
+/**
+ * @brief The ATU's two status lines for the home screen
+ *
+ * - network bypassed: "ATU BYP"
+ * - network in line: topology and nominal values, "LC 2.35uH" / "   340pF"
+ * - tuning: "TUNING" / "n 23" (readings so far), ATU_TEXT_BUSY
+ * - for ATU_STATUS_HOLD_MS after a refusal or failure: "TUNE" / the reason, ATU_TEXT_ALERT
+ * - for ATU_STATUS_HOLD_MS after ATU_FAIL_NO_MATCH: the setting kept, ATU_TEXT_BUSY
+ *
+ * @param line1 Receives the first line (at least 12 characters)
+ * @param line2 Receives the second line (at least 12 characters)
+ * @param n Size of each buffer
+ * @return How to colour the lines
+ */
+ATUTextColour ATUStatusText(char *line1, char *line2, size_t n);
 
 /// Planner for ATU_PROG_TUNE, in ATUTuneAlgo.cpp
 extern const ATUPlanner ATUTunePlanner;

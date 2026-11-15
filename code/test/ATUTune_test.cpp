@@ -613,6 +613,12 @@ TEST_F(ATUTuneAlgoTest, NoMatchKeepsTheBestSettingAndSaysSo) {
     EXPECT_NE(r->finalSetting, op);
     EXPECT_LE(r->n, 120);
     ExpectBackInReceive();
+    // The home screen shows the setting kept, flagged for a while
+    char l1[16], l2[16];
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_BUSY);
+    EXPECT_NE(std::string(l1), "TUNE");
+    AddMillisTime(ATU_STATUS_HOLD_MS + 1);
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_NORMAL);
 }
 
 namespace {
@@ -673,6 +679,55 @@ TEST_F(ATUTuneAlgoTest, Button16IsRefusedWhenTheTunerCannotRun) {
     EXPECT_EQ(ATUTuneLastRecord()->code, ATU_REFUSED_UNCALIBRATED);
     EXPECT_EQ(GetATURegisterState(), op);
     ExpectBackInReceive();
+}
+
+TEST(ATUBoardNominal, SumsTheDesignValues) {
+    EXPECT_FLOAT_EQ(ATUNominalInductance_uH(0), 0.0f);
+    EXPECT_FLOAT_EQ(ATUNominalCapacitance_pF(0), 0.0f);
+    EXPECT_NEAR(ATUNominalInductance_uH(0xFF), 17.22f, 1e-4f);
+    EXPECT_FLOAT_EQ(ATUNominalCapacitance_pF(0xFF), 3869.0f);
+    EXPECT_NEAR(ATUNominalInductance_uH(0x21), 0.05f + 2.2f, 1e-5f);
+    EXPECT_FLOAT_EQ(ATUNominalCapacitance_pF(0x05), 10.0f + 47.0f);
+}
+
+TEST_F(ATUTuneAlgoTest, StatusTextShowsTheSettingAndTheTuner) {
+    char l1[16], l2[16];
+    SetFrequency("FA00014200000;");
+    AddMillisTime(ATU_STATUS_HOLD_MS + 1);      // nothing recent from earlier tests
+    SetATUPacked(ATU_PACKED_BYPASS);
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_NORMAL);
+    EXPECT_STREQ(l1, "ATU BYP");
+    EXPECT_STREQ(l2, "");
+    SetATUPacked(ATU_PACK(1, 0, 0, 0x21, 0x0F));
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_NORMAL);
+    EXPECT_STREQ(l1, "LC 2.25uH");
+    EXPECT_STREQ(l2, "   179pF");
+    SetATUPacked(ATU_PACK(1, 0, 1, 0xFF, 0xFF));
+    ATUStatusText(l1, l2, sizeof(l1));
+    EXPECT_STREQ(l1, "CL 17.2uH");
+    EXPECT_STREQ(l2, "   3869pF");
+    // A refusal shows its reason for a while, then the setting again
+    ED.SWR_CalLevel[BAND_20M] = 0;
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_REFUSED_UNCALIBRATED);
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_ALERT);
+    EXPECT_STREQ(l1, "TUNE");
+    EXPECT_STREQ(l2, "NO CAL");
+    AddMillisTime(ATU_STATUS_HOLD_MS + 1);
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_NORMAL);
+    EXPECT_STREQ(l1, "CL 17.2uH");
+    ED.SWR_CalLevel[BAND_20M] = 1;
+    // While tuning: the readings so far
+    MakePlant(0.05, 11);
+    plantLoad = {200.0f, 0.0f};
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(RunUntilKeyed());
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_BUSY);
+    EXPECT_STREQ(l1, "TUNING");
+    EXPECT_STREQ(l2, "n 0");
+    ASSERT_TRUE(Run());
+    ASSERT_EQ(ATUTuneLastRecord()->code, ATU_OK);
+    EXPECT_EQ(ATUStatusText(l1, l2, sizeof(l1)), ATU_TEXT_NORMAL);
+    EXPECT_EQ(std::string(l1).substr(0, 3), "LC ");
 }
 
 TEST_F(ATUTuneAlgoTest, AbortMidSearchUnkeysAndRestoresTheOperatorSetting) {
