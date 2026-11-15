@@ -337,7 +337,7 @@ void ATUTuneService(void){
                 case ATU_STEP_BUSY:
                     break;
                 case ATU_STEP_DONE:
-                    Finish(ATU_OK, step.setting);
+                    Finish(step.code, step.setting);   // ATU_FAIL_NO_MATCH keeps its best setting too
                     break;
                 case ATU_STEP_FAIL:
                     Finish(step.code, eng.operatorSetting);

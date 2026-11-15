@@ -6,6 +6,9 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <iostream>
 #include "../src/PhoenixSketch/SDT.h"
 #include "Adafruit_I2CDevice.h"
 #include "atu_plant/ATUModel.h"
@@ -462,4 +465,286 @@ TEST_F(ATUMemoryTest, MemoryAndSettingsRoundTripThroughStorage) {
     EXPECT_FALSE(ED.ATU_AutoApply);
     ED.ATU_TunePower_W = 2.0f;
     ED.ATU_AutoApply = true;
+}
+
+TEST_F(ATUMemoryTest, TuneStoresItsResultAndTheNextTuneReusesIt) {
+    MakePlant(0.05, 7);
+    SetFrequency("FA00007100000;");
+    plantLoad = {120.0f, -60.0f};
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    ASSERT_EQ(r->code, ATU_OK);
+    uint32_t s; int32_t f; float swr;
+    ASSERT_TRUE(ATUMemoryGet(BAND_40M, 0, &s, &f, &swr));
+    EXPECT_EQ(s, r->finalSetting);
+    EXPECT_EQ(f, 7100);
+    EXPECT_NEAR(swr, Swr(r->finalGamma), 1e-4f);
+    // Tuning again nearby: the stored setting is read first and kept
+    SetATUPacked(ATU_PACKED_BYPASS);
+    Cat("FA00007150000;");
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_OK);
+    EXPECT_EQ(ATUTuneLastRecord()->n, 1);
+    EXPECT_EQ(GetATURegisterState(), s);
+    // Far away on the band (more than 1 %), it tunes afresh
+    Cat("FA00007250000;");
+    ATUModelPrepare(&plantCache, &plantParams, 7.25e6);
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    EXPECT_GT(ATUTuneLastRecord()->n, 1);
+    ExpectBackInReceive();
+}
+
+// ================================================================ search tuner
+
+namespace {
+
+/// A load at a reflection coefficient
+atu_cf LoadAt(float gr, float gi){
+    float den = (1 - gr) * (1 - gr) + gi * gi;
+    return {50.0f * (1 - gr * gr - gi * gi) / den, 50.0f * 2 * gi / den};
+}
+
+/// True if no setting appears twice among the readings
+bool NoRepeats(const ATUTuneRecord *r){
+    for (int i = 0; i < r->n; i++)
+        for (int j = i + 1; j < r->n; j++)
+            if (r->setting[i] == r->setting[j]) return false;
+    return true;
+}
+
+/// The setting with the lowest reading
+uint32_t BestReading(const ATUTuneRecord *r){
+    int b = 0;
+    for (int i = 1; i < r->n; i++) if (r->gamma[i] < r->gamma[b]) b = i;
+    return r->setting[b];
+}
+
+}  // namespace
+
+TEST_F(ATUTuneAlgoTest, NearMatchStaysBypassed) {
+    MakePlant(0.05, 1);
+    SetFrequency("FA00014200000;");
+    plantLoad = {55.0f, 8.0f};                  // SWR 1.2
+    SetATUPacked(ATU_PACK(1, 0, 0, 0x10, 0x10));
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    EXPECT_EQ(r->code, ATU_OK);
+    EXPECT_EQ(r->n, 1);
+    EXPECT_EQ(r->finalSetting, ATU_PACKED_BYPASS);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUTuneAlgoTest, OpenOrShortIsReportedAsAnAntennaFault) {
+    MakePlant(0.05, 2);
+    SetFrequency("FA00007100000;");
+    plantLoad = {0.05f, 0.0f};                  // a short
+    const uint32_t op = ATU_PACK(1, 0, 0, 3, 3);
+    SetATUPacked(op);
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_FAIL_ANTENNA);
+    EXPECT_EQ(GetATURegisterState(), op);       // the operator's setting is back
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUTuneAlgoTest, SearchesWithoutRepeatsAndEndsOnTheBestReading) {
+    MakePlant(0.12, 3);
+    SetFrequency("FA00007100000;");
+    plantLoad = {200.0f, -100.0f};
+    SetATUPacked(ATU_PACKED_BYPASS);
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    EXPECT_EQ(r->code, ATU_OK);
+    EXPECT_GT(r->n, 2);
+    EXPECT_TRUE(NoRepeats(r));
+    EXPECT_EQ(r->finalSetting, BestReading(r));
+    EXPECT_NEAR(Swr(TrueGammaOf(r->finalSetting)), Swr(r->finalGamma), 0.02f);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUTuneAlgoTest, NoMatchKeepsTheBestSettingAndSaysSo) {
+    // A load this network can't bring below SWR 1.7 on 160 m, that still reads
+    // well below a total reflection at bypass (so it isn't an antenna fault)
+    MakePlant(0.05, 4);
+    SetFrequency("FA00001900000;");
+    bool found = false;
+    for (float r = 3.0f; (r <= 6.0f) && !found; r += 1.0f){
+        plantLoad = {r, 0.0f};
+        found = (TrueGammaOf(ATU_PACKED_BYPASS) < 0.95f) &&
+                (Swr(ATUModelSearchAll(&plantCache, plantLoad, ATUSharedTopK()).g) > 1.7f);
+    }
+    ASSERT_TRUE(found);
+    const uint32_t op = ATU_PACK(1, 0, 0, 3, 3);
+    SetATUPacked(op);
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    EXPECT_EQ(r->code, ATU_FAIL_NO_MATCH);
+    EXPECT_EQ(r->finalSetting, BestReading(r));
+    EXPECT_NE(r->finalSetting, op);
+    EXPECT_LE(r->n, 120);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUTuneAlgoTest, AbortMidSearchUnkeysAndRestoresTheOperatorSetting) {
+    MakePlant(0.05, 5);
+    SetFrequency("FA00014200000;");
+    plantLoad = {25.0f, 60.0f};
+    const uint32_t op = ATU_PACK(1, 0, 1, 7, 9);
+    SetATUPacked(op);
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    // Run until ten readings are in and the carrier is on again
+    for (int i = 0; (i < 5000) && (ATUTuneLastRecord()->n < 10); i++){
+        ATUTuneService();
+        if (modeSM.state_id == ModeSm_StateId_ATU_TUNE_MARK) PerformSWRBridgeReading();
+        AddMillisTime(5);
+    }
+    ASSERT_TRUE(RunUntilKeyed());
+    ATUTuneAbort();
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_ABORTED);
+    EXPECT_EQ(GetATURegisterState(), op);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUTuneAlgoTest, CatAYPagesThroughTheReadings) {
+    MakePlant(0.05, 6);
+    SetFrequency("FA00007100000;");
+    plantLoad = {12.5f, 0.0f};
+    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    ASSERT_GT(r->n, 12);
+    // AYpp,<n>,<nbsLLLCCC>:<g x 1000>,... with 12 readings a page
+    std::string p0 = Cat("AY00;"), p1 = Cat("AY01;");
+    char head[16];
+    snprintf(head, sizeof(head), "AY00,%d,", (int)r->n);
+    EXPECT_EQ(p0.rfind(head, 0), 0u) << p0;
+    char first[32];
+    uint32_t s = r->setting[12];
+    snprintf(first, sizeof(first), "AY01,%d,%d%d%d%03d%03d:%d", (int)r->n,
+             (int)ATU_PACKED_NET(s), (int)ATU_PACKED_BAL(s), (int)ATU_PACKED_CAPSIN(s),
+             (int)ATU_PACKED_L(s), (int)ATU_PACKED_C(s), (int)lroundf(r->gamma[12] * 1000.0f));
+    EXPECT_EQ(p1.rfind(first, 0), 0u) << p1;
+    int colons = 0;
+    for (char ch : p0) colons += (ch == ':');
+    EXPECT_EQ(colons, 12);
+    EXPECT_EQ(p0.back(), ';');
+    char past[8];
+    snprintf(past, sizeof(past), "AY%02d;", r->n / 12 + 1);
+    snprintf(head, sizeof(head), "AY%02d,%d;", r->n / 12 + 1, (int)r->n);
+    EXPECT_EQ(Cat(past), head);                 // a page past the end is empty
+    EXPECT_EQ(Cat("AYx1;"), "?;");
+}
+
+TEST_F(ATUTuneAlgoTest, TunesOtherBuildsCloseToTheirBestOnEveryBand) {
+    // Each build's coils and capacitors differ from the reference board; the
+    // tuner doesn't know the board at all. "Shortfall" is how far the tuned SWR
+    // is above the better of the best the build allows and SRCH_GOOD_SWR (1.2),
+    // where the search is allowed to stop.
+    //
+    // 80-15 m are judged against the best setting of the simulated board. On 10 m
+    // that best usually relies on the largest elements far past their resonance,
+    // where the model is known to be wrong (code/docs/ATU_RF_Board_Characterisation.md
+    // section 3.5), so 10 m only has to beat bypass; the bench judges it.
+    //
+    // The limits hold the performance this search reached when it was written
+    // (5 % build: 50/51 reachable loads within SWR 1.5, 90th percentile shortfall
+    // 0.18; 12 % build with a leaky bridge: 46/51, 0.56; median 58-60 readings),
+    // so a change that makes it worse fails here.
+    struct Variant { const char *name; double sigma; float leakHF, leak10m; float minReached, maxP90; };
+    const Variant variants[] = {{"5 % build, no leak", 0.05, 0.0f, 0.0f, 0.9f, 0.3f},
+                                {"12 % build, leaky bridge", 0.12, 0.03f, 0.10f, 0.85f, 0.6f}};
+    const char *bands[] = {"FA00003650000;", "FA00007100000;", "FA00014200000;",
+                           "FA00021200000;", "FA00028400000;"};
+    const float R[] = {12.5f, 25.0f, 100.0f, 200.0f, 400.0f};
+    const float X[] = {-100.0f, 0.0f, 100.0f};
+    int build = 0;
+    for (const Variant &v : variants){
+        std::cout << "  " << v.name << std::endl;
+        std::vector<float> hfShortfall, allReadings;
+        int hfReachable = 0, hfReached = 0;
+        for (const char *fa : bands){
+            std::vector<float> shortfall, readings;
+            int reachable = 0, reached = 0;
+            float worstSwr = 0;
+            bool tenMetres = atoll(fa + 2) > 25000000;
+            float leak = tenMetres ? v.leak10m : v.leakHF;
+            bridgeLeak = {leak * cosf(1.0f), leak * sinf(1.0f)};
+            for (float r : R){
+                for (float x : X){
+                    MakePlant(v.sigma, 200 + build++);
+                    SetFrequency(fa);
+                    plantLoad = {r, x};
+                    SetATUPacked(ATU_PACKED_BYPASS);
+                    ATUMemoryForget(Band(), 0);     // each load is tuned afresh
+                    ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+                    ASSERT_TRUE(Run());
+                    const ATUTuneRecord *rec = ATUTuneLastRecord();
+                    // An antenna fault is fair for a load beyond SWR 10 that a leaky
+                    // bridge reads as a nearly total reflection
+                    bool fault = (rec->code == ATU_FAIL_ANTENNA) && (Swr(TrueGammaOf(ATU_PACKED_BYPASS)) > 10.0f);
+                    ASSERT_TRUE((rec->code == ATU_OK) || (rec->code == ATU_FAIL_NO_MATCH) || fault)
+                        << fa << " " << r << (x < 0 ? "" : "+") << x << "j code " << rec->code;
+                    if (fault) SetATUPacked(ATU_PACKED_BYPASS);
+                    ExpectBackInReceive();
+                    float got = Swr(TrueGammaOf(GetATURegisterState()));
+                    float best = Swr(ATUModelSearchAll(&plantCache, plantLoad, ATUSharedTopK()).g);
+                    shortfall.push_back(fmaxf(0.0f, got - fmaxf(best, 1.2f)));
+                    // ATU_DIAG=1 lists the poor results, ATU_DIAG=2 also every reading
+                    if (getenv("ATU_DIAG") && (got - fmaxf(best, 1.2f) > 0.3f)){
+                        ATUCandidate bc = ATUModelSearchAll(&plantCache, plantLoad, ATUSharedTopK());
+                        uint32_t fs = GetATURegisterState();
+                        printf("      BAD %s R%.1f X%.0f got %.2f (%s L%d C%d) best %.2f (%s L%d C%d) n=%d\n", fa + 2, r, x, got,
+                               ATU_PACKED_CAPSIN(fs) ? "CL" : "LC", ATU_PACKED_L(fs), ATU_PACKED_C(fs), best,
+                               bc.topo ? "CL" : "LC", bc.l, bc.c, rec->n);
+                        if (getenv("ATU_DIAG")[0] == '2') for (int i = 0; i < rec->n; i++){
+                            uint32_t q = rec->setting[i];
+                            printf("        %2d %s L%3d C%3d g %.3f true %.3f\n", i, ATU_PACKED_NET(q) ? (ATU_PACKED_CAPSIN(q) ? "CL" : "LC") : "BY",
+                                   ATU_PACKED_L(q), ATU_PACKED_C(q), rec->gamma[i], TrueGammaOf(q));
+                        }
+                    }
+                    readings.push_back(rec->n);
+                    allReadings.push_back(rec->n);
+                    if (tenMetres){
+                        float bypass = Swr(TrueGammaOf(ATU_PACKED_BYPASS));
+                        EXPECT_LE(got, bypass + 0.01f) << fa << " " << r << (x < 0 ? "" : "+") << x << "j";
+                    } else {
+                        hfShortfall.push_back(fmaxf(0.0f, got - fmaxf(best, 1.2f)));
+                    }
+                    worstSwr = fmaxf(worstSwr, got);
+                    if (best <= 1.4f){
+                        reachable++;
+                        reached += (got <= 1.5f);
+                        if (!tenMetres){ hfReachable++; hfReached += (got <= 1.5f); }
+                    }
+                    EXPECT_LE(rec->n, 120);
+                }
+            }
+            std::sort(shortfall.begin(), shortfall.end());
+            std::sort(readings.begin(), readings.end());
+            size_t n = shortfall.size();
+            float median = shortfall[n / 2], p90 = shortfall[(n * 9) / 10];
+            std::cout << "    " << (fa + 2) << " median shortfall " << median << ", 90th " << p90
+                      << ", worst " << shortfall.back() << ", worst SWR " << worstSwr
+                      << ", reached 1.5 in " << reached << "/" << reachable
+                      << ", readings median " << readings[n / 2] << " max " << readings.back()
+                      << std::endl;
+        }
+        std::sort(hfShortfall.begin(), hfShortfall.end());
+        std::sort(allReadings.begin(), allReadings.end());
+        size_t n = hfShortfall.size();
+        float median = hfShortfall[n / 2], p90 = hfShortfall[(n * 9) / 10];
+        std::cout << "    80-15 m: median shortfall " << median << ", 90th " << p90
+                  << ", reached 1.5 in " << hfReached << "/" << hfReachable
+                  << "; readings median " << allReadings[allReadings.size() / 2] << std::endl;
+        EXPECT_LE(median, 0.05f) << v.name;
+        EXPECT_LE(p90, v.maxP90) << v.name;
+        EXPECT_GE(hfReached, (int)ceilf(v.minReached * hfReachable)) << v.name;
+        EXPECT_LE(allReadings[allReadings.size() / 2], 65.0f) << v.name;
+    }
 }

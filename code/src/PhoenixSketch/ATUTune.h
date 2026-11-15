@@ -54,17 +54,16 @@ If not, see <https://www.gnu.org/licenses/>.
 #define ATU_COLLECT_MIN_MS      60      // collect for at least this long...
 #define ATU_COLLECT_MIN_SAMPLES 5       // ...and at least this many bridge readings
 #define ATU_COLLECT_TIMEOUT_MS  300     // give up on a reading after this long keyed
-#define ATU_TUNE_TIMEOUT_MS     15000   // whole program
+#define ATU_TUNE_TIMEOUT_MS     20000   // whole program (a search is at most 120 readings)
 #define ATU_MIN_FWD_W           0.1f    // below this the reading is not valid
 #define ATU_DEFAULT_TUNE_POWER_W 2.0f
 
-#define ATU_MAX_READINGS        64      // readings kept in the record
+#define ATU_MAX_READINGS        128     // readings kept in the record
 
 typedef enum {
     ATU_PROG_NONE = 0,
     ATU_PROG_READ = 2,      // diagnostic: read bypass and the current setting, 3 times each
     ATU_PROG_TUNE = 3,      // the automatic tuner
-    ATU_PROG_CALIBRATE = 4, // per-build coil calibration into a dummy load
 } ATUProgram;
 
 typedef enum {
@@ -92,8 +91,8 @@ typedef struct {
     float gamma[ATU_MAX_READINGS];              // |Gamma| of each reading
     uint32_t finalSetting;                      // the setting left on the relays
     float finalGamma;                           // its measured |Gamma| (-1 if not read)
-    float predictedGamma;                       // the model's |Gamma| for it (-1 if none)
-    float zRe, zIm;                             // load estimate (0 if none)
+    float predictedGamma;                       // unused by the search tuner (-1); kept so
+    float zRe, zIm;                             // the AX; reply keeps its format (0)
     float fwd_W;                                // forward power of the last reading
     uint32_t elapsed_ms;
 } ATUTuneRecord;
@@ -102,7 +101,8 @@ typedef struct {
 typedef enum {
     ATU_STEP_MEASURE,   // read this setting
     ATU_STEP_BUSY,      // still computing; ask again next pass
-    ATU_STEP_DONE,      // finished: leave this setting on the relays
+    ATU_STEP_DONE,      // finished: leave this setting on the relays, with step.code
+                        // (ATU_OK, or ATU_FAIL_NO_MATCH for the best of a poor match)
     ATU_STEP_FAIL,      // finished with an error: restore the operator's setting
 } ATUStepKind;
 

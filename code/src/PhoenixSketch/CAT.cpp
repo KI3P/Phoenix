@@ -104,6 +104,7 @@ char *AT_write( char* cmd );
 char *AT_read(  char* cmd );
 char *AX_write( char* cmd );
 char *AX_read(  char* cmd );
+char *AY_write( char* cmd );
 
 typedef struct  {
     char name[3];   //two chars plus zero terminator
@@ -124,7 +125,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 37
+#define NUM_SUPPORTED_COMMANDS 38
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
@@ -171,7 +172,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "BR", 3+1,3, BR_write, BR_read }, // raw SWR bridge readings: clear, sample, statistics -- NOT a Kenwood keyword
         { "XA", 3+3,3, XA_write, XA_read },  // CW transmit attenuation override -- NOT a Kenwood keyword
         { "AT", 3+9,3, AT_write, AT_read },  // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
-        { "AX", 3+1,3, AX_write, AX_read }   // ATU tuner diagnostics (needs ATU_PRESENT) -- NOT a Kenwood keyword
+        { "AX", 3+1,3, AX_write, AX_read },  // ATU tuner diagnostics (needs ATU_PRESENT) -- NOT a Kenwood keyword
+        { "AY", 3+2,0, AY_write, unsupported_cmd }   // ATU program readings, a page at a time -- NOT a Kenwood keyword
     };
 
 /**
@@ -1252,8 +1254,6 @@ char *AT_read( char* cmd ){
  *   AX2;  run the READ diagnostic: |Gamma| with the network bypassed, then with the
  *         present setting, three readings each, at the tune power. Result with AX;
  *   AX3;  tune (ATU_PROG_TUNE). Result with AX;
- *   AX4;  the relay setting of each of the last program's first 24 readings:
- *         "AX4,<s1>,<s2>...;" with each setting as nbsLLLCCC (as for AT)
  *   AX5;  forget the stored ATU setting for the current band and antenna
  *
  * AX2 and AX3 reply nothing if the program started, "AX<code>;" with an
@@ -1272,18 +1272,6 @@ char *AX_write( char* cmd ){
             if( ATUTuneActive() ) break;
             ATUMemoryForget( ATUCurrentBand(), ATUCurrentAntenna() );
             return empty_string_p;
-        case '4':{
-            const ATUTuneRecord *r = ATUTuneLastRecord();
-            int len = sprintf( obuf, "AX4" );
-            for( int i = 0; (i < r->n) && (i < 24); i++ ){
-                uint32_t q = r->setting[i];
-                len += sprintf( obuf + len, ",%d%d%d%03d%03d",
-                                (int)ATU_PACKED_NET(q), (int)ATU_PACKED_BAL(q), (int)ATU_PACKED_CAPSIN(q),
-                                (int)ATU_PACKED_L(q), (int)ATU_PACKED_C(q) );
-            }
-            sprintf( obuf + len, ";" );
-            return obuf;
-        }
         case '2':
         case '3':{
             ATUResultCode rc = ATUTuneStart( cmd[2] == '2' ? ATU_PROG_READ : ATU_PROG_TUNE );
@@ -1329,6 +1317,39 @@ char *AX_read( char* cmd ){
     sprintf( obuf, "?;");
     return obuf;
 #endif
+}
+
+/**
+ * CAT command AY - the readings of the running or last ATU program, a page at a time
+ * (non-standard Kenwood command)
+ *
+ *   AYpp;  page pp (two digits) of the record, 12 readings a page:
+ *          "AYpp,<n>,<nbsLLLCCC>:<g x 1000>,...;" where n is the number of readings,
+ *          each setting is as for AT and g is its |Gamma|. A page past the end
+ *          replies "AYpp,<n>;". AX; has the rest of the record.
+ *
+ * @param cmd CAT command string
+ * @return the page, or "?;" for a malformed page or a build without ATU_PRESENT
+ */
+char *AY_write( char* cmd ){
+#ifdef ATU_PRESENT
+    if( cmd[2] >= '0' && cmd[2] <= '9' && cmd[3] >= '0' && cmd[3] <= '9' ){
+        int page = 10 * ( cmd[2] - '0' ) + ( cmd[3] - '0' );
+        const ATUTuneRecord *r = ATUTuneLastRecord();
+        int len = sprintf( obuf, "AY%02d,%d", page, (int)r->n );
+        for( int i = page * 12; ( i < r->n ) && ( i < page * 12 + 12 ); i++ ){
+            uint32_t q = r->setting[i];
+            len += sprintf( obuf + len, ",%d%d%d%03d%03d:%d",
+                            (int)ATU_PACKED_NET(q), (int)ATU_PACKED_BAL(q), (int)ATU_PACKED_CAPSIN(q),
+                            (int)ATU_PACKED_L(q), (int)ATU_PACKED_C(q),
+                            (int)lroundf( r->gamma[i] * 1000.0f ) );
+        }
+        sprintf( obuf + len, ";" );
+        return obuf;
+    }
+#endif
+    sprintf( obuf, "?;");
+    return obuf;
 }
 
 /**
