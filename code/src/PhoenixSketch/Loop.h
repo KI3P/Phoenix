@@ -51,7 +51,8 @@ typedef enum {
     iMODE_CHANGE,             /**< Operating mode changed (SSB/CW) */
     iPOWER_CHANGE,            /**< Transmit power level changed */
     iEQUALIZER,               /**< Adjust the transmit and receive equalizers */
-    iBITDISPLAY               /**< Display the results of the BIT */
+    iBITDISPLAY,              /**< Display the results of the BIT */
+    iATUSTATUSDISPLAY         /**< Display the ATU tuning status table (ATU_PRESENT) */
 } InterruptType;
 
 /**

@@ -515,4 +515,29 @@ ATUTextColour ATUStatusText(char *line1, char *line2, size_t n){
     return (recent && (record.code == ATU_FAIL_NO_MATCH)) ? ATU_TEXT_BUSY : ATU_TEXT_NORMAL;
 }
 
+void ATUStatusTableRow(int32_t band, int32_t antenna, char *buf, size_t n){
+    const char *name = ((band >= 0) && (band < NUMBER_OF_BANDS)) ? bands[band].name : "?";
+    uint32_t s;
+    int32_t f_kHz;
+    float swr;
+    if (!ATUMemoryGet(band, antenna, &s, &f_kHz, &swr)){
+        snprintf(buf, n, "%-5s  --", name);
+        return;
+    }
+    char setting[24];
+    if (!ATU_PACKED_NET(s)){
+        snprintf(setting, sizeof(setting), "bypass");
+    } else {
+        float L = ATUNominalInductance_uH(ATU_PACKED_L(s));
+        float C = ATUNominalCapacitance_pF(ATU_PACKED_C(s));
+        const char *topo = ATU_PACKED_CAPSIN(s) ? "CL" : "LC";
+        if (L < 9.995f) snprintf(setting, sizeof(setting), "%s %.2fuH %4.0fpF", topo, (double)L, (double)C);
+        else            snprintf(setting, sizeof(setting), "%s %.1fuH %4.0fpF", topo, (double)L, (double)C);
+    }
+    char swrText[8];
+    if (swr > 0) snprintf(swrText, sizeof(swrText), "%.2f", (double)swr);
+    else         snprintf(swrText, sizeof(swrText), "--");
+    snprintf(buf, n, "%-5s %6ld kHz  %-19s %s", name, (long)f_kHz, setting, swrText);
+}
+
 #endif // ATU_PRESENT

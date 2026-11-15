@@ -521,6 +521,23 @@ TEST_F(ATUMemoryTest, MemoryAndSettingsRoundTripThroughStorage) {
     ED.ATU_TunePower_W = 2.0f;
 }
 
+TEST_F(ATUMemoryTest, StatusTableRowsSayWhatIsStored) {
+    char row[64];
+    ATUStatusTableRow(BAND_20M, 0, row, sizeof(row));
+    EXPECT_STREQ(row, "20M    --");
+    ATUMemoryStore(BAND_20M, 0, ATU_PACK(1, 0, 1, 15, 13), 14200, 1.25f);
+    ATUStatusTableRow(BAND_20M, 0, row, sizeof(row));
+    EXPECT_STREQ(row, "20M    14200 kHz  CL 0.82uH  157pF    1.25");
+    ATUMemoryStore(BAND_40M, 0, ATU_PACKED_BYPASS, 7100, 1.18f);
+    ATUStatusTableRow(BAND_40M, 0, row, sizeof(row));
+    EXPECT_STREQ(row, "40M     7100 kHz  bypass              1.18");
+    ATUMemoryStore(BAND_160M, 0, ATU_PACK(1, 0, 0, 255, 255), 1850, 0.0f);   // stored by hand
+    ATUStatusTableRow(BAND_160M, 0, row, sizeof(row));
+    EXPECT_STREQ(row, "160M    1850 kHz  LC 17.2uH 3869pF    --");
+    ATUStatusTableRow(BAND_20M, 1, row, sizeof(row));                       // other antenna
+    EXPECT_STREQ(row, "20M    --");
+}
+
 TEST_F(ATUMemoryTest, ARetuneSearchesAfreshAndStoresAgain) {
     MakePlant(0.05, 7);
     SetFrequency("FA00007100000;");

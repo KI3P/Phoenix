@@ -234,7 +234,7 @@ TEST_F(ATUBoardTest, CatRefusesWritesWhileTransmitting) {
 // ================== MENU ==================
 
 namespace {
-enum { ITEM_ENABLE = 0, ITEM_CLEAR = 1, ITEM_TUNE = 2, ITEM_POWER = 3, ITEM_OUTPUT = 4 };
+enum { ITEM_ENABLE = 0, ITEM_TABLE = 1, ITEM_CLEAR = 2, ITEM_TUNE = 3, ITEM_POWER = 4, ITEM_OUTPUT = 5 };
 
 /// Select a function item of the ATU menu, as the front panel does: the menu goes
 /// home and then runs the item
@@ -278,6 +278,7 @@ TEST_F(ATUMenuTest, MenuIsLastPrimaryEntryWithTheSimpleItems) {
     EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].secondary, ATUOptions);
     EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].length, (size_t)ATU_MENU_ITEMS);
     EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Bypass ATU");
+    EXPECT_STREQ(ATUOptions[ITEM_TABLE].label, "Tuning status table");
     EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 0");
     EXPECT_STREQ(ATUOptions[ITEM_TUNE].label, "Tune");
     EXPECT_STREQ(ATUOptions[ITEM_POWER].label, "Tune power (W)");
@@ -361,4 +362,18 @@ TEST_F(ATUMenuTest, MovingOffOrWaitingCancelsAClear) {
     EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
     Select(ITEM_CLEAR);
     EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+}
+
+TEST_F(ATUMenuTest, StatusTableIsAPageThatHomeLeaves) {
+    while (GetInterrupt() != iNONE) {}
+    Select(ITEM_TABLE);
+    ConsumeInterrupt();
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_ATU_STATUS);
+    EXPECT_TRUE(uiSM.vars.clearScreen);
+    DrawDisplay();                              // draws the table once
+    EXPECT_FALSE(uiSM.vars.clearScreen);
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    ConsumeInterrupt();
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
 }

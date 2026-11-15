@@ -69,6 +69,52 @@ void BlankBox(Rectangle *rect){
     tft.fillRect(rect->x0, rect->y0, rect->width, rect->height, RA8875_BLACK);
 }
 
+#ifdef ATU_PRESENT
+/**
+ * @brief The ATU tuning status table (ATU menu -> Tuning status table)
+ * @note Drawn once on entering the ATU_STATUS UI state; HOME returns. One row per
+ *       amateur band with what is stored for the antenna selected on this band.
+ */
+void DrawATUStatusTable(void){
+    if (!(uiSM.state_id == UISm_StateId_ATU_STATUS) || !uiSM.vars.clearScreen)
+        return;
+    tft.writeTo(L1);
+    tft.fillWindow();
+    tft.writeTo(L2);
+    tft.fillWindow();
+    tft.writeTo(L1);
+    uiSM.vars.clearScreen = false;
+
+    int32_t ant = ATUCurrentAntenna();
+    char buf[64];
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
+    snprintf(buf, sizeof(buf), "ATU memory, antenna %ld, %s output", (long)ant,
+             ATUAntennaBalun(ant) ? "balun" : "coax");
+    tft.setCursor(10, 6);
+    tft.print(buf);
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(ATUAntennaEnabled(ant) ? RA8875_GREEN : RA8875_YELLOW);
+    snprintf(buf, sizeof(buf), "ATU %s on this antenna. Tune power %.1f W. HOME to return.",
+             ATUAntennaEnabled(ant) ? "enabled" : "bypassed", (double)ED.ATU_TunePower_W);
+    tft.setCursor(10, 42);
+    tft.print(buf);
+
+    tft.setFontScale((enum RA8875tsize)1);
+    int16_t y = 66;
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
+        if (bands[b].band_type != HAM_BAND) continue;
+        ATUStatusTableRow(b, ant, buf, sizeof(buf));
+        tft.setTextColor((b == ED.currentBand[ED.activeVFO]) ? RA8875_YELLOW : RA8875_WHITE);
+        tft.setCursor(10, y);
+        tft.print(buf);
+        y += 30;
+        if (y > WINDOW_HEIGHT - 30) break;
+    }
+}
+#endif // ATU_PRESENT
+
 /**
  * @brief Main BIT screen rendering function
  * @note Called from DrawDisplay() when in BIT UI state
@@ -342,6 +388,12 @@ void DrawDisplay(void){
             DrawBIT();
             break;
         }
+#ifdef ATU_PRESENT
+        case (UISm_StateId_ATU_STATUS):{
+            DrawATUStatusTable();
+            break;
+        }
+#endif
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             DrawCalibrateFrequency();
             break;

@@ -266,6 +266,16 @@ typedef enum { ATU_TEXT_NORMAL, ATU_TEXT_BUSY, ATU_TEXT_ALERT } ATUTextColour;
  */
 ATUTextColour ATUStatusText(char *line1, char *line2, size_t n);
 
+/**
+ * @brief One row of the tuning status table: what is stored for a band and antenna
+ *
+ * "20M    14200 kHz  CL 0.82uH  157pF  1.25", "40M     7100 kHz  bypass        1.18",
+ * or "15M    --" when nothing is stored. The SWR is "--" if it was not measured.
+ *
+ * @param n Size of buf (at least 48)
+ */
+void ATUStatusTableRow(int32_t band, int32_t antenna, char *buf, size_t n);
+
 /// Planner for ATU_PROG_TUNE, in ATUTuneAlgo.cpp
 extern const ATUPlanner ATUTunePlanner;
 

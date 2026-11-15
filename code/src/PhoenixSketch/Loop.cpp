@@ -774,6 +774,17 @@ void HandleButtonPress(int32_t button){
             }
             break;
         } // end of BIT state
+        case (UISm_StateId_ATU_STATUS):{
+            switch (button){
+                case HOME_SCREEN:{
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of ATU_STATUS state
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (button){
                 case HOME_SCREEN:{
@@ -1488,6 +1499,10 @@ void ConsumeInterrupt(void){
         }
         case (iBITDISPLAY):{
             UISm_dispatch_event(&uiSM,UISm_EventId_BIT);
+            break;
+        }
+        case (iATUSTATUSDISPLAY):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_ATU_STATUS);
             break;
         }
         case (iCALIBRATE_FREQUENCY):{

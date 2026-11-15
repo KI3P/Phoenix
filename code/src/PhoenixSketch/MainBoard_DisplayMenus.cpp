@@ -663,6 +663,13 @@ void ATUMenuToggleEnable(void){
 }
 
 /**
+ * Menu callback: show the tuning status table (UI state ATU_STATUS; HOME returns).
+ */
+void ATUMenuShowTable(void){
+    SetInterrupt(iATUSTATUSDISPLAY);
+}
+
+/**
  * Menu callback: clear the memory of every band for this antenna. The first press
  * arms and re-opens the menu on this item; a second press within ATU_CLEAR_ARM_MS
  * clears.
@@ -704,6 +711,7 @@ VariableParameter atuTunePower = {
 
 struct SecondaryMenuOption ATUOptions[ATU_MENU_ITEMS] = {
     atuEnableLabel, functionOption, NULL, (void *)ATUMenuToggleEnable, NULL,
+    "Tuning status table", functionOption, NULL, (void *)ATUMenuShowTable, NULL,
     atuClearLabel, functionOption, NULL, (void *)ATUMenuClearAntenna, NULL,
     "Tune", functionOption, NULL, (void *)ATUMenuTune, NULL,
     "Tune power (W)", variableOption, &atuTunePower, NULL, NULL,
