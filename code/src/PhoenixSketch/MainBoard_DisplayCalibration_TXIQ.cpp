@@ -614,9 +614,11 @@ static void DrawTXIQInstructionsPane(void){
     tft.setCursor(x0, y0+delta);
     tft.print("* Center tune: Q DC offset.");
 
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("* Button 14: Carrier null.");
+    if (HasDualVFOs()){
+        delta += lineD;
+        tft.setCursor(x0, y0+delta);
+        tft.print("* Button 14: Carrier null.");
+    }
 
     #endif
 

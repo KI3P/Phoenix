@@ -871,8 +871,12 @@ void HandleButtonPress(int32_t button){
                 }
                 case 14:{
                     #ifdef DIRECT_COUPLED_TX
-                    SetInterrupt(iPTT_PRESSED);
-                    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+                    // The carrier null measures the carrier through the receiver,
+                    // which only dual-VFO radios can do
+                    if (HasDualVFOs()){
+                        SetInterrupt(iPTT_PRESSED);
+                        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+                    }
                     #endif
                     break;
                 }

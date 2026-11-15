@@ -1203,7 +1203,9 @@ TEST_F(CalibrationTest, SingleVFOTXIQKeysAtTheDisplayedAttenuation) {
     SetInterrupt(iPTT_RELEASED);
     loop(); MyDelay(10);
 
-    // Less attenuation, set while unkeyed
+    // Less attenuation, set while unkeyed (on direct-coupled builds the fine
+    // tune encoder sets the I offset instead, and the attenuation stays put)
+#ifndef DIRECT_COUPLED_TX
     for (int i = 0; i < 4; i++){
         SetInterrupt(iFINETUNE_DECREASE);
         loop(); MyDelay(10);
@@ -1220,6 +1222,7 @@ TEST_F(CalibrationTest, SingleVFOTXIQKeysAtTheDisplayedAttenuation) {
         loop(); MyDelay(10);
         EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
     }
+#endif
 
     SetButton(HOME_SCREEN);
     SetInterrupt(iBUTTON_PRESSED);
@@ -1227,6 +1230,44 @@ TEST_F(CalibrationTest, SingleVFOTXIQKeysAtTheDisplayedAttenuation) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     SetDualVFOs(true);
 }
+
+#ifdef DIRECT_COUPLED_TX
+// The automatic carrier null (button 14) reads the carrier through the receiver,
+// which a single-VFO radio cannot do: there it must do nothing
+TEST_F(CalibrationTest, CarrierNullOnlyOnDualVFO) {
+    SetDualVFOs(false);
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+    SetButton(14);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    SetDualVFOs(true);
+    extern size_t primaryMenuIndex;
+    extern size_t secondaryMenuIndex;
+    primaryMenuIndex = 0;
+    secondaryMenuIndex = 0;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+    SetButton(14);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+    EXPECT_NE(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+#endif
 
 TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
