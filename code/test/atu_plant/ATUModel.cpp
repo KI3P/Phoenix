@@ -38,10 +38,6 @@ If not, see <https://www.gnu.org/licenses/>.
  * then needs two complex multiplies per C code.
  */
 
-#include "SDT.h"
-
-#ifdef ATU_PRESENT
-
 #include <complex>
 #include <math.h>
 #include "ATUModel.h"
@@ -83,9 +79,9 @@ static inline atu_cf CDiv(atu_cf a, atu_cf b){
 
 float ATUCAbs(atu_cf z){ return sqrtf(CNorm(z)); }
 
-// About 40 KB together: RAM2, not the stack or RAM1
-static DMAMEM ATUModelCache sharedCache;
-static DMAMEM ATUTopK sharedTopK;
+// About 40 KB together
+static ATUModelCache sharedCache;
+static ATUTopK sharedTopK;
 ATUModelCache *ATUSharedModelCache(void){ return &sharedCache; }
 ATUTopK *ATUSharedTopK(void){ return &sharedTopK; }
 
@@ -402,4 +398,3 @@ ATURobustChoice ATUModelRobustPick(const ATUModelCache *cache, atu_cf zl, const 
     return out;
 }
 
-#endif // ATU_PRESENT

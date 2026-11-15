@@ -23,7 +23,11 @@ If not, see <https://www.gnu.org/licenses/>.
 
 /**
  * @file ATUModel.h
- * @brief Circuit model of the K9HZ ATU RF board, for the automatic tuner
+ * @brief Circuit model of the K9HZ ATU RF board: the simulated tuner in the host tests
+ *
+ * Not part of the firmware. The tuner searches by measurement and needs no model; the
+ * tests use this one as the plant (the board the tuner drives), and to find the best
+ * setting a load allows by brute force.
  *
  * A port of code/tools/atu_vna/model.py. Every relay setting is a cascade of ABCD
  * matrices: line A, then a shunt node (stray plus the capacitor bank), then line B,
@@ -153,8 +157,7 @@ atu_cf ATUModelGammaPerturbed(const ATUModelCache *cache, int set,
 float ATUCAbs(atu_cf z);
 
 /**
- * @brief The firmware's one model cache, in RAM2 (DMAMEM)
- * @note Shared by the tuner and the AX benchmark; only one of them runs at a time
+ * @brief One shared model cache and top-K list, so a test needs no 40 KB on the stack
  */
 ATUModelCache *ATUSharedModelCache(void);
 ATUTopK *ATUSharedTopK(void);

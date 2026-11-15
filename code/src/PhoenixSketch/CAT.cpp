@@ -1249,10 +1249,6 @@ char *AT_read( char* cmd ){
  * CAT command AX - ATU tuner control and diagnostics (non-standard Kenwood command)
  *
  *   AX0;  stop a running tuner program
- *   AX1;  time the tuner model at the current frequency: the per-frequency
- *         precompute, a search of all 131,072 settings for a sample load (30+j40 ohm)
- *         and robust selection. Blocks the main loop for that long; bench use only.
- *         Replies "AX1,<f_kHz>,<prepare_us>,<search_us>,<robust_us>,<topo><LLL><CCC>,<g x 1000>;"
  *   AX2;  run the READ diagnostic: |Gamma| with the network bypassed, then with the
  *         present setting, three readings each, at the tune power. Result with AX;
  *   AX3;  tune (ATU_PROG_TUNE). Result with AX;
@@ -1269,26 +1265,6 @@ char *AX_write( char* cmd ){
         case '0':
             ATUTuneAbort();
             return empty_string_p;
-        case '1':{
-            if( !ATUChangeAllowed() || ATUTuneActive() ) break;
-            ATUModelCache *cache = ATUSharedModelCache();
-            ATUTopK *topk = ATUSharedTopK();
-            double f_Hz = (double)GetTXRXFreq_cHz() / 100.0;
-            atu_cf zl = { 30.0f, 40.0f };
-            uint32_t t0 = micros();
-            ATUModelPrepare( cache, &ATUModelDefaultParams, f_Hz );
-            uint32_t t1 = micros();
-            ATUModelSearchAll( cache, zl, topk );
-            uint32_t t2 = micros();
-            ATURobustChoice pick = ATUModelRobustPick( cache, zl, topk );
-            uint32_t t3 = micros();
-            sprintf( obuf, "AX1,%lu,%lu,%lu,%lu,%d%03d%03d,%d;",
-                     (unsigned long)(f_Hz / 1000.0), (unsigned long)(t1 - t0),
-                     (unsigned long)(t2 - t1), (unsigned long)(t3 - t2),
-                     pick.best.topo, pick.best.l, pick.best.c,
-                     (int)lroundf( pick.best.g * 1000.0f ) );
-            return obuf;
-        }
         case '2':
         case '3':{
             ATUResultCode rc = ATUTuneStart( cmd[2] == '2' ? ATU_PROG_READ : ATU_PROG_TUNE );

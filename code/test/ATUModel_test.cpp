@@ -7,7 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include "../src/PhoenixSketch/SDT.h"
-#include "../src/PhoenixSketch/ATUModel.h"
+#include "atu_plant/ATUModel.h"
 #include "atu_golden.h"
 
 namespace {
@@ -155,24 +155,4 @@ TEST(ATUModel, RobustPickIsDeterministicAndNoWorseThanItsCandidates) {
     EXPECT_LE(a.worst, plainWorst + 1e-6f);
     // A good match is still available on 10 m (report: robust median SWR ~1.09)
     EXPECT_LT(a.worst, 0.15f);
-}
-
-// ================== CAT: AX1 benchmark ==================
-
-extern char *command_parser(char *command);
-
-TEST(ATUModel, CatAX1RunsTheBenchmark) {
-    InitializeRFHardware();
-    modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
-    UpdateRFHardwareState();
-    char cmd[] = "AX1;";
-    std::string reply(command_parser(cmd));
-    // AX1,<f_kHz>,<prepare_us>,<search_us>,<robust_us>,<topo><LLL><CCC>,<g x 1000>;
-    EXPECT_EQ(reply.substr(0, 4), "AX1,");
-    EXPECT_EQ(reply.back(), ';');
-    int commas = 0;
-    for (char ch : reply) commas += (ch == ',');
-    EXPECT_EQ(commas, 6);
-    char bad[] = "AX9;";
-    EXPECT_STREQ(command_parser(bad), "?;");
 }

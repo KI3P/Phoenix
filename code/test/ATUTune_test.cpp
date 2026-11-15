@@ -8,6 +8,7 @@
 #include <string>
 #include "../src/PhoenixSketch/SDT.h"
 #include "Adafruit_I2CDevice.h"
+#include "atu_plant/ATUModel.h"
 
 extern char *command_parser(char *command);
 void AddMillisTime(uint64_t delta_ms);

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Write the firmware's copy of the fitted ATU model: ATUModelParams_default.h.
+"""Write the host-test plant's copy of the fitted ATU model: ATUModelParams_default.h.
 
-    python3 export_c.py            # writes ../../src/PhoenixSketch/ATUModelParams_default.h
+    python3 export_c.py            # writes ../../test/atu_plant/ATUModelParams_default.h
 
 The header holds the 79 model parameters from fits.json (both zero networks, eight
 inductors, eight capacitors and the shared bank inductance) and the fixed table of
 coil perturbations that ATUModelRobustPick() uses. The table is drawn once here with
-a fixed seed, so the firmware's choice of setting is deterministic.
+a fixed seed, so ATUModelRobustPick() is deterministic.
 """
 import json
 import os
@@ -14,7 +14,7 @@ import os
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "..", "..", "src", "PhoenixSketch", "ATUModelParams_default.h")
+OUT = os.path.join(HERE, "..", "..", "test", "atu_plant", "ATUModelParams_default.h")
 
 N_PERT = 6          # perturbed coil sets for robust selection (report section 6.4)
 SIGMA_PERT = 0.02   # relative spread of each coil's L and Cp in those sets
