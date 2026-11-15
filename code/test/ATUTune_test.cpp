@@ -1092,3 +1092,74 @@ TEST_F(ATUTuneAlgoTest, TunesOtherBuildsCloseToTheirBestOnEveryBand) {
         EXPECT_LE(allReadings[allReadings.size() / 2], 65.0f) << v.name;
     }
 }
+
+// ============================================================ document figures
+
+// Not a check: writes the data behind the figures of code/docs/ATU_Tuning_Algorithm.html.
+// Skipped unless ATU_DOC_DIR names a directory. Then, from code/:
+//   ATU_DOC_DIR=/tmp/atudoc test/build/all_ATU_tests --gtest_filter='*DocFigureData'
+//   python3 tools/atu_vna/build_tuning_doc.py /tmp/atudoc docs/ATU_Tuning_Algorithm.html
+// traces.json: each load's tune, every reading as
+//   [net, capsIn, L, C, phase (ATUTuneAlgoPhase()), measured |Gamma|, true Gamma re, im]
+// <name>.bin: true Gamma (two float32) of every setting, [topology][L][C]
+TEST_F(ATUTuneAlgoTest, DocFigureData) {
+    const char *dir = getenv("ATU_DOC_DIR");
+    if (!dir) GTEST_SKIP() << "set ATU_DOC_DIR to write the figure data";
+    struct Case { const char *name; const char *fa; float r, x; };
+    const Case cases[] = {{"20m_200", "FA00014200000;", 200, 0}, {"80m_12", "FA00003650000;", 12.5f, 0},
+                          {"40m_25p100", "FA00007100000;", 25, 100}, {"15m_100m100", "FA00021200000;", 100, -100},
+                          {"40m_400", "FA00007100000;", 400, 0}, {"20m_25m100", "FA00014200000;", 25, -100}};
+    FILE *js = fopen((std::string(dir) + "/traces.json").c_str(), "w");
+    ASSERT_NE(js, nullptr) << dir;
+    fprintf(js, "[\n");
+    int k = 0;
+    for (const Case &cs : cases){
+        MakePlant(0.05, 300 + k);
+        SetFrequency(cs.fa);
+        plantLoad = {cs.r, cs.x};
+        SetATUPacked(ATU_PACKED_BYPASS);
+        ATUMemoryForget(Band(), 0);
+        ASSERT_EQ(ATUTuneStart(ATU_PROG_TUNE), ATU_OK);
+        // As Run(), noting the search phase that asked for each reading. A reading
+        // enters the record before the planner is asked for the next step, so the
+        // phase on the pass where the record grows is the one that asked for it.
+        int phase[ATU_MAX_READINGS] = {};
+        int seen = 0;
+        for (int i = 0; (i < 5000) && ATUTuneActive(); i++){
+            ATUTuneService();
+            if (modeSM.state_id == ModeSm_StateId_ATU_TUNE_MARK) PerformSWRBridgeReading();
+            while (seen < ATUTuneLastRecord()->n) phase[seen++] = ATUTuneAlgoPhase();
+            AddMillisTime(5);
+        }
+        ASSERT_FALSE(ATUTuneActive());
+        const ATUTuneRecord *rec = ATUTuneLastRecord();
+        ATUCandidate best = ATUModelSearchAll(&plantCache, plantLoad, ATUSharedTopK());
+        fprintf(js, "%s{\"name\":\"%s\",\"f\":%lld,\"r\":%g,\"x\":%g,\"code\":%d,\"final\":%lu,\"finalG\":%g,"
+                "\"best\":[%d,%d,%d,%g],\"readings\":[", k ? "," : "", cs.name, (long long)(GetTXRXFreq_cHz() / 100), cs.r, cs.x,
+                (int)rec->code, (unsigned long)rec->finalSetting, rec->finalGamma, best.topo, best.l, best.c, best.g);
+        for (int i = 0; i < rec->n; i++){
+            uint32_t q = rec->setting[i];
+            atu_cf g;
+            if (!ATU_PACKED_NET(q)){
+                float dr = cs.r + 50, nr = cs.r - 50, x = cs.x, den = dr * dr + x * x;
+                g = {(nr * dr + x * x) / den, (x * dr - nr * x) / den};
+            } else {
+                g = ATUModelGamma(&plantCache, ATU_PACKED_CAPSIN(q) ? ATU_TOPO_CL : ATU_TOPO_LC,
+                                  ATU_PACKED_L(q), ATU_PACKED_C(q), plantLoad);
+            }
+            fprintf(js, "%s[%d,%d,%d,%d,%d,%.5f,%.5f,%.5f]", i ? "," : "", (int)ATU_PACKED_NET(q), (int)ATU_PACKED_CAPSIN(q),
+                    (int)ATU_PACKED_L(q), (int)ATU_PACKED_C(q), phase[i], rec->gamma[i], g.re, g.im);
+        }
+        fprintf(js, "]}\n");
+        FILE *bf = fopen((std::string(dir) + "/" + cs.name + ".bin").c_str(), "wb");
+        ASSERT_NE(bf, nullptr);
+        for (int t = 0; t < 2; t++) for (int l = 0; l < 256; l++) for (int c = 0; c < 256; c++){
+            atu_cf g = ATUModelGamma(&plantCache, t, l, c, plantLoad);
+            fwrite(&g, sizeof(g), 1, bf);
+        }
+        fclose(bf);
+        k++;
+    }
+    fprintf(js, "]\n");
+    fclose(js);
+}

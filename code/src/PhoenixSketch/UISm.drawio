@@ -1,6 +1,6 @@
 <mxfile host="Electron" scale="1.2" border="0" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" version="29.0.3" pages="3">
   <diagram name="design" id="4_nRLMKhFGq-wlyzxGz1">
-    <mxGraphModel dx="922" dy="765" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="1026" dy="772" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="vznjmWunc6GqldK8daHC-0" />
         <mxCell id="vznjmWunc6GqldK8daHC-1" parent="vznjmWunc6GqldK8daHC-0" />
@@ -278,14 +278,17 @@
           <mxGeometry y="30" width="230" height="30" as="geometry" />
         </mxCell>
         <mxCell id="ATUSTATUS-2" value="ATU_STATUS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.94;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="vznjmWunc6GqldK8daHC-1" source="vznjmWunc6GqldK8daHC-8" target="ATUSTATUS-0" edge="1">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry x="0.7583" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="ATUSTATUS-3" value="HOME" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="vznjmWunc6GqldK8daHC-1" source="ATUSTATUS-0" target="vznjmWunc6GqldK8daHC-8" edge="1">
-          <mxGeometry relative="1" as="geometry">
+          <mxGeometry x="-0.9362" relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="1240" y="775" />
               <mxPoint x="1240" y="355" />
             </Array>
+            <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
       </root>

@@ -1533,3 +1533,12 @@ Readability, with no change in behaviour: `TuneNext()` in `ATUTuneAlgo.cpp` is s
 function per phase (the reading sequences of the 150 simulated tunes are identical before and
 after), duplicate element tables removed from `ATUBoard.cpp`, stale comments corrected.
 Updated [[atu-control]].
+
+## [2026-11-15] doc | ATU tuning algorithm write-up with Smith charts
+Added `code/docs/ATU_Tuning_Algorithm.html`: an illustrated description of the search, with
+Smith charts and |Γ| maps of the code space drawn from the firmware's own search run against
+the board model. It is built by `code/tools/atu_vna/build_tuning_doc.py` from data written by
+the test `ATUTuneAlgoTest.DocFigureData` (skipped unless `ATU_DOC_DIR` is set), which labels
+each reading with `ATUTuneAlgoPhase()`. Also committed: the user's re-laid-out `ModeSm.drawio`
+and `UISm.drawio` (the generated code is unchanged) and the regenerated `ModeSm.sim.html`,
+which now has the ATU states. See [[atu-control]].

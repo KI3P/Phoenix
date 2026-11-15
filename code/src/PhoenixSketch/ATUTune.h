@@ -299,4 +299,11 @@ void ATUStatusTableRow(int32_t band, int32_t antenna, char *buf, size_t n);
 /// Planner for ATU_PROG_TUNE, in ATUTuneAlgo.cpp
 extern const ATUPlanner ATUTunePlanner;
 
+/**
+ * @brief Where the search is: phase * 2 + topology (0 bypass, 2/3 walk LC/CL,
+ *        4/5 refine LC/CL, 6/7 done)
+ * @note For the unit tests and the figures of code/docs/ATU_Tuning_Algorithm.html only
+ */
+int ATUTuneAlgoPhase(void);
+
 #endif // ATUTUNE_H

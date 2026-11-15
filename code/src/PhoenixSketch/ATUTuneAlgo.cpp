@@ -540,6 +540,10 @@ static ATUStep TuneNext(ATUTuneRecord *rec){
 
 static void TuneReport(ATUTuneRecord *rec, uint32_t setting, float gamma){}
 
+int ATUTuneAlgoPhase(void){
+    return (int)srch.phase * 2 + srch.topo;
+}
+
 const ATUPlanner ATUTunePlanner = {TuneBegin, TuneNext, TuneReport};
 
 #endif // ATU_PRESENT
