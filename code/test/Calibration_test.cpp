@@ -1269,6 +1269,87 @@ TEST_F(CalibrationTest, CarrierNullOnlyOnDualVFO) {
 }
 #endif
 
+// The automatic sweeps keep, for each pass, the setting with the largest reading
+// above 0 dB. When no reading beats 0 dB (a broken or mirrored loopback), a pass
+// must leave its setting alone, not write a value left over from the last pass.
+// A mirrored spectrum makes every reading negative: the receive image bin (128)
+// is above the wanted bin (384), the transmit image above the wanted tone
+// (256 -/+ 17 by sideband), and the carrier (256) above both.
+static void MirroredSpectrum(int32_t band){
+    for (int i = 0; i < SPECTRUM_RES; i++) psdnew[i] = 1.0f;
+    psdnew[128] = 2.0f;
+    psdnew[256] = 3.0f;
+    bool usb = (bands[band].mode == USB);
+    psdnew[256 + 17] = usb ? 1.0f : 2.0f;
+    psdnew[256 - 17] = usb ? 2.0f : 1.0f;
+}
+
+TEST_F(CalibrationTest, RXIQAutoKeepsSettingWhenNoReadingIsValid) {
+    auto savedED = ED; // the sweep goes on to the next band: put everything back after
+    MirroredSpectrum(FIRST_BAND);
+    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+    ED.IQAmpCorrectionFactor[FIRST_BAND] = 1.07f;
+    ED.IQPhaseCorrectionFactor[FIRST_BAND] = 0.03f;
+    InitializeRXIQCalibration();
+    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_AUTO);
+    ASSERT_TRUE(RXIQCalibrationAutoActive());
+    // Run until the first band is done and the sweep moves on
+    for (int k = 0; (k < 200000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND); k++){
+        UpdateRXDeltaVal();
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+    }
+    EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    // The amplitude is untouched; the phase is where each band's sweep starts it
+    EXPECT_FLOAT_EQ(ED.IQAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], 0.0f);
+    AbortRXIQCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
+TEST_F(CalibrationTest, TXIQAutoKeepsSettingWhenNoReadingIsValid) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    MirroredSpectrum(FIRST_BAND);
+    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+    ED.IQXAmpCorrectionFactor[FIRST_BAND] = 1.07f;
+    ED.IQXPhaseCorrectionFactor[FIRST_BAND] = 0.03f;
+    InitializeTXIQCalibration();
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
+    ASSERT_TRUE(TXIQCalibrationAutoActive());
+    for (int k = 0; (k < 200000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND); k++){
+        UpdateTXDeltaVal();
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    }
+    EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[FIRST_BAND], 0.0f);
+    AbortTXIQCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
+TEST_F(CalibrationTest, CarrierNullAutoKeepsSettingWhenNoReadingIsValid) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    MirroredSpectrum(FIRST_BAND);
+    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+    ED.DCOffsetI[FIRST_BAND] = 123;
+    ED.DCOffsetQ[FIRST_BAND] = -45;
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    for (int k = 0; (k < 400000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND); k++){
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+    }
+    EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 123);
+    EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], 0);
+    AbortTXCarrierCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
 TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 

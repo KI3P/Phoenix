@@ -206,6 +206,13 @@ void AdjustTXCarrierCalSetting(void){
         TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_MIN_EXIT);
         return;
     }
+    // Each pass starts from the setting it sweeps around. If no reading in
+    // the pass is above 0 dB (a broken loopback), the setting stays where it
+    // was, rather than taking the best value of the previous pass
+    if (step == 0){
+        int32_t b = ED.currentBand[ED.activeVFO];
+        maxDBC_parameter = (iteration%2 == 0) ? ED.DCOffsetI[b] : ED.DCOffsetQ[b];
+    }
     // Change the appropriate parameter
     SetOffset(iteration,step); 
     // Go to read data state after waiting for txcarrSM.vars.acquisitionDuration_ms

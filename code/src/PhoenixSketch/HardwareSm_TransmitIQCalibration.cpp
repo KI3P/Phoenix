@@ -218,6 +218,13 @@ void AdjustTXIQCalSetting(void){
         TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_MIN_EXIT);
         return;
     }
+    // Each pass starts from the setting it sweeps around. If no reading in
+    // the pass is above 0 dB (a broken loopback), the setting stays where it
+    // was, rather than taking the best value of the previous pass
+    if (step == 0){
+        int32_t b = ED.currentBand[ED.activeVFO];
+        maxSBS_parameter = (iteration%2 == 0) ? ED.IQXAmpCorrectionFactor[b] : ED.IQXPhaseCorrectionFactor[b];
+    }
     // Change the appropriate parameter
     SetAmpPhase(iteration,step); 
 
