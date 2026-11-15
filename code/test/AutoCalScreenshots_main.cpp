@@ -23,58 +23,16 @@
  * them as PNGs named Auto-L<level>-<nn>-<name>.png.
  */
 
-#include <iostream>
-#include <chrono>
-#include <atomic>
-#include <thread>
-#include <string>
 #include <cmath>
 #include <functional>
-#include <filesystem>
 
-#include "SDT.h"
-#include "RA8875.h"
-#include "LittleFS_mock.h"
+#include "SimScript.h"
 #include "Adafruit_I2CDevice.h"
 
 #define GETHWRBITS(LSB,len) ((hardwareRegister >> LSB) & ((1 << len) - 1))
 
-void setup(void);
-void tick1ms(void);
-extern void StartMillis(void);
-extern LittleFS_Program myfs;
-extern RA8875 tft;
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;
-
-///////////////////////////////////////////////////////////////////////////////
-// The 1 ms timer, locked to the wall clock
-///////////////////////////////////////////////////////////////////////////////
-
-static std::atomic<bool> timer_running{false};
-static std::thread timer_thread;
-
-static void start_timer1ms() {
-    timer_running.store(true);
-    timer_thread = std::thread([]() {
-        int64_t last = millis();
-        while (timer_running.load()) {
-            int64_t now = millis();
-            if (now < last) last = now;
-            while (last < now) {
-                tick1ms();
-                last++;
-            }
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
-        }
-    });
-}
-
-static void stop_timer1ms() {
-    timer_running.store(false);
-    if (timer_thread.joinable())
-        timer_thread.join();
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // The bench: radio 2, and the standard on the connector
@@ -222,36 +180,14 @@ static void SetTiming(void){
                                                                  : autoCal.collectReflection_ms;
 }
 
-static void Step(void){
-    SetTiming();
-    loop();
-    tft.updateScreen();
-    MyDelay(1);
-}
 
-static void Settle(int loops = 40){
-    for (int i = 0; i < loops; i++) Step();
-}
 
-static void Press(int32_t button){
-    SetButton(button);
-    SetInterrupt(iBUTTON_PRESSED);
-    Step();
-}
 
-static void Turn(InterruptType encoder){
-    SetInterrupt(encoder);
-    Step();
-}
 
 static void Shot(const char *name){
-    Settle(20);  // let the panes redraw
     char path[512];
     snprintf(path, sizeof(path), "%s/L%d-%02d-%s.bmp", outDir.c_str(), level, ++shotNumber, name);
-    if (RA8875_SDL_SaveScreenshot(path))
-        std::cout << "Saved " << path << std::endl;
-    else
-        std::cerr << "Could not save " << path << std::endl;
+    SaveShot(path);
 }
 
 static void Fail(const std::string &why){
@@ -396,24 +332,8 @@ int main(int argc, char *argv[]){
     }
     std::filesystem::create_directories(outDir);
 
-    Q_in_L.setChannel(0);
-    Q_in_R.setChannel(1);
-    Q_in_L.clear();
-    Q_in_R.clear();
-    Q_in_L_Ex.setChannel(0);
-    Q_in_R_Ex.setChannel(1);
-    Q_in_L_Ex.clear();
-    Q_in_R_Ex.clear();
-    StartMillis();
-    // A fresh configuration each run, kept out of the working directory
-    std::string store = outDir + "/storage";
-    std::filesystem::remove_all(store);
-    std::filesystem::create_directories(store);
-    myfs.setDiskBackingPath(store);
-
-    setup();
-    digitalWrite(KEY1, 1);
-    digitalWrite(KEY2, 1);
+    SimStartRadio(outDir + "/storage");
+    simStepHook = SetTiming;
     Adafruit_I2CDevice::setMockADCProvider(BridgeADC);
     start_timer1ms();
 
@@ -422,6 +342,6 @@ int main(int argc, char *argv[]){
     stop_timer1ms();
     Adafruit_I2CDevice::setMockADCProvider(nullptr);
     RA8875_SDL_Cleanup();
-    std::filesystem::remove_all(store);
+    std::filesystem::remove_all(outDir + "/storage");
     return 0;
 }

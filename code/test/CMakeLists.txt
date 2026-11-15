@@ -260,4 +260,12 @@ if(USE_SDL_DISPLAY)
     target_include_directories(autocal_screenshots PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(autocal_screenshots ${SDL2_LIBRARIES})
 
+    # Screenshots of the calibration screens for
+    # code/docs/CalibrationGuide/Calibration_Guide.html:
+    #   SDL_VIDEODRIVER=offscreen ./calguide_screenshots <single|dual> <output directory>
+    add_executable(calguide_screenshots CalGuideScreenshots_main.cpp ${SIMULATOR_SOURCES})
+    target_compile_definitions(calguide_screenshots PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS)
+    target_include_directories(calguide_screenshots PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(calguide_screenshots ${SDL2_LIBRARIES})
+
 endif()

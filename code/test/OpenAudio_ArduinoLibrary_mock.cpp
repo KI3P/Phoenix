@@ -135,11 +135,13 @@ public:
             return;
         }
 
-        // Convert int16_t to float32_t for DataBlock
-        // Swap I and Q so that sideband is correct and apply imperfections too
+        // Convert int16_t to float32_t for DataBlock, with the imperfections of
+        // a real transmitter: a 10 % amplitude error and DC offsets (a carrier).
+        // I and Q keep their places: swapping them mirrors the spectrum, which
+        // puts the wanted tone where the calibration expects the image
         for (int i = 0; i < FEEDBACK_BLOCK_SIZE; i++) {
-            iFloat[i] = 1.1*(float32_t)samples[i] + 150.2;
-            qFloat[i] = (float32_t)iBuffer[i] + 67.8;
+            iFloat[i] = 1.1*(float32_t)iBuffer[i] + 150.2;
+            qFloat[i] = (float32_t)samples[i] + 67.8;
         }
 
         // Apply frequency shift (Fs/4 = 48kHz at 192kHz sample rate)
