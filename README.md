@@ -62,6 +62,67 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 # Version History
 
+## V1.5.1 Release Notes
+
+### Major New Features
+
+**Support for the K9HZ Automatic Antenna Tuner**
+Phoenix now drives the K9HZ ATU board: an L-network of 8 switched inductors and 8 switched capacitors, which can sit on either side of the inductors, with a bypass and a 4:1 balun output. Support is off by default. Enable it by defining `ATU_PRESENT` in `code/src/PhoenixSketch/Config.h`. The tuner's two I/O expanders appear on the BIT screen.
+
+- **Automatic tuning with no calibration.** The tuner needs no characterisation of the board, no VNA measurements and no model of the network. Hand-wound coils that differ from build to build don't matter.
+  - It transmits a low-power carrier (2 W by default) and ranks relay settings by the SWR the radio's bridge measures.
+  - It first finds, for each inductor, the capacitor that matches best. That traces the narrow valley of good settings across the L/C grid.
+  - It then fine-tunes from the lowest point of the valley.
+  - It stops at SWR 1.2 or better, or after 120 readings. It leaves the best setting it read, and an antenna that is already 1.3 or better stays bypassed.
+- **Bench results.** On the prototype, 100 Ω and 200 Ω loads tuned to SWR 1.05–1.41 on 80–10 m in 3–6 s.
+- **Memory per band and per antenna.** Each tune is stored for the band and the antenna in use (RF Options → Antenna). Selecting a band or an antenna puts its stored setting on the relays, so a setting tuned for one antenna is never used on another. Relays never switch while transmitting.
+- **Button 16 tunes.** Button 16, previously unassigned, starts a fresh tune of the current band and antenna and stores the result. Pressing any button stops a tune and puts the previous setting back.
+- **The home screen shows the tuner.** Two lines to the right of SWR and PWR show:
+
+  | When | Shown | Colour |
+  |---|---|---|
+  | Network in line | Topology and nominal inductance and capacitance, e.g. `CL 0.82uH` / `157pF` | White |
+  | Network bypassed | `ATU BYP` | White |
+  | ATU bypassed on this antenna | `ATU OFF` | White |
+  | Tuning | `TUNING` and the reading count | Yellow |
+  | For 3 s after the tuner refuses or fails | `TUNE` and the reason, e.g. `MODE` or `NO CAL` | Red |
+
+- **A simple ATU menu.** All six items act on the current antenna:
+
+  | Item | Does |
+  |---|---|
+  | **Bypass ATU** / **Enable ATU** | Bypasses or enables the ATU on this antenna. Tuning re-enables it. |
+  | **Tuning status table** | Opens a page showing what is stored on each band. |
+  | **Clear memory, ant N** | Clears the stored settings. Needs a second press to confirm. |
+  | **Tune** | Starts a tune, the same as button 16. |
+  | **Tune power (W)** | Sets the carrier power for tuning. |
+  | **Output: coax** / **Output: balun** | Chooses which ATU output this antenna is on. |
+
+- **CAT control.** The Kenwood `AC` command bypasses or enables the tuner and starts or stops a tune. A radio built without the ATU answers `AC000;`, as a radio with no tuner does.
+
+The tuner starts only from SSB or CW receive, on a band where transmit is allowed and the SWR bridge is calibrated. The balun output, reactive loads and 100 W have not yet been tested. See the wiki pages `firmware/atu-control.md` and `roadmap/atu-auto-tuning.md`.
+
+### Bug Fixes
+
+- **The display could freeze the radio.** The LPSPI that drives the display ran from a 240 MHz clock and occasionally lost a received byte. The main loop then waited forever inside a display call, while USB kept running, so CAT went silent with no reboot. It now runs from 132 MHz, and display writes run at 18.9 MHz instead of 20 MHz. Over 10 minutes the old clock hung 8 times and the new one never did.
+- **Reboot loop with some Optimize settings.** The zoom FFT and the IQ phase correction put 24 KB of scratch buffers on the stack. Builds whose code fills more of the Teensy's fast memory left too little room for that, and -O2 LTO rebooted 8 s after every start. The buffers now live in OCRAM, and peak stack use fell from 17.5 KB to 3.6 KB.
+- **CAT `FA;`, `FB;` and `IF;` replies were garbled on the radio.** The Teensy's `printf` doesn't support `%lld`, so `FA;` answered `FA0000000000ld;`. The same bug showed "ld" on screen for the fine tune step and the power calibration frequency.
+- **Every band, antenna or attenuator change cleared the upper 32 bits of the hardware register.** That reset the transmit VFO bit in the register record. It would also have reset the ATU relays, which live in those bits.
+- **Two GCC 15 warnings (Teensyduino 1.62).**
+  - The Si5351 driver freed an array with `delete` instead of `delete[]`. It now uses a local array, which also removes a heap allocation from every PLL change.
+  - The zoom label's buffer was one byte too short.
+
+### Under-the-Hood Changes
+
+- **New CAT commands**, bringing the table to 39:
+  - `AC`: Kenwood antenna tuner control.
+  - `AT`: set or read every ATU relay, for bench work.
+  - `AX`: tuner diagnostics (tune, abort, last result, forget one band).
+  - `AY`: the tuner's readings, 12 per page.
+- **New stored settings:** the ATU memory (setting, frequency and SWR per band and antenna), the tune power, and per antenna the ATU enable and output.
+- **A new UI state, `ATU_STATUS`,** for the tuning status table. `UISm` was regenerated with StateSmith 0.20.
+- **Tests:** the unit tests have grown to 969. `all_ATU_tests` is built with `ATU_PRESENT` and runs the tuner against a circuit model of the board, fitted from VNA measurements. The model is used only in the tests, never in the firmware. The tests tune 15 loads on each of 80–10 m on simulated builds whose coils and capacitors are 5 % and 12 % off, and check the result against the best each build can reach. `code/tools/atu_vna/search_sim.py` runs the same search offline.
+
 ## V1.5.0 Release Notes
 
 ### Major New Features
