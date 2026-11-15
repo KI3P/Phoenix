@@ -68,7 +68,7 @@ the current band (RF Options → Antenna).
 |---|---|
 | **Bypass ATU** / **Enable ATU** | bypass the ATU on this antenna, or enable it again (`ED.ATU_Enabled[ant]`, saved); the label says what selecting it will do |
 | **Tuning status table** | full-screen page (UI state `ATU_STATUS`): this antenna's output and enable state, then one row per amateur band with the stored frequency, setting (topology and nominal µH/pF, or bypass) and SWR, or `--`; the current band in yellow; HOME returns |
-| **Clear memory, ant N** | forget every band's setting for this antenna. Press twice: the first press re-opens the menu on the item, now reading "Press again to clear"; moving off it or waiting 10 s cancels. The home screen then shows `MEM` / `CLEARED`. |
+| **Clear memory, ant N** | forget every band's setting for this antenna. Press twice: the first press re-opens the menu on the item, now reading "Press again to clear"; moving off it or waiting 10 s cancels. The home screen then shows `MEM` / `CLEARED`. While transmitting, the relays are left alone and bypassed on the way back to receive. |
 | **Tune** | retune, as button 16 |
 | **Tune power (W)** | 0.5–10 W, default 2 |
 | **Output: coax** / **Output: balun** | which ATU output this antenna is on (`ED.ATU_BalunOut[ant]`, K18, saved) |
@@ -108,7 +108,11 @@ See [[atu-auto-tuning]] for the algorithm and the bench results. In brief:
     Pressing any button while it runs stops it and restores the previous setting.
   - **Menu:** ATU → **Tune**.
   - **CAT:** `AC001;` (Kenwood) or `AX3;`.
-  - A retune enables the ATU on the antenna if it was bypassed.
+  - A retune enables the ATU on the antenna if it was bypassed. If that tune is then stopped
+    or fails, the antenna's stored setting goes on the relays (bypass if there is none).
+  - A band or antenna change during a tune (only CAT can make one; the front panel stops the
+    tune first) ends it with `ATU_FAIL_STATE`, stores nothing, and sets the relays up for the
+    new band and antenna.
 - **Refusals:** the tuner only starts from SSB or CW receive, on a band where transmit is
   allowed and the SWR bridge is calibrated.
 - **Search:** the tuner is a measured search with no model or calibration

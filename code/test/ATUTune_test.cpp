@@ -592,6 +592,60 @@ TEST_F(ATUMemoryTest, TuneOnOneAntennaLeavesTheOtherAntennasAlone) {
     ExpectBackInReceive();
 }
 
+TEST_F(ATUMemoryTest, AStoppedRetuneOfABypassedAntennaLeavesItsStoredSetting) {
+    // Tune enables the ATU on a bypassed antenna. If that tune is stopped, the
+    // antenna is enabled, so its stored setting belongs on the relays.
+    MakePlant(0.05, 9);
+    SetFrequency("FA00014200000;");
+    plantLoad = {200.0f, 0.0f};
+    const uint32_t x = ATU_PACK(1, 0, 1, 0x21, 0x05);
+    ATUMemoryStore(BAND_20M, 0, x, 14200, 1.2f);
+    ASSERT_TRUE(ATUSetEnabled(0, false));
+    ASSERT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    ASSERT_EQ(ATURetune(), ATU_OK);
+    EXPECT_TRUE(ATUAntennaEnabled(0));
+    ASSERT_TRUE(RunUntilKeyed());
+    ATUTuneAbort();
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_ABORTED);
+    EXPECT_EQ(GetATURegisterState(), x);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUMemoryTest, ABandChangeDuringATuneStopsItAndStoresNothing) {
+    // CAT can change the band while the tuner runs (the front panel cannot). The
+    // readings are then of the wrong band: stop, and set up the new band.
+    MakePlant(0.05, 9);
+    SetFrequency("FA00014200000;");
+    plantLoad = {200.0f, 0.0f};
+    const uint32_t on40 = ATU_PACK(1, 0, 0, 0x08, 0x02);
+    ATUMemoryStore(BAND_40M, 0, on40, 7100, 1.3f);
+    UpdateTuneState();
+    ASSERT_EQ(ATURetune(), ATU_OK);
+    ASSERT_TRUE(RunUntilKeyed());
+    SetBand(BAND_40M);
+    ASSERT_TRUE(Run());
+    EXPECT_EQ(ATUTuneLastRecord()->code, ATU_FAIL_STATE);
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+    uint32_t s;
+    ASSERT_TRUE(ATUMemoryGet(BAND_40M, 0, &s, NULL, NULL));
+    EXPECT_EQ(s, on40);
+    EXPECT_EQ(GetATURegisterState(), on40);
+    ExpectBackInReceive();
+}
+
+TEST_F(ATUMemoryTest, ClearingWhileTransmittingBypassesOnTheWayBackToReceive) {
+    const uint32_t x = ATU_PACK(1, 0, 0, 0x21, 0x05);
+    ATUMemoryStore(BAND_20M, 0, x, 14200, 1.2f);
+    UpdateTuneState();
+    ASSERT_EQ(GetATURegisterState(), x);
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
+    ASSERT_EQ(modeSM.state_id, ModeSm_StateId_SSB_TRANSMIT);
+    EXPECT_TRUE(ATUMemoryClearAntenna(0));
+    EXPECT_EQ(GetATURegisterState(), x);        // never switched with RF present
+    ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+}
+
 // ================================================================ search tuner
 
 namespace {

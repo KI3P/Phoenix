@@ -60,8 +60,9 @@ If not, see <https://www.gnu.org/licenses/>.
 //#define USE_ANALOG_SWR
 
 // K9HZ 100W antenna tuner (ATU). Uncomment if the ATU control board is connected
-// to the BANDS connector (I2C bus Wire2). Compiles in the ATU driver, its BIT
-// rows, the ATU menu and the AT; CAT command. The tuner boots bypassed.
+// to the BANDS connector (I2C bus Wire2). Compiles in the ATU driver, the automatic
+// tuner (front-panel button 16), its BIT rows, the ATU menu and the ATU CAT commands
+// (AC, AT, AX, AY). The tuner boots bypassed.
 // Address jumpers on the control board: see ATU_MCP23017_ADDR below.
 //#define ATU_PRESENT
 

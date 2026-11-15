@@ -22,10 +22,14 @@ If not, see <https://www.gnu.org/licenses/>.
  *
  * Phases of one reading, all timed from millis() so the main loop never waits:
  *
- *   PLAN -- write relays --> RELAY (15 ms) -- ATU_CARRIER_ON --> CARRIER (25 ms)
- *     ^                                                              |
- *     |                                            ClearSWRBridgeStats()
- *     +---- report |Gamma| <-- ATU_CARRIER_OFF <-- COLLECT (>= 60 ms, >= 5 readings)
+ *   PLAN -- write relays --> RELAY -- ATU_CARRIER_ON --> CARRIER
+ *     ^                                                      |
+ *     |                                       ClearSWRBridgeStats()
+ *     +---- report |Gamma| <-- ATU_CARRIER_OFF <-- COLLECT
+ *
+ * RELAY lasts ATU_RELAY_SETTLE_MS and CARRIER ATU_CARRIER_SETTLE_MS. COLLECT lasts
+ * until there are ATU_COLLECT_MIN_SAMPLES bridge readings and ATU_COLLECT_MIN_MS
+ * have passed. Before the first PLAN, ENTER waits ATU_TR_SETTLE_MS for the T/R relay.
  *
  * The relays only ever switch in ATU_TUNE_SPACE, with the carrier off. The T/R
  * relay stays in TX for the whole program, so it switches twice per program, not
@@ -47,7 +51,8 @@ static struct {
     uint32_t pending;           // setting being read
     uint32_t start_ms;
     uint32_t t0_ms;             // start of the current phase
-} eng = {PH_IDLE, NULL, 0, 0, 0, 0};
+    int32_t band, antenna;      // where the program started; it stops if either changes
+} eng = {PH_IDLE, NULL, 0, 0, 0, 0, 0, 0};
 
 static ATUTuneRecord record;
 
@@ -79,6 +84,15 @@ static const ATUPlanner ReadPlanner = {ReadBegin, ReadNext, ReadReport};
 // Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
+/// Both I/O expanders answered at startup
+static inline bool BoardPresent(void){
+    return bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present;
+}
+
+static inline bool AntennaIndexOK(int32_t antenna){
+    return (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS);
+}
+
 static inline bool InTuneStates(void){
     return (modeSM.state_id == ModeSm_StateId_ATU_TUNE_SPACE) ||
            (modeSM.state_id == ModeSm_StateId_ATU_TUNE_MARK);
@@ -107,7 +121,7 @@ float ATUTuneAttenuation_dB(void){
 ///////////////////////////////////////////////////////////////////////////////
 
 static inline bool MemoryIndexOK(int32_t band, int32_t antenna){
-    return (band >= 0) && (band < NUMBER_OF_BANDS) && (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS);
+    return (band >= 0) && (band < NUMBER_OF_BANDS) && AntennaIndexOK(antenna);
 }
 
 int32_t ATUCurrentBand(void){ return ED.currentBand[ED.activeVFO]; }
@@ -129,7 +143,7 @@ bool ATUMemoryGet(int32_t band, int32_t antenna, uint32_t *state, int32_t *f_kHz
 
 void ATUMemoryStore(int32_t band, int32_t antenna, uint32_t state, int32_t f_kHz, float swr){
     if (!MemoryIndexOK(band, antenna)) return;
-    ED.ATU_State[band][antenna] = (state & 0x7FFFFu) | ATU_MEMORY_VALID;
+    ED.ATU_State[band][antenna] = (state & ATU_PACKED_MASK) | ATU_MEMORY_VALID;
     ED.ATU_Freq_kHz[band][antenna] = f_kHz;
     ED.ATU_SWR[band][antenna] = swr;
     SaveDataToStorage(false);
@@ -143,20 +157,31 @@ void ATUMemoryForget(int32_t band, int32_t antenna){
     SaveDataToStorage(false);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Per-antenna settings, and putting the right setting on the relays
+///////////////////////////////////////////////////////////////////////////////
+
+// The band and antenna whose setting was last put on the relays (-1: none yet).
+// ATUApplyStoredIfChanged() acts only when the current ones differ from these.
 static int32_t appliedBand = -1;
 static int32_t appliedAntenna = -1;
 
-void ATUMemoryResetHook(void){
+/// PRIVATE: Make the next ATUApplyStoredIfChanged() apply, whatever the band and antenna
+static void ForgetApplied(void){
     appliedBand = -1;
     appliedAntenna = -1;
 }
 
+void ATUMemoryResetHook(void){
+    ForgetApplied();
+}
+
 bool ATUAntennaEnabled(int32_t antenna){
-    return (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS) && ED.ATU_Enabled[antenna];
+    return AntennaIndexOK(antenna) && ED.ATU_Enabled[antenna];
 }
 
 bool ATUAntennaBalun(int32_t antenna){
-    return (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS) && ED.ATU_BalunOut[antenna];
+    return AntennaIndexOK(antenna) && ED.ATU_BalunOut[antenna];
 }
 
 uint32_t ATUBypassFor(int32_t antenna){
@@ -168,13 +193,12 @@ uint32_t ATUSettingFor(int32_t band, int32_t antenna){
     if (!ATUAntennaEnabled(antenna) || !ATUMemoryGet(band, antenna, &s, NULL, NULL))
         return ATUBypassFor(antenna);
     // The output connector is the antenna's, whatever was stored
-    return (s & ~(1u << 17)) | (ATUAntennaBalun(antenna) ? (1u << 17) : 0u);
+    return (s & ~ATU_PACKED_BAL_BIT) | (ATUAntennaBalun(antenna) ? ATU_PACKED_BAL_BIT : 0u);
 }
 
 bool ATUApplyForAntenna(int32_t band, int32_t antenna){
     if (ATUTuneActive() || PowerCalAutoActive()) return false;
-    if (!MemoryIndexOK(band, antenna) ||
-        !(bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present)) return false;
+    if (!MemoryIndexOK(band, antenna) || !BoardPresent()) return false;
     if (!ATUChangeAllowed()) return false;      // transmitting
     SetATUPacked(ATUSettingFor(band, antenna));
     appliedBand = band;
@@ -184,39 +208,47 @@ bool ATUApplyForAntenna(int32_t band, int32_t antenna){
 
 void ATUApplyStoredIfChanged(int32_t band, int32_t antenna){
     if ((band == appliedBand) && (antenna == appliedAntenna)) return;
+    // Busy: leave appliedBand/appliedAntenna alone, so a later call applies
     if (ATUTuneActive() || PowerCalAutoActive()) return;
-    if (!MemoryIndexOK(band, antenna) ||
-        !(bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present)){
+    if (!MemoryIndexOK(band, antenna) || !BoardPresent()){
+        // Nothing can ever be applied here: remember it, so as not to try on every call
         appliedBand = band;
         appliedAntenna = antenna;
         return;
     }
-    ATUApplyForAntenna(band, antenna);          // transmitting: tried again in receive
+    // If transmitting this does nothing and remembers nothing, so the next call in
+    // receive (HandleTuneState() runs on the way back) applies
+    ATUApplyForAntenna(band, antenna);
+}
+
+/**
+ * PRIVATE: Set one antenna's entry of ED.ATU_Enabled or ED.ATU_BalunOut, save it, and
+ * put the result on the relays if it is the current antenna.
+ *
+ * @return false if refused: tuning, transmitting, or antenna out of range
+ */
+static bool SetAntennaFlag(bool *flags, int32_t antenna, bool on){
+    if (!AntennaIndexOK(antenna) || ATUTuneActive()) return false;
+    if (!ATUChangeAllowed()) return false;
+    flags[antenna] = on;
+    SaveDataToStorage(false);
+    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
+    return true;
 }
 
 bool ATUSetEnabled(int32_t antenna, bool on){
-    if ((antenna < 0) || (antenna >= ATU_NUM_ANTENNAS) || ATUTuneActive()) return false;
-    if (!ATUChangeAllowed()) return false;
-    ED.ATU_Enabled[antenna] = on;
-    SaveDataToStorage(false);
-    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
-    return true;
+    return SetAntennaFlag(ED.ATU_Enabled, antenna, on);
 }
 
 bool ATUSetBalunOut(int32_t antenna, bool on){
-    if ((antenna < 0) || (antenna >= ATU_NUM_ANTENNAS) || ATUTuneActive()) return false;
-    if (!ATUChangeAllowed()) return false;
-    ED.ATU_BalunOut[antenna] = on;
-    SaveDataToStorage(false);
-    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
-    return true;
+    return SetAntennaFlag(ED.ATU_BalunOut, antenna, on);
 }
 
 static bool memoryCleared = false;          // shown on the home screen for a while
 static uint32_t memoryCleared_ms = 0;
 
 bool ATUMemoryClearAntenna(int32_t antenna){
-    if ((antenna < 0) || (antenna >= ATU_NUM_ANTENNAS) || ATUTuneActive()) return false;
+    if (!AntennaIndexOK(antenna) || ATUTuneActive()) return false;
     memoryCleared = true;
     memoryCleared_ms = (uint32_t)millis();
     for (int32_t b = 0; b < NUMBER_OF_BANDS; b++){
@@ -225,19 +257,16 @@ bool ATUMemoryClearAntenna(int32_t antenna){
         ED.ATU_SWR[b][antenna] = 0;
     }
     SaveDataToStorage(false);
-    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
+    // The current antenna's relays now show a setting that is no longer stored. If
+    // they cannot be bypassed now (transmitting), do it on the way back to receive.
+    if ((antenna == ATUCurrentAntenna()) && !ATUApplyForAntenna(ATUCurrentBand(), antenna))
+        ForgetApplied();
     return true;
 }
 
-ATUResultCode ATURetune(void){
-    ATUResultCode rc = ATUTuneStart(ATU_PROG_TUNE);
-    int32_t antenna = ATUCurrentAntenna();
-    if ((rc == ATU_OK) && !ATUAntennaEnabled(antenna) && (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS)){
-        ED.ATU_Enabled[antenna] = true;
-        SaveDataToStorage(false);
-    }
-    return rc;
-}
+///////////////////////////////////////////////////////////////////////////////
+// The engine
+///////////////////////////////////////////////////////////////////////////////
 
 bool ATUTuneActive(void){ return eng.phase != PH_IDLE; }
 
@@ -299,7 +328,7 @@ static void Finish(ATUResultCode code, uint32_t setting){
  */
 static float ReadingToGamma(const SWRBridgeStats &st){
     if (st.n < ATU_COLLECT_MIN_SAMPLES) return -1.0f;
-    int32_t band = ED.currentBand[ED.activeVFO];
+    int32_t band = ATUCurrentBand();
     float m_f = SWRCAL_NOMINAL_SLOPE_MV_PER_DB + ED.SWR_F_SlopeAdj[band];
     float b_f = ED.SWR_F_Offset[band] - SWRCAL_OFFSET_CONSTANT_DB;
     float m_r = SWRCAL_NOMINAL_SLOPE_MV_PER_DB + ED.SWR_R_SlopeAdj[band];
@@ -310,10 +339,6 @@ static float ReadingToGamma(const SWRBridgeStats &st){
     return SWRCalGamma(st.fwdMean_mV, st.refMean_mV, m_f, b_f, m_r, b_r);
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Public engine functions
-///////////////////////////////////////////////////////////////////////////////
-
 ATUResultCode ATUTuneStart(ATUProgram program){
     ATUResultCode refuse = ATU_OK;
     const ATUPlanner *planner = NULL;
@@ -322,12 +347,12 @@ ATUResultCode ATUTuneStart(ATUProgram program){
         case ATU_PROG_TUNE: planner = &ATUTunePlanner; break;
         default: refuse = ATU_REFUSED_MODE; break;
     }
-    int32_t band = ED.currentBand[ED.activeVFO];
+    int32_t band = ATUCurrentBand();
     if (refuse != ATU_OK){
         // unknown program
     } else if (ATUTuneActive() || PowerCalAutoActive()){
         refuse = ATU_REFUSED_BUSY;
-    } else if (!(bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present)){
+    } else if (!BoardPresent()){
         refuse = ATU_REFUSED_NO_BOARD;
     } else if ((modeSM.state_id != ModeSm_StateId_SSB_RECEIVE) &&
                (modeSM.state_id != ModeSm_StateId_CW_RECEIVE)){
@@ -338,7 +363,8 @@ ATUResultCode ATUTuneStart(ATUProgram program){
         refuse = ATU_REFUSED_UNCALIBRATED;
     }
     if (refuse != ATU_OK){
-        // Leave the last program's record alone unless nothing has run yet
+        // Note the refusal in the record (the home screen shows it for a while), but
+        // not while a program runs: that record is in use
         if (!ATUTuneActive()){
             record.program = program;
             record.code = refuse;
@@ -355,6 +381,8 @@ ATUResultCode ATUTuneStart(ATUProgram program){
     record.predictedGamma = -1.0f;
     eng.planner = planner;
     eng.operatorSetting = GetATURegisterState();
+    eng.band = band;
+    eng.antenna = ATUCurrentAntenna();
     eng.start_ms = millis();
     eng.t0_ms = eng.start_ms;
     eng.phase = PH_ENTER;
@@ -366,6 +394,20 @@ ATUResultCode ATUTuneStart(ATUProgram program){
     }
     planner->begin(&record, eng.operatorSetting, (double)GetTXRXFreq_cHz() / 100.0);
     return ATU_OK;
+}
+
+ATUResultCode ATURetune(void){
+    ATUResultCode rc = ATUTuneStart(ATU_PROG_TUNE);
+    int32_t antenna = ATUCurrentAntenna();
+    if ((rc == ATU_OK) && AntennaIndexOK(antenna) && !ED.ATU_Enabled[antenna]){
+        // Asking for a tune enables a bypassed antenna. Should the tune be stopped or
+        // fail, what goes back on the relays is then what an enabled antenna has, its
+        // stored setting, not the bypass it started in.
+        ED.ATU_Enabled[antenna] = true;
+        SaveDataToStorage(false);
+        eng.operatorSetting = ATUSettingFor(ATUCurrentBand(), antenna);
+    }
+    return rc;
 }
 
 void ATUTuneAbort(void){
@@ -382,6 +424,16 @@ void ATUTuneService(void){
         // just record it. Restore the operator's setting if we are back in receive.
         if (ATUChangeAllowed()) SetATUPacked(eng.operatorSetting);
         Finish(ATU_FAIL_STATE, eng.operatorSetting);
+        return;
+    }
+    if ((ATUCurrentBand() != eng.band) || (ATUCurrentAntenna() != eng.antenna)){
+        // The band or antenna changed under the tuner. The front panel cannot do that
+        // (ConsumeInterrupt() stops the program first) but CAT can. The readings no
+        // longer belong to one antenna on one band, so stop without storing anything,
+        // and set the relays up for where the radio is now.
+        Finish(ATU_FAIL_STATE, eng.operatorSetting);
+        ForgetApplied();
+        ATUApplyStoredIfChanged(ATUCurrentBand(), ATUCurrentAntenna());
         return;
     }
     if (now - eng.start_ms > ATU_TUNE_TIMEOUT_MS){
@@ -463,8 +515,12 @@ void ATUTuneService(void){
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Text for the display
+///////////////////////////////////////////////////////////////////////////////
+
 /**
- * The short reason shown for a refused or failed program, or NULL if there is none
+ * PRIVATE: The short reason shown for a refused or failed program, or NULL if there is none
  */
 static const char *StatusReason(ATUResultCode code){
     switch (code){

@@ -244,18 +244,15 @@ uint8_t GetATUCapacitors(void){
     return ATU_GPB_STATE;
 }
 
-static const float nominalL_uH[ATU_NUM_INDUCTORS] = {0.05f, 0.1f, 0.22f, 0.45f, 1.0f, 2.2f, 4.4f, 8.8f};
-static const float nominalC_pF[ATU_NUM_CAPACITORS] = {10, 22, 47, 100, 220, 470, 1000, 2000};
-
 float ATUNominalInductance_uH(uint8_t lMask){
     float sum = 0;
-    for (int n = 0; n < ATU_NUM_INDUCTORS; n++) if (lMask & (1u << n)) sum += nominalL_uH[n];
+    for (int n = 0; n < ATU_NUM_INDUCTORS; n++) if (lMask & (1u << n)) sum += inductorValues_uH[n];
     return sum;
 }
 
 float ATUNominalCapacitance_pF(uint8_t cMask){
     float sum = 0;
-    for (int n = 0; n < ATU_NUM_CAPACITORS; n++) if (cMask & (1u << n)) sum += nominalC_pF[n];
+    for (int n = 0; n < ATU_NUM_CAPACITORS; n++) if (cMask & (1u << n)) sum += capacitorValues_pF[n];
     return sum;
 }
 
@@ -286,19 +283,27 @@ void SetATUState(bool networkEngaged, bool balancedOutput, bool capsAtInput,
 }
 
 /**
- * Return true if it is safe to switch the ATU relays now.
+ * Set every ATU relay from a packed state (the format of GetATURegisterState()),
+ * with a single hardware update.
  *
- * Relays must not be switched while RF is present: hot-switching was not
- * tested and would shorten contact life. Only the receive state is safe.
- * The low-level setters do not check this; the menu and CAT paths do.
- *
- * @return true if the RF hardware is in the receive state
+ * @param state Bit 0-7 L mask, 8-15 C mask, 16 caps at input, 17 balun, 18 network in line
  */
 void SetATUPacked(uint32_t state){
     SET_ATU_STATE(state);
     UpdateATURegisters();
 }
 
+/**
+ * Return true if it is safe to switch the ATU relays now.
+ *
+ * Relays must not be switched while RF is present: hot-switching was not
+ * tested and would shorten contact life. Only the receive state is safe.
+ * The low-level setters do not check this; the menu and CAT paths do.
+ * (The tuner switches them in ATU_TUNE_SPACE, with the carrier off: see
+ * ATUTuneRelaysAllowed().)
+ *
+ * @return true if the RF hardware is in the receive state
+ */
 bool ATUChangeAllowed(void){
     return GetRFHardwareState() == RFReceive;
 }
@@ -314,21 +319,11 @@ float32_t ATUCapacitorValue_pF(uint8_t n){
 }
 
 float32_t GetATUInductance_uH(void){
-    float32_t total = 0.0f;
-    uint8_t mask = ATU_GPA_STATE;
-    for (uint8_t i = 0; i < ATU_NUM_INDUCTORS; i++){
-        if (mask & (1 << i)) total += inductorValues_uH[i];
-    }
-    return total;
+    return ATUNominalInductance_uH(ATU_GPA_STATE);
 }
 
 float32_t GetATUCapacitance_pF(void){
-    float32_t total = 0.0f;
-    uint8_t mask = ATU_GPB_STATE;
-    for (uint8_t i = 0; i < ATU_NUM_CAPACITORS; i++){
-        if (mask & (1 << i)) total += capacitorValues_pF[i];
-    }
-    return total;
+    return ATUNominalCapacitance_pF(ATU_GPB_STATE);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

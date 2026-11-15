@@ -629,18 +629,26 @@ extern bool redrawMenu;          // defined with the menu navigation, below
 static char atuEnableLabel[24];
 static char atuClearLabel[32];
 static char atuOutputLabel[24];
-static uint32_t atuClearArmed_ms = 0;
-static bool atuClearArmed = false;
-#define ATU_CLEAR_ARM_MS 10000
+static bool atuClearArmed = false;       // "Clear memory" pressed once; see ATUMenuClearIsArmed()
+static uint32_t atuClearArmed_ms = 0;    // millis() of that press
+#define ATU_CLEAR_ARM_MS 10000           // a second press within this long clears
 
 /**
- * Point the ATU menu's labels at text for the current antenna's state.
+ * True if "Clear memory" has been pressed once and a second press would still clear.
+ * The first press lapses after ATU_CLEAR_ARM_MS.
+ */
+static bool ATUMenuClearIsArmed(void){
+    if (atuClearArmed && ((uint32_t)(millis() - atuClearArmed_ms) >= ATU_CLEAR_ARM_MS)) atuClearArmed = false;
+    return atuClearArmed;
+}
+
+/**
+ * Write the ATU menu's changing labels for the current antenna's state.
  */
 void ATUMenuRefreshLabels(void){
     int32_t ant = ATUCurrentAntenna();
     snprintf(atuEnableLabel, sizeof(atuEnableLabel), "%s", ATUAntennaEnabled(ant) ? "Bypass ATU" : "Enable ATU");
-    if (atuClearArmed && ((uint32_t)(millis() - atuClearArmed_ms) >= ATU_CLEAR_ARM_MS)) atuClearArmed = false;
-    if (atuClearArmed)
+    if (ATUMenuClearIsArmed())
         snprintf(atuClearLabel, sizeof(atuClearLabel), "Press again to clear");
     else
         snprintf(atuClearLabel, sizeof(atuClearLabel), "Clear memory, ant %ld", (long)ant);
@@ -675,7 +683,7 @@ void ATUMenuShowTable(void){
  * clears.
  */
 void ATUMenuClearAntenna(void){
-    if (atuClearArmed && ((uint32_t)(millis() - atuClearArmed_ms) < ATU_CLEAR_ARM_MS)){
+    if (ATUMenuClearIsArmed()){
         atuClearArmed = false;
         ATUMemoryClearAntenna(ATUCurrentAntenna());
         return;

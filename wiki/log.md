@@ -1517,3 +1517,19 @@ re-enables; clearing needs two presses; the table shows one row per ham band. Co
 `fcd481e`, `94a3f61` and `b620f34` on `ATU_search`, verified on the prototype. Manual relay
 control is now CAT-only (`AT`). Updated [[atu-control]], [[ui-state-machine]] and
 [[atu-auto-tuning]].
+
+## [2026-11-15] review | ATU branch reviewed against nightly: three fixes, search split into phases
+Review of `ATU_search` against `nightly` before merging. Each bug was first shown by a failing
+test:
+- A retune of a bypassed antenna that was stopped or failed left the antenna enabled but
+  bypassed, with its stored setting unapplied. It now falls back to the stored setting.
+- A band or antenna change over CAT during a tune was not noticed: the tune ran on, stored its
+  result under the band it started on, and left that setting on the new band. The engine now
+  ends with `ATU_FAIL_STATE`, stores nothing and applies the new band's setting.
+- Clearing an antenna's memory while transmitting left the cleared setting on the relays until
+  the next band change. It is now bypassed on the way back to receive.
+
+Readability, with no change in behaviour: `TuneNext()` in `ATUTuneAlgo.cpp` is split into one
+function per phase (the reading sequences of the 150 simulated tunes are identical before and
+after), duplicate element tables removed from `ATUBoard.cpp`, stale comments corrected.
+Updated [[atu-control]].

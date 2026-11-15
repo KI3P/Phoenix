@@ -45,7 +45,9 @@ If not, see <https://www.gnu.org/licenses/>.
 #define ATU_PACKED_CAPSIN(s)  (((s) >> 16) & 1)
 #define ATU_PACKED_BAL(s)     (((s) >> 17) & 1)
 #define ATU_PACKED_NET(s)     (((s) >> 18) & 1)
-#define ATU_PACKED_BYPASS     0u
+#define ATU_PACKED_BAL_BIT    (1u << 17)    // K18: output to the balun
+#define ATU_PACKED_MASK       0x7FFFFu      // the 19 relay bits
+#define ATU_PACKED_BYPASS     0u            // every relay off: bypassed, coax output
 
 // Timing (ms)
 #define ATU_TR_SETTLE_MS        30      // T/R relay, on entering ATU_TUNE_SPACE
@@ -60,12 +62,15 @@ If not, see <https://www.gnu.org/licenses/>.
 
 #define ATU_MAX_READINGS        128     // readings kept in the record
 
+// The values are the digit of CAT AX<n>; and are reported by AX;, so they stay fixed
+// (1 was a program that no longer exists)
 typedef enum {
     ATU_PROG_NONE = 0,
     ATU_PROG_READ = 2,      // diagnostic: read bypass and the current setting, 3 times each
     ATU_PROG_TUNE = 3,      // the automatic tuner
 } ATUProgram;
 
+// Reported by CAT AX; as a number, so the values stay fixed
 typedef enum {
     ATU_OK = 0,
     ATU_ABORTED = 1,                // operator or CAT stopped it
@@ -75,10 +80,11 @@ typedef enum {
     ATU_REFUSED_UNCALIBRATED = 5,   // the SWR bridge is not calibrated on this band
     ATU_REFUSED_NO_BOARD = 6,       // the ATU expanders did not answer at startup
     ATU_FAIL_NO_RF = 7,             // forward power below ATU_MIN_FWD_W, or no readings
-    ATU_FAIL_STATE = 8,             // ModeSm was not where the engine expected
+    ATU_FAIL_STATE = 8,             // ModeSm was not where the engine expected, or the
+                                    // band or antenna changed under the tuner (CAT)
     ATU_FAIL_TIMEOUT = 9,
-    ATU_FAIL_ANTENNA = 10,          // every probe nearly totally reflected
-    ATU_FAIL_NO_MATCH = 11,
+    ATU_FAIL_ANTENNA = 10,          // nearly total reflection in bypass: an open or a short
+    ATU_FAIL_NO_MATCH = 11,         // searched, but the best setting is above the target SWR
 } ATUResultCode;
 
 /// What the last program did (CAT AX;)
@@ -91,8 +97,10 @@ typedef struct {
     float gamma[ATU_MAX_READINGS];              // |Gamma| of each reading
     uint32_t finalSetting;                      // the setting left on the relays
     float finalGamma;                           // its measured |Gamma| (-1 if not read)
-    float predictedGamma;                       // unused by the search tuner (-1); kept so
-    float zRe, zIm;                             // the AX; reply keeps its format (0)
+    // The next three are not used by the search tuner. They stay, at -1 and 0, so
+    // that the AX; reply keeps its format.
+    float predictedGamma;
+    float zRe, zIm;
     float fwd_W;                                // forward power of the last reading
     uint32_t elapsed_ms;
     uint32_t end_ms;                            // millis() when it ended or was refused
@@ -113,7 +121,12 @@ typedef struct {
     ATUResultCode code;
 } ATUStep;
 
-/// A program run by the engine. next() is only called while the carrier is off.
+/**
+ * A program run by the engine.
+ *   begin()  called once, when the program starts
+ *   next()   called with the carrier off: what to do now (an ATUStep)
+ *   report() called after each reading, which is by then also in the record
+ */
 typedef struct {
     void (*begin)(ATUTuneRecord *rec, uint32_t operatorSetting, double f_Hz);
     ATUStep (*next)(ATUTuneRecord *rec);
@@ -227,12 +240,19 @@ bool ATUSetEnabled(int32_t antenna, bool on);
 /// Put an antenna on the balun (true) or coax output (saved, applied at once); as ATUSetEnabled
 bool ATUSetBalunOut(int32_t antenna, bool on);
 
-/// Forget the stored setting of every band for an antenna (saved; the current one is bypassed)
+/**
+ * @brief Forget the stored setting of every band for an antenna (saved)
+ * @return false if refused: tuning, or antenna out of range
+ * @note The current antenna is bypassed at once, or on the way back to receive if
+ *       the radio is transmitting
+ */
 bool ATUMemoryClearAntenna(int32_t antenna);
 
 /**
  * @brief Retune (ATU_PROG_TUNE): front-panel button 16, the menu, CAT AC and AX3
- * @return As ATUTuneStart(). If it started, the ATU is enabled on this antenna.
+ * @return As ATUTuneStart(). If it started, the ATU is enabled on this antenna; if
+ *         it was bypassed and the tune is then stopped or fails, the antenna's stored
+ *         setting goes on the relays (bypass if there is none).
  */
 ATUResultCode ATURetune(void);
 
@@ -269,7 +289,7 @@ ATUTextColour ATUStatusText(char *line1, char *line2, size_t n);
 /**
  * @brief One row of the tuning status table: what is stored for a band and antenna
  *
- * "20M    14200 kHz  CL 0.82uH  157pF  1.25", "40M     7100 kHz  bypass        1.18",
+ * "20M    14200 kHz  CL 0.82uH  157pF    1.25", "40M     7100 kHz  bypass              1.18",
  * or "15M    --" when nothing is stored. The SWR is "--" if it was not measured.
  *
  * @param n Size of buf (at least 48)

@@ -1352,8 +1352,10 @@ char *AX_write( char* cmd ){
  * @param cmd CAT command string
  * @return "AX<prog>,<code>,<active>,<n>,<ms>,<final nbsLLLCCC>,<final g>,<predicted g>,
  *          <R>,<X>,<fwd W x 10>[,<g1>,<g2>...];"
- *         with |Gamma| values x 1000 (-1 if none), the load estimate R + jX in ohm,
- *         and the first 24 readings' |Gamma|. "?;" without ATU_PRESENT.
+ *         with |Gamma| values x 1000 (-1 if none) and the first 24 readings' |Gamma|
+ *         (AY has them all, with their settings). The search tuner predicts nothing
+ *         and estimates no load, so <predicted g> is always -1000 and <R>,<X> are 0;
+ *         the fields stay so that the reply keeps its format. "?;" without ATU_PRESENT.
  */
 char *AX_read( char* cmd ){
 #ifdef ATU_PRESENT
