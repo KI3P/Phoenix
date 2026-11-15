@@ -1432,3 +1432,69 @@ with the carrier off, and the T/R relay is held in TX for the whole program. CAT
 - **Bench:** repeatability ±0.001 in |Γ|; bypass 0.047 against 0.04 on the VNA.
 - **Bridge against model:** within 0.02 above |Γ| 0.6, up to 0.07 high near a match (bridge leak
   plus load mismatch). Details in [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU Phase 2 stage C: the tuning algorithm
+`ATUTuneAlgo.cpp`: bypass check → 4 probes → LM load estimate → chunked robust jump →
+accept/re-estimate → polish/climb, each slice a few ms.
+- **Host simulation** (coils 5 % off, 0.03 bridge leak): median 6 readings and 0.02–0.04 SWR
+  above the best possible on 80/40/20/10 m.
+- **Bench:** a dummy load stays bypassed. See [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU bench: resistive loads; CL model unreliable above 15 MHz
+100 Ω and 200 Ω on the antenna connector, tuned on 80/40/20/10 m.
+- **80 and 40 m:** 6 readings, 0.7 s, SWR 1.06–1.21.
+- **20 m:** 1.21 on 100 Ω. On 200 Ω, 1.6–2.0: a model coverage hole at the estimated load,
+  because the output path rotates the load by 3.5–5.5 ns.
+- **10 m:** reached 1.30–1.42, but only by fallback hill-climb (43–46 readings, 4.5 s).
+- **15 m (200 Ω):** SWR 5.1.
+- **Cause:** offline fits of the probe readings show the bridge is consistent with the LC model
+  on 10 m (0.012 rms), but the CL model is 0.3 off. Report §3.5 predicted this.
+- **Changes:** elements limited to 75 % of resonance, no repeated jumps, and the fourth probe is
+  LC above 15 MHz.
+- **Next:** the CL path needs re-measuring with the VNA and a refit. Deferred until the other
+  tests are done. Details in [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU Phase 2 stage D: per-band, per-antenna memory
+ED gains the ATU memory (packed relays, frequency and SWR per band and antenna), the tune power
+and an auto-apply flag. The hook in `HandleTuneState()` applies stored settings on band or
+antenna change, in receive only. A tune tries the stored setting first and stores its result.
+New menu items, and CAT `AX5;` to forget an entry.
+- **Bench (KI3P prototype, 200 Ω):** every check passed. A re-tune from memory takes 1 reading.
+- Updated [[atu-control]] and [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU Phase 2 stage E: per-band bridge scale calibration
+The first coil calibration solved L4–L8 3–16 % high. The cause was the SWR bridge, which reads
+|Γ| high by a factor that depends on the band.
+- **Rework (owner's choice, "bridge scale only"):** each band's scale comes from reference
+  capacitors into the dummy load. It is stored in `ED.ATU_GammaScale` and divides every tuner
+  reading. Coils are measured and reported (`AX7`) but not applied. ED is saved after the
+  operator's band is back. New CAT commands `AX8` and `AX9`.
+- **Bench (KI3P prototype):**
+  - Scales: 80 m 1.020, 40 m 1.047, 30 m 1.055, 20 m 1.076.
+  - 160 m (1.088) and 17 m (1.150) each rest on one capacitor and look unreliable. The 160 m
+    coils say the scale there is about 1.0.
+  - 15/12/10 m behave like an additive leak and are rejected.
+  - Persistence across a reboot was verified.
+- **Open:** require at least two references that agree. Details in [[atu-auto-tuning]]; CAT
+  table in [[atu-control]].
+
+## [2026-11-15] decision | ATU: replace the model-based tuner with a measured search
+The model-based tuner (stages A, C and E) needed a VNA fit of one board and a per-band bridge
+calibration. Builders with hand-wound coils can't do either, and the bench had already shown it
+failing where the model was wrong (CL above 15 MHz).
+- **New approach:** a search that uses only measured |Γ|, on branch `ATU_search` (from stage
+  B, with stage D memory cherry-picked).
+  - It walks the L-network's valley floor (best C for each single-element L), then refines
+    with a pattern search.
+  - It stops at SWR 1.2 or after 120 readings, never repeats a reading, and reports
+    `ATU_FAIL_NO_MATCH` but keeps the best setting when it can't reach 1.5.
+- **Model:** it stays only as the host-test plant. `tools/atu_vna/search_sim.py` mirrors the
+  search offline.
+- **Bench (KI3P prototype):** 100 Ω and 200 Ω reach SWR 1.04–1.41 on 80–10 m in 16–73
+  readings (1.7–6.4 s).
+  - It beats the model tuner on 20 m (1.25 vs 1.6–2.0) and 15 m (1.37 vs 5.1).
+  - Memory re-tunes take 1 reading.
+  - Readings were cut from 114 to 99 ms.
+- **CAT:** `AY` pages the readings. `AX1`, `AX4` and `AX6`–`AX9` are gone.
+
+Details in [[atu-auto-tuning]]; CAT table in [[atu-control]].

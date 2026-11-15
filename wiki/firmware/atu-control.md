@@ -3,7 +3,7 @@ title: ATU Control (manual, Phase 1)
 type: module
 status: draft
 created: 2026-11-14
-updated: 2026-11-14
+updated: 2026-11-15
 tags: [firmware, atu, antenna-tuner, cat, menu, config-flag]
 source_refs: []
 related: ["[[atu-board]]", "[[atu-auto-tuning]]", "[[cat-control]]", "[[built-in-test]]", "[[hardware-state-machine]]", "[[display-subsystem]]"]
@@ -78,6 +78,30 @@ relay state held through RX→TX→RX and a band change up and back.
 - **Sizing:** `NUM_PRIMARY_MENUS` in `MainBoard_Display.h` is 9 or 10 depending on the flag. A
   mismatch with the table is a compile error. Tests rely on RF Options staying at index 0 and
   Calibration at index 6.
+
+## Automatic tuning and memory (Phase 2)
+See [[atu-auto-tuning]] for the algorithm and the bench results. In brief:
+- **Menu:** ATU → **Tune** runs the tuner at **Tune power (W)** (default 2 W) and stores the
+  result for the band and antenna.
+- **Auto-apply memory:** stored settings are re-applied on band or antenna changes, in receive
+  only.
+- **Memory items:** **Save to memory** stores a manual setting; **Forget band** clears one.
+- **Search:** the tuner is a measured search with no model or calibration
+  (`ATUTuneAlgo.cpp`, branch `ATU_search`). A first tune takes about 30–75 readings (3–6 s at
+  99 ms each); a re-tune from memory takes 1.
+- **CAT** (`AX` and `AY`, not Kenwood):
+
+  | Command | Effect |
+  |---|---|
+  | `AX3;` | tune |
+  | `AX0;` | abort |
+  | `AX;` | result (and the first 24 \|Γ\| readings) |
+  | `AYpp;` | readings page pp (two digits), 12 a page: `AYpp,<n>,<nbsLLLCCC>:<g×1000>,…;` |
+  | `AX2;` | READ diagnostic (bypass ×3, then the present setting ×3) |
+  | `AX5;` | forget the memory entry |
+- **Superseded:** the model-based tuner on branch `ATU_support` also had `AX1` (model
+  benchmark), `AX4` (settings of the first 24 readings) and `AX6`–`AX9` (coil and bridge-scale
+  calibration). The search tuner needs none of them.
 
 ## CAT: `AT` (not a Kenwood command)
 | Form | Meaning |
