@@ -395,7 +395,8 @@ extern struct config_t {
     int32_t ATU_Freq_kHz[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** Frequency the ATU setting was stored at */
     float32_t ATU_SWR[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** SWR measured when stored; 0 if not measured */
     float32_t ATU_TunePower_W = 2.0f; /** Carrier power the ATU tunes with */
-    bool ATU_AutoApply = true; /** Apply the stored ATU setting on a band or antenna change */
+    bool ATU_Enabled[ATU_NUM_ANTENNAS] = {true,true,true,true}; /** ATU in use on this antenna (else always bypassed) */
+    bool ATU_BalunOut[ATU_NUM_ANTENNAS] = {}; /** This antenna is on the ATU's balun output (K18), not the coax */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine

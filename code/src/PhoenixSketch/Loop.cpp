@@ -662,7 +662,7 @@ void HandleButtonPress(int32_t button){
                     // Retune the ATU: a fresh search, stored for this band and
                     // antenna. A refusal is shown by the SWR pane. Pressing any
                     // button again while it runs stops it (ConsumeInterrupt).
-                    ATUTuneStart(ATU_PROG_TUNE);
+                    ATURetune();
                     break;
                 }
 #endif

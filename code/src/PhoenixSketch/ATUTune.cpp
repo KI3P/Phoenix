@@ -63,7 +63,7 @@ static void ReadBegin(ATUTuneRecord *rec, uint32_t operatorSetting, double f_Hz)
 }
 
 static ATUStep ReadNext(ATUTuneRecord *rec){
-    if (readProg.done < 3) return {ATU_STEP_MEASURE, ATU_PACKED_BYPASS, ATU_OK};
+    if (readProg.done < 3) return {ATU_STEP_MEASURE, ATUBypassFor(ATUCurrentAntenna()), ATU_OK};
     if (readProg.done < 6) return {ATU_STEP_MEASURE, readProg.operatorSetting, ATU_OK};
     rec->finalGamma = rec->gamma[rec->n - 1];
     return {ATU_STEP_DONE, readProg.operatorSetting, ATU_OK};
@@ -151,20 +151,92 @@ void ATUMemoryResetHook(void){
     appliedAntenna = -1;
 }
 
+bool ATUAntennaEnabled(int32_t antenna){
+    return (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS) && ED.ATU_Enabled[antenna];
+}
+
+bool ATUAntennaBalun(int32_t antenna){
+    return (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS) && ED.ATU_BalunOut[antenna];
+}
+
+uint32_t ATUBypassFor(int32_t antenna){
+    return ATU_PACK(0, ATUAntennaBalun(antenna), 0, 0, 0);
+}
+
+uint32_t ATUSettingFor(int32_t band, int32_t antenna){
+    uint32_t s;
+    if (!ATUAntennaEnabled(antenna) || !ATUMemoryGet(band, antenna, &s, NULL, NULL))
+        return ATUBypassFor(antenna);
+    // The output connector is the antenna's, whatever was stored
+    return (s & ~(1u << 17)) | (ATUAntennaBalun(antenna) ? (1u << 17) : 0u);
+}
+
+bool ATUApplyForAntenna(int32_t band, int32_t antenna){
+    if (ATUTuneActive() || PowerCalAutoActive()) return false;
+    if (!MemoryIndexOK(band, antenna) ||
+        !(bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present)) return false;
+    if (!ATUChangeAllowed()) return false;      // transmitting
+    SetATUPacked(ATUSettingFor(band, antenna));
+    appliedBand = band;
+    appliedAntenna = antenna;
+    return true;
+}
+
 void ATUApplyStoredIfChanged(int32_t band, int32_t antenna){
     if ((band == appliedBand) && (antenna == appliedAntenna)) return;
     if (ATUTuneActive() || PowerCalAutoActive()) return;
-    if (!ED.ATU_AutoApply || !MemoryIndexOK(band, antenna) ||
+    if (!MemoryIndexOK(band, antenna) ||
         !(bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present)){
         appliedBand = band;
         appliedAntenna = antenna;
         return;
     }
-    if (!ATUChangeAllowed()) return;            // transmitting: try again in receive
-    uint32_t s;
-    SetATUPacked(ATUMemoryGet(band, antenna, &s, NULL, NULL) ? s : ATU_PACKED_BYPASS);
-    appliedBand = band;
-    appliedAntenna = antenna;
+    ATUApplyForAntenna(band, antenna);          // transmitting: tried again in receive
+}
+
+bool ATUSetEnabled(int32_t antenna, bool on){
+    if ((antenna < 0) || (antenna >= ATU_NUM_ANTENNAS) || ATUTuneActive()) return false;
+    if (!ATUChangeAllowed()) return false;
+    ED.ATU_Enabled[antenna] = on;
+    SaveDataToStorage(false);
+    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
+    return true;
+}
+
+bool ATUSetBalunOut(int32_t antenna, bool on){
+    if ((antenna < 0) || (antenna >= ATU_NUM_ANTENNAS) || ATUTuneActive()) return false;
+    if (!ATUChangeAllowed()) return false;
+    ED.ATU_BalunOut[antenna] = on;
+    SaveDataToStorage(false);
+    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
+    return true;
+}
+
+static bool memoryCleared = false;          // shown on the home screen for a while
+static uint32_t memoryCleared_ms = 0;
+
+bool ATUMemoryClearAntenna(int32_t antenna){
+    if ((antenna < 0) || (antenna >= ATU_NUM_ANTENNAS) || ATUTuneActive()) return false;
+    memoryCleared = true;
+    memoryCleared_ms = (uint32_t)millis();
+    for (int32_t b = 0; b < NUMBER_OF_BANDS; b++){
+        ED.ATU_State[b][antenna] = 0;
+        ED.ATU_Freq_kHz[b][antenna] = 0;
+        ED.ATU_SWR[b][antenna] = 0;
+    }
+    SaveDataToStorage(false);
+    if (antenna == ATUCurrentAntenna()) ATUApplyForAntenna(ATUCurrentBand(), antenna);
+    return true;
+}
+
+ATUResultCode ATURetune(void){
+    ATUResultCode rc = ATUTuneStart(ATU_PROG_TUNE);
+    int32_t antenna = ATUCurrentAntenna();
+    if ((rc == ATU_OK) && !ATUAntennaEnabled(antenna) && (antenna >= 0) && (antenna < ATU_NUM_ANTENNAS)){
+        ED.ATU_Enabled[antenna] = true;
+        SaveDataToStorage(false);
+    }
+    return rc;
 }
 
 bool ATUTuneActive(void){ return eng.phase != PH_IDLE; }
@@ -417,6 +489,11 @@ ATUTextColour ATUStatusText(char *line1, char *line2, size_t n){
     }
     bool recent = (record.program != ATU_PROG_NONE) &&
                   ((uint32_t)(millis() - record.end_ms) < ATU_STATUS_HOLD_MS);
+    if (memoryCleared && ((uint32_t)(millis() - memoryCleared_ms) < ATU_STATUS_HOLD_MS)){
+        snprintf(line1, n, "MEM");
+        snprintf(line2, n, "CLEARED");
+        return ATU_TEXT_NORMAL;
+    }
     const char *reason = StatusReason(record.code);
     if (recent && reason){
         snprintf(line1, n, "TUNE");
@@ -425,8 +502,8 @@ ATUTextColour ATUStatusText(char *line1, char *line2, size_t n){
     }
     uint32_t s = GetATURegisterState();
     if (!ATU_PACKED_NET(s)){
-        snprintf(line1, n, "ATU BYP");
-        line2[0] = 0;
+        snprintf(line1, n, ATUAntennaEnabled(ATUCurrentAntenna()) ? "ATU BYP" : "ATU OFF");
+        snprintf(line2, n, "%s", ATU_PACKED_BAL(s) ? "BALUN" : "");
     } else {
         float L = ATUNominalInductance_uH(ATU_PACKED_L(s));
         float C = ATUNominalCapacitance_pF(ATU_PACKED_C(s));

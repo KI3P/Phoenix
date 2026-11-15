@@ -11,8 +11,8 @@
 #endif
 
 extern char *command_parser(char *command);
-extern struct SecondaryMenuOption ATUOptions[11];
-extern void SyncATUMenuVariables(void);
+extern size_t primaryMenuIndex;
+extern size_t secondaryMenuIndex;
 
 // The whole ATU field: bits 33-51 of hardwareRegister
 static const uint64_t ATU_FIELD = 0x7FFFFULL << ATULLSB;
@@ -233,61 +233,132 @@ TEST_F(ATUBoardTest, CatRefusesWritesWhileTransmitting) {
 
 // ================== MENU ==================
 
-TEST_F(ATUBoardTest, MenuIsLastPrimaryEntry) {
+namespace {
+enum { ITEM_ENABLE = 0, ITEM_CLEAR = 1, ITEM_TUNE = 2, ITEM_POWER = 3, ITEM_OUTPUT = 4 };
+
+/// Select a function item of the ATU menu, as the front panel does: the menu goes
+/// home and then runs the item
+void Select(int item) {
+    primaryMenuIndex = NUM_PRIMARY_MENUS - 1;
+    secondaryMenuIndex = item;
+    UISm_start(&uiSM);
+    uiSM.state_id = UISm_StateId_SECONDARY_MENU;
+    UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);   // -> UPDATE
+    UISm_dispatch_event(&uiSM, UISm_EventId_HOME);
+    ((void (*)(void))ATUOptions[item].func)();
+    ATUMenuRefreshLabels();
+}
+
+int32_t Ant(void) { return ED.antennaSelection[ED.currentBand[ED.activeVFO]]; }
+}  // namespace
+
+class ATUMenuTest : public ATUBoardTest {
+protected:
+    void SetUp() override {
+        ATUBoardTest::SetUp();
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            ED.ATU_Enabled[j] = true;
+            ED.ATU_BalunOut[j] = false;
+            for (int b = 0; b < NUMBER_OF_BANDS; b++) ATUMemoryForget(b, j);
+        }
+        ED.antennaSelection[ED.currentBand[ED.activeVFO]] = 0;
+        ATUMenuDisarm();
+        ATUMenuRefreshLabels();
+    }
+    void TearDown() override {
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){ ED.ATU_Enabled[j] = true; ED.ATU_BalunOut[j] = false; }
+        ED.antennaSelection[ED.currentBand[ED.activeVFO]] = 0;
+        ATUBoardTest::TearDown();
+    }
+};
+
+TEST_F(ATUMenuTest, MenuIsLastPrimaryEntryWithTheSimpleItems) {
     EXPECT_EQ(NUM_PRIMARY_MENUS, 10);
     EXPECT_STREQ(primaryMenu[NUM_PRIMARY_MENUS - 1].label, "ATU");
     EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].secondary, ATUOptions);
-    EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].length, 11u);
+    EXPECT_EQ(primaryMenu[NUM_PRIMARY_MENUS - 1].length, (size_t)ATU_MENU_ITEMS);
+    EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Bypass ATU");
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 0");
+    EXPECT_STREQ(ATUOptions[ITEM_TUNE].label, "Tune");
+    EXPECT_STREQ(ATUOptions[ITEM_POWER].label, "Tune power (W)");
+    EXPECT_EQ(ATUOptions[ITEM_POWER].varPam->variable, &ED.ATU_TunePower_W);
+    EXPECT_STREQ(ATUOptions[ITEM_OUTPUT].label, "Output: coax");
     // Existing positions that other tests rely on are unchanged
     EXPECT_STREQ(primaryMenu[0].label, "RF Options");
     EXPECT_STREQ(primaryMenu[6].label, "Calibration");
 }
 
-// Apply one encoder step to a menu item and run its post-update callback
-static void Step(int item, bool up) {
-    SecondaryMenuOption &opt = ATUOptions[item];
-    if (up) IncrementVariable(opt.varPam); else DecrementVariable(opt.varPam);
-    ((void (*)(void))opt.postUpdateFunc)();
-}
-
-TEST_F(ATUBoardTest, MenuItemsDriveTheRelays) {
-    SyncATUMenuVariables();
-    Step(1, true);                        // Network in line
-    EXPECT_TRUE(ATUNetworkEngaged());
-    Step(2, true);                        // Caps at input
-    EXPECT_TRUE(ATUCapsAtInput());
-    Step(3, true);                        // Balun output
-    EXPECT_TRUE(ATUBalancedOutput());
-    Step(4, true); Step(4, true);         // L mask 0 -> 2
-    EXPECT_EQ(GetATUInductors(), 2);
-    Step(5, true);                        // C mask 0 -> 1
-    EXPECT_EQ(GetATUCapacitors(), 1);
-    Step(5, false); Step(5, false);       // clamps at 0
-    EXPECT_EQ(GetATUCapacitors(), 0);
-
-    // Bypass all
-    ((void (*)(void))ATUOptions[6].func)();
-    EXPECT_EQ(GetATURegisterState(), 0u);
-    EXPECT_EQ(*(int32_t *)ATUOptions[4].varPam->variable, 0);
-}
-
-TEST_F(ATUBoardTest, MenuPicksUpChangesMadeOverCat) {
-    Cat("AT100077000;");
-    UpdateArrayVariables();
-    EXPECT_TRUE(*(bool *)ATUOptions[1].varPam->variable);
-    EXPECT_EQ(*(int32_t *)ATUOptions[4].varPam->variable, 77);
-}
-
-TEST_F(ATUBoardTest, MenuChangesRefusedWhileTransmitting) {
-    SyncATUMenuVariables();
-    PutInTransmit();
-    Step(1, true);
-    Step(4, true);
+TEST_F(ATUMenuTest, BypassAndEnableArePerAntenna) {
+    const uint32_t stored = 0x40000u | (5u << 8) | 9u;   // LC, C 5, L 9, network in
+    ATUMemoryStore(ED.currentBand[ED.activeVFO], 0, stored, 14200, 1.2f);
+    ATUApplyForAntenna(ED.currentBand[ED.activeVFO], 0);
+    EXPECT_EQ(GetATURegisterState(), stored);
+    Select(ITEM_ENABLE);                        // Bypass ATU
+    EXPECT_FALSE(ED.ATU_Enabled[0]);
+    EXPECT_TRUE(ED.ATU_Enabled[1]);
     EXPECT_FALSE(ATUNetworkEngaged());
-    EXPECT_EQ(GetATUInductors(), 0);
-    // The shadow values revert to the hardware state
-    EXPECT_FALSE(*(bool *)ATUOptions[1].varPam->variable);
-    EXPECT_EQ(*(int32_t *)ATUOptions[4].varPam->variable, 0);
-    ((void (*)(void))ATUOptions[6].func)();   // Bypass all is refused too
+    EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Enable ATU");
+    Select(ITEM_ENABLE);                        // Enable ATU: the stored setting is back
+    EXPECT_TRUE(ED.ATU_Enabled[0]);
+    EXPECT_EQ(GetATURegisterState(), stored);
+    EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Bypass ATU");
+    // The label follows the antenna chosen in RF Options
+    ED.ATU_Enabled[2] = false;
+    ED.antennaSelection[ED.currentBand[ED.activeVFO]] = 2;
+    ATUMenuRefreshLabels();
+    EXPECT_STREQ(ATUOptions[ITEM_ENABLE].label, "Enable ATU");
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 2");
+}
+
+TEST_F(ATUMenuTest, OutputSwitchesTheBalunRelayForThisAntenna) {
+    Select(ITEM_OUTPUT);
+    EXPECT_TRUE(ED.ATU_BalunOut[0]);
+    EXPECT_TRUE(ATUBalancedOutput());
+    EXPECT_FALSE(ATUNetworkEngaged());
+    EXPECT_STREQ(ATUOptions[ITEM_OUTPUT].label, "Output: balun");
+    Select(ITEM_OUTPUT);
+    EXPECT_FALSE(ED.ATU_BalunOut[0]);
+    EXPECT_FALSE(ATUBalancedOutput());
+}
+
+TEST_F(ATUMenuTest, TogglesAreRefusedWhileTransmitting) {
+    PutInTransmit();
+    Select(ITEM_ENABLE);
+    Select(ITEM_OUTPUT);
+    EXPECT_TRUE(ED.ATU_Enabled[0]);
+    EXPECT_FALSE(ED.ATU_BalunOut[0]);
+    EXPECT_FALSE(ATUBalancedOutput());
     PutInReceive();
+}
+
+TEST_F(ATUMenuTest, ClearNeedsASecondPressAndClearsOnlyThisAntenna) {
+    ATUMemoryStore(BAND_20M, 0, 0x40101u, 14200, 1.2f);
+    ATUMemoryStore(BAND_40M, 0, 0x40202u, 7100, 1.3f);
+    ATUMemoryStore(BAND_20M, 1, 0x40303u, 14200, 1.1f);
+    Select(ITEM_CLEAR);
+    // Armed: back in the menu on the same item, nothing cleared yet
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_SECONDARY_MENU);
+    EXPECT_EQ(secondaryMenuIndex, (size_t)ITEM_CLEAR);
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Press again to clear");
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+    Select(ITEM_CLEAR);
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+    EXPECT_FALSE(ATUMemoryGet(BAND_40M, 0, NULL, NULL, NULL));
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 1, NULL, NULL, NULL));
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Clear memory, antenna 0");
+}
+
+TEST_F(ATUMenuTest, MovingOffOrWaitingCancelsAClear) {
+    ATUMemoryStore(BAND_20M, 0, 0x40101u, 14200, 1.2f);
+    Select(ITEM_CLEAR);
+    IncrementSecondaryMenu();                   // moved off the item
+    Select(ITEM_CLEAR);                         // arms again rather than clearing
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+    EXPECT_STREQ(ATUOptions[ITEM_CLEAR].label, "Press again to clear");
+    AddMillisTime(10001);                       // too late
+    Select(ITEM_CLEAR);
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+    Select(ITEM_CLEAR);
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
 }

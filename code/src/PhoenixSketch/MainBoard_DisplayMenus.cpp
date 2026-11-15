@@ -621,128 +621,79 @@ struct SecondaryMenuOption SampleRateOptions[2] = {
 };
 
 #ifdef ATU_PRESENT
-// ATU menu: manual control of the antenna tuner relays (see ATUBoard.cpp).
-// Each item edits a shadow variable and its post-update callback applies it to
-// the hardware. The shadows are refreshed from the hardware register in
-// UpdateArrayVariables(), so changes made over CAT (AT) show up the next time
-// the menu is drawn. Relays never switch while transmitting: a change made then
-// is refused and the shadow reverts.
-static bool atuNetworkIn = false;
-static bool atuBalancedOut = false;
-static bool atuCapsAtInput = false;
-static int32_t atuLMask = 0;
-static int32_t atuCMask = 0;
-
-VariableParameter atuNetwork = {
-    .variable = &atuNetworkIn,
-    .type = TYPE_BOOL,
-    .limits = {.b = {.min = false, .max = true, .step = 1}}
-};
-
-VariableParameter atuBalanced = {
-    .variable = &atuBalancedOut,
-    .type = TYPE_BOOL,
-    .limits = {.b = {.min = false, .max = true, .step = 1}}
-};
-
-VariableParameter atuCapsInput = {
-    .variable = &atuCapsAtInput,
-    .type = TYPE_BOOL,
-    .limits = {.b = {.min = false, .max = true, .step = 1}}
-};
-
-VariableParameter atuL = {
-    .variable = &atuLMask,
-    .type = TYPE_I32,
-    .limits = {.i32 = {.min = 0, .max = 255, .step = 1}}
-};
-
-VariableParameter atuC = {
-    .variable = &atuCMask,
-    .type = TYPE_I32,
-    .limits = {.i32 = {.min = 0, .max = 255, .step = 1}}
-};
+extern bool redrawMenu;          // defined with the menu navigation, below
+// ATU menu. Everything acts on the antenna selected for this band (RF Options ->
+// Antenna): the ATU can be bypassed or enabled, and the output connector chosen, per
+// antenna; the memory is per band and antenna. Manual relay control is over CAT (AT).
+// Toggles are function items whose labels say what selecting them will do.
+static char atuEnableLabel[24];
+static char atuClearLabel[32];
+static char atuOutputLabel[24];
+static uint32_t atuClearArmed_ms = 0;
+static bool atuClearArmed = false;
+#define ATU_CLEAR_ARM_MS 10000
 
 /**
- * Copy the ATU relay state from the hardware register into the menu variables.
+ * Point the ATU menu's labels at text for the current antenna's state.
  */
-void SyncATUMenuVariables(void){
-    atuNetworkIn = ATUNetworkEngaged();
-    atuBalancedOut = ATUBalancedOutput();
-    atuCapsAtInput = ATUCapsAtInput();
-    atuLMask = GetATUInductors();
-    atuCMask = GetATUCapacitors();
+void ATUMenuRefreshLabels(void){
+    int32_t ant = ATUCurrentAntenna();
+    snprintf(atuEnableLabel, sizeof(atuEnableLabel), "%s", ATUAntennaEnabled(ant) ? "Bypass ATU" : "Enable ATU");
+    if (atuClearArmed && ((uint32_t)(millis() - atuClearArmed_ms) >= ATU_CLEAR_ARM_MS)) atuClearArmed = false;
+    if (atuClearArmed)
+        snprintf(atuClearLabel, sizeof(atuClearLabel), "Press again to clear");
+    else
+        snprintf(atuClearLabel, sizeof(atuClearLabel), "Clear memory, antenna %ld", (long)ant);
+    snprintf(atuOutputLabel, sizeof(atuOutputLabel), "Output: %s", ATUAntennaBalun(ant) ? "balun" : "coax");
 }
 
 /**
- * Post-update callback: put the L/C network in line or bypass it.
+ * Cancel a pending "press again to clear" (the menu moved off the item).
  */
-void UpdateATUNetwork(void){
-    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
-    if (atuNetworkIn) ATUEngageNetwork(); else ATUBypassNetwork();
+void ATUMenuDisarm(void){
+    atuClearArmed = false;
 }
 
 /**
- * Post-update callback: select the balun or the coax output.
+ * Menu callback: bypass the ATU on this antenna, or enable it again.
  */
-void UpdateATUBalanced(void){
-    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
-    if (atuBalancedOut) ATUSelectBalancedOutput(); else ATUSelectUnbalancedOutput();
+void ATUMenuToggleEnable(void){
+    int32_t ant = ATUCurrentAntenna();
+    ATUSetEnabled(ant, !ATUAntennaEnabled(ant));
 }
 
 /**
- * Post-update callback: put the capacitor bank at the input (C-L) or output (L-C) side.
+ * Menu callback: clear the memory of every band for this antenna. The first press
+ * arms and re-opens the menu on this item; a second press within ATU_CLEAR_ARM_MS
+ * clears.
  */
-void UpdateATUCapsInput(void){
-    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
-    if (atuCapsAtInput) ATUSelectCapsAtInput(); else ATUSelectCapsAtOutput();
+void ATUMenuClearAntenna(void){
+    if (atuClearArmed && ((uint32_t)(millis() - atuClearArmed_ms) < ATU_CLEAR_ARM_MS)){
+        atuClearArmed = false;
+        ATUMemoryClearAntenna(ATUCurrentAntenna());
+        return;
+    }
+    atuClearArmed = true;
+    atuClearArmed_ms = (uint32_t)millis();
+    // Selecting a function item has just gone home; come back to this item
+    UISm_dispatch_event(&uiSM, UISm_EventId_MENU);
+    UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
+    redrawMenu = true;
 }
 
 /**
- * Post-update callback: apply the inductor mask.
- */
-void UpdateATUInductors(void){
-    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
-    SetATUInductors((uint8_t)atuLMask);
-}
-
-/**
- * Post-update callback: apply the capacitor mask.
- */
-void UpdateATUCapacitors(void){
-    if (!ATUChangeAllowed()){ SyncATUMenuVariables(); return; }
-    SetATUCapacitors((uint8_t)atuCMask);
-}
-
-/**
- * Menu callback: return the tuner to its safe state (bypassed, no L, no C).
- */
-void ATUMenuReset(void){
-    if (ATUChangeAllowed()) ResetATUBoard();
-    SyncATUMenuVariables();
-}
-
-/**
- * Menu callback: retune (ATU_PROG_TUNE, a fresh search at the tune power), as
- * front-panel button 16 does. The result is stored for this band and antenna.
+ * Menu callback: retune, as front-panel button 16. The home screen shows progress.
  */
 void ATUMenuTune(void){
-    ATUTuneStart(ATU_PROG_TUNE);
+    ATURetune();
 }
 
 /**
- * Menu callback: store the present relay setting for this band and antenna.
+ * Menu callback: switch this antenna between the coax and the balun output.
  */
-void ATUMenuSaveToMemory(void){
-    ATUMemoryStore(ATUCurrentBand(), ATUCurrentAntenna(), GetATURegisterState(),
-                   (int32_t)(GetTXRXFreq_cHz() / 100000), 0.0f);
-}
-
-/**
- * Menu callback: forget the stored setting for this band and antenna.
- */
-void ATUMenuForget(void){
-    ATUMemoryForget(ATUCurrentBand(), ATUCurrentAntenna());
+void ATUMenuToggleOutput(void){
+    int32_t ant = ATUCurrentAntenna();
+    ATUSetBalunOut(ant, !ATUAntennaBalun(ant));
 }
 
 VariableParameter atuTunePower = {
@@ -751,24 +702,12 @@ VariableParameter atuTunePower = {
     .limits = {.f32 = {.min = 0.5f, .max = 10.0f, .step = 0.5f}}
 };
 
-VariableParameter atuAutoApply = {
-    .variable = &ED.ATU_AutoApply,
-    .type = TYPE_BOOL,
-    .limits = {.b = {.min = false, .max = true, .step = 1}}
-};
-
-struct SecondaryMenuOption ATUOptions[11] = {
+struct SecondaryMenuOption ATUOptions[ATU_MENU_ITEMS] = {
+    atuEnableLabel, functionOption, NULL, (void *)ATUMenuToggleEnable, NULL,
+    atuClearLabel, functionOption, NULL, (void *)ATUMenuClearAntenna, NULL,
     "Tune", functionOption, NULL, (void *)ATUMenuTune, NULL,
-    "Network in line", variableOption, &atuNetwork, NULL, (void *)UpdateATUNetwork,
-    "Caps at input (CL)", variableOption, &atuCapsInput, NULL, (void *)UpdateATUCapsInput,
-    "Balun output", variableOption, &atuBalanced, NULL, (void *)UpdateATUBalanced,
-    "L mask", variableOption, &atuL, NULL, (void *)UpdateATUInductors,
-    "C mask", variableOption, &atuC, NULL, (void *)UpdateATUCapacitors,
-    "Bypass all (safe)", functionOption, NULL, (void *)ATUMenuReset, NULL,
-    "Save to memory", functionOption, NULL, (void *)ATUMenuSaveToMemory, NULL,
-    "Forget band/antenna", functionOption, NULL, (void *)ATUMenuForget, NULL,
-    "Auto-apply memory", variableOption, &atuAutoApply, NULL, NULL,
     "Tune power (W)", variableOption, &atuTunePower, NULL, NULL,
+    atuOutputLabel, functionOption, NULL, (void *)ATUMenuToggleOutput, NULL,
 };
 #endif // ATU_PRESENT
 
@@ -802,7 +741,7 @@ void UpdateArrayVariables(void){
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
 #ifdef ATU_PRESENT
-    SyncATUMenuVariables();
+    ATUMenuRefreshLabels();
 #endif
 }
 
@@ -819,6 +758,9 @@ bool redrawMenu = true;          // Flag to trigger menu redraw
  * Advance to the next primary menu category (with wrap-around).
  */
 void IncrementPrimaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     primaryMenuIndex++;
     if (primaryMenuIndex >= sizeof(primaryMenu)/sizeof(primaryMenu[0]))
         primaryMenuIndex = 0;
@@ -830,6 +772,9 @@ void IncrementPrimaryMenu(void){
  * Move to the previous primary menu category (with wrap-around).
  */
 void DecrementPrimaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     if (primaryMenuIndex == 0)
         primaryMenuIndex = sizeof(primaryMenu)/sizeof(primaryMenu[0]) - 1;
     else
@@ -842,6 +787,9 @@ void DecrementPrimaryMenu(void){
  * Advance to the next secondary menu option within current category (with wrap-around).
  */
 void IncrementSecondaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     secondaryMenuIndex++;
     if (secondaryMenuIndex >= primaryMenu[primaryMenuIndex].length)
         secondaryMenuIndex = 0;
@@ -852,6 +800,9 @@ void IncrementSecondaryMenu(void){
  * Move to the previous secondary menu option within current category (with wrap-around).
  */
 void DecrementSecondaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     if (secondaryMenuIndex == 0)
         secondaryMenuIndex = primaryMenu[primaryMenuIndex].length - 1;
     else
@@ -1007,6 +958,9 @@ void DrawMainMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+#ifdef ATU_PRESENT
+    ATUMenuRefreshLabels();
+#endif
     tft.fillRect(1, 5, 650, 460, RA8875_BLACK);
     tft.drawRect(1, 5, 650, 460, RA8875_YELLOW);
 
@@ -1043,6 +997,9 @@ void DrawSecondaryMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+#ifdef ATU_PRESENT
+    ATUMenuRefreshLabels();
+#endif
 
     tft.fillRect(1,  5, 650, 460, RA8875_BLACK);
     tft.drawRect(1,  5, 650, 460, RA8875_YELLOW);

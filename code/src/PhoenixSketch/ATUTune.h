@@ -185,17 +185,56 @@ void ATUMemoryForget(int32_t band, int32_t antenna);
 int32_t ATUCurrentBand(void);
 int32_t ATUCurrentAntenna(void);
 
+/// The ATU is in use on this antenna (ED.ATU_Enabled); a disabled antenna is always bypassed
+bool ATUAntennaEnabled(int32_t antenna);
+
+/// This antenna is on the balun output (ED.ATU_BalunOut); every setting keeps K18 so
+bool ATUAntennaBalun(int32_t antenna);
+
+/// The network bypassed, on this antenna's output connector
+uint32_t ATUBypassFor(int32_t antenna);
+
 /**
- * @brief Apply the stored setting if the band or antenna has changed
+ * @brief The setting a band and antenna should have: the stored one if the antenna is
+ *        enabled and something is stored, else bypass; always on the antenna's output
+ */
+uint32_t ATUSettingFor(int32_t band, int32_t antenna);
+
+/**
+ * @brief Put ATUSettingFor(band, antenna) on the relays now
+ * @return false if not done: tuning, transmitting, or no board
+ */
+bool ATUApplyForAntenna(int32_t band, int32_t antenna);
+
+/**
+ * @brief Apply ATUSettingFor() if the band or antenna has changed
  *
  * Called from HandleTuneState() on every tune update. It acts only when the band or
- * antenna differs from the last one applied, so a manual change made from the menu
- * or over CAT stays until the next band or antenna change. It only switches relays
- * in receive (ATUChangeAllowed()); a change seen while transmitting is applied on
- * the next call in receive. With nothing stored it bypasses the network. Does
- * nothing while a tuner program runs, or with ED.ATU_AutoApply off.
+ * antenna differs from the last one applied, so a manual change made over CAT stays
+ * until the next band or antenna change. It only switches relays in receive
+ * (ATUChangeAllowed()); a change seen while transmitting is applied on the next call
+ * in receive. Does nothing while a tuner program runs.
  */
 void ATUApplyStoredIfChanged(int32_t band, int32_t antenna);
+
+/**
+ * @brief Enable or bypass the ATU on an antenna (saved), applied at once if it is the
+ *        current antenna
+ * @return false if refused: tuning, transmitting, or antenna out of range
+ */
+bool ATUSetEnabled(int32_t antenna, bool on);
+
+/// Put an antenna on the balun (true) or coax output (saved, applied at once); as ATUSetEnabled
+bool ATUSetBalunOut(int32_t antenna, bool on);
+
+/// Forget the stored setting of every band for an antenna (saved; the current one is bypassed)
+bool ATUMemoryClearAntenna(int32_t antenna);
+
+/**
+ * @brief Retune (ATU_PROG_TUNE): front-panel button 16, the menu, CAT AC and AX3
+ * @return As ATUTuneStart(). If it started, the ATU is enabled on this antenna.
+ */
+ATUResultCode ATURetune(void);
 
 /// Forget which band and antenna were last applied, so the next call applies (tests)
 void ATUMemoryResetHook(void);
@@ -212,11 +251,13 @@ typedef enum { ATU_TEXT_NORMAL, ATU_TEXT_BUSY, ATU_TEXT_ALERT } ATUTextColour;
 /**
  * @brief The ATU's two status lines for the home screen
  *
- * - network bypassed: "ATU BYP"
+ * - network bypassed: "ATU BYP", or "ATU OFF" if the ATU is bypassed on this antenna;
+ *   line 2 "BALUN" if the balun output is selected
  * - network in line: topology and nominal values, "LC 2.35uH" / "   340pF"
  * - tuning: "TUNING" / "n 23" (readings so far), ATU_TEXT_BUSY
  * - for ATU_STATUS_HOLD_MS after a refusal or failure: "TUNE" / the reason, ATU_TEXT_ALERT
  * - for ATU_STATUS_HOLD_MS after ATU_FAIL_NO_MATCH: the setting kept, ATU_TEXT_BUSY
+ * - for ATU_STATUS_HOLD_MS after an antenna's memory is cleared: "MEM" / "CLEARED"
  *
  * @param line1 Receives the first line (at least 12 characters)
  * @param line2 Receives the second line (at least 12 characters)

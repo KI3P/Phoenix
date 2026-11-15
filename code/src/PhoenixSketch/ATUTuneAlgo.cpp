@@ -92,6 +92,8 @@ enum InnerMode { IN_SWEEP, IN_DESCEND };
 static struct {
     SearchPhase phase;
     int32_t band, antenna, f_kHz;   // where the result is stored
+    bool bal;                       // the antenna is on the balun output: every setting keeps it
+    uint32_t bypass;                // the network out, on this antenna's output
 
     // Valley walk, one topology at a time
     uint8_t topo;                   // 0 = LC, 1 = CL
@@ -125,7 +127,7 @@ static struct {
 static inline uint8_t CoarseCode(int item){ return item ? (uint8_t)(1u << (item - 1)) : 0; }
 
 static inline uint32_t Pack(uint8_t topo, uint8_t l, uint8_t c){
-    return ATU_PACK(true, false, topo == 1, l, c);
+    return ATU_PACK(true, srch.bal, topo == 1, l, c);
 }
 
 static inline bool InRange(int l, int c){ return (l >= 0) && (l <= 255) && (c >= 0) && (c <= 255); }
@@ -150,7 +152,7 @@ static bool Lookup(const ATUTuneRecord *rec, uint32_t setting, float *g){
 
 /// PRIVATE: The best setting read so far (bypass if nothing has been read)
 static uint32_t BestRead(const ATUTuneRecord *rec, float *g){
-    uint32_t best = ATU_PACKED_BYPASS;
+    uint32_t best = srch.bypass;
     *g = 2.0f;
     for (int i = 0; i < rec->n; i++){
         if (rec->gamma[i] < *g){ *g = rec->gamma[i]; best = rec->setting[i]; }
@@ -291,6 +293,8 @@ static void TuneBegin(ATUTuneRecord *rec, uint32_t operatorSetting, double f_Hz)
     srch.phase = S_BYPASS;
     srch.band = ATUCurrentBand();
     srch.antenna = ATUCurrentAntenna();
+    srch.bal = ATUAntennaBalun(srch.antenna);
+    srch.bypass = ATUBypassFor(srch.antenna);
     srch.f_kHz = (int32_t)lround(f_Hz / 1000.0);
 }
 
@@ -308,8 +312,8 @@ static ATUStep TuneNext(ATUTuneRecord *rec){
     for (int guard = 0; guard < 8 * ATU_MAX_READINGS; guard++){
         switch (srch.phase){
             case S_BYPASS:{
-                if (!Lookup(rec, ATU_PACKED_BYPASS, &g)) return Measure(ATU_PACKED_BYPASS);
-                if (g <= SwrToGamma(SRCH_BYPASS_SWR)) return Done(rec, ATU_PACKED_BYPASS, g);
+                if (!Lookup(rec, srch.bypass, &g)) return Measure(srch.bypass);
+                if (g <= SwrToGamma(SRCH_BYPASS_SWR)) return Done(rec, srch.bypass, g);
                 if (g > SRCH_FAULT_GAMMA) return {ATU_STEP_FAIL, 0, ATU_FAIL_ANTENNA};
                 StartWalk(0);
                 break;

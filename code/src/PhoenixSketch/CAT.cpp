@@ -1177,17 +1177,19 @@ char *XA_read( char* cmd ){
  * CAT command AC - set the antenna tuner (Kenwood TS-480 "AC P1 P2 P3;")
  *
  *   P1 RX-AT: ignored (Phoenix's tuner is in line for receive and transmit alike)
- *   P2 TX-AT: 0 = thru (bypass the network), 1 = in (the stored setting for this
- *      band and antenna; left alone if the network is already in line)
- *   P3 tuning: 1 = start a retune (as front-panel button 16), 0 = stop one
+ *   P2 TX-AT: 0 = thru (bypass the ATU on this antenna), 1 = in (enable it: the
+ *      stored setting for this band goes on the relays). Saved per antenna, as the
+ *      menu's Bypass / Enable ATU.
+ *   P3 tuning: 1 = start a retune (as front-panel button 16; enables the ATU on this
+ *      antenna), 0 = stop one
  *
- * With P3 = 1, P2 is not acted on: the tuner decides whether the network ends up in
- * line. With P3 = 0 a running tune is stopped first, then P2 applies. Without
- * ATU_PRESENT it is accepted and does nothing, as on a radio with no tuner.
+ * With P3 = 1, P2 is not acted on. With P3 = 0 a running tune is stopped first, then
+ * P2 applies. Without ATU_PRESENT it is accepted and does nothing, as on a radio with
+ * no tuner.
  *
  * @param cmd CAT command string
  * @return Empty string on success; "?;" for a malformed command, a tune that was
- *         refused, or a relay change that is not allowed now (transmitting)
+ *         refused, or a change that is not allowed now (transmitting)
  */
 char *AC_write( char* cmd ){
     for( int i = 2; i < 5; i++ ){
@@ -1198,21 +1200,16 @@ char *AC_write( char* cmd ){
     }
 #ifdef ATU_PRESENT
     if( cmd[4] == '1' ){
-        if( ATUTuneStart( ATU_PROG_TUNE ) == ATU_OK ) return empty_string_p;
+        if( ATURetune() == ATU_OK ) return empty_string_p;
         sprintf( obuf, "?;");
         return obuf;
     }
     if( ATUTuneActive() ) ATUTuneAbort();
-    if( !ATUChangeAllowed() ){
+    bool on = (cmd[3] == '1');
+    int32_t antenna = ATUCurrentAntenna();
+    if( (ATUAntennaEnabled( antenna ) != on) && !ATUSetEnabled( antenna, on ) ){
         sprintf( obuf, "?;");
         return obuf;
-    }
-    if( cmd[3] == '0' ){
-        if( ATUNetworkEngaged() ) ATUBypassNetwork();
-    } else if( !ATUNetworkEngaged() ){
-        uint32_t s;
-        if( ATUMemoryGet( ATUCurrentBand(), ATUCurrentAntenna(), &s, NULL, NULL ) )
-            SetATUPacked( s );
     }
 #endif
     return empty_string_p;
@@ -1221,12 +1218,12 @@ char *AC_write( char* cmd ){
 /**
  * CAT command AC - read the antenna tuner (Kenwood TS-480)
  * @param cmd CAT command string
- * @return "AC0<P2><P3>;": P2 1 if the network is in line, P3 1 while a tuner
- *         program runs. "AC000;" without ATU_PRESENT.
+ * @return "AC0<P2><P3>;": P2 1 if the ATU is enabled on this antenna, P3 1 while a
+ *         tuner program runs. "AC000;" without ATU_PRESENT.
  */
 char *AC_read( char* cmd ){
 #ifdef ATU_PRESENT
-    sprintf( obuf, "AC0%d%d;", ATUNetworkEngaged() ? 1 : 0, ATUTuneActive() ? 1 : 0 );
+    sprintf( obuf, "AC0%d%d;", ATUAntennaEnabled( ATUCurrentAntenna() ) ? 1 : 0, ATUTuneActive() ? 1 : 0 );
 #else
     sprintf( obuf, "AC000;");
 #endif
@@ -1337,7 +1334,7 @@ char *AX_write( char* cmd ){
             return empty_string_p;
         case '2':
         case '3':{
-            ATUResultCode rc = ATUTuneStart( cmd[2] == '2' ? ATU_PROG_READ : ATU_PROG_TUNE );
+            ATUResultCode rc = (cmd[2] == '2') ? ATUTuneStart( ATU_PROG_READ ) : ATURetune();
             if( rc == ATU_OK ) return empty_string_p;
             sprintf( obuf, "AX%d;", (int)rc );
             return obuf;

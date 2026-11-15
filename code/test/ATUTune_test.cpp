@@ -367,8 +367,13 @@ protected:
         ATUTuneAlgoTest::SetUp();
         for (int b = 0; b < NUMBER_OF_BANDS; b++)
             for (int a = 0; a < ATU_NUM_ANTENNAS; a++) ED.ATU_State[b][a] = 0;
-        ED.ATU_AutoApply = true;
+        for (int a = 0; a < ATU_NUM_ANTENNAS; a++){ ED.ATU_Enabled[a] = true; ED.ATU_BalunOut[a] = false; }
         ATUMemoryResetHook();
+    }
+    void TearDown() override {
+        for (int a = 0; a < ATU_NUM_ANTENNAS; a++){ ED.ATU_Enabled[a] = true; ED.ATU_BalunOut[a] = false; }
+        ED.antennaSelection[BAND_20M] = 0;
+        ATUTuneAlgoTest::TearDown();
     }
     void SetBand(int32_t band){
         ED.currentBand[ED.activeVFO] = band;
@@ -434,27 +439,74 @@ TEST_F(ATUMemoryTest, NeverSwitchesWhileTransmittingAndCatchesUpInReceive) {
     EXPECT_EQ(GetATURegisterState(), x);        // applied on the way back to receive
 }
 
-TEST_F(ATUMemoryTest, AutoApplyOffLeavesTheRelaysAlone) {
-    ATUMemoryStore(BAND_20M, 0, ATU_PACK(1, 0, 0, 1, 1), 14200, 1.2f);
-    ED.ATU_AutoApply = false;
-    const uint32_t manual = ATU_PACK(1, 0, 1, 7, 7);
-    SetATUPacked(manual);
+TEST_F(ATUMemoryTest, ABypassedAntennaStaysBypassedAcrossBandChanges) {
+    const uint32_t x = ATU_PACK(1, 0, 0, 1, 1);
+    ATUMemoryStore(BAND_20M, 0, x, 14200, 1.2f);
+    ATUMemoryStore(BAND_20M, 1, ATU_PACK(1, 0, 1, 2, 2), 14200, 1.2f);
+    SetBand(BAND_20M);
+    EXPECT_EQ(GetATURegisterState(), x);
+    ASSERT_TRUE(ATUSetEnabled(0, false));
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
     SetBand(BAND_40M);
     SetBand(BAND_20M);
-    EXPECT_EQ(GetATURegisterState(), manual);
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    // Antenna 1 is still enabled
+    ED.antennaSelection[BAND_20M] = 1;
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), ATU_PACK(1, 0, 1, 2, 2));
+    ED.antennaSelection[BAND_20M] = 0;
+    UpdateTuneState();
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    // Enabling puts the stored setting back at once
+    ASSERT_TRUE(ATUSetEnabled(0, true));
+    EXPECT_EQ(GetATURegisterState(), x);
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));   // memory kept throughout
+}
+
+TEST_F(ATUMemoryTest, TheBalunOutputIsKeptInBypassAndInStoredSettings) {
+    const uint32_t coaxStored = ATU_PACK(1, 0, 0, 4, 4);
+    ATUMemoryStore(BAND_20M, 0, coaxStored, 14200, 1.2f);
+    SetBand(BAND_20M);
+    ASSERT_TRUE(ATUSetBalunOut(0, true));
+    EXPECT_EQ(GetATURegisterState(), ATU_PACK(1, 1, 0, 4, 4));
+    ASSERT_TRUE(ATUSetEnabled(0, false));
+    EXPECT_EQ(GetATURegisterState(), ATU_PACK(0, 1, 0, 0, 0));
+    SetBand(BAND_40M);                          // nothing stored there
+    EXPECT_EQ(GetATURegisterState(), ATU_PACK(0, 1, 0, 0, 0));
+}
+
+TEST_F(ATUMemoryTest, ClearingAnAntennaLeavesTheOthers) {
+    ATUMemoryStore(BAND_20M, 0, ATU_PACK(1, 0, 0, 1, 1), 14200, 1.2f);
+    ATUMemoryStore(BAND_40M, 0, ATU_PACK(1, 0, 0, 2, 2), 7100, 1.2f);
+    ATUMemoryStore(BAND_20M, 1, ATU_PACK(1, 0, 0, 3, 3), 14200, 1.2f);
+    SetBand(BAND_20M);
+    ASSERT_TRUE(ATUMemoryClearAntenna(0));
+    EXPECT_FALSE(ATUMemoryGet(BAND_20M, 0, NULL, NULL, NULL));
+    EXPECT_FALSE(ATUMemoryGet(BAND_40M, 0, NULL, NULL, NULL));
+    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 1, NULL, NULL, NULL));
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    char l1[16], l2[16];
+    ATUStatusText(l1, l2, sizeof(l1));
+    EXPECT_STREQ(l1, "MEM");
+    EXPECT_STREQ(l2, "CLEARED");
+    AddMillisTime(ATU_STATUS_HOLD_MS + 1);
+    ATUStatusText(l1, l2, sizeof(l1));
+    EXPECT_STREQ(l1, "ATU BYP");
 }
 
 TEST_F(ATUMemoryTest, MemoryAndSettingsRoundTripThroughStorage) {
     InitializeStorage();
     ATUMemoryStore(BAND_15M, 2, ATU_PACK(1, 0, 1, 200, 17), 21200, 1.44f);
     ED.ATU_TunePower_W = 3.5f;
-    ED.ATU_AutoApply = false;
+    ED.ATU_Enabled[1] = false;
+    ED.ATU_BalunOut[3] = true;
     SaveDataToStorage(false);
     ED.ATU_State[BAND_15M][2] = 0;
     ED.ATU_Freq_kHz[BAND_15M][2] = 0;
     ED.ATU_SWR[BAND_15M][2] = 0;
     ED.ATU_TunePower_W = 2.0f;
-    ED.ATU_AutoApply = true;
+    ED.ATU_Enabled[1] = true;
+    ED.ATU_BalunOut[3] = false;
     RestoreDataFromStorage();
     uint32_t s; int32_t f; float swr;
     ASSERT_TRUE(ATUMemoryGet(BAND_15M, 2, &s, &f, &swr));
@@ -462,9 +514,11 @@ TEST_F(ATUMemoryTest, MemoryAndSettingsRoundTripThroughStorage) {
     EXPECT_EQ(f, 21200);
     EXPECT_NEAR(swr, 1.44f, 1e-4f);
     EXPECT_FLOAT_EQ(ED.ATU_TunePower_W, 3.5f);
-    EXPECT_FALSE(ED.ATU_AutoApply);
+    EXPECT_FALSE(ED.ATU_Enabled[1]);
+    EXPECT_TRUE(ED.ATU_Enabled[0]);
+    EXPECT_TRUE(ED.ATU_BalunOut[3]);
+    EXPECT_FALSE(ED.ATU_BalunOut[0]);
     ED.ATU_TunePower_W = 2.0f;
-    ED.ATU_AutoApply = true;
 }
 
 TEST_F(ATUMemoryTest, ARetuneSearchesAfreshAndStoresAgain) {
@@ -730,52 +784,83 @@ TEST_F(ATUTuneAlgoTest, StatusTextShowsTheSettingAndTheTuner) {
     EXPECT_EQ(std::string(l1).substr(0, 3), "LC ");
 }
 
-TEST_F(ATUTuneAlgoTest, CatACStartsStopsAndSwitchesTheTuner) {
+TEST_F(ATUTuneAlgoTest, CatACStartsStopsAndBypassesTheTuner) {
     MakePlant(0.05, 12);
     SetFrequency("FA00014200000;");
+    ED.antennaSelection[BAND_20M] = 0;
+    ED.ATU_Enabled[0] = true;
     plantLoad = {25.0f, 60.0f};
     SetATUPacked(ATU_PACKED_BYPASS);
-    EXPECT_EQ(Cat("AC;"), "AC000;");
+    EXPECT_EQ(Cat("AC;"), "AC010;");            // enabled, not tuning
     // P3 = 1 starts a retune, reported as tuning; P3 = 0 stops it
-    EXPECT_EQ(Cat("AC001;"), "");
+    EXPECT_EQ(Cat("AC011;"), "");
     EXPECT_TRUE(ATUTuneActive());
-    EXPECT_EQ(Cat("AC;"), "AC001;");
+    EXPECT_EQ(Cat("AC;"), "AC011;");
     ASSERT_TRUE(RunUntilKeyed());
-    EXPECT_EQ(Cat("AC000;"), "");
+    EXPECT_EQ(Cat("AC010;"), "");
     EXPECT_FALSE(ATUTuneActive());
     EXPECT_EQ(ATUTuneLastRecord()->code, ATU_ABORTED);
     EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
     ExpectBackInReceive();
-    // P2 = 1 with nothing stored: stays thru
-    ATUMemoryForget(BAND_20M, 0);
-    EXPECT_EQ(Cat("AC010;"), "");
-    EXPECT_EQ(Cat("AC;"), "AC000;");
-    // P2 = 1 puts the stored setting in line; P2 = 0 bypasses, keeping the memory
+    // P2 = 0 bypasses the ATU on this antenna, keeping the memory; P2 = 1 enables it
     const uint32_t stored = ATU_PACK(1, 0, 1, 0x12, 0x34);
     ATUMemoryStore(BAND_20M, 0, stored, 14200, 1.3f);
+    SetATUPacked(stored);
+    EXPECT_EQ(Cat("AC100;"), "");
+    EXPECT_FALSE(ED.ATU_Enabled[0]);
+    EXPECT_EQ(GetATURegisterState(), ATU_PACKED_BYPASS);
+    EXPECT_EQ(Cat("AC;"), "AC000;");
     EXPECT_EQ(Cat("AC010;"), "");
+    EXPECT_TRUE(ED.ATU_Enabled[0]);
     EXPECT_EQ(GetATURegisterState(), stored);
-    EXPECT_EQ(Cat("AC;"), "AC010;");
-    // ...but leaves a network already in line alone
-    const uint32_t manual = ATU_PACK(1, 0, 0, 3, 3);
-    SetATUPacked(manual);
-    EXPECT_EQ(Cat("AC110;"), "");
-    EXPECT_EQ(GetATURegisterState(), manual);
+    // A retune while bypassed enables the ATU again
     EXPECT_EQ(Cat("AC000;"), "");
-    EXPECT_FALSE(ATU_PACKED_NET(GetATURegisterState()));   // network out (L/C relays as they were)
-    uint32_t s;
-    EXPECT_TRUE(ATUMemoryGet(BAND_20M, 0, &s, NULL, NULL));
-    // Refused tune and malformed commands
+    EXPECT_EQ(Cat("AC001;"), "");
+    EXPECT_TRUE(ED.ATU_Enabled[0]);
+    ASSERT_TRUE(Run());
+    // Refused tune and malformed commands; a refused tune doesn't enable
+    EXPECT_EQ(Cat("AC000;"), "");
     ED.SWR_CalLevel[BAND_20M] = 0;
     EXPECT_EQ(Cat("AC011;"), "?;");
+    EXPECT_FALSE(ED.ATU_Enabled[0]);
     ED.SWR_CalLevel[BAND_20M] = 1;
     EXPECT_EQ(Cat("AC200;"), "?;");
     EXPECT_EQ(Cat("AC0x0;"), "?;");
     // Not while transmitting
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
     EXPECT_EQ(Cat("AC010;"), "?;");
-    EXPECT_FALSE(ATU_PACKED_NET(GetATURegisterState()));
+    EXPECT_FALSE(ED.ATU_Enabled[0]);
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
+    ExpectBackInReceive();
+    ED.ATU_Enabled[0] = true;
+    ATUMemoryForget(BAND_20M, 0);
+}
+
+TEST_F(ATUTuneAlgoTest, OnTheBalunOutputEveryReadingKeepsIt) {
+    MakePlant(0.05, 13);
+    SetFrequency("FA00007100000;");
+    ED.antennaSelection[BAND_40M] = 0;
+    ED.ATU_BalunOut[0] = true;
+    plantLoad = {200.0f, -100.0f};
+    ASSERT_EQ(ATURetune(), ATU_OK);
+    ASSERT_TRUE(Run());
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    EXPECT_EQ(r->code, ATU_OK);
+    ASSERT_GT(r->n, 2);
+    for (int i = 0; i < r->n; i++) EXPECT_TRUE(ATU_PACKED_BAL(r->setting[i])) << i;
+    EXPECT_TRUE(ATU_PACKED_BAL(GetATURegisterState()));
+    // The status line says so when bypassed
+    char l1[16], l2[16];
+    AddMillisTime(ATU_STATUS_HOLD_MS + 1);
+    SetATUPacked(ATUBypassFor(0));
+    ATUStatusText(l1, l2, sizeof(l1));
+    EXPECT_STREQ(l1, "ATU BYP");
+    EXPECT_STREQ(l2, "BALUN");
+    ED.ATU_Enabled[0] = false;
+    ATUStatusText(l1, l2, sizeof(l1));
+    EXPECT_STREQ(l1, "ATU OFF");
+    ED.ATU_Enabled[0] = true;
+    ED.ATU_BalunOut[0] = false;
     ExpectBackInReceive();
 }
 

@@ -379,4 +379,11 @@ extern size_t secondaryMenuIndex;
 #endif
 extern struct PrimaryMenuOption primaryMenu[NUM_PRIMARY_MENUS];
 
+#ifdef ATU_PRESENT
+#define ATU_MENU_ITEMS 5
+extern struct SecondaryMenuOption ATUOptions[ATU_MENU_ITEMS];
+void ATUMenuRefreshLabels(void);
+void ATUMenuDisarm(void);
+#endif
+
 #endif

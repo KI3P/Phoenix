@@ -48,7 +48,10 @@ void InitializeStorage(void){
  */
 static void SaveATUFields(JsonDocument &doc){
     doc["ATU_TunePower_W"] = ED.ATU_TunePower_W;
-    doc["ATU_AutoApply"] = ED.ATU_AutoApply;
+    for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+        doc["ATU_Enabled"][j] = ED.ATU_Enabled[j];
+        doc["ATU_BalunOut"][j] = ED.ATU_BalunOut[j];
+    }
     for (int i = 0; i < NUMBER_OF_BANDS; i++){
         for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
             doc["ATU_State"][i][j] = ED.ATU_State[i][j];
@@ -60,11 +63,17 @@ static void SaveATUFields(JsonDocument &doc){
 
 /**
  * PRIVATE: Read the ATU memory and settings back. A file saved before these fields
- * existed leaves the defaults (memory empty, 2 W, auto-apply on).
+ * existed leaves the defaults (memory empty, 2 W, enabled, coax output on every
+ * antenna). The old "ATU_AutoApply" key is ignored.
  */
 static void RestoreATUFields(JsonDocument &doc){
     ED.ATU_TunePower_W = doc["ATU_TunePower_W"] | ED.ATU_TunePower_W;
-    ED.ATU_AutoApply = doc["ATU_AutoApply"] | ED.ATU_AutoApply;
+    for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+        if (doc["ATU_Enabled"].is<JsonArray>())
+            ED.ATU_Enabled[j] = doc["ATU_Enabled"][j] | ED.ATU_Enabled[j];
+        if (doc["ATU_BalunOut"].is<JsonArray>())
+            ED.ATU_BalunOut[j] = doc["ATU_BalunOut"][j] | ED.ATU_BalunOut[j];
+    }
     for (int i = 0; i < NUMBER_OF_BANDS; i++){
         for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
             if (doc["ATU_State"][i].is<JsonArray>())
@@ -976,7 +985,11 @@ void PrintEDToSerial(void){
 
     sprintf(buff, "%4.1f", ED.ATU_TunePower_W);
     Serial.print("ATU_TunePower_W: "); Serial.println(buff);
-    Serial.print("ATU_AutoApply: "); Serial.println((int)ED.ATU_AutoApply);
+    Serial.print("ATU_Enabled / ATU_BalunOut (antenna 0-3):");
+    for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+        Serial.print(" "); Serial.print((int)ED.ATU_Enabled[j]); Serial.print("/"); Serial.print((int)ED.ATU_BalunOut[j]);
+    }
+    Serial.println();
     Serial.println("ATU memory (band: antenna 0-3 as state/kHz/SWR):");
     for (int i = 0; i < NUMBER_OF_BANDS; i++){
         Serial.print("  "); Serial.print(i); Serial.print(":");
