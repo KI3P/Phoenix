@@ -320,6 +320,40 @@ TEST(RFBoard, SetCWVFOFrequency_Test) {
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702615000);
 }
 
+// Changing the frequency correction resets the Si5351, which leaves every output
+// without a frequency. The TX and CW VFOs must be reprogrammed the next time they
+// are set, even to the frequency they had before the reset.
+TEST(RFBoard, FrequencyCorrectionReprogramsTXAndCWVFOs) {
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    SetDualVFOs(true);
+    SetRXVFOFrequency(707400000);
+    SetTXVFOFrequency(707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK4], 707400000);
+    SetFrequencyCorrectionFactor(1234);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000); // RX restored by the correction
+    SetTXVFOFrequency(707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK4], 707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK5], 707400000);
+
+    SetCWVFOFrequency(702515000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 702515000);
+    SetFrequencyCorrectionFactor(0);
+    SetCWVFOFrequency(702515000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 702515000);
+
+    // Single VFO: the CW output is CLK2
+    si5351 = Si5351();
+    ResetVFOState();
+    SetDualVFOs(false);
+    SetCWVFOFrequency(702615000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702615000);
+    SetFrequencyCorrectionFactor(1234);
+    SetCWVFOFrequency(702615000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702615000);
+    SetDualVFOs(true);
+}
+
 TEST(RFBoard, EnableCWVFOOutput_Test) {
     si5351 = Si5351(); // Reset mock
     SetDualVFOs(true);

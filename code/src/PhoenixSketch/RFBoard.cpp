@@ -314,7 +314,10 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 
 void SetFrequencyCorrectionFactor(int32_t corr){
     int64_t freq = GetRXVFOFrequency();
-    RXVFOFreq_cHz = 0;
+    // The reset leaves every output without a frequency, so forget all the
+    // cached VFO settings: the next Set*VFOFrequency call must reprogram the
+    // chip even if its frequency is unchanged
+    ResetVFOState();
 
     si5351.reset();
     si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);
@@ -1012,7 +1015,8 @@ uint16_t GetRFMCPRegisters(void){
  *
  * Resets the static VFO multiple tracking variables to force fresh
  * frequency calculations on the next SetRXVFOFrequency() or SetTXVFOFrequency() call.
- * This is used by unit tests to ensure clean state between test runs.
+ * Used after an Si5351 reset (SetFrequencyCorrectionFactor), and by unit tests
+ * to ensure clean state between test runs.
  */
 void ResetVFOState(void){
     oldrxMultiple = 0;
