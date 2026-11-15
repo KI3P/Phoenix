@@ -1,0 +1,591 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Phoenix Calibration Guide</title><meta name="description" content="Step-by-step calibration of a finished Phoenix (T41) SDR transceiver: frequency, receive IQ, transmit IQ, power and SWR, and the S-meter, for single- and dual-VFO radios."><style>
+:root{
+  --bg:#fbfaf7; --panel:#ffffff; --ink:#1d2329; --muted:#5d6670; --rule:#e3e0d8;
+  --accent:#9a3412; --accent-soft:#fde3d3; --code:#f2f0ea; --off:#b9bec5;
+  --single:#2563eb; --single-soft:#dbe6fd; --dual:#0f766e; --dual-soft:#d5efe9;
+  --warn:#b91c1c; --warn-soft:#fde2e2;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181c; --panel:#1c2026; --ink:#e7e9ec; --muted:#9aa3ad; --rule:#2d333b;
+    --accent:#fb923c; --accent-soft:#3d2618; --code:#232830; --off:#4a525c;
+    --single:#60a5fa; --single-soft:#1e2c47; --dual:#2dd4bf; --dual-soft:#123a35;
+    --warn:#f87171; --warn-soft:#3b1d1d;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15181c; --panel:#1c2026; --ink:#e7e9ec; --muted:#9aa3ad; --rule:#2d333b;
+  --accent:#fb923c; --accent-soft:#3d2618; --code:#232830; --off:#4a525c;
+  --single:#60a5fa; --single-soft:#1e2c47; --dual:#2dd4bf; --dual-soft:#123a35;
+  --warn:#f87171; --warn-soft:#3b1d1d;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16.5px/1.62 Charter,"Bitstream Charter","Iowan Old Style",Georgia,serif}
+main{max-width:860px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3,h4,figcaption,table,.kicker,.toc,.callout b,.tag,.step-n,.badge{font-family:-apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+h1{font-size:2.1rem;line-height:1.2;margin:.2em 0 .3em;letter-spacing:-.01em}
+h2{font-size:1.45rem;margin:2.6em 0 .6em;padding-top:.7em;border-top:1px solid var(--rule)}
+h3{font-size:1.08rem;margin:1.8em 0 .4em}
+h4{font-size:.95rem;margin:1.4em 0 .3em;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kicker{color:var(--accent);font-weight:600;font-size:.85rem;letter-spacing:.06em;text-transform:uppercase}
+.lede{font-size:1.15rem;color:var(--muted);margin-top:0}
+p{margin:.7em 0}
+a{color:var(--accent)}
+kbd{font-family:-apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;font-size:.82em;font-weight:600;background:var(--code);border:1px solid var(--rule);border-bottom-width:2px;border-radius:5px;padding:.05em .45em;white-space:nowrap}
+.callout{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:8px;padding:14px 18px;margin:1.4em 0}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.callout ul{margin:.4em 0 0;padding-left:1.2em}
+.callout p:first-child{margin-top:0} .callout p:last-child{margin-bottom:0}
+.toc{font-size:.95rem;margin:1.2em 0;padding:0;list-style:none;counter-reset:none}
+.toc li{margin:.25em 0}
+.toc a{text-decoration:none} .toc a:hover{text-decoration:underline}
+.toc .sub{color:var(--muted);font-size:.86rem}
+figure{margin:1.4em 0;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:12px}
+figure img{display:block;width:100%;height:auto;border-radius:4px;image-rendering:auto}
+figcaption{font-size:.86rem;color:var(--muted);margin-top:8px;line-height:1.5}
+figcaption b{color:var(--ink)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.mapgrid{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:22px;align-items:start;margin:1.2em 0}
+.mapgrid figure{margin:0}
+@media (max-width:700px){.pair,.mapgrid{grid-template-columns:1fr}.mapgrid figure{max-width:340px}}
+svg{display:block;width:100%;height:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem;margin:.8em 0 1.2em}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.tablewrap{overflow-x:auto}
+ol.steps{list-style:none;padding-left:0;counter-reset:step}
+ol.steps>li{position:relative;padding-left:2.4em;margin:1em 0;counter-increment:step}
+ol.steps>li::before{content:counter(step);position:absolute;left:0;top:.05em;width:1.75em;height:1.75em;border-radius:50%;background:var(--accent);color:#fff;font:600 .85rem/1.75em -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;text-align:center}
+ol.steps figure{margin:.8em 0}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:.1em .55em;border-radius:999px;vertical-align:.12em}
+.tag.single{background:var(--single-soft);color:var(--single)}
+.tag.dual{background:var(--dual-soft);color:var(--dual)}
+.tag.both{background:var(--code);color:var(--muted)}
+.vfo{border:1px solid var(--rule);border-radius:10px;padding:4px 18px 10px;margin:1.4em 0;background:var(--panel)}
+.vfo.single{border-left:4px solid var(--single)}
+.vfo.dual{border-left:4px solid var(--dual)}
+.equip{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:6px 18px 6px;margin:1.2em 0}
+.equip h4{margin-top:.8em}
+.equip table{margin-top:.2em}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:-apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;font-size:.85rem;color:var(--muted);margin:.2em 0 1em}
+.meta b{color:var(--ink);font-weight:600}
+.order{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:1.4em 0}
+.order a{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:10px 10px 12px;font-family:-apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;font-size:.85rem;line-height:1.35}
+.order a:hover{border-color:var(--accent)}
+.order .n{display:block;font-size:1.4rem;font-weight:700;color:var(--accent)}
+.order .t{display:block;font-weight:600;margin:.1em 0 .25em}
+.order .e{display:block;color:var(--muted);font-size:.78rem}
+@media (max-width:700px){.order{grid-template-columns:1fr 1fr}}
+.checklist{list-style:none;padding-left:0}
+.checklist li{padding-left:1.6em;position:relative;margin:.35em 0}
+.checklist li::before{content:"";position:absolute;left:0;top:.35em;width:.95em;height:.95em;border:1.5px solid var(--muted);border-radius:3px}
+/* Button maps */
+.bm-panel{fill:var(--panel);stroke:var(--rule);stroke-width:1.5}
+.bm-on{fill:var(--accent)}
+.bm-off{fill:none;stroke:var(--off);stroke-width:1.2}
+.bm-num-on{fill:#fff;font:600 12px -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+.bm-num-off{fill:var(--off);font:12px -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+.bm-lab{fill:var(--ink);font:11px -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+.bm-enc-on{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.bm-enc-off{fill:none;stroke:var(--off);stroke-width:1.2}
+.bm-encname-on{fill:var(--ink);font:600 10px -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+.bm-encname-off{fill:var(--off);font:10px -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+/* Bench diagrams */
+.d-box{fill:var(--panel);stroke:var(--ink);stroke-width:1.5}
+.d-box.hl{fill:var(--accent-soft);stroke:var(--accent)}
+.d-line{stroke:var(--ink);stroke-width:2;fill:none}
+.d-lab{font:12.5px -apple-system,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;fill:var(--ink)}
+.d-lab.b{font-weight:600}
+.d-lab.s{font-size:11px;fill:var(--muted)}
+.d-ax{stroke:var(--muted);stroke-width:1}
+.d-sig{fill:var(--accent)} .d-img{fill:var(--single)} .d-car{fill:var(--muted)}
+@media print{
+  body{background:#fff;font-size:11pt}
+  main{max-width:none;padding:0}
+  h2{break-before:page}
+  figure,table,.callout,.vfo,.equip{break-inside:avoid}
+  a{color:inherit;text-decoration:none}
+}
+</style></head><body><main>
+
+<div class="kicker">Phoenix SDR · Calibration</div>
+<h1>Calibrating your Phoenix transceiver</h1>
+<p class="lede">A step-by-step guide to calibrating a finished radio: the frequency reference, the receive and transmit IQ balance, the output power and SWR readings, and the S-meter. It covers both the single-VFO and the dual-VFO versions of the RF board.</p>
+
+<div class="callout"><b>In short</b><ul>
+<li>Calibrate in this order: <b>frequency → receive IQ → transmit IQ → power and SWR → S-meter</b>. Each step relies on the ones before it.</li>
+<li>Every calibration is on <kbd>Menu</kbd> → <b>Calibration</b>. Pressing <kbd>Home</kbd> (button 17) leaves the screen and saves the result.</li>
+<li>A <b>dual-VFO</b> radio calibrates its transmit IQ by itself with no test equipment. A <b>single-VFO</b> radio needs a dummy load, an attenuator and a spectrum analyser or second receiver for that step.</li>
+<li>The minimum kit is a 50&nbsp;Ω dummy load (20&nbsp;W), a shorting plug and an off-air frequency standard such as WWV or CHU. A wattmeter, a signal generator and, for single-VFO radios, a spectrum analyser make the results better or possible.</li>
+</ul></div>
+
+<div class="order">
+<a href="#frequency"><span class="n">1</span><span class="t">Frequency</span><span class="e">WWV/CHU or a locked generator</span></a>
+<a href="#rxiq"><span class="n">2</span><span class="t">Receive IQ</span><span class="e">No equipment</span></a>
+<a href="#txiq"><span class="n">3</span><span class="t">Transmit IQ</span><span class="e">Dual: none · Single: load, attenuator, analyser</span></a>
+<a href="#power"><span class="n">4</span><span class="t">Power and SWR</span><span class="e">Load, short; wattmeter recommended</span></a>
+<a href="#smeter"><span class="n">5</span><span class="t">S-meter</span><span class="e">Signal generator</span></a>
+</div>
+
+<ul class="toc">
+<li><a href="#before">0. Before you begin</a> <span class="sub">safety, menus, single or dual VFO, saving</span></li>
+<li><a href="#frequency">1. Frequency reference</a></li>
+<li><a href="#rxiq">2. Receive IQ balance</a></li>
+<li><a href="#txiq">3. Transmit IQ balance</a> <span class="sub">dual VFO · single VFO</span></li>
+<li><a href="#power">4. Power and SWR</a> <span class="sub">automatic · manual fallback</span></li>
+<li><a href="#smeter">5. S-meter level</a></li>
+<li><a href="#appendix">Appendix</a> <span class="sub">summary, when to recalibrate, troubleshooting, panel map</span></li>
+</ul>
+
+<!-- ======================================================================= -->
+<h2 id="before">0. Before you begin</h2>
+
+<h3>What this guide assumes</h3>
+<p>The radio is fully built and its boards are tested: it boots to the home screen, receives, and transmits into a dummy load. The guide is written for the current Phoenix firmware. You do not need to know anything about the firmware itself. All calibration is done from the front panel.</p>
+<p>The calibrations cover the <b>20&nbsp;W PA</b>. If your radio also has the 100&nbsp;W amplifier, calibrate the 20&nbsp;W PA first; the 100&nbsp;W PA is not covered here.</p>
+
+<div class="callout warn"><p><b>Safety</b></p><ul>
+<li>Whenever a step transmits, there must be a 50&nbsp;Ω load on the antenna connector that can take the power: a dummy load, or a wattmeter terminated in its load. The steps say which ones transmit.</li>
+<li>Never connect a spectrum analyser, SDR or receiver straight to the antenna connector while transmitting. Take the signal from a sampler or through an attenuator rated for the power. Most small analysers are damaged above about +10&nbsp;dBm (10&nbsp;mW).</li>
+<li>Calibration tones are continuous carriers. Keep transmissions short and let the PA rest between them.</li>
+</ul></div>
+
+<h3>Warm up</h3>
+<p>Switch the radio on at least 15 minutes before you start and leave it on for the whole session. The reference oscillator and the power amplifier both drift slightly as they warm up.</p>
+
+<h3 id="menus">Finding your way around</h3>
+<p>The front panel has 18 numbered buttons (0 to 17) and four encoders. The calibration screens refer to the buttons by number, and so does this guide. The map below shows what the buttons do on the home screen; each calibration section has its own map.</p>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:home --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Home screen"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-on"/><text x="80" y="44.5" class="bm-num-on" text-anchor="middle">0</text><text x="80" y="68" class="bm-lab" text-anchor="middle">Select</text><circle cx="200" cy="40" r="15" class="bm-on"/><text x="200" y="44.5" class="bm-num-on" text-anchor="middle">1</text><text x="200" y="68" class="bm-lab" text-anchor="middle">Menu</text><circle cx="320" cy="40" r="15" class="bm-on"/><text x="320" y="44.5" class="bm-num-on" text-anchor="middle">2</text><text x="320" y="68" class="bm-lab" text-anchor="middle">Band +</text><circle cx="80" cy="114" r="15" class="bm-on"/><text x="80" y="118.5" class="bm-num-on" text-anchor="middle">3</text><text x="80" y="142" class="bm-lab" text-anchor="middle">Zoom</text><circle cx="200" cy="114" r="15" class="bm-on"/><text x="200" y="118.5" class="bm-num-on" text-anchor="middle">4</text><text x="200" y="142" class="bm-lab" text-anchor="middle">Reset</text><text x="200" y="155" class="bm-lab" text-anchor="middle">tuning</text><circle cx="320" cy="114" r="15" class="bm-on"/><text x="320" y="118.5" class="bm-num-on" text-anchor="middle">5</text><text x="320" y="142" class="bm-lab" text-anchor="middle">Band −</text><circle cx="80" cy="188" r="15" class="bm-on"/><text x="80" y="192.5" class="bm-num-on" text-anchor="middle">6</text><text x="80" y="216" class="bm-lab" text-anchor="middle">Mode</text><circle cx="200" cy="188" r="15" class="bm-on"/><text x="200" y="192.5" class="bm-num-on" text-anchor="middle">7</text><text x="200" y="216" class="bm-lab" text-anchor="middle">Demod.</text><circle cx="320" cy="188" r="15" class="bm-on"/><text x="320" y="192.5" class="bm-num-on" text-anchor="middle">8</text><text x="320" y="216" class="bm-lab" text-anchor="middle">Centre tune</text><text x="320" y="229" class="bm-lab" text-anchor="middle">step</text><circle cx="80" cy="262" r="15" class="bm-on"/><text x="80" y="266.5" class="bm-num-on" text-anchor="middle">9</text><text x="80" y="290" class="bm-lab" text-anchor="middle">Noise</text><text x="80" y="303" class="bm-lab" text-anchor="middle">reduction</text><circle cx="200" cy="262" r="15" class="bm-on"/><text x="200" y="266.5" class="bm-num-on" text-anchor="middle">10</text><text x="200" y="290" class="bm-lab" text-anchor="middle">Notch</text><circle cx="320" cy="262" r="15" class="bm-on"/><text x="320" y="266.5" class="bm-num-on" text-anchor="middle">11</text><text x="320" y="290" class="bm-lab" text-anchor="middle">Fine tune</text><text x="320" y="303" class="bm-lab" text-anchor="middle">step</text><circle cx="80" cy="336" r="15" class="bm-on"/><text x="80" y="340.5" class="bm-num-on" text-anchor="middle">12</text><text x="80" y="364" class="bm-lab" text-anchor="middle">Filter</text><circle cx="200" cy="336" r="15" class="bm-on"/><text x="200" y="340.5" class="bm-num-on" text-anchor="middle">13</text><text x="200" y="364" class="bm-lab" text-anchor="middle">Decoder</text><circle cx="320" cy="336" r="15" class="bm-on"/><text x="320" y="340.5" class="bm-num-on" text-anchor="middle">14</text><text x="320" y="364" class="bm-lab" text-anchor="middle">Direct</text><text x="320" y="377" class="bm-lab" text-anchor="middle">freq. entry</text><circle cx="80" cy="410" r="15" class="bm-off"/><text x="80" y="414.5" class="bm-num-off" text-anchor="middle">15</text><circle cx="200" cy="410" r="15" class="bm-off"/><text x="200" y="414.5" class="bm-num-off" text-anchor="middle">16</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Home</text><circle cx="80" cy="502" r="26" class="bm-enc-on"/><text x="80" y="505.5" class="bm-encname-on" text-anchor="middle">Volume</text><text x="80" y="542" class="bm-lab" text-anchor="middle">Volume</text><circle cx="320" cy="502" r="26" class="bm-enc-on"/><text x="320" y="505.5" class="bm-encname-on" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-on" text-anchor="middle">tune</text><text x="320" y="542" class="bm-lab" text-anchor="middle">Tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Filter width</text><text x="80" y="655" class="bm-lab" text-anchor="middle">menu scroll</text><circle cx="320" cy="602" r="26" class="bm-enc-on"/><text x="320" y="605.5" class="bm-encname-on" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-on" text-anchor="middle">tune</text><text x="320" y="642" class="bm-lab" text-anchor="middle">Fine tune</text></svg><!-- /buttonmap:home --><figcaption><b>Front panel, home screen.</b> Buttons are numbered left to right, top to bottom.</figcaption></figure>
+<div>
+<p>To open a calibration:</p>
+<ol class="steps">
+<li>Press <kbd>1</kbd> (Menu) to open the main menu.</li>
+<li>Turn the <b>Filter</b> encoder until <b>Calibration</b> is highlighted, then press <kbd>0</kbd> (Select).</li>
+<li>Turn the <b>Filter</b> encoder to the calibration you want and press <kbd>0</kbd> (Select).</li>
+</ol>
+<p>The Calibration menu has five entries: <b>S meter level</b>, <b>Frequency</b>, <b>Receive IQ</b>, <b>Transmit IQ</b> and <b>Power</b>. Press <kbd>17</kbd> (Home) at any time to leave a menu.</p>
+</div>
+</div>
+
+<div class="pair">
+<figure><img src="menu-primary.png" alt="Main menu with Calibration highlighted" loading="lazy"><figcaption><b>Main menu</b>, turned to Calibration.</figcaption></figure>
+<figure><img src="menu-calibration.png" alt="Calibration menu with Frequency highlighted" loading="lazy"><figcaption><b>Calibration menu</b>, turned to Frequency.</figcaption></figure>
+</div>
+
+<h3 id="vfo">Single or dual VFO?</h3>
+<p>The RF board comes in two versions. The <span class="tag single">Single VFO</span> board has one quadrature local oscillator, shared by receive and transmit. The <span class="tag dual">Dual VFO</span> board has separate receive and transmit oscillators, which lets the radio listen to its own transmitter. That makes a difference only to the <a href="#txiq">transmit IQ calibration</a>; every other step is the same.</p>
+<p>The radio detects the board when it starts. To see which one you have, open <kbd>Menu</kbd> → <b>Diagnostics</b> → <b>I2C BIT test</b> and read the <b>RF SI5351</b> line:</p>
+<div class="tablewrap"><table>
+<tr><th>RF SI5351 address</th><th>Board</th></tr>
+<tr><td><b>0x61</b></td><td><span class="tag dual">Dual VFO</span></td></tr>
+<tr><td><b>0x60</b></td><td><span class="tag single">Single VFO</span></td></tr>
+</table></div>
+<figure><img src="bit-single.png" alt="I2C status report showing RF SI5351 at 0x60" loading="lazy"><figcaption><b>I2C status report</b> of a single-VFO radio: the RF SI5351 is at 0x60. A dual-VFO radio shows 0x61. Press <kbd>17</kbd> to return to the home screen.</figcaption></figure>
+
+<h3 id="saving">How results are saved</h3>
+<p>Each calibration screen saves its results to the radio's internal memory when you press <kbd>17</kbd> (Home) to leave it. The S-meter level is the exception: see <a href="#smeter">section 5</a>. The settings survive switching off. When you switch the radio off with its power switch, it also writes a backup copy to the SD card, if one is fitted.</p>
+<p>You can repeat any calibration at any time. The new values replace the old ones.</p>
+
+<h3 id="kit">Equipment checklist</h3>
+<div class="tablewrap"><table>
+<tr><th>Item</th><th>Used in</th><th>Needed?</th></tr>
+<tr><td>Off-air frequency standard (WWV, WWVH, CHU), or a signal generator locked to a GPS or rubidium reference</td><td><a href="#frequency">1</a></td><td>Yes</td></tr>
+<tr><td>50&nbsp;Ω dummy load, 20&nbsp;W continuous or more, 1.8–54&nbsp;MHz</td><td><a href="#txiq">3</a> (single VFO), <a href="#power">4</a></td><td>Yes</td></tr>
+<tr><td>Shorting plug that fits the antenna connector directly</td><td><a href="#power">4</a></td><td>Yes</td></tr>
+<tr><td>HF wattmeter (with its own 50&nbsp;Ω load), accurate near 2&nbsp;W and up to 20&nbsp;W</td><td><a href="#power">4</a></td><td>Recommended</td></tr>
+<tr><td>Spectrum analyser covering HF (a tinySA is fine) or a second receiver or SDR with a waterfall</td><td><a href="#txiq-single">3</a> (single VFO only)</td><td>Single VFO: yes</td></tr>
+<tr><td>Power attenuator or RF sampler, 30–40&nbsp;dB, rated for 20&nbsp;W</td><td><a href="#txiq-single">3</a> (single VFO only)</td><td>Single VFO: yes</td></tr>
+<tr><td>HF signal generator with a known output level (for example −73&nbsp;dBm)</td><td><a href="#smeter">5</a></td><td>Optional</td></tr>
+<tr><td>Microphone or footswitch with PTT</td><td><a href="#txiq">3</a>, <a href="#power-manual">4 (manual)</a></td><td>Yes</td></tr>
+</table></div>
+
+<!-- ======================================================================= -->
+<h2 id="frequency">1. Frequency reference</h2>
+<div class="meta"><span><b>Applies to</b> <span class="tag both">Both boards</span></span><span><b>Transmits</b> no</span><span><b>Time</b> about 5 minutes</span></div>
+<p>All of the radio's oscillators are derived from one 25&nbsp;MHz crystal. Its frequency is never exactly 25&nbsp;MHz, so the radio applies a correction factor, in parts per billion. This step sets that factor by tuning to a signal whose frequency is known exactly and nulling the error. The correction applies to both receive and transmit.</p>
+<p>Do this first: the later calibrations place their test tones by frequency.</p>
+
+<div class="equip"><h4>Equipment</h4><div class="tablewrap"><table>
+<tr><th>Item</th><th>Notes</th></tr>
+<tr><td>A carrier of exactly known frequency</td><td>An off-air time-and-frequency station: WWV or WWVH on 5, 10 or 15&nbsp;MHz, or CHU on 3.330, 7.850 or 14.670&nbsp;MHz. Or a signal generator locked to a GPS-disciplined or rubidium reference, at a moderate level (around −70&nbsp;dBm). Use the highest frequency you can receive well: the same crystal error makes a larger frequency offset there, so it is easier to null.</td></tr>
+<tr><td>An antenna</td><td>For an off-air standard.</td></tr>
+</table></div></div>
+
+<h3>Before you start</h3>
+<p>The tuning controls do not work on the calibration screen, so tune to the reference first, on the home screen.</p>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:frequency --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Frequency calibration"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-off"/><text x="80" y="44.5" class="bm-num-off" text-anchor="middle">0</text><circle cx="200" cy="40" r="15" class="bm-off"/><text x="200" y="44.5" class="bm-num-off" text-anchor="middle">1</text><circle cx="320" cy="40" r="15" class="bm-off"/><text x="320" y="44.5" class="bm-num-off" text-anchor="middle">2</text><circle cx="80" cy="114" r="15" class="bm-off"/><text x="80" y="118.5" class="bm-num-off" text-anchor="middle">3</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-off"/><text x="320" y="118.5" class="bm-num-off" text-anchor="middle">5</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-on"/><text x="200" y="192.5" class="bm-num-on" text-anchor="middle">7</text><text x="200" y="216" class="bm-lab" text-anchor="middle">Demod.</text><text x="200" y="229" class="bm-lab" text-anchor="middle">(pick SAM)</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-off"/><text x="80" y="340.5" class="bm-num-off" text-anchor="middle">12</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-off"/><text x="320" y="340.5" class="bm-num-off" text-anchor="middle">14</text><circle cx="80" cy="410" r="15" class="bm-on"/><text x="80" y="414.5" class="bm-num-on" text-anchor="middle">15</text><text x="80" y="438" class="bm-lab" text-anchor="middle">Step size</text><circle cx="200" cy="410" r="15" class="bm-off"/><text x="200" y="414.5" class="bm-num-off" text-anchor="middle">16</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Save</text><text x="320" y="451" class="bm-lab" text-anchor="middle">and exit</text><circle cx="80" cy="502" r="26" class="bm-enc-off"/><text x="80" y="505.5" class="bm-encname-off" text-anchor="middle">Volume</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Correction</text><text x="80" y="655" class="bm-lab" text-anchor="middle">factor</text><circle cx="320" cy="602" r="26" class="bm-enc-off"/><text x="320" y="605.5" class="bm-encname-off" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-off" text-anchor="middle">tune</text></svg><!-- /buttonmap:frequency --><figcaption><b>Frequency calibration controls.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td><b>Filter</b> encoder</td><td>Changes the correction factor</td></tr>
+<tr><td><kbd>15</kbd></td><td>Changes the step: 1, 10, 100, 1000 or 10000</td></tr>
+<tr><td><kbd>7</kbd></td><td>Changes the demodulation; it must be <b>SAM</b></td></tr>
+<tr><td><kbd>17</kbd> Home</td><td>Saves the factor and leaves</td></tr>
+</table></div></div>
+</div>
+
+<h3>Step by step</h3>
+<ol class="steps">
+<li>Connect the antenna (or the generator) and tune the radio to the reference frequency exactly, for example 10&nbsp;000.000&nbsp;kHz. Direct frequency entry (button <kbd>14</kbd>) is the quickest way.</li>
+<li>Press <kbd>7</kbd> (Demod.) until the demodulation is <b>SAM</b> (synchronous AM). Check that you can hear the carrier and that it is inside the filter passband.
+<figure><img src="freq-home-sam.png" alt="Home screen tuned to 10 MHz in SAM" loading="lazy"><figcaption><b>Tuned to 10.000 MHz in SAM.</b></figcaption></figure></li>
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Frequency</b>. The screen shows the <b>Factor</b>, the step (<b>Incr.</b>) and the <b>Error</b>, a measure of how far the received carrier is from where the radio expects it. The same reading appears as <b>Err</b> on the home screen in SAM.
+<figure><img src="freq-cal.png" alt="Frequency calibration screen" loading="lazy"><figcaption><b>Frequency calibration screen</b>, with the error nulled. The modulation is shown in green when it is SAM.</figcaption></figure></li>
+<li>Turn the <b>Filter</b> encoder to bring the <b>Error</b> towards zero. Start with a large step (press <kbd>15</kbd> to change it) and make it smaller as you get close. The error reading settles a second or so after each change, so turn slowly.</li>
+<li>Stop when the error stays between −1 and +1. Off-air signals wander with propagation; aim for the middle of the wander.</li>
+<li>Press <kbd>17</kbd> (Home) to save and leave.</li>
+</ol>
+
+<h3>How do I know it worked?</h3>
+<p>Tune to a second standard in SAM, for example 15&nbsp;MHz after calibrating on 10&nbsp;MHz. The <b>Err</b> reading on the home screen should stay close to zero. If you have a frequency counter, a CW carrier into a dummy load should be within a few hertz of the dial on any band.</p>
+
+<div class="vfo"><h4>Single and dual VFO</h4><p>The procedure is the same on both boards. The correction applies to every oscillator, so the transmitter is corrected too.</p></div>
+
+<!-- ======================================================================= -->
+<h2 id="rxiq">2. Receive IQ balance</h2>
+<div class="meta"><span><b>Applies to</b> <span class="tag both">Both boards</span></span><span><b>Transmits</b> no (internal test signal)</span><span><b>Time</b> about 3 minutes, automatic</span></div>
+<p>The receiver mixes the incoming signal to I and Q channels. If those two channels are not exactly equal in amplitude and exactly 90° apart, a signal also appears as a faint mirror image on the other side of the display centre. This step finds the amplitude and phase corrections, band by band, that cancel that image.</p>
+<p>The radio generates its own test signal and routes it internally into the receiver, so you need no equipment. The measure of success is <b>Delta</b>: how far the image is below the wanted signal, in dB. Higher is better; aim for more than 60&nbsp;dB.</p>
+
+<div class="equip"><h4>Equipment</h4><p>None. Fit a dummy load (or leave the antenna disconnected) so that strong off-air signals do not disturb the measurement.</p></div>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:rxiq --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Receive IQ calibration"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-off"/><text x="80" y="44.5" class="bm-num-off" text-anchor="middle">0</text><circle cx="200" cy="40" r="15" class="bm-off"/><text x="200" y="44.5" class="bm-num-off" text-anchor="middle">1</text><circle cx="320" cy="40" r="15" class="bm-on"/><text x="320" y="44.5" class="bm-num-on" text-anchor="middle">2</text><text x="320" y="68" class="bm-lab" text-anchor="middle">Band +</text><circle cx="80" cy="114" r="15" class="bm-off"/><text x="80" y="118.5" class="bm-num-off" text-anchor="middle">3</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-on"/><text x="320" y="118.5" class="bm-num-on" text-anchor="middle">5</text><text x="320" y="142" class="bm-lab" text-anchor="middle">Band −</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-off"/><text x="200" y="192.5" class="bm-num-off" text-anchor="middle">7</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-off"/><text x="80" y="340.5" class="bm-num-off" text-anchor="middle">12</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-off"/><text x="320" y="340.5" class="bm-num-off" text-anchor="middle">14</text><circle cx="80" cy="410" r="15" class="bm-on"/><text x="80" y="414.5" class="bm-num-on" text-anchor="middle">15</text><text x="80" y="438" class="bm-lab" text-anchor="middle">Step size</text><circle cx="200" cy="410" r="15" class="bm-on"/><text x="200" y="414.5" class="bm-num-on" text-anchor="middle">16</text><text x="200" y="438" class="bm-lab" text-anchor="middle">Automatic</text><text x="200" y="451" class="bm-lab" text-anchor="middle">(all bands)</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Save</text><text x="320" y="451" class="bm-lab" text-anchor="middle">and exit</text><circle cx="80" cy="502" r="26" class="bm-enc-on"/><text x="80" y="505.5" class="bm-encname-on" text-anchor="middle">Volume</text><text x="80" y="542" class="bm-lab" text-anchor="middle">Amplitude</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Phase</text><circle cx="320" cy="602" r="26" class="bm-enc-off"/><text x="320" y="605.5" class="bm-encname-off" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-off" text-anchor="middle">tune</text></svg><!-- /buttonmap:rxiq --><figcaption><b>Receive IQ controls.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td><kbd>16</kbd></td><td>Automatic calibration of every band</td></tr>
+<tr><td><b>Volume</b> encoder</td><td>Amplitude correction of the current band</td></tr>
+<tr><td><b>Filter</b> encoder</td><td>Phase correction of the current band</td></tr>
+<tr><td><kbd>15</kbd></td><td>Changes the step: 0.01 or 0.001</td></tr>
+<tr><td><kbd>2</kbd> / <kbd>5</kbd></td><td>Next or previous band</td></tr>
+<tr><td><kbd>17</kbd> Home</td><td>Saves and leaves</td></tr>
+</table></div></div>
+</div>
+
+<h3>Step by step</h3>
+<ol class="steps">
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Receive IQ</b>. The screen shows the current band's <b>Delta</b>, <b>Amp</b> and <b>Phase</b>, a table of every band, and the spectrum with the test signal and its image.
+<figure><img src="rxiq-entry.png" alt="Receive IQ calibration screen before calibration" loading="lazy"><figcaption><b>Receive IQ calibration</b>, before calibrating: amplitude 1.000 and phase 0.000 on every band.</figcaption></figure></li>
+<li>Press <kbd>16</kbd>. The radio calibrates every band in turn, starting with 160&nbsp;m: on each band it sweeps the amplitude and then the phase in coarse, medium and fine passes, and keeps the setting with the largest Delta. Leave it alone until it has finished the last band.
+<figure><img src="rxiq-auto.png" alt="Receive IQ automatic calibration in progress" loading="lazy"><figcaption><b>Automatic calibration in progress</b>, on 40&nbsp;m. The bands above it in the table are already done.</figcaption></figure></li>
+<li>When it stops, check the table: the <b>Val</b> column is each band's Delta. The screen's target is 60&nbsp;dB; if a band falls well short, select it and touch it up by hand (next step).
+<figure><img src="rxiq-done.png" alt="Receive IQ calibration complete" loading="lazy"><figcaption><b>Finished.</b> Each band has its own amplitude and phase correction.</figcaption></figure></li>
+<li><i>Optional:</i> to improve a band by hand, select it with <kbd>2</kbd> / <kbd>5</kbd>, set the step to 0.001 with <kbd>15</kbd>, and turn the <b>Volume</b> (amplitude) and <b>Filter</b> (phase) encoders alternately for the largest Delta.</li>
+<li>Press <kbd>17</kbd> (Home) to save and leave.</li>
+</ol>
+<p>Pressing <kbd>17</kbd> during the automatic run stops it. The bands it had finished keep their new values; the band it was working on goes back to its previous setting.</p>
+
+<h3>How do I know it worked?</h3>
+<p>On the home screen, tune a strong steady carrier (a broadcast station or a generator) about 20&nbsp;kHz to one side of the display centre. Its mirror image on the other side should be gone, or at the noise floor.</p>
+
+<div class="vfo"><h4>Single and dual VFO</h4><p>The procedure is the same on both boards.</p></div>
+
+<!-- ======================================================================= -->
+<h2 id="txiq">3. Transmit IQ balance</h2>
+<div class="meta"><span><b>Applies to</b> <span class="tag dual">Dual VFO</span> and <span class="tag single">Single VFO</span>, done differently</span><span><b>Transmits</b> dual: no (internal loop) · single: yes</span><span><b>Time</b> dual: about 3 minutes, automatic · single: about 5 minutes per band</span></div>
+<p>The transmitter has the same problem as the receiver in reverse: an amplitude or phase imbalance between I and Q puts a copy of your signal on the <b>opposite sideband</b>. This step finds the corrections, band by band, that suppress that unwanted sideband. The measure is the <b>image rejection ratio</b> (IRR): how far the unwanted sideband is below the wanted one. Aim for more than 60&nbsp;dB on a dual-VFO radio. On a single-VFO radio the analyser's own dynamic range usually sets the limit, so aim for at least 50&nbsp;dB.</p>
+<p>The radio transmits an <b>800&nbsp;Hz</b> tone on the band's normal sideband. Do the receive IQ calibration first: on a dual-VFO radio the transmitter is measured through the receiver.</p>
+
+<div class="vfo dual" id="txiq-dual">
+<h3><span class="tag dual">Dual VFO</span> Automatic, no equipment</h3>
+<p>A dual-VFO radio can listen to its own transmitter. In this calibration the transmit signal is routed back into the receiver inside the radio, at low level, so <b>nothing is sent to the antenna connector</b>. The radio measures the IRR itself and shows it on screen.</p>
+
+<div class="equip"><h4>Equipment</h4><p>None. Leave a dummy load on the antenna connector as good practice.</p></div>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:txiq-dual --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Transmit IQ calibration, dual VFO"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-off"/><text x="80" y="44.5" class="bm-num-off" text-anchor="middle">0</text><circle cx="200" cy="40" r="15" class="bm-off"/><text x="200" y="44.5" class="bm-num-off" text-anchor="middle">1</text><circle cx="320" cy="40" r="15" class="bm-on"/><text x="320" y="44.5" class="bm-num-on" text-anchor="middle">2</text><text x="320" y="68" class="bm-lab" text-anchor="middle">Band +</text><circle cx="80" cy="114" r="15" class="bm-off"/><text x="80" y="118.5" class="bm-num-off" text-anchor="middle">3</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-on"/><text x="320" y="118.5" class="bm-num-on" text-anchor="middle">5</text><text x="320" y="142" class="bm-lab" text-anchor="middle">Band −</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-off"/><text x="200" y="192.5" class="bm-num-off" text-anchor="middle">7</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-off"/><text x="80" y="340.5" class="bm-num-off" text-anchor="middle">12</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-off"/><text x="320" y="340.5" class="bm-num-off" text-anchor="middle">14</text><circle cx="80" cy="410" r="15" class="bm-on"/><text x="80" y="414.5" class="bm-num-on" text-anchor="middle">15</text><text x="80" y="438" class="bm-lab" text-anchor="middle">Step size</text><circle cx="200" cy="410" r="15" class="bm-on"/><text x="200" y="414.5" class="bm-num-on" text-anchor="middle">16</text><text x="200" y="438" class="bm-lab" text-anchor="middle">Automatic</text><text x="200" y="451" class="bm-lab" text-anchor="middle">(all bands)</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Save</text><text x="320" y="451" class="bm-lab" text-anchor="middle">and exit</text><circle cx="80" cy="502" r="26" class="bm-enc-on"/><text x="80" y="505.5" class="bm-encname-on" text-anchor="middle">Volume</text><text x="80" y="542" class="bm-lab" text-anchor="middle">Amplitude</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Phase</text><circle cx="320" cy="602" r="26" class="bm-enc-on"/><text x="320" y="605.5" class="bm-encname-on" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-on" text-anchor="middle">tune</text><text x="320" y="642" class="bm-lab" text-anchor="middle">TX attenuation</text></svg><!-- /buttonmap:txiq-dual --><figcaption><b>Transmit IQ controls, dual VFO.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td><kbd>16</kbd></td><td>Automatic calibration of every band</td></tr>
+<tr><td>PTT</td><td>Transmits the test tone for a manual adjustment</td></tr>
+<tr><td><b>Volume</b> encoder</td><td>Amplitude correction</td></tr>
+<tr><td><b>Filter</b> encoder</td><td>Phase correction</td></tr>
+<tr><td><b>Fine tune</b> encoder</td><td>Transmit attenuation. Leave it at 31.5&nbsp;dB.</td></tr>
+<tr><td><kbd>15</kbd></td><td>Changes the step: 0.1, 0.01 or 0.001</td></tr>
+<tr><td><kbd>2</kbd> / <kbd>5</kbd></td><td>Next or previous band</td></tr>
+<tr><td><kbd>17</kbd> Home</td><td>Saves and leaves</td></tr>
+</table></div></div>
+</div>
+
+<h4>Step by step</h4>
+<ol class="steps">
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Transmit IQ</b>. The radio tunes to the middle of the current band.
+<figure><img src="txiq-entry-dual.png" alt="Transmit IQ calibration screen, dual VFO" loading="lazy"><figcaption><b>Transmit IQ calibration</b> on a dual-VFO radio, not transmitting.</figcaption></figure></li>
+<li><i>Optional:</i> hold the PTT to see where you start. The spectrum shows the wanted tone and, to the other side of the centre, the unwanted sideband; <b>IRR</b> shows the difference and <b>dBc</b> the carrier leak. Release the PTT.
+<figure><img src="txiq-keyed-dual.png" alt="Transmit IQ calibration while transmitting, with IRR shown" loading="lazy"><figcaption><b>Transmitting the test tone</b> into the internal loop. PTT shows On.</figcaption></figure></li>
+<li>Select 160&nbsp;m with <kbd>2</kbd> / <kbd>5</kbd>, then press <kbd>16</kbd>. The radio keys itself and calibrates every band in turn from the band on the screen upwards, then stops transmitting. You do not need to hold the PTT. (To redo only the higher bands, start from the first one you want.)
+<figure><img src="txiq-auto-dual.png" alt="Transmit IQ automatic calibration in progress" loading="lazy"><figcaption><b>Automatic calibration in progress</b>, on 40&nbsp;m.</figcaption></figure></li>
+<li>When it stops, check the table: each band has its own amplitude and phase, and the <b>IRR</b> it reached.
+<figure><img src="txiq-done-dual.png" alt="Transmit IQ calibration complete" loading="lazy"><figcaption><b>Finished.</b></figcaption></figure></li>
+<li><i>Optional:</i> to touch up a band by hand, select it with <kbd>2</kbd> / <kbd>5</kbd>, hold the PTT, and turn the <b>Volume</b> and <b>Filter</b> encoders alternately for the highest IRR. The controls work while you transmit.</li>
+<li>Press <kbd>17</kbd> (Home) to save and leave.</li>
+</ol>
+<p>Pressing <kbd>17</kbd> during the automatic run stops it and stops transmitting. Bands already finished keep their new values; the band in progress goes back to its previous setting.</p>
+</div>
+
+<div class="vfo single" id="txiq-single">
+<h3><span class="tag single">Single VFO</span> Manual, with a spectrum analyser</h3>
+<p>A single-VFO radio cannot receive while it transmits, so it cannot measure its own image. It transmits the test tone through the power amplifier to the antenna connector, and you read the image on an external analyser and adjust by hand. The screen has no IRR reading on this board.</p>
+
+<div class="equip"><h4>Equipment</h4><div class="tablewrap"><table>
+<tr><th>Item</th><th>Notes</th></tr>
+<tr><td>50&nbsp;Ω dummy load</td><td>20&nbsp;W continuous. The radio transmits a continuous tone for as long as you hold the PTT.</td></tr>
+<tr><td>Sampler or attenuator</td><td>A dummy load with a sample port, or a 30–40&nbsp;dB power attenuator in line, so that the analyser sees no more than about 0&nbsp;dBm.</td></tr>
+<tr><td>Spectrum analyser or second receiver</td><td>Covering HF, with a resolution bandwidth of 300&nbsp;Hz or less so that it separates the tone, the carrier and the image, which are 800&nbsp;Hz apart. A second SDR with a waterfall and a dB scale also works.</td></tr>
+<tr><td>PTT</td><td>A microphone PTT switch or a footswitch.</td></tr>
+</table></div></div>
+
+<figure><svg viewBox="0 0 760 210" role="img" aria-label="Bench setup: radio to dummy load with sampler, through attenuator, to spectrum analyser; spectrum shows wanted tone, carrier and image">
+<rect x="10" y="40" width="130" height="56" rx="8" class="d-box hl"/><text x="75" y="64" class="d-lab b" text-anchor="middle">Phoenix</text><text x="75" y="82" class="d-lab s" text-anchor="middle">antenna connector</text>
+<line x1="140" y1="68" x2="200" y2="68" class="d-line"/>
+<rect x="200" y="40" width="140" height="56" rx="8" class="d-box"/><text x="270" y="64" class="d-lab b" text-anchor="middle">Dummy load</text><text x="270" y="82" class="d-lab s" text-anchor="middle">20 W, with sample port</text>
+<line x1="270" y1="96" x2="270" y2="140" class="d-line"/>
+<rect x="200" y="140" width="140" height="50" rx="8" class="d-box"/><text x="270" y="162" class="d-lab b" text-anchor="middle">Attenuator</text><text x="270" y="179" class="d-lab s" text-anchor="middle">to about 0 dBm</text>
+<line x1="340" y1="165" x2="390" y2="165" class="d-line"/>
+<rect x="390" y="140" width="120" height="50" rx="8" class="d-box"/><text x="450" y="162" class="d-lab b" text-anchor="middle">Analyser</text><text x="450" y="179" class="d-lab s" text-anchor="middle">RBW ≤ 300 Hz</text>
+<g transform="translate(540,20)">
+<line x1="0" y1="160" x2="210" y2="160" class="d-ax"/>
+<rect x="45" y="128" width="6" height="32" class="d-img"/><text x="48" y="122" class="d-lab s" text-anchor="middle">image</text>
+<rect x="102" y="110" width="6" height="50" class="d-car"/><text x="105" y="104" class="d-lab s" text-anchor="middle">carrier</text>
+<rect x="159" y="20" width="6" height="140" class="d-sig"/><text x="162" y="14" class="d-lab s" text-anchor="middle">tone</text>
+<text x="48" y="177" class="d-lab s" text-anchor="middle">−800 Hz</text><text x="105" y="177" class="d-lab s" text-anchor="middle">dial</text><text x="162" y="177" class="d-lab s" text-anchor="middle">+800 Hz</text>
+</g>
+</svg><figcaption><b>Single-VFO bench setup</b>, and what the analyser shows on an upper-sideband band. On lower-sideband bands (160, 80 and 40&nbsp;m) the tone and the image swap sides. Minimise the <b>image</b>.</figcaption></figure>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:txiq-single --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Transmit IQ calibration, single VFO"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-off"/><text x="80" y="44.5" class="bm-num-off" text-anchor="middle">0</text><circle cx="200" cy="40" r="15" class="bm-off"/><text x="200" y="44.5" class="bm-num-off" text-anchor="middle">1</text><circle cx="320" cy="40" r="15" class="bm-on"/><text x="320" y="44.5" class="bm-num-on" text-anchor="middle">2</text><text x="320" y="68" class="bm-lab" text-anchor="middle">Band +</text><circle cx="80" cy="114" r="15" class="bm-off"/><text x="80" y="118.5" class="bm-num-off" text-anchor="middle">3</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-on"/><text x="320" y="118.5" class="bm-num-on" text-anchor="middle">5</text><text x="320" y="142" class="bm-lab" text-anchor="middle">Band −</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-off"/><text x="200" y="192.5" class="bm-num-off" text-anchor="middle">7</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-off"/><text x="80" y="340.5" class="bm-num-off" text-anchor="middle">12</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-off"/><text x="320" y="340.5" class="bm-num-off" text-anchor="middle">14</text><circle cx="80" cy="410" r="15" class="bm-on"/><text x="80" y="414.5" class="bm-num-on" text-anchor="middle">15</text><text x="80" y="438" class="bm-lab" text-anchor="middle">Step size</text><circle cx="200" cy="410" r="15" class="bm-off"/><text x="200" y="414.5" class="bm-num-off" text-anchor="middle">16</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Save</text><text x="320" y="451" class="bm-lab" text-anchor="middle">and exit</text><circle cx="80" cy="502" r="26" class="bm-enc-on"/><text x="80" y="505.5" class="bm-encname-on" text-anchor="middle">Volume</text><text x="80" y="542" class="bm-lab" text-anchor="middle">Amplitude</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Phase</text><circle cx="320" cy="602" r="26" class="bm-enc-on"/><text x="320" y="605.5" class="bm-encname-on" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-on" text-anchor="middle">tune</text><text x="320" y="642" class="bm-lab" text-anchor="middle">TX attenuation</text></svg><!-- /buttonmap:txiq-single --><figcaption><b>Transmit IQ controls, single VFO.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td>PTT</td><td>Transmits the 800&nbsp;Hz test tone</td></tr>
+<tr><td><b>Volume</b> encoder</td><td>Amplitude correction</td></tr>
+<tr><td><b>Filter</b> encoder</td><td>Phase correction</td></tr>
+<tr><td><b>Fine tune</b> encoder</td><td>Transmit attenuation, 0.5&nbsp;dB a step; starts at 31.5&nbsp;dB (lowest power)</td></tr>
+<tr><td><kbd>15</kbd></td><td>Changes the step: 0.1, 0.01 or 0.001</td></tr>
+<tr><td><kbd>2</kbd> / <kbd>5</kbd></td><td>Next or previous band</td></tr>
+<tr><td><kbd>17</kbd> Home</td><td>Saves and leaves</td></tr>
+</table></div></div>
+</div>
+
+<h4>Step by step</h4>
+<ol class="steps">
+<li>Connect the radio to the dummy load, the sampler or attenuator, and the analyser as above.</li>
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Transmit IQ</b>. The radio tunes to the middle of the current band and shows the frequency. The attenuation (<b>Att.</b>) starts at 31.5&nbsp;dB, the lowest output power.
+<figure><img src="txiq-entry-single.png" alt="Transmit IQ calibration screen, single VFO" loading="lazy"><figcaption><b>Transmit IQ calibration</b> on a single-VFO radio: no IRR reading and no spectrum. The band table shows every band's settings.</figcaption></figure></li>
+<li>Set the analyser to the frequency shown, with a span of about 5&nbsp;kHz.</li>
+<li>Hold the PTT. Find the tone 800&nbsp;Hz from the dial frequency. If it is too weak to see the image clearly, release the PTT, turn the <b>Fine tune</b> encoder anticlockwise a few steps to reduce the attenuation, and try again. A few hundred milliwatts is plenty.
+<figure><img src="txiq-keyed-single.png" alt="Transmit IQ calibration, single VFO, transmitting at 25.5 dB attenuation" loading="lazy"><figcaption><b>Transmitting</b> at 25.5&nbsp;dB attenuation. PTT shows On.</figcaption></figure></li>
+<li>While holding the PTT, turn the <b>Volume</b> encoder (amplitude) to make the image as small as you can, then the <b>Filter</b> encoder (phase). Go back and forth between them; each one shifts the best setting of the other. Make the step smaller with <kbd>15</kbd> as the image drops. The controls work while you transmit.</li>
+<li>Release the PTT whenever you need to rest the PA; the settings stay.</li>
+<li>Press <kbd>2</kbd> (Band +) and repeat steps 3 to 6 on every band you use. Retune the analyser to each band's frequency.</li>
+<li>Press <kbd>17</kbd> (Home) to save and leave.</li>
+</ol>
+</div>
+
+<div class="callout"><p><b>Radios built with direct-coupled transmit.</b> Some builds use a direct-coupled transmit path, which can also null the transmitted carrier. On those radios the <b>Fine tune</b> and <b>Centre tune</b> encoders set the I and Q DC offsets on this screen (instead of the attenuation), and a dual-VFO radio nulls the carrier automatically with button <kbd>14</kbd>. On a single-VFO radio, minimise the carrier on the analyser with the two offsets by hand. The attenuation then stays at 31.5&nbsp;dB.</p></div>
+
+<h3>How do I know it worked?</h3>
+<p>Transmit a single tone in SSB into a dummy load and look at it on an analyser or a second receiver: the opposite sideband should be at least 50 to 60&nbsp;dB down. On a dual-VFO radio the IRR column in the table gives the same answer for every band.</p>
+
+<!-- ======================================================================= -->
+<h2 id="power">4. Power and SWR</h2>
+<div class="meta"><span><b>Applies to</b> <span class="tag both">Both boards</span>, 20 W PA</span><span><b>Transmits</b> yes, up to full power</span><span><b>Time</b> 12 to 20 minutes, automatic</span></div>
+<p>This step makes two things accurate on every band from 160 to 6&nbsp;m:</p>
+<ul>
+<li><b>The output power.</b> The radio measures how its output varies with drive, so that the power you set in CW and SSB is the power you get.</li>
+<li><b>The power and SWR readings.</b> It calibrates the SWR bridge with three known terminations: a 50&nbsp;Ω load, an open (nothing fitted) and a short.</li>
+</ul>
+<p>The radio does the work itself. You fit the load, the open and the short when it asks, and, if you have a wattmeter, type in its reading twice per band. Do this after the transmit IQ calibration, because the SSB part of the measurement includes any unwanted sideband.</p>
+
+<h3>Which level?</h3>
+<p>The automatic calibration has levels that differ in how much equipment you need and how accurate the power display is afterwards. The SWR reading is almost as good at every level.</p>
+<div class="tablewrap"><table>
+<tr><th>Level</th><th>Equipment</th><th>Wattmeter readings</th><th>Power display accuracy</th></tr>
+<tr><td>1</td><td>50&nbsp;Ω dummy load, short</td><td>none</td><td>about ±1.5&nbsp;dB</td></tr>
+<tr><td><b>2 (recommended)</b></td><td>Wattmeter with its 50&nbsp;Ω load, short</td><td>2 per band, 22 in all</td><td>about ±0.3&nbsp;dB, worst ±0.8&nbsp;dB</td></tr>
+</table></div>
+<p>Use level 2 if you have a wattmeter. You can calibrate at level 1 now and repeat at level 2 later; the new results replace the old ones. (Level 3 takes eight readings per band and is intended for development work.)</p>
+
+<div class="equip"><h4>Equipment</h4><div class="tablewrap"><table>
+<tr><th>Item</th><th>Notes</th></tr>
+<tr><td>50&nbsp;Ω load</td><td>Level 1: a dummy load. Level 2: the wattmeter, connected with as short a lead as possible, with its own load on its output. Either way it must take 20&nbsp;W continuously: the radio transmits for about 20&nbsp;s at a time on each band.</td></tr>
+<tr><td>Short</td><td>A low-inductance shorting plug that fits the antenna connector directly.</td></tr>
+<tr><td>Open</td><td>Nothing on the connector.</td></tr>
+</table></div></div>
+
+<h3>Before you start</h3>
+<ul>
+<li><b>Know your L44 turns.</b> The calibration asks for the number of turns per core on the SWR bridge's coupler, L44, from your build. The examples below use 20.</li>
+<li><b>Fit everything directly on the antenna connector</b>: no cables or adapters. This matters most for the short. A cable between the connector and the short makes every SWR reading high, and the calibration cannot correct for it.</li>
+<li>Use the antenna connector you normally operate from.</li>
+</ul>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:power-auto --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Automatic power and SWR calibration"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-on"/><text x="80" y="44.5" class="bm-num-on" text-anchor="middle">0</text><text x="80" y="68" class="bm-lab" text-anchor="middle">Start / confirm</text><text x="80" y="81" class="bm-lab" text-anchor="middle">enter / accept</text><circle cx="200" cy="40" r="15" class="bm-off"/><text x="200" y="44.5" class="bm-num-off" text-anchor="middle">1</text><circle cx="320" cy="40" r="15" class="bm-off"/><text x="320" y="44.5" class="bm-num-off" text-anchor="middle">2</text><circle cx="80" cy="114" r="15" class="bm-on"/><text x="80" y="118.5" class="bm-num-on" text-anchor="middle">3</text><text x="80" y="142" class="bm-lab" text-anchor="middle">Abort</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-off"/><text x="320" y="118.5" class="bm-num-off" text-anchor="middle">5</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-off"/><text x="200" y="192.5" class="bm-num-off" text-anchor="middle">7</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-on"/><text x="80" y="340.5" class="bm-num-on" text-anchor="middle">12</text><text x="80" y="364" class="bm-lab" text-anchor="middle">Skip load</text><text x="80" y="377" class="bm-lab" text-anchor="middle">(level 1)</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-on"/><text x="320" y="340.5" class="bm-num-on" text-anchor="middle">14</text><text x="320" y="364" class="bm-lab" text-anchor="middle">W / dBm</text><text x="320" y="377" class="bm-lab" text-anchor="middle">retry failed</text><circle cx="80" cy="410" r="15" class="bm-on"/><text x="80" y="414.5" class="bm-num-on" text-anchor="middle">15</text><text x="80" y="438" class="bm-lab" text-anchor="middle">Step size</text><circle cx="200" cy="410" r="15" class="bm-off"/><text x="200" y="414.5" class="bm-num-off" text-anchor="middle">16</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Leave</text><circle cx="80" cy="502" r="26" class="bm-enc-on"/><text x="80" y="505.5" class="bm-encname-on" text-anchor="middle">Volume</text><text x="80" y="542" class="bm-lab" text-anchor="middle">Level</text><text x="80" y="555" class="bm-lab" text-anchor="middle">(setup only)</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">L44 turns</text><text x="80" y="655" class="bm-lab" text-anchor="middle">wattmeter reading</text><circle cx="320" cy="602" r="26" class="bm-enc-off"/><text x="320" y="605.5" class="bm-encname-off" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-off" text-anchor="middle">tune</text></svg><!-- /buttonmap:power-auto --><figcaption><b>Automatic power and SWR controls.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td><kbd>0</kbd> Select</td><td>Start; confirm that a standard is fitted; enter a wattmeter reading; accept the results</td></tr>
+<tr><td><kbd>3</kbd></td><td>Abort at any time. The radio stops transmitting at once and nothing is stored.</td></tr>
+<tr><td><b>Volume</b> encoder</td><td>Choose the level (setup screen only)</td></tr>
+<tr><td><b>Filter</b> encoder</td><td>Set the L44 turns (setup screen); dial in a wattmeter reading</td></tr>
+<tr><td><kbd>12</kbd></td><td>Skip the load stage (level 1 only, to recalibrate the SWR bridge alone)</td></tr>
+<tr><td><kbd>14</kbd></td><td>Switch the wattmeter entry between W and dBm; on the review screen, repeat the bands that failed</td></tr>
+<tr><td><kbd>15</kbd></td><td>Change the wattmeter entry's step: 1, 0.1 or 0.01</td></tr>
+<tr><td><kbd>17</kbd> Home</td><td>Leave</td></tr>
+</table></div></div>
+</div>
+
+<h3>Step by step (level 2)</h3>
+<ol class="steps">
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Power</b>. The manual power calibration screen appears. Check that it shows <b>PA 20W</b>, then press <kbd>1</kbd> to start the automatic calibration.
+<figure><img src="Auto-L1-02-manual-screen.png" alt="Manual power calibration screen" loading="lazy"><figcaption><b>Power calibration</b>, where the automatic calibration starts.</figcaption></figure></li>
+<li>On the setup screen, turn the <b>Volume</b> encoder until the level reads <b>2</b>, and the <b>Filter</b> encoder until <b>L44 turns</b> is right for your radio. The radio remembers the turns. Press <kbd>0</kbd>.
+<figure><img src="Auto-L2-01-setup.png" alt="Automatic calibration setup screen, level 2" loading="lazy"><figcaption><b>Setup</b>: level 2, 20 turns.</figcaption></figure></li>
+<li>The radio asks for the <b>wattmeter + 50 Ohm load</b>. Connect them and press <kbd>0</kbd>.
+<figure><img src="Auto-L2-02-prompt-load.png" alt="Prompt for the wattmeter and load" loading="lazy"><figcaption><b>Prompt for the load.</b></figcaption></figure></li>
+<li>Starting on 160&nbsp;m, the radio keys a CW carrier and steps the drive down from full power in 12 steps. <b>KEYED</b> in red means it is transmitting. Leave the connector alone.
+<figure><img src="Auto-L2-03-load-measuring.png" alt="Load measurement in progress" loading="lazy"><figcaption><b>Measuring into the load</b>, on 20&nbsp;m.</figcaption></figure></li>
+<li>After the sweep, the radio keys near 2&nbsp;W and asks for the wattmeter reading. Turn the <b>Filter</b> encoder until <b>Measured</b> matches the meter, then press <kbd>0</kbd>. The entry starts at the power the radio expects, so it usually needs only a small change. Use <kbd>14</kbd> if your meter reads in dBm and <kbd>15</kbd> to change the step.
+<figure><img src="Auto-L2-04-meter-2W.png" alt="Wattmeter entry near 2 W" loading="lazy"><figcaption><b>First reading</b>: 1.78&nbsp;W on 20&nbsp;m.</figcaption></figure>
+If you do not press <kbd>0</kbd> within 30 seconds, the radio stops transmitting to protect the PA. Press <kbd>0</kbd> to key it again and finish the entry.</li>
+<li>The radio keys at full power and asks for the second reading. Dial it in and press <kbd>0</kbd>.
+<figure><img src="Auto-L2-05-meter-full.png" alt="Wattmeter entry at full power" loading="lazy"><figcaption><b>Second reading</b>: 10.96&nbsp;W on 20&nbsp;m.</figcaption></figure></li>
+<li>The radio sends a short SSB tone and moves to the next band. Repeat the two readings on every band: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10 and 6&nbsp;m.</li>
+<li>After 6&nbsp;m the radio asks for the <b>open</b>. Remove the wattmeter, leave the connector bare and press <kbd>0</kbd>. The radio measures every band again with short, low-power bursts, with pauses so the PA stays cool.
+<figure><img src="Auto-L2-06-prompt-open.png" alt="Prompt for the open" loading="lazy"><figcaption><b>Prompt for the open.</b></figcaption></figure></li>
+<li>The radio asks for the <b>short</b>. Screw the shorting plug directly onto the connector and press <kbd>0</kbd>. It measures every band again.
+<figure><img src="Auto-L2-08-prompt-short.png" alt="Prompt for the short" loading="lazy"><figcaption><b>Prompt for the short.</b></figcaption></figure></li>
+<li>The review screen shows the result for every band. Green <b>pass</b> means the band is ready to store. <b>pass(open)</b> or <b>pass(shrt)</b> means the band passed but its SWR calibration came from only one of the two standards, which is slightly less accurate. Some PAs oscillate into a short; the radio detects this and leaves those readings out. <b>S50</b> is the SWR the bridge read on the load; it should be close to 1.
+<figure><img src="Auto-L2-09-review.png" alt="Review screen with all bands passing" loading="lazy"><figcaption><b>Review</b>: every band passed; 10&nbsp;m was calibrated from the open alone.</figcaption></figure></li>
+<li>Press <kbd>0</kbd> to store the bands that passed (bands that failed keep their previous calibration), then <kbd>17</kbd> to leave. The radio returns to your band, frequency and mode.</li>
+</ol>
+
+<h3>Level 1: no wattmeter</h3>
+<p>The same as level 2, except: choose level <b>1</b> on the setup screen; the radio asks for a plain <b>50&nbsp;Ω load</b>; and it never asks for meter readings. A level 1 session takes about 12 minutes. Without a wattmeter the radio uses typical values for the absolute power, so the power display is good to about ±1.5&nbsp;dB.</p>
+<p>At level 1 you can press <kbd>12</kbd> at the load prompt instead of <kbd>0</kbd> to skip the load and recalibrate only the SWR bridge, keeping the existing power calibration.</p>
+
+<h3>If a band fails</h3>
+<p>On the review screen, press <kbd>14</kbd> to repeat the session for the failed bands only. The radio asks for the load, the open and the short again but measures only those bands.</p>
+<div class="tablewrap"><table>
+<tr><th>Reason on the review screen</th><th>What to check</th></tr>
+<tr><td>50 Ohm load missing</td><td>The load was not fitted, or came loose, during the load stage.</td></tr>
+<tr><td>load SWR too high</td><td>A poor dummy load, or a cable or adapter between it and the connector. The band fails above an S50 of 1.3 (1.5 above 20&nbsp;MHz).</td></tr>
+<tr><td>level 2 offset</td><td>The 2&nbsp;W reading was more than 3&nbsp;dB (4&nbsp;dB above 20&nbsp;MHz) from what the L44 turns predict. Check the meter, its range and the L44 turns.</td></tr>
+<tr><td>open and short abandoned</td><td>The PA oscillated into both the open and the short. Check the PA, then retry.</td></tr>
+<tr><td>too few readings</td><td>The SWR bridge readings did not arrive. Check the LPF board and its I²C connection.</td></tr>
+<tr><td>PA curve fit</td><td>A reading was wrong. Retry.</td></tr>
+<tr><td>any other reason</td><td>Check that the standards are fitted directly on the connector and retry. If a band still fails, calibrate its power by hand (below).</td></tr>
+</table></div>
+
+<h3 id="power-manual">Manual power calibration (fallback)</h3>
+<p>Use this for a band that will not pass the automatic calibration. It calibrates the output power of one band at a time from three CW readings and one SSB reading. It does not calibrate the SWR bridge.</p>
+<div class="equip"><h4>Equipment</h4><p>A wattmeter with its 50&nbsp;Ω load, rated for 20&nbsp;W, and a PTT switch.</p></div>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:power-manual --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: Manual power calibration"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-on"/><text x="80" y="44.5" class="bm-num-on" text-anchor="middle">0</text><text x="80" y="68" class="bm-lab" text-anchor="middle">Record</text><text x="80" y="81" class="bm-lab" text-anchor="middle">the point</text><circle cx="200" cy="40" r="15" class="bm-on"/><text x="200" y="44.5" class="bm-num-on" text-anchor="middle">1</text><text x="200" y="68" class="bm-lab" text-anchor="middle">Automatic</text><text x="200" y="81" class="bm-lab" text-anchor="middle">calibration</text><circle cx="320" cy="40" r="15" class="bm-on"/><text x="320" y="44.5" class="bm-num-on" text-anchor="middle">2</text><text x="320" y="68" class="bm-lab" text-anchor="middle">Band +</text><circle cx="80" cy="114" r="15" class="bm-on"/><text x="80" y="118.5" class="bm-num-on" text-anchor="middle">3</text><text x="80" y="142" class="bm-lab" text-anchor="middle">Start</text><text x="80" y="155" class="bm-lab" text-anchor="middle">again</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-on"/><text x="320" y="118.5" class="bm-num-on" text-anchor="middle">5</text><text x="320" y="142" class="bm-lab" text-anchor="middle">Band −</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-off"/><text x="200" y="192.5" class="bm-num-off" text-anchor="middle">7</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-on"/><text x="80" y="340.5" class="bm-num-on" text-anchor="middle">12</text><text x="80" y="364" class="bm-lab" text-anchor="middle">SSB step</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-on"/><text x="320" y="340.5" class="bm-num-on" text-anchor="middle">14</text><text x="320" y="364" class="bm-lab" text-anchor="middle">W / dBm</text><circle cx="80" cy="410" r="15" class="bm-on"/><text x="80" y="414.5" class="bm-num-on" text-anchor="middle">15</text><text x="80" y="438" class="bm-lab" text-anchor="middle">Step size</text><circle cx="200" cy="410" r="15" class="bm-off"/><text x="200" y="414.5" class="bm-num-off" text-anchor="middle">16</text><circle cx="320" cy="410" r="15" class="bm-on"/><text x="320" y="414.5" class="bm-num-on" text-anchor="middle">17</text><text x="320" y="438" class="bm-lab" text-anchor="middle">Save</text><text x="320" y="451" class="bm-lab" text-anchor="middle">and exit</text><circle cx="80" cy="502" r="26" class="bm-enc-on"/><text x="80" y="505.5" class="bm-encname-on" text-anchor="middle">Volume</text><text x="80" y="542" class="bm-lab" text-anchor="middle">TX attenuation</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Measured</text><text x="80" y="655" class="bm-lab" text-anchor="middle">power</text><circle cx="320" cy="602" r="26" class="bm-enc-off"/><text x="320" y="605.5" class="bm-encname-off" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-off" text-anchor="middle">tune</text></svg><!-- /buttonmap:power-manual --><figcaption><b>Manual power calibration controls.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td>PTT</td><td>Transmits (CW carrier for steps 1–3, SSB tone for step 4)</td></tr>
+<tr><td><b>Volume</b> encoder</td><td>Transmit attenuation, 0.5&nbsp;dB a step</td></tr>
+<tr><td><b>Filter</b> encoder</td><td>The measured power you enter</td></tr>
+<tr><td><kbd>0</kbd> Select</td><td>Record the point</td></tr>
+<tr><td><kbd>12</kbd></td><td>Go on to the SSB step (step 4)</td></tr>
+<tr><td><kbd>3</kbd></td><td>Start again from step 1</td></tr>
+<tr><td><kbd>14</kbd> / <kbd>15</kbd></td><td>W or dBm / entry step</td></tr>
+<tr><td><kbd>2</kbd> / <kbd>5</kbd></td><td>Next or previous band</td></tr>
+<tr><td><kbd>17</kbd> Home</td><td>Saves and leaves</td></tr>
+</table></div></div>
+</div>
+
+<p>All buttons are ignored while you transmit, so the rhythm of each step is: key, read the meter, unkey, dial in the reading, press <kbd>0</kbd>.</p>
+<ol class="steps">
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Power</b>. Check <b>PA 20W</b>, and select the band with <kbd>2</kbd> / <kbd>5</kbd>.
+<figure><img src="power-manual.png" alt="Manual power calibration screen at step 1" loading="lazy"><figcaption><b>Manual power calibration</b>, step 1 on 20&nbsp;m.</figcaption></figure></li>
+<li><b>Step 1</b>, full power: with 0&nbsp;dB attenuation, key the PTT, read the wattmeter and unkey. Turn the <b>Filter</b> encoder to the reading and press <kbd>0</kbd>.</li>
+<li><b>Step 2</b>: turn the <b>Volume</b> encoder to raise the attenuation until the power drops by about 6&nbsp;dB (to about a quarter). Twelve steps of 0.5&nbsp;dB is a good start. Key, read, unkey, dial in the reading and press <kbd>0</kbd>.</li>
+<li><b>Step 3</b>: raise the attenuation for a further 6&nbsp;dB drop and record the reading the same way. The radio fits its power curve and shows it in the table.
+<figure><img src="power-curve.png" alt="Manual power calibration after three points" loading="lazy"><figcaption><b>After step 3</b>: three points recorded and the curve fitted.</figcaption></figure></li>
+<li><b>Step 4</b>, SSB: press <kbd>12</kbd>. Key the PTT; the radio sends an 800&nbsp;Hz tone at its SSB drive. Read the meter, unkey, dial in the reading and press <kbd>0</kbd>.
+<figure><img src="power-ssb.png" alt="Manual power calibration, SSB step" loading="lazy"><figcaption><b>Step 4</b>, the SSB tone.</figcaption></figure></li>
+<li>Repeat for any other band, then press <kbd>17</kbd> (Home) to save and leave.</li>
+</ol>
+
+<h3>How do I know it worked?</h3>
+<p>Set 5&nbsp;W in CW and key into the wattmeter on a few bands: the meter should agree with the setting to within the accuracy of your level. Then put the shorting plug, the open and the dummy load on in turn and key briefly at low power: the SWR display should read very high, very high and close to 1.0.</p>
+
+<div class="vfo"><h4>Single and dual VFO</h4><p>The procedure is the same on both boards.</p></div>
+
+<!-- ======================================================================= -->
+<h2 id="smeter">5. S-meter level</h2>
+<div class="meta"><span><b>Applies to</b> <span class="tag both">Both boards</span></span><span><b>Transmits</b> no</span><span><b>Time</b> 2 minutes per band</span></div>
+<p>The radio shows received signal strength in dBm next to the S-meter. This step adds a correction, per band, so that the reading matches a known signal. It is optional: the other calibrations do not depend on it. The setting is in decibels, from −20 to +50 in 0.5&nbsp;dB steps.</p>
+
+<div class="equip"><h4>Equipment</h4><div class="tablewrap"><table>
+<tr><th>Item</th><th>Notes</th></tr>
+<tr><td>Signal generator</td><td>An HF generator whose output level you trust, or a generator followed by a calibrated step attenuator. Use a level well above the noise and below overload: −73&nbsp;dBm (S9, 50&nbsp;µV into 50&nbsp;Ω) is a good choice. Allow for the loss of the cable.</td></tr>
+</table></div></div>
+
+<div class="mapgrid">
+<figure><!-- buttonmap:smeter --><svg viewBox="0 0 400 686" class="bmap" role="img" aria-label="Front panel controls: S-meter level"><rect x="20" y="14" width="360" height="446" rx="10" class="bm-panel"/><circle cx="80" cy="40" r="15" class="bm-on"/><text x="80" y="44.5" class="bm-num-on" text-anchor="middle">0</text><text x="80" y="68" class="bm-lab" text-anchor="middle">Done</text><circle cx="200" cy="40" r="15" class="bm-off"/><text x="200" y="44.5" class="bm-num-off" text-anchor="middle">1</text><circle cx="320" cy="40" r="15" class="bm-off"/><text x="320" y="44.5" class="bm-num-off" text-anchor="middle">2</text><circle cx="80" cy="114" r="15" class="bm-off"/><text x="80" y="118.5" class="bm-num-off" text-anchor="middle">3</text><circle cx="200" cy="114" r="15" class="bm-off"/><text x="200" y="118.5" class="bm-num-off" text-anchor="middle">4</text><circle cx="320" cy="114" r="15" class="bm-off"/><text x="320" y="118.5" class="bm-num-off" text-anchor="middle">5</text><circle cx="80" cy="188" r="15" class="bm-off"/><text x="80" y="192.5" class="bm-num-off" text-anchor="middle">6</text><circle cx="200" cy="188" r="15" class="bm-off"/><text x="200" y="192.5" class="bm-num-off" text-anchor="middle">7</text><circle cx="320" cy="188" r="15" class="bm-off"/><text x="320" y="192.5" class="bm-num-off" text-anchor="middle">8</text><circle cx="80" cy="262" r="15" class="bm-off"/><text x="80" y="266.5" class="bm-num-off" text-anchor="middle">9</text><circle cx="200" cy="262" r="15" class="bm-off"/><text x="200" y="266.5" class="bm-num-off" text-anchor="middle">10</text><circle cx="320" cy="262" r="15" class="bm-off"/><text x="320" y="266.5" class="bm-num-off" text-anchor="middle">11</text><circle cx="80" cy="336" r="15" class="bm-off"/><text x="80" y="340.5" class="bm-num-off" text-anchor="middle">12</text><circle cx="200" cy="336" r="15" class="bm-off"/><text x="200" y="340.5" class="bm-num-off" text-anchor="middle">13</text><circle cx="320" cy="336" r="15" class="bm-off"/><text x="320" y="340.5" class="bm-num-off" text-anchor="middle">14</text><circle cx="80" cy="410" r="15" class="bm-off"/><text x="80" y="414.5" class="bm-num-off" text-anchor="middle">15</text><circle cx="200" cy="410" r="15" class="bm-off"/><text x="200" y="414.5" class="bm-num-off" text-anchor="middle">16</text><circle cx="320" cy="410" r="15" class="bm-off"/><text x="320" y="414.5" class="bm-num-off" text-anchor="middle">17</text><circle cx="80" cy="502" r="26" class="bm-enc-off"/><text x="80" y="505.5" class="bm-encname-off" text-anchor="middle">Volume</text><circle cx="320" cy="502" r="26" class="bm-enc-off"/><text x="320" y="505.5" class="bm-encname-off" text-anchor="middle">Centre</text><text x="320" y="515.5" class="bm-encname-off" text-anchor="middle">tune</text><circle cx="80" cy="602" r="26" class="bm-enc-on"/><text x="80" y="605.5" class="bm-encname-on" text-anchor="middle">Filter</text><text x="80" y="642" class="bm-lab" text-anchor="middle">Offset (dB)</text><circle cx="320" cy="602" r="26" class="bm-enc-off"/><text x="320" y="605.5" class="bm-encname-off" text-anchor="middle">Fine</text><text x="320" y="615.5" class="bm-encname-off" text-anchor="middle">tune</text></svg><!-- /buttonmap:smeter --><figcaption><b>S-meter level controls.</b></figcaption></figure>
+<div><div class="tablewrap"><table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td><b>Filter</b> encoder</td><td>Changes the offset of the current band</td></tr>
+<tr><td><kbd>0</kbd> Select</td><td>Closes the setting</td></tr>
+</table></div></div>
+</div>
+
+<ol class="steps">
+<li>Connect the generator to the antenna connector and set it to −73&nbsp;dBm on a frequency in the band, for example 14.100&nbsp;MHz.</li>
+<li>On the home screen, select the band and tune so that the carrier is in the receive passband. Note the dBm reading next to the S-meter.</li>
+<li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>S meter level</b>. A box with the current band's offset appears over the home screen, and the reading stays visible.
+<figure><img src="smeter.png" alt="S meter level setting over the home screen" loading="lazy"><figcaption><b>S meter level</b>: the offset box over the home screen.</figcaption></figure></li>
+<li>Turn the <b>Filter</b> encoder until the dBm reading equals the generator level. Then press <kbd>0</kbd>.</li>
+<li>Change band on the home screen and repeat for every band you use.</li>
+<li><b>Save the result</b>: this setting is not saved by pressing Home. Open <kbd>Menu</kbd> → <b>EEPROM</b> → <b>Save data to storage</b>, or switch the radio off with its power switch. Leaving any other calibration screen with <kbd>17</kbd> also saves it.</li>
+</ol>
+
+<div class="vfo"><h4>Single and dual VFO</h4><p>The procedure is the same on both boards.</p></div>
+
+<!-- ======================================================================= -->
+<h2 id="appendix">Appendix</h2>
+
+<h3>Summary</h3>
+<div class="tablewrap"><table>
+<tr><th></th><th>Calibration</th><th>Equipment</th><th>Transmits</th><th>Dual VFO</th><th>Single VFO</th></tr>
+<tr><td>1</td><td><a href="#frequency">Frequency</a></td><td>WWV/CHU or a locked generator</td><td>no</td><td colspan="2">Same on both</td></tr>
+<tr><td>2</td><td><a href="#rxiq">Receive IQ</a></td><td>none</td><td>no</td><td colspan="2">Same on both; automatic</td></tr>
+<tr><td>3</td><td><a href="#txiq">Transmit IQ</a></td><td>Dual: none. Single: dummy load, attenuator, analyser</td><td>Dual: internal only. Single: yes</td><td>Automatic, measured inside the radio</td><td>Manual, per band, read on an analyser</td></tr>
+<tr><td>4</td><td><a href="#power">Power and SWR</a></td><td>Dummy load, short; wattmeter recommended</td><td>yes, up to full power</td><td colspan="2">Same on both; automatic</td></tr>
+<tr><td>5</td><td><a href="#smeter">S-meter</a></td><td>Signal generator</td><td>no</td><td colspan="2">Same on both; optional</td></tr>
+</table></div>
+
+<h3>When to recalibrate</h3>
+<div class="tablewrap"><table>
+<tr><th>After…</th><th>Repeat</th></tr>
+<tr><td>Replacing the RF board, the Si5351 or its crystal</td><td>Everything, from step 1</td></tr>
+<tr><td>Work on the receive mixer or the audio codec</td><td>2, then 3 on a dual-VFO radio, and 5</td></tr>
+<tr><td>Work on the transmit mixer</td><td>3, then 4</td></tr>
+<tr><td>Work on the PA, the LPF board or the SWR bridge (including L44)</td><td>4</td></tr>
+<tr><td>Changing the antenna connector you calibrate on</td><td>4 (SWR only: level 1 with button 12)</td></tr>
+<tr><td>Erasing the radio's settings</td><td>Everything</td></tr>
+</table></div>
+
+<h3>Troubleshooting</h3>
+<div class="tablewrap"><table>
+<tr><th>Symptom</th><th>Check</th></tr>
+<tr><td>Frequency: the error never settles</td><td>The demodulation must be SAM, and the carrier must be inside the passband before you open the screen. A fading off-air signal makes the error wander; try another frequency or a generator.</td></tr>
+<tr><td>Receive IQ: Delta stays low on every band</td><td>A strong signal on the antenna connector; fit a dummy load. Check the receive mixer and the codec wiring.</td></tr>
+<tr><td>Transmit IQ (dual): IRR stays low</td><td>Do the receive IQ calibration first.</td></tr>
+<tr><td>Transmit IQ (single): no tone on the analyser</td><td>Hold the PTT, check that the analyser is tuned to the frequency on the screen, and reduce the attenuation with the Fine tune encoder.</td></tr>
+<tr><td>Transmit IQ (single): the image will not go below the analyser's noise</td><td>Reduce the attenuation for a stronger tone, or narrow the analyser's resolution bandwidth. You have reached the analyser's limit, which is good enough.</td></tr>
+<tr><td>Power: the automatic calibration will not start</td><td>It needs the 20&nbsp;W PA selected (<b>PA 20W</b> on the power screen).</td></tr>
+<tr><td>A setting was lost after switching off</td><td>Leave calibration screens with <kbd>17</kbd> (Home); save the S-meter level from the EEPROM menu.</td></tr>
+</table></div>
+
+<h3>About the screenshots</h3>
+<p>The screen images come from the Phoenix radio simulator, which runs the radio's own firmware on a PC. The automatic calibrations in it run against simulated test signals, so the numbers on your radio will differ.</p>
+
+</main></body></html>

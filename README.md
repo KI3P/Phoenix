@@ -337,6 +337,11 @@ The comprehensive unit tests, mocking functions, and their build files are locat
 The same directory also builds the **desktop radio simulator** (`RadioSimulator_main.cpp` → the
 `radio_simulator` target), which runs the firmware on a PC with an SDL-emulated display.
 
+The step-by-step guide to calibrating a finished radio (frequency, receive and transmit IQ, power
+and SWR, S-meter; single- and dual-VFO RF boards) is here:
+
+* **Calibration guide**: `code/docs/CalibrationGuide/Calibration_Guide.html`
+
 Useful sketches for testing the boards as you build them are here:
 
 * **Board tests**: `code/src/BoardTest`
