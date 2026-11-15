@@ -1182,6 +1182,52 @@ TEST_F(CalibrationTest, HomeDuringRXIQAutoRunRestoresBand) {
     EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], -0.02f);
 }
 
+// Single-VFO Transmit IQ transmits through the PA into the antenna connector.
+// It must start at full attenuation, and every key-down must use the attenuation
+// the screen shows, not 0 dB on the first key-down and 31.5 dB after
+TEST_F(CalibrationTest, SingleVFOTXIQKeysAtTheDisplayedAttenuation) {
+    extern float32_t attLevel;
+    SetDualVFOs(false);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    EXPECT_NEAR(attLevel, 31.5, 0.00001);
+    EXPECT_NEAR(GetTXIQAttenuation(), 31.5, 0.00001);
+
+    // First key-down
+    SetInterrupt(iPTT_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    EXPECT_NEAR(GetTXAttenuation(), 31.5, 0.01);
+    SetInterrupt(iPTT_RELEASED);
+    loop(); MyDelay(10);
+
+    // Less attenuation, set while unkeyed
+    for (int i = 0; i < 4; i++){
+        SetInterrupt(iFINETUNE_DECREASE);
+        loop(); MyDelay(10);
+    }
+    EXPECT_NEAR(attLevel, 29.5, 0.00001);
+
+    // The next two key-downs use it
+    for (int n = 0; n < 2; n++){
+        SetInterrupt(iPTT_PRESSED);
+        loop(); MyDelay(10);
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+        EXPECT_NEAR(GetTXAttenuation(), 29.5, 0.01);
+        SetInterrupt(iPTT_RELEASED);
+        loop(); MyDelay(10);
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    }
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    SetDualVFOs(true);
+}
+
 TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 
@@ -1373,6 +1419,10 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+
+    // The screen opens at full attenuation; start mid-range so both directions move
+    EXPECT_NEAR(attLevel, 31.5, 0.00001);
+    attLevel = 15.0;
 
     // Get the current band and store initial XAttenSSB value
     int32_t currentBand = ED.currentBand[ED.activeVFO];

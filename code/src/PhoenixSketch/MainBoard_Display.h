@@ -329,6 +329,7 @@ void DrawCalibrateRXIQ(void);
  * @note Minimizes carrier and sideband leakage in transmit path
  */
 void DrawCalibrateTXIQ(void);
+float32_t GetTXIQAttenuation(void);
 
 /**
  * @brief Draw the CW power amplifier calibration interface

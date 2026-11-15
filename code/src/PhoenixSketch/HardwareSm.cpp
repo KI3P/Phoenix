@@ -328,9 +328,9 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             DisableCalFeedback();
             MyDelay(10);
 
-            // Start configuring the transmit chain
-            // Don't mess with the transmit attenuation, this is set by the 
-            // calibration loop
+            // Start configuring the transmit chain at the attenuation set on
+            // the calibration screen (receive sets it to 31.5 dB in between)
+            SetTXAttenuation( GetTXIQAttenuation() );
 
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
