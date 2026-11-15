@@ -34,6 +34,7 @@ The hardware design files for the V12 radio modules can be found at the followin
 * [Front panel encoder boards](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_Encoder_Boards)
 * [LPF module](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_LPF_Module)
 * [20W amplifier module](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_20W_PA)
+* [Antenna Tuner](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_Antenna_Tuner)
 
 The latest version (V12.6) of the bare PCBs are available for less than $5 each on the [discussion forum](https://groups.io/g/SoftwareControlledHamRadio) by contacting Bill K9HZ. If you prefer a partially-assembled kit,  Justin AI6YM sells them on his [website](https://ai6ym.radio/t41-ep-sdt/).
 
