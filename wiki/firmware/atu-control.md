@@ -61,28 +61,42 @@ relay state held through RX→TX→RX and a band change up and back.
   bench-testing without Phoenix. The PhoenixSketch copy is the master.
 
 ## Menu: Main menu → ATU (last entry)
-| Item | Type | Effect |
-|---|---|---|
-| Network in line | bool | K19+K20 |
-| Caps at input (CL) | bool | K17 |
-| Balun output | bool | K18 |
-| L mask | 0–255 | K1–K8 |
-| C mask | 0–255 | K9–K16 |
-| Bypass all (safe) | action | every relay off |
+Simplified on 2026-11-15 from eleven bench items. Everything acts on the antenna selected for
+the current band (RF Options → Antenna).
 
-- **Editing:** items are variable options, so the encoder stays on the item. Each edits a
-  shadow variable whose post-update callback applies it.
-- **Shadows:** refreshed from the register in `UpdateArrayVariables()`, so CAT changes show up
-  the next time the menu is drawn. A change attempted while transmitting is refused and the
-  shadow reverts.
-- **Sizing:** `NUM_PRIMARY_MENUS` in `MainBoard_Display.h` is 9 or 10 depending on the flag. A
-  mismatch with the table is a compile error. Tests rely on RF Options staying at index 0 and
-  Calibration at index 6.
+| Item | Effect |
+|---|---|
+| **Bypass ATU** / **Enable ATU** | bypass the ATU on this antenna, or enable it again (`ED.ATU_Enabled[ant]`, saved); the label says what selecting it will do |
+| **Tuning status table** | full-screen page (UI state `ATU_STATUS`): this antenna's output and enable state, then one row per amateur band with the stored frequency, setting (topology and nominal µH/pF, or bypass) and SWR, or `--`; the current band in yellow; HOME returns |
+| **Clear memory, ant N** | forget every band's setting for this antenna. Press twice: the first press re-opens the menu on the item, now reading "Press again to clear"; moving off it or waiting 10 s cancels. The home screen then shows `MEM` / `CLEARED`. |
+| **Tune** | retune, as button 16 |
+| **Tune power (W)** | 0.5–10 W, default 2 |
+| **Output: coax** / **Output: balun** | which ATU output this antenna is on (`ED.ATU_BalunOut[ant]`, K18, saved) |
+
+- **Toggles:** they are function items with changing labels (`ATUMenuRefreshLabels()`),
+  because bool items display "true"/"false". A function item closes the menu when selected.
+- **Not while transmitting:** the toggles are refused while keyed.
+- **Manual relay control** is no longer in the menu. It stays on CAT `AT` for bench work;
+  forgetting a single band is `AX5;`.
+- **Sizing:** `NUM_PRIMARY_MENUS` in `MainBoard_Display.h` is 9 or 10 depending on the flag;
+  `ATU_MENU_ITEMS` is 6. A mismatch with the table is a compile error. Tests rely on RF Options
+  staying at index 0 and Calibration at index 6.
+- **Labels:** keep them to about 20 characters. "Clear memory, antenna 0" overflowed the menu
+  outline on the radio.
+
+## Per-antenna settings
+- **Bypass / enable** (`ED.ATU_Enabled[ant]`, default enabled): a bypassed antenna stays
+  bypassed across band changes, and its memory is kept. A retune enables it again.
+- **Output** (`ED.ATU_BalunOut[ant]`, default coax): K18 sits after the bypass relays, so it
+  belongs to the antenna. It is kept when bypassed, in every stored setting
+  (`ATUSettingFor()`), and in every setting the tuner reads. Before 2026-11-15 the tuner
+  always forced coax.
+- **Memory:** one entry per band and antenna (13 × 4).
 
 ## Automatic tuning and memory (Phase 2)
 See [[atu-auto-tuning]] for the algorithm and the bench results. In brief:
 - **Selecting a band or antenna** puts the setting stored for that band and antenna on the
-  relays (**Auto-apply memory**, on by default), in receive only. With nothing stored the
+  relays, in receive only. With nothing stored, or with the ATU bypassed on the antenna, the
   network is bypassed. Settings are kept per band *and* antenna (13 × 4), so a setting tuned
   on one antenna is never used on another.
 - **Tuning is always a retune:** a fresh search from bypass at **Tune power (W)** (default
@@ -94,10 +108,9 @@ See [[atu-auto-tuning]] for the algorithm and the bench results. In brief:
     Pressing any button while it runs stops it and restores the previous setting.
   - **Menu:** ATU → **Tune**.
   - **CAT:** `AC001;` (Kenwood) or `AX3;`.
+  - A retune enables the ATU on the antenna if it was bypassed.
 - **Refusals:** the tuner only starts from SSB or CW receive, on a band where transmit is
   allowed and the SWR bridge is calibrated.
-- **Memory items:** **Save to memory** stores a manual setting; **Forget band/antenna** clears
-  one.
 - **Search:** the tuner is a measured search with no model or calibration
   (`ATUTuneAlgo.cpp`, branch `ATU_search`).
 
@@ -107,7 +120,8 @@ the pane is 170 px wide). `ATUStatusText()` in `ATUTune.cpp` builds them:
 
 | State | Shows | Colour |
 |---|---|---|
-| Network bypassed | `ATU BYP` | white |
+| Network bypassed | `ATU BYP`, or `ATU OFF` if the ATU is bypassed on this antenna; line 2 `BALUN` on the balun output | white |
+| 3 s after clearing an antenna's memory | `MEM` / `CLEARED` | white |
 | Network in line | topology and **nominal** values: `CL 0.82uH` / `157pF` | white |
 | Tuning | `TUNING` / `n 23` (readings so far) | yellow |
 | 3 s after a refusal or failure | `TUNE` / `MODE`, `NO TX`, `NO CAL`, `BUSY`, `NO RF`, `ANT FAULT`, `TIMEOUT` … | red |
@@ -120,9 +134,9 @@ the pane is 170 px wide). `ATUStatusText()` in `ATUTune.cpp` builds them:
 ### CAT: `AC` (Kenwood TS-480)
 | Form | Meaning |
 |---|---|
-| `AC;` | read → `AC0<P2><P3>;`: P2 = 1 if the network is in line, P3 = 1 while a tuner program runs |
-| `ACp1p2p3;` with P3 = 1 | start a retune (as button 16); `?;` if refused |
-| `ACp1p2p3;` with P3 = 0 | stop a running tune, then P2 = 0 bypasses the network, P2 = 1 puts the stored setting in line (a network already in line is left alone; nothing stored → stays bypassed) |
+| `AC;` | read → `AC0<P2><P3>;`: P2 = 1 if the ATU is enabled on this antenna, P3 = 1 while a tuner program runs |
+| `ACp1p2p3;` with P3 = 1 | start a retune (as button 16; enables the ATU); `?;` if refused |
+| `ACp1p2p3;` with P3 = 0 | stop a running tune, then P2 = 0 bypasses the ATU on this antenna, P2 = 1 enables it (the stored setting goes on the relays), as the menu's Bypass / Enable ATU |
 
 - **P1** (RX-AT) is ignored.
 - **Errors:** `?;` when a relay change isn't allowed (transmitting) or for anything other than

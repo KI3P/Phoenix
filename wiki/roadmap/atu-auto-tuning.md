@@ -148,6 +148,26 @@ tune button that retunes and stores the result.
   - Antenna 1 on 20 m showed `ATU BYP`, and antenna 0 its stored setting again.
 - **Build:** RAM1 free for local variables is 14.2 KB with `ATU_PRESENT` and 16.5 KB without.
 
+### Simple menu, per-antenna bypass and output, status table (2026-11-15)
+The user found the eleven-item ATU menu confusing. It became six items, all acting on the
+current antenna: Bypass/Enable ATU, Tuning status table, Clear memory (press twice), Tune,
+Tune power, Output coax/balun.
+
+| Commit | What |
+|---|---|
+| `fcd481e` | Simple menu; `ED.ATU_Enabled[]`/`ATU_BalunOut[]` per antenna replace `ATU_AutoApply`; the tuner keeps the antenna's balun relay (it forced coax before); a retune enables the ATU; `AC` P2 = per-antenna enable; `ATU OFF`, `BALUN`, `MEM CLEARED` on the home screen. |
+| `94a3f61` | Tuning status table: new UISm state `ATU_STATUS`. |
+| `b620f34` | "Clear memory, ant N": the longer label overflowed the menu outline. |
+
+- **Bench (KI3P prototype, 200 Ω):** the user checked every item.
+  - Bypass gave `ATU OFF` and held across band changes; Enable brought back the stored setting.
+  - Button 16 while bypassed tuned and re-enabled the ATU.
+  - The table showed the stored bands.
+  - Output toggled K18 and showed `BALUN`.
+  - Clear needed two presses, and moving off the item cancelled it.
+  - The only problem was the long clear label.
+- **Build:** 14.1 KB RAM1 free with `ATU_PRESENT`, 16.5 KB without.
+
 ## Why the report proposed a model (superseded)
 - **SWR alone can't identify a setting.** One |Γ| reading puts the antenna on a circle of
   impedances needing entirely different settings, even different K17 positions.

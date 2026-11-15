@@ -1507,3 +1507,13 @@ memory-first step. Commits on `ATU_search`: `02700ef` (always search), `6e0d3cc`
 `2c39d77` (display: nominal µH/pF, `TUNING n…`, red refusal reasons for 3 s), `cbee6ec`
 (Kenwood `AC`). Verified on the KI3P prototype into 200 Ω. Updated [[atu-control]] and
 [[atu-auto-tuning]].
+
+## [2026-11-15] decision | ATU menu simplified; bypass and output per antenna; status table
+The user found the eleven-item ATU menu confusing and asked for Bypass/Enable, a status table,
+clear memory for this antenna, Tune and Tune power. Added a sixth item, Output coax/balun, after
+finding that the tuner forced K18 to coax on every reading, which would have moved a
+balanced-fed antenna to the wrong connector. User's choices: bypass per antenna; a retune
+re-enables; clearing needs two presses; the table shows one row per ham band. Commits
+`fcd481e`, `94a3f61` and `b620f34` on `ATU_search`, verified on the prototype. Manual relay
+control is now CAT-only (`AT`). Updated [[atu-control]], [[ui-state-machine]] and
+[[atu-auto-tuning]].
