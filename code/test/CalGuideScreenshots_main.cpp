@@ -240,8 +240,7 @@ static void TransmitIQCalibrationDual(void){
     Shot("txiq-keyed");
     KeyPTT(false);
     Settle(100);
-    // The automatic run starts from the band on the screen
-    SelectBandOnScreen(FIRST_BAND);
+    // Still on 40 m: the automatic run starts from 160 m whatever the band
     Press(16);
     RunUntil([](){ return ED.currentBand[ED.activeVFO] == BAND_40M; }, "TX IQ auto run at 40 m");
     Settle(2000);

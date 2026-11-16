@@ -1582,3 +1582,10 @@ At the user's direction, the single-VFO Transmit IQ procedure takes the analyser
 RF board's TX output, J6 (before the PA), through a cheap 10–20 dB attenuator, instead of from
 the antenna connector through a 20 W attenuator; wattmeter readings in the power calibration are
 described as set with the Filter encoder. Recorded J6 in [[rf-board-electronics]].
+
+## [2026-11-16] decision | Transmit IQ automatic run covers every band, like Receive IQ
+The Transmit IQ automatic run (button 16) started from the band shown on the screen, because the
+screen's Band +/- handlers set the run's band counter (`SetTXIQCurrentBand`). The user asked for
+it to match Receive IQ, which always starts from 160 m: the calls and the setter are removed
+(and the unused `SetTXCarrierCurrentBand`). Test `TXIQAutoRunStartsFromFirstBand`. The guide's
+"select 160 m first" instruction is gone. See [[calibration-state-machines]].

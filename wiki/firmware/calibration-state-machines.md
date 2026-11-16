@@ -3,7 +3,7 @@ title: Calibration Sub-State-Machines (the 4 generated cal SMs)
 type: module
 status: draft
 created: 2026-06-09
-updated: 2026-11-15
+updated: 2026-11-16
 tags: [state-machine, calibration, statesmith, iq, carrier, power, sweep]
 source_refs: []
 related: ["[[overview]]", "[[hardware-state-machine]]", "[[state-machine-architecture]]", "[[iq-imbalance-correction]]", "[[tx-carrier-null]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[log-amp-power-detection]]", "[[automatic-power-swr-calibration]]"]
@@ -69,6 +69,12 @@ completed keep their results, and the TX runs queue the `iPTT_RELEASED` they owe
 `CALIBRATE_TX_IQ_MARK` handles `CALIBRATE_EXIT` itself, so HOME with the PTT held also returns
 the mode machine to receive. `TXIQCalibrationAutoActive()` / `RXIQCalibrationAutoActive()`
 report whether a run is in progress.
+
+**Every automatic run starts from the first band.** The run's band counter is reset to
+`FIRST_BAND` whenever the machine enters `STANDBY` (`Reset*CalBand`: on entering the screen,
+after a finished run and after an abort). Until 2026-11-16 the Transmit IQ screen's Band +/−
+handlers also set it (`SetTXIQCurrentBand`, now removed), so a TX run started from the band on
+screen; it now covers every band like the RX run.
 
 **Single vs dual VFO.** Only Transmit IQ differs. Dual-VFO boards loop the TX back into the
 receiver (`RFCalTransmitIQ`, 31.5 dB) and measure IRR/dBc themselves; button 16 runs the sweep,
