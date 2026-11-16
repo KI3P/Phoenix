@@ -1576,3 +1576,9 @@ automatic IQ calibration works on hardware, so the simulator was corrected: RX I
 Observed, not changed: the Transmit IQ automatic run starts from the band on the screen
 (the band buttons call `SetTXIQCurrentBand`), whereas Receive IQ always does every band. The
 guide tells the operator to select 160 m first.
+
+## [2026-11-16] decision | Calibration guide: single-VFO analyser on RF board J6
+At the user's direction, the single-VFO Transmit IQ procedure takes the analyser signal from the
+RF board's TX output, J6 (before the PA), through a cheap 10–20 dB attenuator, instead of from
+the antenna connector through a 20 W attenuator; wattmeter readings in the power calibration are
+described as set with the Filter encoder. Recorded J6 in [[rf-board-electronics]].

@@ -3,7 +3,7 @@ title: RF Board — Electronics (Si5351 LO, PE4312 attenuators, mixer front end)
 type: hardware
 status: draft
 created: 2026-06-16
-updated: 2026-06-16
+updated: 2026-11-16
 tags: [hardware, rf, si5351, pe4312, attenuator, mixer, mcp23017, board-revisions]
 source_refs: [sources/t41-ep-schematics]
 related: ["[[hardware-platform]]", "[[i2c-bus-map]]", "[[rf-board]]", "[[filter-board-electronics]]", "[[t41-ep-schematics]]"]
@@ -80,6 +80,12 @@ revisions — always state the revision. Owner-clarified 2026-06-14.)
 **AD8599, OPA2209, MC33078, LM358B** op-amps buffer/scale the I and Q channels to/from the
 main-board converters: **J1 IQ_Out → PCM1808** (RX I/Q in), **J5 IQ_In ← SGTL5000 TX I/Q**
 (see [[hardware-platform]] for the converter map).
+
+## RF connectors
+**J6 is the TX output**: the low-level transmit signal, before the PA, which a cable carries on
+to the next board. Single-VFO radios calibrate transmit IQ with a spectrum analyser on J6
+through a 10–20 dB attenuator (the calibration guide, `code/docs/CalibrationGuide/`); a 20 W
+attenuator on the antenna connector is not needed. *(from the user, 2026-11-16)*
 
 ## Open questions
 - PA bias / supply rails feeding the front-end gain blocks.
