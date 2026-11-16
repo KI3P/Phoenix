@@ -108,10 +108,6 @@ void InitializeTXIQCalibration(void){
     txiqSM.vars.acquisitionDuration_ms = 60;
 }
 
-void SetTXIQCurrentBand(int32_t band){
-    currentBand = band;
-}
-
 void ResetTXIQCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)

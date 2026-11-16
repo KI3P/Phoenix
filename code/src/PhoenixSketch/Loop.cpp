@@ -899,7 +899,6 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
-                    SetTXIQCurrentBand(ED.currentBand[ED.activeVFO]);
                     UpdateRFHardwareState();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
@@ -910,7 +909,6 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
-                    SetTXIQCurrentBand(ED.currentBand[ED.activeVFO]);
                     UpdateRFHardwareState();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;

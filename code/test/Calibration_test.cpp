@@ -1269,6 +1269,41 @@ TEST_F(CalibrationTest, CarrierNullOnlyOnDualVFO) {
 }
 #endif
 
+// The automatic Transmit IQ run calibrates every band from the first, like the
+// Receive IQ run, whichever band the operator selected on the screen before it
+TEST_F(CalibrationTest, TXIQAutoRunStartsFromFirstBand) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    // Move to another band with the band buttons (at least one press)
+    int presses = 0;
+    do {
+        SetButton(BAND_UP);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+    } while ((++presses <= NUMBER_OF_BANDS) && (ED.currentBand[ED.activeVFO] != BAND_40M));
+    ASSERT_EQ(ED.currentBand[ED.activeVFO], BAND_40M);
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);   // the PTT press the run queued
+    ASSERT_TRUE(TXIQCalibrationAutoActive());
+    for (int k = 0; k < 10; k++)
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<4; k++){ loop(); MyDelay(10); }
+    EXPECT_FALSE(TXIQCalibrationAutoActive());
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    ED = savedED;
+}
+
 // The automatic sweeps keep, for each pass, the setting with the largest reading
 // above 0 dB. When no reading beats 0 dB (a broken or mirrored loopback), a pass
 // must leave its setting alone, not write a value left over from the last pass.

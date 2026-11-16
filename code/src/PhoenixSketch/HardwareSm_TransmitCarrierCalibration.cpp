@@ -100,10 +100,6 @@ void InitializeTXCarrierCalibration(void){
     txcarrSM.vars.acquisitionDuration_ms = 60;
 }
 
-void SetTXCarrierCurrentBand(int32_t band){
-    currentBand = band;
-}
-
 void ResetTXCarrierCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
