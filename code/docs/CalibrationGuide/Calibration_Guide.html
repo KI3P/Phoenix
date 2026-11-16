@@ -116,14 +116,14 @@ ol.steps figure{margin:.8em 0}
 <div class="callout"><b>In short</b><ul>
 <li>Calibrate in this order: <b>frequency → receive IQ → transmit IQ → power and SWR → S-meter</b>. Each step relies on the ones before it.</li>
 <li>Every calibration is on <kbd>Menu</kbd> → <b>Calibration</b>. Pressing <kbd>Home</kbd> (button 17) leaves the screen and saves the result.</li>
-<li>A <b>dual-VFO</b> radio calibrates its transmit IQ by itself with no test equipment. A <b>single-VFO</b> radio needs a dummy load, an attenuator and a spectrum analyser or second receiver for that step.</li>
+<li>A <b>dual-VFO</b> radio calibrates its transmit IQ by itself with no test equipment. A <b>single-VFO</b> radio needs a spectrum analyser (or second receiver) and a small 10–20&nbsp;dB attenuator, connected to the TX output of the RF board, for that step.</li>
 <li>The minimum kit is a 50&nbsp;Ω dummy load (20&nbsp;W), a shorting plug and an off-air frequency standard such as WWV or CHU. A wattmeter, a signal generator and, for single-VFO radios, a spectrum analyser make the results better or possible.</li>
 </ul></div>
 
 <div class="order">
 <a href="#frequency"><span class="n">1</span><span class="t">Frequency</span><span class="e">WWV/CHU or a locked generator</span></a>
 <a href="#rxiq"><span class="n">2</span><span class="t">Receive IQ</span><span class="e">No equipment</span></a>
-<a href="#txiq"><span class="n">3</span><span class="t">Transmit IQ</span><span class="e">Dual: none · Single: load, attenuator, analyser</span></a>
+<a href="#txiq"><span class="n">3</span><span class="t">Transmit IQ</span><span class="e">Dual: none · Single: analyser, 10–20 dB attenuator</span></a>
 <a href="#power"><span class="n">4</span><span class="t">Power and SWR</span><span class="e">Load, short; wattmeter recommended</span></a>
 <a href="#smeter"><span class="n">5</span><span class="t">S-meter</span><span class="e">Signal generator</span></a>
 </div>
@@ -147,7 +147,7 @@ ol.steps figure{margin:.8em 0}
 
 <div class="callout warn"><p><b>Safety</b></p><ul>
 <li>Whenever a step transmits, there must be a 50&nbsp;Ω load on the antenna connector that can take the power: a dummy load, or a wattmeter terminated in its load. The steps say which ones transmit.</li>
-<li>Never connect a spectrum analyser, SDR or receiver straight to the antenna connector while transmitting. Take the signal from a sampler or through an attenuator rated for the power. Most small analysers are damaged above about +10&nbsp;dBm (10&nbsp;mW).</li>
+<li>Never connect a spectrum analyser, SDR or receiver to the antenna connector while transmitting. Where this guide uses an analyser, it goes on the low-level TX output of the RF board, through an attenuator. Most small analysers are damaged above about +10&nbsp;dBm (10&nbsp;mW).</li>
 <li>Calibration tones are continuous carriers. Keep transmissions short and let the PA rest between them.</li>
 </ul></div>
 
@@ -193,11 +193,11 @@ ol.steps figure{margin:.8em 0}
 <div class="tablewrap"><table>
 <tr><th>Item</th><th>Used in</th><th>Needed?</th></tr>
 <tr><td>Off-air frequency standard (WWV, WWVH, CHU), or a signal generator locked to a GPS or rubidium reference</td><td><a href="#frequency">1</a></td><td>Yes</td></tr>
-<tr><td>50&nbsp;Ω dummy load, 20&nbsp;W continuous or more, 1.8–54&nbsp;MHz</td><td><a href="#txiq">3</a> (single VFO), <a href="#power">4</a></td><td>Yes</td></tr>
+<tr><td>50&nbsp;Ω dummy load, 20&nbsp;W continuous or more, 1.8–54&nbsp;MHz</td><td><a href="#power">4</a></td><td>Yes</td></tr>
 <tr><td>Shorting plug that fits the antenna connector directly</td><td><a href="#power">4</a></td><td>Yes</td></tr>
 <tr><td>HF wattmeter (with its own 50&nbsp;Ω load), accurate near 2&nbsp;W and up to 20&nbsp;W</td><td><a href="#power">4</a></td><td>Recommended</td></tr>
 <tr><td>Spectrum analyser covering HF (a tinySA is fine) or a second receiver or SDR with a waterfall</td><td><a href="#txiq-single">3</a> (single VFO only)</td><td>Single VFO: yes</td></tr>
-<tr><td>Power attenuator or RF sampler, 30–40&nbsp;dB, rated for 20&nbsp;W</td><td><a href="#txiq-single">3</a> (single VFO only)</td><td>Single VFO: yes</td></tr>
+<tr><td>Low-power attenuator, 10–20&nbsp;dB, and a coax lead to fit the RF board's TX output</td><td><a href="#txiq-single">3</a> (single VFO only)</td><td>Single VFO: yes</td></tr>
 <tr><td>HF signal generator with a known output level (for example −73&nbsp;dBm)</td><td><a href="#smeter">5</a></td><td>Optional</td></tr>
 <tr><td>Microphone or footswitch with PTT</td><td><a href="#txiq">3</a>, <a href="#power-manual">4 (manual)</a></td><td>Yes</td></tr>
 </table></div>
@@ -286,7 +286,7 @@ ol.steps figure{margin:.8em 0}
 
 <!-- ======================================================================= -->
 <h2 id="txiq">3. Transmit IQ balance</h2>
-<div class="meta"><span><b>Applies to</b> <span class="tag dual">Dual VFO</span> and <span class="tag single">Single VFO</span>, done differently</span><span><b>Transmits</b> dual: no (internal loop) · single: yes</span><span><b>Time</b> dual: about 3 minutes, automatic · single: about 5 minutes per band</span></div>
+<div class="meta"><span><b>Applies to</b> <span class="tag dual">Dual VFO</span> and <span class="tag single">Single VFO</span>, done differently</span><span><b>Transmits</b> dual: no (internal loop) · single: into the analyser only</span><span><b>Time</b> dual: about 3 minutes, automatic · single: about 5 minutes per band</span></div>
 <p>The transmitter has the same problem as the receiver in reverse: an amplitude or phase imbalance between I and Q puts a copy of your signal on the <b>opposite sideband</b>. This step finds the corrections, band by band, that suppress that unwanted sideband. The measure is the <b>image rejection ratio</b> (IRR): how far the unwanted sideband is below the wanted one. Aim for more than 60&nbsp;dB on a dual-VFO radio. On a single-VFO radio the analyser's own dynamic range usually sets the limit, so aim for at least 50&nbsp;dB.</p>
 <p>The radio transmits an <b>800&nbsp;Hz</b> tone on the band's normal sideband. Do the receive IQ calibration first: on a dual-VFO radio the transmitter is measured through the receiver.</p>
 
@@ -329,24 +329,24 @@ ol.steps figure{margin:.8em 0}
 
 <div class="vfo single" id="txiq-single">
 <h3><span class="tag single">Single VFO</span> Manual, with a spectrum analyser</h3>
-<p>A single-VFO radio cannot receive while it transmits, so it cannot measure its own image. It transmits the test tone through the power amplifier to the antenna connector, and you read the image on an external analyser and adjust by hand. The screen has no IRR reading on this board.</p>
+<p>A single-VFO radio cannot receive while it transmits, so it cannot measure its own image. You read the image on an external analyser and adjust by hand. The screen has no IRR reading on this board.</p>
+<p>Take the signal from the <b>TX output of the RF board</b>, not from the antenna connector. The signal there is at a low level, before the power amplifier, so a cheap low-power 10–20&nbsp;dB attenuator is enough to protect the analyser, and nothing needs to handle 20&nbsp;W.</p>
 
 <div class="equip"><h4>Equipment</h4><div class="tablewrap"><table>
 <tr><th>Item</th><th>Notes</th></tr>
-<tr><td>50&nbsp;Ω dummy load</td><td>20&nbsp;W continuous. The radio transmits a continuous tone for as long as you hold the PTT.</td></tr>
-<tr><td>Sampler or attenuator</td><td>A dummy load with a sample port, or a 30–40&nbsp;dB power attenuator in line, so that the analyser sees no more than about 0&nbsp;dBm.</td></tr>
+<tr><td>Attenuator</td><td>10–20&nbsp;dB, an ordinary low-power one. It keeps the analyser's input well below its maximum.</td></tr>
+<tr><td>Coax lead</td><td>To connect the RF board's TX output to the attenuator, in place of the cable that normally goes from that output to the next board.</td></tr>
 <tr><td>Spectrum analyser or second receiver</td><td>Covering HF, with a resolution bandwidth of 300&nbsp;Hz or less so that it separates the tone, the carrier and the image, which are 800&nbsp;Hz apart. A second SDR with a waterfall and a dB scale also works.</td></tr>
 <tr><td>PTT</td><td>A microphone PTT switch or a footswitch.</td></tr>
 </table></div></div>
 
-<figure><svg viewBox="0 0 760 210" role="img" aria-label="Bench setup: radio to dummy load with sampler, through attenuator, to spectrum analyser; spectrum shows wanted tone, carrier and image">
-<rect x="10" y="40" width="130" height="56" rx="8" class="d-box hl"/><text x="75" y="64" class="d-lab b" text-anchor="middle">Phoenix</text><text x="75" y="82" class="d-lab s" text-anchor="middle">antenna connector</text>
-<line x1="140" y1="68" x2="200" y2="68" class="d-line"/>
-<rect x="200" y="40" width="140" height="56" rx="8" class="d-box"/><text x="270" y="64" class="d-lab b" text-anchor="middle">Dummy load</text><text x="270" y="82" class="d-lab s" text-anchor="middle">20 W, with sample port</text>
-<line x1="270" y1="96" x2="270" y2="140" class="d-line"/>
-<rect x="200" y="140" width="140" height="50" rx="8" class="d-box"/><text x="270" y="162" class="d-lab b" text-anchor="middle">Attenuator</text><text x="270" y="179" class="d-lab s" text-anchor="middle">to about 0 dBm</text>
-<line x1="340" y1="165" x2="390" y2="165" class="d-line"/>
-<rect x="390" y="140" width="120" height="50" rx="8" class="d-box"/><text x="450" y="162" class="d-lab b" text-anchor="middle">Analyser</text><text x="450" y="179" class="d-lab s" text-anchor="middle">RBW ≤ 300 Hz</text>
+<figure><svg viewBox="0 0 760 210" role="img" aria-label="Bench setup: RF board TX output through a 10 to 20 dB attenuator to the spectrum analyser; spectrum shows wanted tone, carrier and image">
+<rect x="10" y="60" width="140" height="64" rx="8" class="d-box hl"/><text x="80" y="86" class="d-lab b" text-anchor="middle">RF board</text><text x="80" y="104" class="d-lab s" text-anchor="middle">TX output</text>
+<line x1="150" y1="92" x2="200" y2="92" class="d-line"/>
+<rect x="200" y="66" width="130" height="52" rx="8" class="d-box"/><text x="265" y="88" class="d-lab b" text-anchor="middle">Attenuator</text><text x="265" y="105" class="d-lab s" text-anchor="middle">10–20 dB</text>
+<line x1="330" y1="92" x2="380" y2="92" class="d-line"/>
+<rect x="380" y="66" width="120" height="52" rx="8" class="d-box"/><text x="440" y="88" class="d-lab b" text-anchor="middle">Analyser</text><text x="440" y="105" class="d-lab s" text-anchor="middle">RBW ≤ 300 Hz</text>
+<text x="80" y="150" class="d-lab s" text-anchor="middle">cable to the next board</text><text x="80" y="165" class="d-lab s" text-anchor="middle">unplugged</text>
 <g transform="translate(540,20)">
 <line x1="0" y1="160" x2="210" y2="160" class="d-ax"/>
 <rect x="45" y="128" width="6" height="32" class="d-img"/><text x="48" y="122" class="d-lab s" text-anchor="middle">image</text>
@@ -372,23 +372,24 @@ ol.steps figure{margin:.8em 0}
 
 <h4>Step by step</h4>
 <ol class="steps">
-<li>Connect the radio to the dummy load, the sampler or attenuator, and the analyser as above.</li>
+<li>Switch the radio off. Unplug the cable from the RF board's TX output (the cable that carries the transmit signal on to the next board), and connect the TX output to the analyser through the 10–20&nbsp;dB attenuator. Leave a dummy load on the antenna connector as good practice. Switch the radio on.</li>
 <li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Transmit IQ</b>. The radio tunes to the middle of the current band and shows the frequency. The attenuation (<b>Att.</b>) starts at 31.5&nbsp;dB, the lowest output power.
 <figure><img src="txiq-entry-single.png" alt="Transmit IQ calibration screen, single VFO" loading="lazy"><figcaption><b>Transmit IQ calibration</b> on a single-VFO radio: no IRR reading and no spectrum. The band table shows every band's settings.</figcaption></figure></li>
 <li>Set the analyser to the frequency shown, with a span of about 5&nbsp;kHz.</li>
-<li>Hold the PTT. Find the tone 800&nbsp;Hz from the dial frequency. If it is too weak to see the image clearly, release the PTT, turn the <b>Fine tune</b> encoder anticlockwise a few steps to reduce the attenuation, and try again. A few hundred milliwatts is plenty.
+<li>Hold the PTT. Find the tone 800&nbsp;Hz from the dial frequency. If it is too weak to see the image clearly, release the PTT, turn the <b>Fine tune</b> encoder anticlockwise a few steps to reduce the attenuation, and try again. Keep the level at the analyser below its maximum input.
 <figure><img src="txiq-keyed-single.png" alt="Transmit IQ calibration, single VFO, transmitting at 25.5 dB attenuation" loading="lazy"><figcaption><b>Transmitting</b> at 25.5&nbsp;dB attenuation. PTT shows On.</figcaption></figure></li>
 <li>While holding the PTT, turn the <b>Volume</b> encoder (amplitude) to make the image as small as you can, then the <b>Filter</b> encoder (phase). Go back and forth between them; each one shifts the best setting of the other. Make the step smaller with <kbd>15</kbd> as the image drops. The controls work while you transmit.</li>
-<li>Release the PTT whenever you need to rest the PA; the settings stay.</li>
+<li>Release the PTT when you like; the settings stay.</li>
 <li>Press <kbd>2</kbd> (Band +) and repeat steps 3 to 6 on every band you use. Retune the analyser to each band's frequency.</li>
 <li>Press <kbd>17</kbd> (Home) to save and leave.</li>
+<li>Switch the radio off, remove the attenuator and analyser, and <b>plug the cable back into the RF board's TX output</b>. The radio does not transmit until you do.</li>
 </ol>
 </div>
 
 <div class="callout"><p><b>Radios built with direct-coupled transmit.</b> Some builds use a direct-coupled transmit path, which can also null the transmitted carrier. On those radios the <b>Fine tune</b> and <b>Centre tune</b> encoders set the I and Q DC offsets on this screen (instead of the attenuation), and a dual-VFO radio nulls the carrier automatically with button <kbd>14</kbd>. On a single-VFO radio, minimise the carrier on the analyser with the two offsets by hand. The attenuation then stays at 31.5&nbsp;dB.</p></div>
 
 <h3>How do I know it worked?</h3>
-<p>Transmit a single tone in SSB into a dummy load and look at it on an analyser or a second receiver: the opposite sideband should be at least 50 to 60&nbsp;dB down. On a dual-VFO radio the IRR column in the table gives the same answer for every band.</p>
+<p>On a dual-VFO radio, the IRR column in the table shows the result for every band. On a single-VFO radio, with the analyser still on the RF board's TX output, transmit a single tone in SSB on the home screen: the opposite sideband should be at least 50 to 60&nbsp;dB below the tone.</p>
 
 <!-- ======================================================================= -->
 <h2 id="power">4. Power and SWR</h2>
@@ -398,7 +399,7 @@ ol.steps figure{margin:.8em 0}
 <li><b>The output power.</b> The radio measures how its output varies with drive, so that the power you set in CW and SSB is the power you get.</li>
 <li><b>The power and SWR readings.</b> It calibrates the SWR bridge with three known terminations: a 50&nbsp;Ω load, an open (nothing fitted) and a short.</li>
 </ul>
-<p>The radio does the work itself. You fit the load, the open and the short when it asks, and, if you have a wattmeter, type in its reading twice per band. Do this after the transmit IQ calibration, because the SSB part of the measurement includes any unwanted sideband.</p>
+<p>The radio does the work itself. You fit the load, the open and the short when it asks, and, if you have a wattmeter, enter its reading twice per band by turning the <b>Filter</b> encoder. Do this after the transmit IQ calibration, because the SSB part of the measurement includes any unwanted sideband.</p>
 
 <h3>Which level?</h3>
 <p>The automatic calibration has levels that differ in how much equipment you need and how accurate the power display is afterwards. The SWR reading is almost as good at every level.</p>
@@ -430,7 +431,7 @@ ol.steps figure{margin:.8em 0}
 <tr><td><kbd>0</kbd> Select</td><td>Start; confirm that a standard is fitted; enter a wattmeter reading; accept the results</td></tr>
 <tr><td><kbd>3</kbd></td><td>Abort at any time. The radio stops transmitting at once and nothing is stored.</td></tr>
 <tr><td><b>Volume</b> encoder</td><td>Choose the level (setup screen only)</td></tr>
-<tr><td><b>Filter</b> encoder</td><td>Set the L44 turns (setup screen); dial in a wattmeter reading</td></tr>
+<tr><td><b>Filter</b> encoder</td><td>Set the L44 turns (setup screen); set a wattmeter reading</td></tr>
 <tr><td><kbd>12</kbd></td><td>Skip the load stage (level 1 only, to recalibrate the SWR bridge alone)</td></tr>
 <tr><td><kbd>14</kbd></td><td>Switch the wattmeter entry between W and dBm; on the review screen, repeat the bands that failed</td></tr>
 <tr><td><kbd>15</kbd></td><td>Change the wattmeter entry's step: 1, 0.1 or 0.01</td></tr>
@@ -451,7 +452,7 @@ ol.steps figure{margin:.8em 0}
 <li>After the sweep, the radio keys near 2&nbsp;W and asks for the wattmeter reading. Turn the <b>Filter</b> encoder until <b>Measured</b> matches the meter, then press <kbd>0</kbd>. The entry starts at the power the radio expects, so it usually needs only a small change. Use <kbd>14</kbd> if your meter reads in dBm and <kbd>15</kbd> to change the step.
 <figure><img src="Auto-L2-04-meter-2W.png" alt="Wattmeter entry near 2 W" loading="lazy"><figcaption><b>First reading</b>: 1.78&nbsp;W on 20&nbsp;m.</figcaption></figure>
 If you do not press <kbd>0</kbd> within 30 seconds, the radio stops transmitting to protect the PA. Press <kbd>0</kbd> to key it again and finish the entry.</li>
-<li>The radio keys at full power and asks for the second reading. Dial it in and press <kbd>0</kbd>.
+<li>The radio keys at full power and asks for the second reading. Set it with the <b>Filter</b> encoder and press <kbd>0</kbd>.
 <figure><img src="Auto-L2-05-meter-full.png" alt="Wattmeter entry at full power" loading="lazy"><figcaption><b>Second reading</b>: 10.96&nbsp;W on 20&nbsp;m.</figcaption></figure></li>
 <li>The radio sends a short SSB tone and moves to the next band. Repeat the two readings on every band: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10 and 6&nbsp;m.</li>
 <li>After 6&nbsp;m the radio asks for the <b>open</b>. Remove the wattmeter, leave the connector bare and press <kbd>0</kbd>. The radio measures every band again with short, low-power bursts, with pauses so the PA stays cool.
@@ -500,15 +501,15 @@ If you do not press <kbd>0</kbd> within 30 seconds, the radio stops transmitting
 </table></div></div>
 </div>
 
-<p>All buttons are ignored while you transmit, so the rhythm of each step is: key, read the meter, unkey, dial in the reading, press <kbd>0</kbd>.</p>
+<p>All buttons are ignored while you transmit, so the rhythm of each step is: key, read the meter, unkey, set the reading with the <b>Filter</b> encoder, press <kbd>0</kbd>.</p>
 <ol class="steps">
 <li>Open <kbd>Menu</kbd> → <b>Calibration</b> → <b>Power</b>. Check <b>PA 20W</b>, and select the band with <kbd>2</kbd> / <kbd>5</kbd>.
 <figure><img src="power-manual.png" alt="Manual power calibration screen at step 1" loading="lazy"><figcaption><b>Manual power calibration</b>, step 1 on 20&nbsp;m.</figcaption></figure></li>
 <li><b>Step 1</b>, full power: with 0&nbsp;dB attenuation, key the PTT, read the wattmeter and unkey. Turn the <b>Filter</b> encoder to the reading and press <kbd>0</kbd>.</li>
-<li><b>Step 2</b>: turn the <b>Volume</b> encoder to raise the attenuation until the power drops by about 6&nbsp;dB (to about a quarter). Twelve steps of 0.5&nbsp;dB is a good start. Key, read, unkey, dial in the reading and press <kbd>0</kbd>.</li>
+<li><b>Step 2</b>: turn the <b>Volume</b> encoder to raise the attenuation until the power drops by about 6&nbsp;dB (to about a quarter). Twelve steps of 0.5&nbsp;dB is a good start. Key, read, unkey, set the reading with the <b>Filter</b> encoder and press <kbd>0</kbd>.</li>
 <li><b>Step 3</b>: raise the attenuation for a further 6&nbsp;dB drop and record the reading the same way. The radio fits its power curve and shows it in the table.
 <figure><img src="power-curve.png" alt="Manual power calibration after three points" loading="lazy"><figcaption><b>After step 3</b>: three points recorded and the curve fitted.</figcaption></figure></li>
-<li><b>Step 4</b>, SSB: press <kbd>12</kbd>. Key the PTT; the radio sends an 800&nbsp;Hz tone at its SSB drive. Read the meter, unkey, dial in the reading and press <kbd>0</kbd>.
+<li><b>Step 4</b>, SSB: press <kbd>12</kbd>. Key the PTT; the radio sends an 800&nbsp;Hz tone at its SSB drive. Read the meter, unkey, set the reading with the <b>Filter</b> encoder and press <kbd>0</kbd>.
 <figure><img src="power-ssb.png" alt="Manual power calibration, SSB step" loading="lazy"><figcaption><b>Step 4</b>, the SSB tone.</figcaption></figure></li>
 <li>Repeat for any other band, then press <kbd>17</kbd> (Home) to save and leave.</li>
 </ol>
@@ -557,7 +558,7 @@ If you do not press <kbd>0</kbd> within 30 seconds, the radio stops transmitting
 <tr><th></th><th>Calibration</th><th>Equipment</th><th>Transmits</th><th>Dual VFO</th><th>Single VFO</th></tr>
 <tr><td>1</td><td><a href="#frequency">Frequency</a></td><td>WWV/CHU or a locked generator</td><td>no</td><td colspan="2">Same on both</td></tr>
 <tr><td>2</td><td><a href="#rxiq">Receive IQ</a></td><td>none</td><td>no</td><td colspan="2">Same on both; automatic</td></tr>
-<tr><td>3</td><td><a href="#txiq">Transmit IQ</a></td><td>Dual: none. Single: dummy load, attenuator, analyser</td><td>Dual: internal only. Single: yes</td><td>Automatic, measured inside the radio</td><td>Manual, per band, read on an analyser</td></tr>
+<tr><td>3</td><td><a href="#txiq">Transmit IQ</a></td><td>Dual: none. Single: analyser and 10–20&nbsp;dB attenuator on the RF board's TX output</td><td>Dual: internal only. Single: into the analyser only</td><td>Automatic, measured inside the radio</td><td>Manual, per band, read on an analyser</td></tr>
 <tr><td>4</td><td><a href="#power">Power and SWR</a></td><td>Dummy load, short; wattmeter recommended</td><td>yes, up to full power</td><td colspan="2">Same on both; automatic</td></tr>
 <tr><td>5</td><td><a href="#smeter">S-meter</a></td><td>Signal generator</td><td>no</td><td colspan="2">Same on both; optional</td></tr>
 </table></div>
@@ -579,7 +580,7 @@ If you do not press <kbd>0</kbd> within 30 seconds, the radio stops transmitting
 <tr><td>Frequency: the error never settles</td><td>The demodulation must be SAM, and the carrier must be inside the passband before you open the screen. A fading off-air signal makes the error wander; try another frequency or a generator.</td></tr>
 <tr><td>Receive IQ: Delta stays low on every band</td><td>A strong signal on the antenna connector; fit a dummy load. Check the receive mixer and the codec wiring.</td></tr>
 <tr><td>Transmit IQ (dual): IRR stays low</td><td>Do the receive IQ calibration first.</td></tr>
-<tr><td>Transmit IQ (single): no tone on the analyser</td><td>Hold the PTT, check that the analyser is tuned to the frequency on the screen, and reduce the attenuation with the Fine tune encoder.</td></tr>
+<tr><td>Transmit IQ (single): no tone on the analyser</td><td>Hold the PTT, check that the analyser is connected to the RF board's TX output and tuned to the frequency on the screen, and reduce the attenuation with the Fine tune encoder.</td></tr>
 <tr><td>Transmit IQ (single): the image will not go below the analyser's noise</td><td>Reduce the attenuation for a stronger tone, or narrow the analyser's resolution bandwidth. You have reached the analyser's limit, which is good enough.</td></tr>
 <tr><td>Power: the automatic calibration will not start</td><td>It needs the 20&nbsp;W PA selected (<b>PA 20W</b> on the power screen).</td></tr>
 <tr><td>A setting was lost after switching off</td><td>Leave calibration screens with <kbd>17</kbd> (Home); save the S-meter level from the EEPROM menu.</td></tr>
