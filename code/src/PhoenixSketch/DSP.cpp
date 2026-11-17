@@ -618,10 +618,16 @@ void AMDecodeSAM(DataBlock *data){
         while (phzerror >= TWO_PI) phzerror -= TWO_PI;
         while (phzerror < 0.0) phzerror += TWO_PI;
     }
-    SAM_carrier =  (omega2 * (float32_t)data->sampleRate_Hz) / (2 * TWO_PI);
-    SAM_carrier_freq_offset = 0.95 * SAM_carrier_freq_offset + 0.05 * (10 * SAM_carrier);   
+    // omega2 is the carrier's offset in radians per sample: in Hz, omega2 * fs / 2 pi.
+    // (It used to be divided by 4 pi and multiplied by 10, which read 5x the offset.)
+    SAM_carrier =  (omega2 * (float32_t)data->sampleRate_Hz) / TWO_PI;
+    SAM_carrier_freq_offset = 0.95 * SAM_carrier_freq_offset + 0.05 * SAM_carrier;
 }
 
+/**
+ * The SAM PLL's carrier offset from the tuned frequency, in Hz, smoothed.
+ * Positive when the carrier is above the dial.
+ */
 float32_t GetSAMCarrierOffset(void){
     return SAM_carrier_freq_offset;
 }

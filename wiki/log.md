@@ -1603,3 +1603,24 @@ At the user's request, `radio_simulator` gets what each calibration needs, in a 
   keeps it). The error nulls at a correction of 2500.
 Finding: the SAM error readout is 5× the carrier offset, opposite sign. See
 [[synchronous-am-detection]].
+
+## [2026-11-16] decision | SAM error readout in hertz; calibration walkthrough in the simulator
+At the user's direction the SAM carrier offset (`GetSAMCarrierOffset()`, the frequency
+calibration screen's Error and the home screen's Err) now reads in Hz: it read 5× the offset.
+The guide's "between −1 and +1" target is unchanged (now ±1 Hz). See [[synchronous-am-detection]].
+
+A scripted walk through every calibration in the simulator (dual and single VFO, and a
+`DIRECT_COUPLED_TX` build) confirmed the earlier fixes: TX/CW VFOs reprogrammed after a
+frequency calibration; HOME while keyed and during each automatic run (RX IQ, TX IQ, carrier
+null) stops, unkeys and restores the band in progress; single-VFO Transmit IQ keys at the
+screen's attenuation (31.5 dB first); button 14 inert on single VFO; Receive IQ's band pane
+follows Band +/−; Transmit IQ's run starts from 160 m. Found, not changed:
+- The no-valid-reading protection has a gap: the first amplitude pass of both IQ sweeps runs
+  0.0–2.0 (100 steps of 0.02; the comments say 0.5–1.5), and any reading above 0 dB counts.
+  With the RX test tone on the wrong sideband, amplitude 0 read +25 dB and most bands ended at
+  amplitude −0.0495.
+- Transmit IQ's run ends on the general-coverage band, where the loopback gives about 2 dB
+  IRR, and stores amplitude ≈ 0 / phase at the sweep edge there.
+- The carrier null (`DIRECT_COUPLED_TX`) nulls the simulated carrier to about 41 dBc on most
+  bands, but on a varying few it stops at the coarse step (6.5 dBc) or leaves 0/0.
+See [[calibration-state-machines]].

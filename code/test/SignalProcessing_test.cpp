@@ -1666,7 +1666,9 @@ TEST(SignalProcessing, DemodulateSAM){
         // Demodulate it
         Demodulate(&data, &RXfilters);
     }
-    EXPECT_NEAR(GetSAMCarrierOffset(),57.7342,0.0002);
+    // The waveform's carrier is 12 Hz above the centre (fcarrier in the
+    // notebook); the smoothed readout, in Hz, is close to it by the end
+    EXPECT_NEAR(GetSAMCarrierOffset(),57.7342/5,0.0002);
 
 }
 
