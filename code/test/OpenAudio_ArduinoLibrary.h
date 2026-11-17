@@ -18,6 +18,9 @@ enum AudioInputSource {
 void setAudioInputSource(AudioInputSource source);
 AudioInputSource getAudioInputSource(void);
 const char* getAudioInputSourceName(void);
+// Single-tone source: where the tone sits beyond the Fs/4 carrier (default 1 kHz)
+void setSingleToneOffsetHz(double offset_Hz);
+double getSingleToneOffsetHz(void);
 
 #ifdef USE_SDL_DISPLAY
 // SDL2 Audio support - cross-platform (Linux, Windows, macOS)

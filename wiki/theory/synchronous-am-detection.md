@@ -3,7 +3,7 @@ title: Synchronous AM Detection (SAM)
 type: concept
 status: draft
 created: 2026-06-09
-updated: 2026-06-09
+updated: 2026-11-16
 tags: [sam, am, synchronous-detection, pll, carrier, demodulation, fading]
 source_refs: []
 related: ["[[theory-overview]]", "[[ssb-phasing-method]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]", "[[display-subsystem]]", "[[code-heritage]]"]
@@ -58,7 +58,15 @@ SAM_carrier_freq_offset = 0.95·prev + 0.05·(10·SAM_carrier);   // smoothed
 ```
 `GetSAMCarrierOffset()` returns it, and the home-screen **SAM-offset pane** displays it
 ([[display-subsystem]]) — so the operator can see how far the PLL has pulled and zero-beat the
-tuning.
+tuning. The frequency calibration screen shows the same value as its **Error**.
+
+**The readout is not in hertz.** `omega2` is the offset in radians per sample, so
+`omega2 · fs / 2π` would be hertz; the extra `/2` halves it and the `×10` then gives **5× the
+offset**, with the opposite sign. Measured in the simulator (2026-11-16): a carrier 25.12 Hz off
+reads −125.6, half the offset reads half that, and the reading nulls at zero offset. The
+`MainBoard_DisplayCalibration_Frequency.cpp` comment ("error in Hz, ideally < 1 Hz") is wrong
+by the same factor; ±1 on the screen is ±0.2 Hz. Frequency calibration only nulls the reading,
+so the scale does not affect the result. Not changed in the firmware.
 
 ## Relationship to other modes
 - **AM** (envelope) vs **SAM** (synchronous) are both AM-family demods in `Demodulate()`.
@@ -67,6 +75,7 @@ tuning.
 
 ## Open questions
 - Exact `zeta` value and the `tauR`/`tauI` fade-leveler constants (and `zeta_help`).
-- Why the `×10` factor in the smoothed `SAM_carrier_freq_offset` (display scaling?).
+- Whether the `/(2·2π)` and `×10` were meant as a 0.1 Hz display unit (which `/2π` and `×10`
+  would give); as written the scale is 0.2 Hz per unit (see above).
 - Whether SAM supports selectable sideband (DSB vs single-sideband SAM) — check the `corr`
   combination.

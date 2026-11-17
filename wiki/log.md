@@ -1589,3 +1589,17 @@ screen's Band +/- handlers set the run's band counter (`SetTXIQCurrentBand`). Th
 it to match Receive IQ, which always starts from 160 m: the calls and the setter are removed
 (and the unused `SetTXCarrierCurrentBand`). Test `TXIQAutoRunStartsFromFirstBand`. The guide's
 "select 160 m first" instruction is gone. See [[calibration-state-machines]].
+
+## [2026-11-16] decision | Radio simulator: a simulated bench for every calibration
+At the user's request, `radio_simulator` gets what each calibration needs, in a shared
+`code/test/SimBench.h` that the screenshot tools also use:
+- The test signals switch in each calibration screen and the operator's input source comes back
+  afterwards (before, the Transmit IQ loopback stayed on and the receiver went quiet).
+- `--single` makes the mock Si5351 answer at 0x60, so the firmware detects single-VFO hardware.
+- Radio 2's power bridge (moved from `AutoCalScreenshots_main.cpp`) answers the AD7991; the `c`
+  key changes the connector (load, open, short); the console prints the wattmeter's reading.
+- Frequency calibration: a frequency standard on the dial, offset by a simulated crystal error
+  (`--xtal-ppb`, default 2500) less the correction the firmware programs (the mock Si5351 now
+  keeps it). The error nulls at a correction of 2500.
+Finding: the SAM error readout is 5× the carrier offset, opposite sign. See
+[[synchronous-am-detection]].

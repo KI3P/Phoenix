@@ -6,8 +6,18 @@
  * used by the Phoenix SDR radio. It allows testing and development of the
  * display code on a desktop computer without the actual hardware.
  *
- * Build with: cmake -DUSE_SDL_DISPLAY=ON .. && make display_simulator
- * Run with: ./display_simulator
+ * Build with: cmake -DUSE_SDL_DISPLAY=ON .. && make radio_simulator
+ * Run with: ./radio_simulator [--single] [--xtal-ppb N]
+ *   --single      single-VFO hardware (the Si5351 answers at 0x60, not 0x61)
+ *   --xtal-ppb N  the simulated reference crystal's error, in ppb (default
+ *                 2500); frequency calibration nulls it when the correction
+ *                 factor reaches N
+ *
+ * The simulated bench (SimBench.h) supplies what each calibration needs: a
+ * frequency standard on the dial in frequency calibration, the RX IQ test tone
+ * in Receive IQ, the transmitter looped back in Transmit IQ (dual VFO), and a
+ * power bridge (radio 2's) with a load, open or short on the connector. While
+ * transmitting, the console prints the wattmeter's reading.
  *
  * Controls:
  *   ESC or close window - Exit
@@ -20,7 +30,7 @@
  *   5 - Reset Tuning (button 4)   t - Decoder Toggle (button 13)
  *   6 - Band Down (button 5)      y - DFE (button 14)
  *   7 - Toggle Mode (button 6)    u - Bearing (button 15)
- *   8 - Demodulation (button 7)   o - Spare (button 16)
+ *   8 - Demodulation (button 7)   o - ATU / calibration auto run (button 16)
  *   9 - Main Tune Inc (button 8)  h - Home Screen (button 17)
  *
  *   ---- Additional Buttons ----
@@ -43,6 +53,9 @@
  *
  *   ---- Audio Source ----
  *   a - Cycle audio input source (Computer/Two-Tone/Single-Tone/RXIQ/Feedback)
+ *
+ *   ---- Bench ----
+ *   c - Cycle what is on the antenna connector (50 Ohm load/open/short)
  */
 
 
@@ -50,6 +63,8 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
+#include <cstring>
+#include <cstdlib>
 
 #ifdef USE_SDL_DISPLAY
 #include <SDL2/SDL.h>
@@ -72,6 +87,7 @@ static std::thread timer_thread;
 #include "OpenAudio_ArduinoLibrary.h"
 #include "LittleFS_mock.h"
 #include "HardwareSm.h"
+#include "SimBench.h"
 
 // External declarations
 extern RA8875 tft;
@@ -83,6 +99,8 @@ void setup(void); // forward declaration of setup function
 
 // External function from Arduino_mock.cpp to start the millis() timer
 extern void StartMillis(void);
+// The mock Si5351's I2C address: 0x61 dual VFO (the default), 0x60 single
+extern void Si5351_Mock_SetDeviceAddress(uint8_t addr);
 
 // Cleanup function declared in RA8875_SDL.cpp
 #ifdef USE_SDL_DISPLAY
@@ -91,61 +109,6 @@ extern void RA8875_SDL_Cleanup();
 
 // Flag to signal shutdown was requested
 static bool shutdownRequested = false;
-
-// Track the previous RF hardware state to detect changes
-static RFHardwareState previousRFState = RFInvalid;
-static int32_t oldband = -1;
-
-/**
- * Update audio input source based on RF hardware state.
- * Automatically switches to appropriate audio sources for calibration modes:
- * - RFCalReceiveIQ: Use the RXIQ_USB tone, which has a 10 % amplitude error
- * - RFCalTransmitIQ: Configure Q_in_L_Ex/Q_in_R_Ex to use transmitIQcal_oscillator,
- *                    and use Feedback mode to loop TX IQ back to RX input
- */
-static void updateAudioSourceForRFState() {
-    RFHardwareState currentState = GetRFHardwareState();
-
-    // Only update when state changes
-    if ((currentState == previousRFState) && (ED.currentBand[ED.activeVFO] == oldband)) {
-        return;
-    }
-    oldband = ED.currentBand[ED.activeVFO];
-    switch (currentState) {
-        case RFCalReceiveIQ:
-            // For RX IQ calibration, the RXIQ_USB tone (with its 10 % amplitude
-            // error) lands in the bin the calibration reads as the wanted signal
-            Q_in_L_Ex.setOscillatorSource(nullptr);
-            Q_in_R_Ex.setOscillatorSource(nullptr);
-            setAudioInputSource(AUDIO_SOURCE_RXIQ_USB);
-            std::cout << "Audio Source (auto): RX IQ tones (USB) for RX IQ calibration" << std::endl;
-            break;
-
-        case RFCalTransmitIQ:
-            // For TX IQ calibration:
-            // 1. Configure Q_in_L_Ex and Q_in_R_Ex to use transmitIQcal_oscillator
-            //    This simulates the audio routing where the oscillator feeds the
-            //    input mixers in CALIBRATE_TX_IQ_MARK state
-            Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
-            Q_in_R_Ex.setOscillatorSource(&transmitIQcal_oscillator);
-            std::cout << "TX IQ Cal: Q_in_L_Ex/Q_in_R_Ex using transmitIQcal_oscillator ("
-                      << transmitIQcal_oscillator.getFrequency() << " Hz, amp="
-                      << transmitIQcal_oscillator.getAmplitude() << ")" << std::endl;
-
-            // 2. Use feedback mode to loop TX IQ output back to RX input
-            setAudioInputSource(AUDIO_SOURCE_FEEDBACK);
-            std::cout << "Audio Source (auto): Feedback for TX IQ calibration" << std::endl;
-            break;
-
-        default:
-            // For other states, disable oscillator mode and don't change audio source
-            Q_in_L_Ex.setOscillatorSource(nullptr);
-            Q_in_R_Ex.setOscillatorSource(nullptr);
-            break;
-    }
-
-    previousRFState = currentState;
-}
 
 // Simulated time is handled by Arduino_mock.cpp
 
@@ -331,6 +294,14 @@ SimulatorAction processEvents() {
                         std::cout << "Audio Source: " << getAudioInputSourceName() << std::endl;
                         break;
                     }
+
+                    // ---- Bench: what is on the antenna connector ----
+                    case SDLK_c:
+                        simConnector = (simConnector == CONNECT_LOAD)  ? CONNECT_OPEN
+                                     : (simConnector == CONNECT_OPEN)  ? CONNECT_SHORT
+                                                                       : CONNECT_LOAD;
+                        std::cout << "Antenna connector: " << SimConnectorName(simConnector) << std::endl;
+                        break;
                 }
                 break;
 
@@ -380,6 +351,15 @@ void printUsage() {
     std::cout << "  /             - CW Key 2 (dah)" << std::endl;
     std::cout << "\n  --- Audio Source ---" << std::endl;
     std::cout << "  a             - Cycle audio source (Computer/Two-Tone/Single-Tone/RXIQ/Feedback)" << std::endl;
+    std::cout << "\n  --- Bench ---" << std::endl;
+    std::cout << "  c             - Cycle the antenna connector: 50 Ohm load/open/short" << std::endl;
+    std::cout << "  The power bridge is radio 2's: set " << (int)RADIO2_TURNS
+              << " turns on L44 in the automatic power calibration." << std::endl;
+    std::cout << "  The wattmeter's reading is printed here while transmitting." << std::endl;
+    std::cout << "\n  --- Calibration ---" << std::endl;
+    std::cout << "  o             - Button 16: automatic run (Receive IQ, Transmit IQ)" << std::endl;
+    std::cout << "  y             - Button 14: carrier null (direct-coupled builds, dual VFO)" << std::endl;
+    std::cout << "  Test signals switch automatically in the calibration screens." << std::endl;
     std::cout << "============================================\n" << std::endl;
 }
 
@@ -427,13 +407,56 @@ void stop_timer1ms() {
 }
 
 
+/**
+ * Print the wattmeter's reading while transmitting: on a change of more than
+ * 1 %, at most twice a second
+ */
+static void showWattmeter() {
+    static bool wasTransmitting = false;
+    static float32_t shown_W = -1;
+    static uint32_t shown_ms = 0;
+    if (!SimTransmitting()) {
+        wasTransmitting = false;
+        return;
+    }
+    float32_t W = SimWattmeter_W();
+    uint32_t now = millis();
+    if (!wasTransmitting || ((now - shown_ms >= 500) && (fabsf(W - shown_W) > 0.01f * shown_W + 0.005f))) {
+        std::cout << "Wattmeter: " << W << " W into the " << SimConnectorName(simConnector) << std::endl;
+        shown_W = W;
+        shown_ms = now;
+    }
+    wasTransmitting = true;
+}
+
 int main(int argc, char* argv[]) {
 #ifndef USE_SDL_DISPLAY
     std::cerr << "Error: This program requires SDL2 support." << std::endl;
     std::cerr << "Rebuild with: cmake -DUSE_SDL_DISPLAY=ON .." << std::endl;
     return 1;
 #else
+    bool singleVFO = false;
+    simCrystalError_ppb = 2500;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--single") == 0) {
+            singleVFO = true;
+        } else if (strcmp(argv[i], "--dual") == 0) {
+            singleVFO = false;
+        } else if ((strcmp(argv[i], "--xtal-ppb") == 0) && (i + 1 < argc)) {
+            simCrystalError_ppb = atoi(argv[++i]);
+        } else {
+            std::cerr << "Usage: " << argv[0] << " [--single] [--xtal-ppb N]" << std::endl;
+            return 2;
+        }
+    }
+
     printUsage();
+    std::cout << (singleVFO ? "Single-VFO" : "Dual-VFO") << " hardware; reference crystal error "
+              << simCrystalError_ppb << " ppb" << std::endl;
+
+    // The hardware the firmware finds at start-up
+    Si5351_Mock_SetDeviceAddress(singleVFO ? SI5351_BUS_BASE_ADDR : SI5351_DUAL_VFO_ADDR);
+    Adafruit_I2CDevice::setMockADCProvider(SimBridgeADC);
 
     // Set up the queues so we get some simulated data through and start the "clock"
     Q_in_L.setChannel(0);
@@ -504,8 +527,9 @@ int main(int argc, char* argv[]) {
         // This processes interrupts, dispatches to state machines, and updates the display
         loop();
 
-        // Update audio source based on RF hardware state (for calibration modes)
-        updateAudioSourceForRFState();
+        // The test signals each calibration needs, and the wattmeter
+        SimRouteTestSignals();
+        showWattmeter();
 
         // Re-initialize SDL audio if the sample rate was changed at run time
         updateAudioForSampleRateChange();

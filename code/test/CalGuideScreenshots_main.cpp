@@ -5,10 +5,12 @@
  *
  * Runs the firmware as the radio simulator does (setup(), loop(), the 1 ms
  * timer on its own thread), with the SDL display, and plays the operator
- * through the calibration screens from the menus. The simulator's own test
- * signals stand in for the bench, exactly as in the interactive simulator:
- * - Receive IQ: the RX IQ test tone (RadioSimulator_main.cpp)
+ * through the calibration screens from the menus. The simulated bench of
+ * SimBench.h stands in for the test equipment, as in the interactive simulator:
+ * - Frequency: a frequency standard on the dial (with no crystal error here)
+ * - Receive IQ: the RX IQ test tone
  * - Transmit IQ (dual VFO): the transmitter looped back into the receiver
+ * Elsewhere the input is the single test tone.
  *
  * A "dual" run captures the screens common to both kinds of radio and the
  * dual-VFO Transmit IQ calibration; a "single" run captures the BIT screen and
@@ -24,6 +26,7 @@
 #include <functional>
 
 #include "SimScript.h"
+#include "SimBench.h"
 
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;
@@ -56,42 +59,12 @@ static void RunUntil(std::function<bool(void)> pred, const char *what, uint32_t 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// The simulator's test signals, as RadioSimulator_main.cpp routes them
+// The test signals are SimBench.h's, as in the interactive simulator
 ///////////////////////////////////////////////////////////////////////////////
 
-static RFHardwareState previousRFState = RFInvalid;
 // Where the single-tone test carrier sits relative to the receive centre
 static const int32_t SIM_CARRIER_OFFSET_HZ = 1000;
 
-static void RouteTestSignals(void){
-    RFHardwareState state = GetRFHardwareState();
-    if (state == previousRFState) return;
-    previousRFState = state;
-    switch (state){
-        case RFCalReceiveIQ:
-            Q_in_L_Ex.setOscillatorSource(nullptr);
-            Q_in_R_Ex.setOscillatorSource(nullptr);
-            // The test tone with the mock's 10 % amplitude error, in the bin
-            // the calibration reads as the wanted signal
-            setAudioInputSource(AUDIO_SOURCE_RXIQ_USB);
-            break;
-        case RFCalTransmitIQ:
-            Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
-            Q_in_R_Ex.setOscillatorSource(&transmitIQcal_oscillator);
-            setAudioInputSource(AUDIO_SOURCE_FEEDBACK);
-            break;
-        case RFCalTransmitIQSingleVFO:
-            // Real transmit into the antenna connector: the receiver sees nothing
-            Q_in_L_Ex.setOscillatorSource(&transmitIQcal_oscillator);
-            Q_in_R_Ex.setOscillatorSource(&transmitIQcal_oscillator);
-            break;
-        default:
-            Q_in_L_Ex.setOscillatorSource(nullptr);
-            Q_in_R_Ex.setOscillatorSource(nullptr);
-            setAudioInputSource(AUDIO_SOURCE_SINGLE_TONE);
-            break;
-    }
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Menus
@@ -331,7 +304,8 @@ int main(int argc, char *argv[]){
 
     SimStartRadio(outDir + "/storage-" + runName);
     SetDualVFOs(runName == "dual");
-    simStepHook = RouteTestSignals;
+    setAudioInputSource(AUDIO_SOURCE_SINGLE_TONE);
+    simStepHook = SimRouteTestSignals;
     start_timer1ms();
 
     RunUntil([](){ return uiSM.state_id == UISm_StateId_HOME; }, "home screen", 20000);

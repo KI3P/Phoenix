@@ -277,11 +277,25 @@ static void generateTwoToneSamples(int16_t* samplesI, int16_t* samplesQ, int num
     }
 }
 
+// Where the single tone sits beyond the Fs/4 carrier. The default, 1 kHz, is
+// a 1 kHz note with the fine tune at 0; the simulator moves it to play a
+// frequency standard (see SimBench.h).
+static std::atomic<double> singleToneOffset_Hz{1000.0};
+
+void setSingleToneOffsetHz(double offset_Hz) {
+    singleToneOffset_Hz.store(offset_Hz);
+}
+
+double getSingleToneOffsetHz(void) {
+    return singleToneOffset_Hz.load();
+}
+
 // Generate I/Q samples for single-tone test signal
-// Tone at -49kHz (1kHz below -48kHz, will appear at 1kHz audio)
+// Tone at -(Fs/4 + offset) (with the default offset of 1 kHz, 1kHz below
+// -Fs/4, which will appear at 1kHz audio)
 static void generateSingleToneSamples(int16_t* samplesI, int16_t* samplesQ, int numSamples) {
     const double sampleRate = MockRadioSampleRate();
-    const double freq = sampleRate / 4.0 + 1000.0;  // Fs/4 carrier + 1kHz -> 1kHz audio
+    const double freq = sampleRate / 4.0 + singleToneOffset_Hz.load();  // Fs/4 carrier + offset
     const double phaseInc = TONE_TWO_PI * freq / sampleRate;
     const double amplitude = 1380.0;  // Full scale single tone. 1380 = S9 tone (determined experimentally).
     // Noise amplitude is 1/20th of signal amplitude
