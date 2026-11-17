@@ -1379,8 +1379,9 @@ TEST_F(CalibrationTest, CarrierNullAutoKeepsSettingWhenNoReadingIsValid) {
         TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
     }
     EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    // Nothing stood out on the band: both offsets as they were before the run
     EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 123);
-    EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], 0);
+    EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], -45);
     AbortTXCarrierCalibration();
     while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
     ED = savedED;
@@ -1433,6 +1434,8 @@ TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmitAndLogsEachStep) 
     MirroredSpectrum(FIRST_BAND);
     ED.DCOffsetI[BAND_GENERAL] = 77;
     ED.DCOffsetQ[BAND_GENERAL] = -88;
+    ED.DCOffsetI[FIRST_BAND] = 11;
+    ED.DCOffsetQ[FIRST_BAND] = -22;
     const char *logFile = "CarrierNull_log.txt";
     Serial.createFile(logFile);
     InitializeTXCarrierCalibration();
@@ -1454,7 +1457,7 @@ TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmitAndLogsEachStep) 
     EXPECT_EQ(ED.DCOffsetI[BAND_GENERAL], 77);
     EXPECT_EQ(ED.DCOffsetQ[BAND_GENERAL], -88);
 
-    // One BAND, a READ per step, six PASS lines and a DONE per band; one END
+    // One BAND, a READ per step, ten PASS lines and a DONE per band; one END
     std::ifstream in(logFile);
     std::string line;
     int nBand = 0, nRead = 0, nPass = 0, nDone = 0, nEnd = 0, nValid = 0;
@@ -1467,15 +1470,55 @@ TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmitAndLogsEachStep) 
         if (line == "CARRCAL,END") nEnd++;
     }
     EXPECT_EQ(nBand, txBands);
-    EXPECT_EQ(nRead, txBands * (100 + 100 + 4 * 24));
-    EXPECT_EQ(nPass, txBands * 6);
-    EXPECT_EQ(nValid, 0);         // the mirrored spectrum gives no valid reading
+    EXPECT_EQ(nRead, txBands * (100 + 100 + 8 * 24));
+    EXPECT_EQ(nPass, txBands * 10);
+    EXPECT_EQ(nValid, 0);         // the flat mirrored spectrum: nothing stands out
     EXPECT_EQ(nDone, txBands);
     EXPECT_EQ(nEnd, 1);
-    // 160 m, pass 0, step 0: I at the bottom of the sweep, Q zeroed for the run;
+    // 160 m, pass 0, step 0: I at the bottom of the sweep, Q where it was stored;
     // tone 10 dB, carrier 30 dB (the mock spectrum, x10)
-    EXPECT_EQ(firstRead.rfind("CARRCAL,READ,160M,0,0,-5000,0,10.00,30.00,-20.00,", 0), 0u) << firstRead;
+    EXPECT_EQ(firstRead.rfind("CARRCAL,READ,160M,0,0,-5000,-22,10.00,30.00,-20.00,", 0), 0u) << firstRead;
+    EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 11);   // restored: nothing stood out
+    EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], -22);
     std::remove(logFile);
+    while (GetInterrupt() != iNONE) {} // drop the PTT release the run queued
+    ED = savedED;
+}
+
+// A model of the loopback: a fixed tone, and a carrier whose level depends on
+// how far the I and Q offsets are from the band's null. Far from it (as with
+// the offsets at 0) the carrier is above the tone, as on the KI3P prototype.
+static int16_t modelNullI = -990, modelNullQ = -1010;
+static void CarrierModelSpectrum(void){
+    int32_t b = ED.currentBand[ED.activeVFO];
+    float32_t dI = (float32_t)(ED.DCOffsetI[b] - modelNullI);
+    float32_t dQ = (float32_t)(ED.DCOffsetQ[b] - modelNullQ);
+    float32_t carrier_dB = 20.0f * log10f(sqrtf(dI * dI + dQ * dQ) + 0.5f) - 30.0f;
+    for (int i = 0; i < SPECTRUM_RES; i++) psdnew[i] = -2.0f;
+    psdnew[256 + 17] = 2.0f;           // the tone, 20 dB, in either sideband
+    psdnew[256 - 17] = 2.0f;
+    psdnew[256] = carrier_dB / 10.0f;
+}
+
+TEST_F(CalibrationTest, CarrierNullFindsANullThatStartsAboveTheTone) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){ ED.DCOffsetI[b] = 0; ED.DCOffsetQ[b] = 0; }
+    CarrierModelSpectrum();
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    for (int k = 0; (k < 6000000) && (txcarrSM.state_id != TransmitCarrierCalSm_StateId_STANDBY); k++){
+        CarrierModelSpectrum();
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+    }
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
+        if (bands[b].band_type != HAM_BAND) continue;
+        EXPECT_NEAR(ED.DCOffsetI[b], modelNullI, 2) << "band " << b;
+        EXPECT_NEAR(ED.DCOffsetQ[b], modelNullQ, 2) << "band " << b;
+        EXPECT_GT(GetTXCarrierVals(b), 40.0f) << "band " << b;
+    }
     while (GetInterrupt() != iNONE) {} // drop the PTT release the run queued
     ED = savedED;
 }

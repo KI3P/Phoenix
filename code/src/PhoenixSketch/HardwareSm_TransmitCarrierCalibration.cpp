@@ -26,36 +26,43 @@ If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "SDT.h"
+#include <algorithm>
 
 TransmitCarrierCalSm txcarrSM;
 
 /**
  * TX Carrier Auto-Tune Algorithm
  *
- * Systematically sweeps DC offsets for I and Q to maximize carrier suppresion (dBc).
+ * Sweeps the I and Q DC offsets, one at a time, to maximise the carrier
+ * suppression (dBc: how far the carrier is below the tone). Each band starts
+ * from its stored offsets. Ten passes ("iterations"), even ones sweeping I and
+ * odd ones Q:
+ *   - 0, 1: coarse, -5000 to +4900 in steps of 100
+ *   - 2, 3 and again 4, 5: medium, 24 steps of 10 around the value kept
+ *   - 6, 7 and again 8, 9: fine, 24 steps of 1 around the value kept
+ * Each step size runs I and Q twice (from the medium passes on): I and Q
+ * interact when one of them is far off, so the second round refines the first.
  *
- * Three-pass approach with progressively finer resolution:
- *
- * Pass 1 (Coarse):
- *   - Iteration 0: I DC offset -5000 to 5000 in 100 steps
- *   - Iteration 1: Q DC offset -5000 to 5000 in 100 steps
- *
- * Pass 2 (Medium):
- *   - Iteration 2: I DC offset ±12 steps of 10 around Pass 1 optimum
- *   - Iteration 3: Q DC offset ±12 steps of 10 around Pass 1 optimum
- *
- * Pass 3 (Fine):
- *   - Iteration 4: I DC offset ±12 steps of 1 around Pass 2 optimum
- *   - Iteration 5: Q DC offset ±12 steps of 1 around Pass 2 optimum
- *
- * For each iteration, measures carrier suppression and records best-performing value.
- * Automatically advances through all bands.
+ * A pass keeps its best reading only if that reading stands out: at least
+ * CARRIER_MIN_CONTRAST_DB above the median of the pass. A pass that is flat
+ * (a broken loopback, the other offset far off, or a floor the offsets cannot
+ * move) keeps the value it swept around instead of a value picked by noise. A
+ * band with no such pass at all gets back the offsets it had before the run.
+ * The first reading of every pass follows a large jump in the offset and is
+ * not used.
  */
-static int16_t center[] =  {0,                  0,                         0,  0,  0,  0 };
-static int8_t NSteps[]  =  {(int)((5000+5000)/100),(int)((5000+5000)/100),24, 24, 24, 24 };
-static int16_t Delta[] =   {100,               100,                       10, 10,  1,  1 };
-static float32_t maxDBC = 0.0;
-static int16_t maxDBC_parameter = 0.0;
+#define CARRIER_PASSES 10
+#define CARRIER_MIN_CONTRAST_DB 3.0f
+#define CARRIER_MAX_STEPS 100
+static int16_t center[CARRIER_PASSES] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const int8_t NSteps[CARRIER_PASSES] = {(5000+5000)/100, (5000+5000)/100, 24, 24, 24, 24, 24, 24, 24, 24};
+static const int16_t Delta[CARRIER_PASSES] = {100, 100, 10, 10, 10, 10, 1, 1, 1, 1};
+static float32_t maxDBC = -1e9f;           // best reading of the pass so far
+static int16_t maxDBC_parameter = 0;       // the offset that gave it
+static int16_t passStartValue = 0;         // the offset the pass sweeps around
+static float32_t passReadings[CARRIER_MAX_STEPS];
+static int8_t nPassReadings = 0;
+static bool bandAnyValid = false;          // some pass on this band stood out
 static int8_t iteration = 0;
 static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
@@ -76,13 +83,15 @@ static int32_t savedQ = 0;
  *       one reading: the offsets tried, the tone and carrier bins behind the
  *       latest measurement (raw dBc = tone - carrier), the smoothed suppression
  *       the algorithm compares (dBc), and the best value of the pass so far
- *   CARRCAL,PASS,<band>,<pass>,<I|Q>,<value kept>,<best dBc>,<valid 0|1>
- *       end of a pass; valid 0: no reading above 0 dB, the offset is unchanged
- *   CARRCAL,DONE,<band>,<I>,<Q>,<dBc>
+ *   CARRCAL,PASS,<band>,<pass>,<I|Q>,<value kept>,<best dBc>,<valid 0|1>,<median dBc>
+ *       end of a pass; valid 0: the best reading was less than
+ *       CARRIER_MIN_CONTRAST_DB above the median, the offset is unchanged
+ *   CARRCAL,DONE,<band>,<I>,<Q>,<dBc>,<valid 0|1>
+ *       valid 0: no pass on the band stood out, its old offsets are restored
  *   CARRCAL,ABORT,<band>,<I restored>,<Q restored>
  *   CARRCAL,END
- * Passes 0, 2, 4 sweep I and 1, 3, 5 sweep Q. code/tools/carrier_cal_log.py
- * records and summarises the log.
+ * Even passes sweep I, odd passes Q. code/tools/carrier_cal_log.py records
+ * and summarises the log.
  */
 static void LogCarrierCal(const char *line){
     Debug(line);
@@ -91,7 +100,7 @@ static void LogCarrierCal(const char *line){
 
 /**
  * @brief Calculate parameter value for given iteration and step
- * @param iter Iteration number (0-5)
+ * @param iter Iteration number (0 to CARRIER_PASSES-1)
  * @param stp Step number within iteration
  * @return Calculated amplitude or phase value
  */
@@ -133,7 +142,9 @@ void ResetTXCarrierCalBand(void){
     ForceUpdateRFHardwareState();
     step = 0;
     iteration = 0;
-    maxDBC = 0;
+    maxDBC = -1e9f;
+    nPassReadings = 0;
+    bandAnyValid = false;
 }
 
 /**
@@ -187,8 +198,8 @@ void AdjustTXCarrierBand(void){
                  (int)savedI, (int)savedQ);
         LogCarrierCal(line);
     }
-    // Start by setting the Q offset to 0
-    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = 0;
+    // Start from the band's stored offsets: the first pass sweeps I with Q
+    // where it was, which on a calibrated radio is near its null
     // Go to find minimum loop
     TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_FIND_MINIMUM);
 }
@@ -196,7 +207,18 @@ void AdjustTXCarrierBand(void){
 void ResetTXCarrierCalSettings(void){
     step = 0;
     iteration = 0;
-    maxDBC = 0;
+    maxDBC = -1e9f;
+    nPassReadings = 0;
+    bandAnyValid = false;
+}
+
+/** The median of the pass's readings (0 if there are none) */
+static float32_t PassMedian(void){
+    if (nPassReadings == 0) return 0.0f;
+    float32_t sorted[CARRIER_MAX_STEPS];
+    std::copy(passReadings, passReadings + nPassReadings, sorted);
+    std::sort(sorted, sorted + nPassReadings);
+    return sorted[nPassReadings / 2];
 }
 
 void SetTXCarrierVals(int32_t band, float32_t value);
@@ -205,52 +227,57 @@ static float32_t maxDBC_save;
 void AdjustTXCarrierCalSetting(void){
     // Have we completed all the steps in this iteration?
     if (step >= NSteps[iteration]){
-        // Set the parameter we were changing to the minimum value
+        // Keep the best reading's offset if it stood out from the pass, else
+        // the offset the pass swept around
+        float32_t median = PassMedian();
+        bool valid = (nPassReadings > 0) && (maxDBC - median >= CARRIER_MIN_CONTRAST_DB);
+        int16_t kept = valid ? maxDBC_parameter : passStartValue;
+        if (valid) bandAnyValid = true;
         if (iteration%2 == 0){
-            ED.DCOffsetI[ED.currentBand[ED.activeVFO]] = maxDBC_parameter;
+            ED.DCOffsetI[currentBand] = kept;
         } else {
-            ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = maxDBC_parameter;
+            ED.DCOffsetQ[currentBand] = kept;
         }
-        // The next time we step around the amplitude or phase, use this as our starting point
+        // The next pass on this offset sweeps around the value kept
         int8_t nextIndex = iteration + 2;
-        if (nextIndex < (int8_t)(sizeof(center)/sizeof(center[0])))
-            center[nextIndex] = maxDBC_parameter;
+        if (nextIndex < CARRIER_PASSES)
+            center[nextIndex] = kept;
 
-        char line[80];
-        snprintf(line, sizeof(line), "CARRCAL,PASS,%s,%d,%s,%d,%.2f,%d", bands[currentBand].name,
-                 (int)iteration, (iteration%2 == 0) ? "I" : "Q", (int)maxDBC_parameter,
-                 (double)maxDBC, (maxDBC > 0) ? 1 : 0);
+        char line[96];
+        snprintf(line, sizeof(line), "CARRCAL,PASS,%s,%d,%s,%d,%.2f,%d,%.2f", bands[currentBand].name,
+                 (int)iteration, (iteration%2 == 0) ? "I" : "Q", (int)kept,
+                 (double)maxDBC, valid ? 1 : 0, (double)median);
         LogCarrierCal(line);
 
         // Go to the next iteration
         step = 0;
         iteration++;
         maxDBC_save = maxDBC;
-        maxDBC = 0.0;
+        maxDBC = -1e9f;
+        nPassReadings = 0;
     }
     // Have we completed all the iterations and ready to go to the next band?
-    if (iteration >= (int8_t)(sizeof(center)/sizeof(center[0]))){
-        // Set the parameter we were changing to the minimum value
-        if ((iteration-1)%2 == 0){
-            ED.DCOffsetI[currentBand] = maxDBC_parameter;
-        } else {
-            ED.DCOffsetQ[currentBand] = maxDBC_parameter;
+    if (iteration >= CARRIER_PASSES){
+        // A band on which nothing stood out gets its old offsets back
+        if (!bandAnyValid){
+            ED.DCOffsetI[currentBand] = savedI;
+            ED.DCOffsetQ[currentBand] = savedQ;
         }
         SetTXCarrierVals(currentBand, maxDBC_save);
         bandCompleted[currentBand] = true;
-        char line[80];
-        snprintf(line, sizeof(line), "CARRCAL,DONE,%s,%d,%d,%.2f", bands[currentBand].name,
-                 (int)ED.DCOffsetI[currentBand], (int)ED.DCOffsetQ[currentBand], (double)maxDBC_save);
+        char line[96];
+        snprintf(line, sizeof(line), "CARRCAL,DONE,%s,%d,%d,%.2f,%d", bands[currentBand].name,
+                 (int)ED.DCOffsetI[currentBand], (int)ED.DCOffsetQ[currentBand], (double)maxDBC_save,
+                 bandAnyValid ? 1 : 0);
         LogCarrierCal(line);
         TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_MIN_EXIT);
         return;
     }
-    // Each pass starts from the setting it sweeps around. If no reading in
-    // the pass is above 0 dB (a broken loopback), the setting stays where it
-    // was, rather than taking the best value of the previous pass
+    // Each pass starts from the setting it sweeps around
     if (step == 0){
         int32_t b = ED.currentBand[ED.activeVFO];
-        maxDBC_parameter = (iteration%2 == 0) ? ED.DCOffsetI[b] : ED.DCOffsetQ[b];
+        passStartValue = (iteration%2 == 0) ? ED.DCOffsetI[b] : ED.DCOffsetQ[b];
+        maxDBC_parameter = passStartValue;
     }
     // Change the appropriate parameter
     SetOffset(iteration,step); 
@@ -259,12 +286,18 @@ void AdjustTXCarrierCalSetting(void){
 }
 
 void ReadTXCarrierDelta(void){
-    bool ignore = (iteration == 0) && (step == 0);
-    if ((GetTXCarrierVals(ED.currentBand[ED.activeVFO]) > maxDBC) && !ignore){
-        // The value of the carrier suppression
-        maxDBC = GetTXCarrierVals(ED.currentBand[ED.activeVFO]);
-        // The amp/phase parameter that delivered this carrier suppression
-        maxDBC_parameter = GetNewVal(iteration, step);
+    // The first reading of a pass follows a large jump in the offset, and the
+    // smoothed reading has not caught up with it
+    bool ignore = (step == 0);
+    float32_t reading = GetTXCarrierVals(ED.currentBand[ED.activeVFO]);
+    if (!ignore){
+        if (nPassReadings < CARRIER_MAX_STEPS) passReadings[nPassReadings++] = reading;
+        if (reading > maxDBC){
+            // The value of the carrier suppression
+            maxDBC = reading;
+            // The offset that delivered this carrier suppression
+            maxDBC_parameter = GetNewVal(iteration, step);
+        }
     }
     // Log the reading
     float32_t tone_dB, carrier_dB;

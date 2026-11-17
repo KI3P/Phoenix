@@ -1640,3 +1640,13 @@ The simulator's carrier log shows why the null stops short there: the simulated 
 coarse pass with no reading above 0 dB keeps its offset. A carrier that starts below the tone, as
 expected on hardware, would not hit this; the hardware log will tell. See
 [[calibration-state-machines]].
+
+## [2026-11-16] decision | Carrier null: four changes after the KI3P prototype run
+The first hardware log (`code/tools/carrier_cal_KI3P_2026-11-16.csv`, untracked) showed the
+coarse I pass discarded on 8 of 12 bands (Q zeroed at band start, null near −1000, nothing
+above 0 dB), 6 m losing its stored Q, and noise choosing medium passes. At the user's direction:
+start from the stored offsets; a pass is valid when its best reading is 3 dB above the pass's
+median; a band with no valid pass gets its old offsets back; medium and fine passes run twice.
+The simulator now nulls every band to about 41 dB (was 6.5 dB on two). The user notes the KI3P
+has no 4 m filter and 6 m is hardware-limited. Rerun on the radio pending (it dropped off USB).
+See [[calibration-state-machines]].

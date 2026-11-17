@@ -8,15 +8,18 @@ code/src/PhoenixSketch/HardwareSm_TransmitCarrierCalibration.cpp:
 
     CARRCAL,BAND,<band>,<I before>,<Q before>
     CARRCAL,READ,<band>,<pass>,<step>,<I>,<Q>,<tone dB>,<carrier dB>,<raw dBc>,<dBc>,<best dBc>,<best value>
-    CARRCAL,PASS,<band>,<pass>,<I|Q>,<value kept>,<best dBc>,<valid 0|1>
-    CARRCAL,DONE,<band>,<I>,<Q>,<dBc>
+    CARRCAL,PASS,<band>,<pass>,<I|Q>,<value kept>,<best dBc>,<valid 0|1>[,<median dBc>]
+    CARRCAL,DONE,<band>,<I>,<Q>,<dBc>[,<valid 0|1>]
     CARRCAL,ABORT,<band>,<I restored>,<Q restored>
     CARRCAL,END
 
-Passes 0, 2, 4 sweep the I offset and 1, 3, 5 the Q offset: a coarse pass over
--5000..+4900 in steps of 100, then +/-12 steps of 10 and of 1 around the value
-kept. "dBc" is how far the carrier is below the tone (the smoothed figure the
-algorithm compares); "raw dBc" is the same from the latest spectrum alone.
+Even passes sweep the I offset and odd passes the Q offset: a coarse pass over
+-5000..+4900 in steps of 100, then passes of 24 steps of 10 and of 1 around the
+value kept (twice each since 2026-11-16, ten passes in all; logs from before
+then have six). "dBc" is how far the carrier is below the tone (the smoothed
+figure the algorithm compares); "raw dBc" is the same from the latest
+spectrum alone. A pass is valid when its best reading stands out from the
+pass (3 dB above its median; before 2026-11-16, above 0 dB).
 
 Usage:
     carrier_cal_log.py record [--port /dev/ttyACM0] [--out carrier.csv] [--plot carrier.png]
@@ -26,7 +29,8 @@ Usage:
         Summarise a recorded log (or any text containing CARRCAL lines).
 
 The summary flags, per band:
-    invalid     a pass with no reading above 0 dB kept the old offset
+    invalid     a pass in which nothing stood out kept the old offset
+    restored    nothing stood out on the whole band: its old offsets were put back
     edge        a fine pass kept a value at the edge of its window: the null
                 may lie outside it
     lag         the smoothed reading the algorithm compares differs from the
@@ -69,6 +73,7 @@ class Pass:
     value: int
     best: float
     valid: bool
+    median: float | None = None
 
 
 @dataclass
@@ -78,6 +83,7 @@ class Band:
     reads: list[Read] = field(default_factory=list)
     passes: list[Pass] = field(default_factory=list)
     done: tuple[int, int, float] | None = None
+    restored: bool = False
     aborted: bool = False
 
 
@@ -102,10 +108,12 @@ def parse(lines) -> tuple["OrderedDict[str, Band]", bool]:
                                     float(f[8]), float(f[9]), float(f[10]), float(f[11]), int(f[12])))
             elif kind == "PASS":
                 b = bands.setdefault(f[2], Band(f[2]))
-                b.passes.append(Pass(int(f[3]), f[4], int(f[5]), float(f[6]), f[7] == "1"))
+                b.passes.append(Pass(int(f[3]), f[4], int(f[5]), float(f[6]), f[7] == "1",
+                                     float(f[8]) if len(f) > 8 else None))
             elif kind == "DONE":
                 b = bands.setdefault(f[2], Band(f[2]))
                 b.done = (int(f[3]), int(f[4]), float(f[5]))
+                b.restored = len(f) > 6 and f[6] == "0"
             elif kind == "ABORT":
                 bands.setdefault(f[2], Band(f[2])).aborted = True
             elif kind == "END":
@@ -132,6 +140,8 @@ def flags(b: Band) -> list[str]:
             out.append(f"lag(p{p.pas}:{at[-1].dbc:.0f}/{at[-1].raw:.0f})")
     if b.done and b.done[2] < SHALLOW_DB:
         out.append("shallow")
+    if b.restored:
+        out.append("restored")
     if b.aborted:
         out.append("aborted")
     return out
@@ -139,12 +149,12 @@ def flags(b: Band) -> list[str]:
 
 def summary(bands: "OrderedDict[str, Band]", ended: bool) -> str:
     rows = [f"{'band':5} {'start I,Q':>13} {'final I,Q':>13} {'dBc':>6}  "
-            f"{'pass values (best dBc)':52} flags"]
+            f"{'pass values (best dBc; - not used)':52} flags"]
     for b in bands.values():
         start = f"{b.start[0]},{b.start[1]}" if b.start else "?"
         final = f"{b.done[0]},{b.done[1]}" if b.done else "-"
         dbc = f"{b.done[2]:.1f}" if b.done else "-"
-        passes = " ".join(f"{p.axis}{p.value}({p.best:.0f})" for p in b.passes)
+        passes = " ".join(f"{p.axis}{p.value}({p.best:.0f}{'' if p.valid else '-'})" for p in b.passes)
         rows.append(f"{b.name:5} {start:>13} {final:>13} {dbc:>6}  {passes:52} {' '.join(flags(b))}")
     rows.append("run complete" if ended else "run not complete (no END line)")
     return "\n".join(rows)
@@ -162,10 +172,10 @@ def plot(bands: "OrderedDict[str, Band]", path: str) -> None:
     for row, name in enumerate(names):
         b = bands[name]
         for k, axis in enumerate("IQ"):
-            kept_fine = [p.value for p in b.passes if p.pas == k + 2]
+            kept_fine = [p.value for p in b.passes if p.pas % 2 == k and p.pas >= 2][-1:]
             for zoom in (False, True):
                 ax = axes[row][2 * k + zoom]
-                for pas in range(k, 6, 2):
+                for pas in range(k, max([p.pas for p in b.passes] + [5]) + 1, 2):
                     rs = [r for r in b.reads if r.pas == pas]
                     if not rs:
                         continue

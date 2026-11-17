@@ -87,8 +87,20 @@ be used, and the loopback there read about 2 dB IRR, so the run stored the edge 
 start, every reading (offsets, raw tone and carrier bins, raw and smoothed dBc, best so far),
 each pass's kept value and whether any reading was valid, the band result, aborts and the end.
 `code/tools/carrier_cal_log.py` records and summarises it, to judge the algorithm on a real
-radio. In the simulator the null reaches about 41 dB below the tone on most bands but stops at
-the coarse step (6.5 dB) or keeps 0/0 on a varying few; not yet explained.
+radio.
+
+**Carrier null algorithm (since 2026-11-16).** The first run on the KI3P prototype showed the
+original sweep failing: each band zeroed Q first, but that radio's Q null is near −1000, so the
+coarse I pass read the carrier 9 dB or more above the tone everywhere and, with "valid" meaning
+above 0 dB, was thrown away on 8 of 12 bands; 6 m found nothing and lost its stored Q; one I/Q
+pass per step size let noise pick the medium I when Q was still far off. Now each band starts
+from its stored offsets; a pass is valid when its best reading is at least 3 dB above the pass's
+median (`CARRIER_MIN_CONTRAST_DB`; on the radio the coarse passes stood 8–12 dB out, noise picks
+0.9–2 dB); a band with no valid pass gets its old offsets back; the medium and fine passes run
+twice each (ten passes); the first reading of each pass (after a large jump, smoothing not
+caught up) is not used. Separately, some bands have a floor the offsets cannot move (30 m about
+22 dB: ±12 counts on either offset changed the reading by about 2 dB). The KI3P has no 4 m
+filter and 6 m is limited by its hardware, so those bands' results mean little there.
 
 **Checking it all.** `code/test/CalWalkthrough_main.cpp` (targets `cal_walkthrough`,
 `cal_walkthrough_dct`) plays an operator through every calibration in the simulator, single and

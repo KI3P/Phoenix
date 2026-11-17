@@ -437,11 +437,14 @@ The format is at the top of
 `record` saves the lines to `carrier_<date>_<time>.csv` (or `--out`) until the
 run ends, or HOME aborts it, or Ctrl+C. The summary has one row per band:
 offsets before and after, the final suppression, the value and best reading of
-each of the six passes (`I`/`Q` coarse, medium, fine), and flags: `invalid` (no
-reading above 0 dB, offset kept), `edge` (a fine pass kept the edge of its
-window, so the null may lie outside it), `lag` (the smoothed reading differs
-from the raw one by more than 3 dB at the kept value), `shallow` (final
-suppression under 30 dB). The plot shows each pass's readings against the
+each pass (`I`/`Q` coarse, then medium and fine twice each; a `-` marks a
+pass whose result was not used), and flags: `invalid` (nothing in the pass stood
+3 dB above its median, so the offset was kept), `restored` (nothing stood out on
+the whole band, so its old offsets were put back), `edge` (a fine pass kept the
+edge of its window, so the null may lie outside it), `lag` (the smoothed
+reading differs from the raw one by more than 3 dB at the kept value),
+`shallow` (final suppression under 30 dB). It also reads logs from before
+2026-11-16 (six passes, 0 dB validity). The plot shows each pass's readings against the
 offset, per band. Debug output goes quiet in USB audio builds (`AUDIO_INTERFACE`),
 where CAT shares the port, so record from a Dual Serial build.
 

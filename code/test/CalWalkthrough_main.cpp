@@ -32,8 +32,8 @@
  * Screenshots of the result screens are saved in the output directory.
  *
  * Known to fail (2026-11-16), not fixed: "with no valid reading every band
- * keeps its setting" (the IQ sweeps' first amplitude pass reaches 0, where a
- * mirrored tone reads +25 dB), and the carrier null stops short on some bands.
+ * keeps its amplitude" (the IQ sweeps' first amplitude pass reaches 0, where a
+ * mirrored tone reads +25 dB).
  */
 
 #include <cmath>
