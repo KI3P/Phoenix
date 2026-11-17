@@ -1650,3 +1650,15 @@ median; a band with no valid pass gets its old offsets back; medium and fine pas
 The simulator now nulls every band to about 41 dB (was 6.5 dB on two). The user notes the KI3P
 has no 4 m filter and 6 m is hardware-limited. Rerun on the radio pending (it dropped off USB).
 See [[calibration-state-machines]].
+
+## [2026-11-17] query | Carrier null rerun on the KI3P prototype
+Second hardware run with the new algorithm (`code/tools/carrier_cal_KI3P_2026-11-17.csv`,
+untracked), radio flashed and run within a minute of power-up. Every HF band converged; carrier
+below the tone (best reading of the last pass) 31.7–47.4 dB, mean 39.5, against 22.5–47.9, mean
+35.3, the evening before: 30 m +24.7, 17 m +20.0, 20 m +15.7, 12 m +9.1, 80 m +5.0 dB, but 160 m
+−10.0, 40 m −7.6, 60 m −5.7, 15 m −5.4, 10 m −3.3 dB. The coarse passes stood out on every HF
+band. Reading noise in the fine passes is 0.5–2 dB, and on 160 m the fine passes swept the
+previous best offsets (−989/−985) without finding them better, so the null itself appears to
+move between runs (warm-up?), not tested. The reported dBc is the best of a pass's noisy
+readings, 3–5 dB above the pass median. 30 m's "22 dB floor" of the first run was the old
+algorithm stalling. 6 m (hardware-limited) kept I −4900, Q 0. See [[calibration-state-machines]].
