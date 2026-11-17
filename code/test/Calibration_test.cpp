@@ -1523,6 +1523,36 @@ TEST_F(CalibrationTest, CarrierNullFindsANullThatStartsAboveTheTone) {
     ED = savedED;
 }
 
+// The spectrum lags the offset, so the coarse passes, where a lag can put the
+// null outside every later window, wait 150 ms per step; the others 60 ms
+TEST_F(CalibrationTest, CarrierNullCoarsePassesWaitLonger) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    CarrierModelSpectrum();
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    ASSERT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    int ticks = 0;
+    bool saw150 = false, saw60 = false;
+    while ((ticks < 200000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND)){
+        CarrierModelSpectrum();
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+        if (txcarrSM.vars.acquisitionDuration_ms == 150) saw150 = true;
+        if (txcarrSM.vars.acquisitionDuration_ms == 60) saw60 = true;
+        ticks++;
+    }
+    EXPECT_TRUE(saw150);
+    EXPECT_TRUE(saw60);
+    // 1 ms per tick: two coarse passes of 100 steps at 150 ms, eight of 24 at 60 ms
+    const int expected = 2 * 100 * 150 + 8 * 24 * 60;
+    EXPECT_GE(ticks, expected);
+    EXPECT_LE(ticks, expected * 11 / 10);
+    AbortTXCarrierCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
 TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
 

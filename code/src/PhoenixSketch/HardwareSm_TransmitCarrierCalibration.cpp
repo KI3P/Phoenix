@@ -50,7 +50,18 @@ TransmitCarrierCalSm txcarrSM;
  * band with no such pass at all gets back the offsets it had before the run.
  * The first reading of every pass follows a large jump in the offset and is
  * not used.
+ *
+ * Each step waits before its reading: CARRIER_COARSE_DWELL_MS in the coarse
+ * passes, CARRIER_DWELL_MS in the others. The spectrum blends each FFT frame
+ * with the previous ones, so a reading still carries some of the previous
+ * step's carrier; near the null that leftover dominates and shifts the peak in
+ * the sweep direction. In the coarse passes the shift reached two 100-count
+ * steps on the KI3P prototype (2026-11-17), which put the null outside every
+ * later window; there the longer wait matters most.
  */
+#define CARRIER_DWELL_MS 60
+#define CARRIER_COARSE_DWELL_MS 150
+#define CARRIER_COARSE_PASSES 2
 #define CARRIER_PASSES 10
 #define CARRIER_MIN_CONTRAST_DB 3.0f
 #define CARRIER_MAX_STEPS 100
@@ -129,7 +140,7 @@ static void SetOffset(int8_t iter, int8_t stp){
  */
 void InitializeTXCarrierCalibration(void){
     TransmitCarrierCalSm_start(&txcarrSM);
-    txcarrSM.vars.acquisitionDuration_ms = 60;
+    txcarrSM.vars.acquisitionDuration_ms = CARRIER_DWELL_MS;
 }
 
 void ResetTXCarrierCalBand(void){
@@ -281,6 +292,8 @@ void AdjustTXCarrierCalSetting(void){
     }
     // Change the appropriate parameter
     SetOffset(iteration,step); 
+    txcarrSM.vars.acquisitionDuration_ms = (iteration < CARRIER_COARSE_PASSES) ? CARRIER_COARSE_DWELL_MS
+                                                                              : CARRIER_DWELL_MS;
     // Go to read data state after waiting for txcarrSM.vars.acquisitionDuration_ms
     TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_READ_DELTA);
 }
