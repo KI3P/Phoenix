@@ -3,7 +3,7 @@ title: Front Panel (encoders, buttons, LEDs)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-06-08
+updated: 2026-11-17
 tags: [front-panel, encoders, buttons, leds, mcp23017, i2c, interrupts, real-time, rotary]
 source_refs: []
 related: ["[[overview]]", "[[main-loop]]", "[[ui-state-machine]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[real-time-constraints]]", "[[hardware-platform]]", "[[i2c-bus-map]]", "[[rapid-tune-mute-freeze]]"]
@@ -29,10 +29,32 @@ Both MCP23017 INT lines are open-drain, active-LOW, wired to Teensy GPIO interru
 
 ## The four encoders
 
-Quadrature encoders handled by **`Rotary_V12`** (`FrontPanel_Rotary.h`), a Ben Buxton-style
-state machine adapted for MCP23017 pins, with per-encoder direction reversal and a `BOURN_ENCODERS`
-build flag (Bourns parts have A/B swapped). `process()` returns accumulated steps
-(interrupt-safe, resets on read).
+Quadrature encoders handled by **`Rotary_V12`** (`FrontPanel_Rotary.h`), with per-encoder
+direction reversal (`*_REVERSED` in `Config.h`). `interrupt2()` reads both contacts of the
+encoder whose pin changed and calls `update(state)` (bit 0 = A, bit 1 = B, 1 = open);
+`process()` returns accumulated steps (interrupt-safe, resets on read).
+
+**Decoder (since 2026-11-17): Ben Buxton's full-step state table, per encoder.** The encoder
+rests at 11; one detent runs 11→10→00→01→11 (A leads, +1 unreversed) or 11→01→00→10→11 (B
+leads, −1). A step is counted only on returning to 11 after the whole sequence, so a contact
+chattering between two neighbouring states cannot add steps. Two additions to Buxton's table:
+- a jump where both contacts changed between readings (a fast spin against the 1 ms service)
+  is resolved in the direction already in progress — single-contact chatter changes one bit
+  at a time, so it can never trigger this;
+- a jump from rest straight to 00 (the first contact's edge missed) resumes the direction of
+  the last step. A wrong guess runs backwards through the table and counts nothing.
+
+*Why it changed.* The previous decoder (AJ8X's May 2026 tweak of the G0ORX version) armed a
+direction on the first contact, counted when the second read closed, and stayed armed while
+steps kept coming (80 ms window, refreshed by every step) — so a chattering closing contact
+counted once per chatter. Its flags and timer were also file statics shared by all four
+encoders. An edge log on the KI3P prototype's Filter knob (2026-11-17) showed contact A
+reopening up to ~90 times over tens of ms as it closed on a clockwise click: the old decoder
+counted +19, +6, 0, +2, 0 for five clockwise clicks (the zeros were missed edges of contact
+B) and −1 for each anticlockwise one; the new decoder counted exactly ±1 on all ten. The
+recorded readings are replayed in `FrontPanel_test.cpp` (`RotaryEncoder.*`). The same log
+showed this knob comes to rest after a clockwise click with B already closed (state 01),
+right on B's switching point.
 
 | Encoder | Events emitted | Consumer |
 |---|---|---|

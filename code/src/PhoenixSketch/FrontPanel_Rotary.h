@@ -20,69 +20,55 @@ If not, see <https://www.gnu.org/licenses/>.
 #define FRONTPANEL_ROTARY_H
 #include "SDT.h"
 
-/*
- * Note: BOURN encoders have their A/B pins reversed compared to cheaper encoders.
- */
-
-#define BOURN_ENCODERS
-
-// Enable weak pullups
-#define ENABLE_PULLUPS
-
-// Enable this to emit codes twice per step.
-//#define HALF_STEP
-
-// Values returned by 'process'
-// No complete step yet.
-#define DIR_NONE 0
-// Clockwise step.
-#define DIR_CW 1
-// Counter-clockwise step.
-#define DIR_CCW 2
-
 /**
- * @brief Rotary encoder handler for quadrature encoders with interrupt-driven state tracking
- * @note Based on Ben Buxton's rotary encoder library, modified for MCP23017 GPIO expander
- * @note Supports BOURN encoders (A/B pins reversed) and directional reversal
- * @note All update methods are interrupt-safe and optimized with FASTRUN
+ * @brief Quadrature decoder for one front-panel rotary encoder, fed from the MCP23017
+ *
+ * The two contacts are read together as a 2-bit state, bit 0 = contact A and
+ * bit 1 = contact B, 1 = open (pulled up). The encoder rests with both contacts
+ * open (0b11), and one detent runs through all four states:
+ *   A leads: 11 -> 10 -> 00 -> 01 -> 11
+ *   B leads: 11 -> 01 -> 00 -> 10 -> 11
+ * A step is counted only when the state returns to 11 after passing through the
+ * whole sequence in order (Ben Buxton's full-step state table). A contact that
+ * chatters as it closes or opens only moves the decoder back and forth between
+ * two neighbouring states, so it can never add a step.
+ *
+ * Each encoder keeps its own state. The decoder is given the current state of
+ * both contacts on every change, so a reading that misses an edge is corrected
+ * by the next one.
+ *
+ * When both contacts have changed since the last reading (a fast spin, with the
+ * front panel read every 1 ms), the skipped state is inferred from the
+ * direction already in progress, and a jump from rest straight to both contacts
+ * closed resumes the direction of the last step. One contact chattering can
+ * only change one bit at a time, so neither turns chatter into steps.
  */
 class Rotary_V12 {
 public:
   /**
-   * @brief Construct a rotary encoder handler
-   * @param reversed Set to true to reverse rotation direction (CW becomes CCW and vice versa)
-   * @note Initializes internal state and sets directional mode for encoder
+   * @brief Construct a rotary encoder decoder
+   * @param reversed true to swap the sign of the steps reported by process()
+   * @note Not reversed: a detent where contact A leads counts +1, B leads -1
    */
   Rotary_V12(bool reversed);
 
   /**
-   * @brief Update encoder state when pin A changes
-   * @param aState Combined encoder state: bits represent [A B] pins (0b00, 0b01, 0b10, 0b11)
-   * @note Called from interrupt handler when encoder pin A state changes
-   * @note Detects clockwise rotation leading edge and completes counter-clockwise rotation
+   * @brief Give the decoder the current state of both contacts
+   * @param state bit 0 = contact A, bit 1 = contact B (1 = open)
+   * @note Called from the front-panel service whenever either contact changes
    */
-  void updateA(unsigned char aState);
+  void update(unsigned char state);
 
   /**
-   * @brief Update encoder state when pin B changes
-   * @param bState Combined encoder state: bits represent [A B] pins (0b00, 0b01, 0b10, 0b11)
-   * @note Called from interrupt handler when encoder pin B state changes
-   * @note Detects counter-clockwise rotation leading edge and completes clockwise rotation
-   */
-  void updateB(unsigned char bState);
-
-  /**
-   * @brief Read and reset accumulated rotation value
-   * @return Number of encoder steps: positive for clockwise, negative for counter-clockwise, 0 for no change
-   * @note This function is interrupt-safe (disables interrupts during read)
-   * @note Resets internal counter to zero after reading
-   * @note Call periodically from main loop to retrieve rotation events
+   * @brief Read and reset the accumulated steps
+   * @return Steps since the last call: positive or negative by direction, 0 for none
+   * @note Interrupt-safe; call from the front-panel service after update()
    */
   int process();
 
 private:
-  int aLastState;
-  int bLastState;
+  unsigned char _state;
+  unsigned char _lastNext;  // R_x_NEXT of the last step's direction, or R_START
   int value;
   bool _reversed;
 };

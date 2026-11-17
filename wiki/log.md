@@ -1683,3 +1683,12 @@ capture are removed; the algorithm changes and the general-coverage skip stay. T
 remain in `code/tools/` (untracked). The fixes of this work were verified in the simulator
 (`cal_walkthrough`); on the radio only the carrier null and the transmit band skip were
 exercised. See [[calibration-state-machines]].
+
+## [2026-11-17] decision | Encoder decoder replaced: a chattering contact counted once per chatter
+One clockwise click of the Filter knob jumped several menu items; anticlockwise was fine. An edge
+log on the KI3P prototype (Filter encoder, 1 ms service, temporary, now removed) showed contact A
+reopening many times as it closed on clockwise clicks; the old decoder stayed armed after a step
+and counted every reclose: +19, +6, 0, +2, 0 for five clockwise clicks, −1 each anticlockwise.
+`Rotary_V12` is now Buxton's full-step state table per encoder, plus two rules for skipped states
+(fast spin, missed first edge). Rerun on the radio: ±1 on all ten clicks; fast spins of the
+Tune and Fine Tune knobs felt good to the user. Tests replay the recording. See [[front-panel]].
