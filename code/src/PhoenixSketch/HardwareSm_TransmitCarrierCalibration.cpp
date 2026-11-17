@@ -66,6 +66,29 @@ static int32_t savedBand = -1;
 static int32_t savedI = 0;
 static int32_t savedQ = 0;
 
+/*
+ * Performance log, for judging the algorithm on a real radio. Each step of the
+ * run prints one line on the diagnostics serial port (Debug(): the first port of
+ * a Dual Serial build; silent in USB audio builds, where CAT shares the port).
+ * Comma-separated, each line starting with CARRCAL:
+ *   CARRCAL,BAND,<band>,<I before>,<Q before>
+ *   CARRCAL,READ,<band>,<pass>,<step>,<I>,<Q>,<tone dB>,<carrier dB>,<raw dBc>,<dBc>,<best dBc>,<best value>
+ *       one reading: the offsets tried, the tone and carrier bins behind the
+ *       latest measurement (raw dBc = tone - carrier), the smoothed suppression
+ *       the algorithm compares (dBc), and the best value of the pass so far
+ *   CARRCAL,PASS,<band>,<pass>,<I|Q>,<value kept>,<best dBc>,<valid 0|1>
+ *       end of a pass; valid 0: no reading above 0 dB, the offset is unchanged
+ *   CARRCAL,DONE,<band>,<I>,<Q>,<dBc>
+ *   CARRCAL,ABORT,<band>,<I restored>,<Q restored>
+ *   CARRCAL,END
+ * Passes 0, 2, 4 sweep I and 1, 3, 5 sweep Q. code/tools/carrier_cal_log.py
+ * records and summarises the log.
+ */
+static void LogCarrierCal(const char *line){
+    Debug(line);
+    (void)line;
+}
+
 /**
  * @brief Calculate parameter value for given iteration and step
  * @param iter Iteration number (0-5)
@@ -104,7 +127,8 @@ void ResetTXCarrierCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
-    currentBand = FIRST_BAND;
+    // Only the bands the radio may transmit on (see NextTXCalBand)
+    currentBand = NextTXCalBand(FIRST_BAND);
     savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
@@ -122,6 +146,10 @@ void AbortTXCarrierCalibration(void){
         if ((savedBand >= FIRST_BAND) && (savedBand <= LAST_BAND) && !bandCompleted[savedBand]){
             ED.DCOffsetI[savedBand] = savedI;
             ED.DCOffsetQ[savedBand] = savedQ;
+            char line[64];
+            snprintf(line, sizeof(line), "CARRCAL,ABORT,%s,%d,%d", bands[savedBand].name,
+                     (int)savedI, (int)savedQ);
+            LogCarrierCal(line);
         }
         SetInterrupt(iPTT_RELEASED);
     }
@@ -129,15 +157,16 @@ void AbortTXCarrierCalibration(void){
 }
 
 void AdjustTXCarrierBand(void){
-    if (bandCompleted[currentBand]){
-        // Was this the last band? If so, exit.
-        if (currentBand == LAST_BAND){
+    if ((currentBand < FIRST_BAND) || bandCompleted[currentBand]){
+        // Go on to the next band the radio may transmit on; if there is none, exit
+        int32_t next = (currentBand < FIRST_BAND) ? -1 : NextTXCalBand(currentBand + 1);
+        if (next < 0){
+            LogCarrierCal("CARRCAL,END");
             TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO_COMPLETE);
             SetInterrupt(iPTT_RELEASED);
             return;
         }
-        // Increment to the next band.
-        currentBand++;
+        currentBand = next;
     }
     // Set the hardware to the current band
     ED.currentBand[ED.activeVFO] = currentBand;
@@ -153,6 +182,10 @@ void AdjustTXCarrierBand(void){
         savedBand = currentBand;
         savedI = ED.DCOffsetI[currentBand];
         savedQ = ED.DCOffsetQ[currentBand];
+        char line[64];
+        snprintf(line, sizeof(line), "CARRCAL,BAND,%s,%d,%d", bands[currentBand].name,
+                 (int)savedI, (int)savedQ);
+        LogCarrierCal(line);
     }
     // Start by setting the Q offset to 0
     ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = 0;
@@ -183,6 +216,12 @@ void AdjustTXCarrierCalSetting(void){
         if (nextIndex < (int8_t)(sizeof(center)/sizeof(center[0])))
             center[nextIndex] = maxDBC_parameter;
 
+        char line[80];
+        snprintf(line, sizeof(line), "CARRCAL,PASS,%s,%d,%s,%d,%.2f,%d", bands[currentBand].name,
+                 (int)iteration, (iteration%2 == 0) ? "I" : "Q", (int)maxDBC_parameter,
+                 (double)maxDBC, (maxDBC > 0) ? 1 : 0);
+        LogCarrierCal(line);
+
         // Go to the next iteration
         step = 0;
         iteration++;
@@ -199,6 +238,10 @@ void AdjustTXCarrierCalSetting(void){
         }
         SetTXCarrierVals(currentBand, maxDBC_save);
         bandCompleted[currentBand] = true;
+        char line[80];
+        snprintf(line, sizeof(line), "CARRCAL,DONE,%s,%d,%d,%.2f", bands[currentBand].name,
+                 (int)ED.DCOffsetI[currentBand], (int)ED.DCOffsetQ[currentBand], (double)maxDBC_save);
+        LogCarrierCal(line);
         TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_MIN_EXIT);
         return;
     }
@@ -223,6 +266,17 @@ void ReadTXCarrierDelta(void){
         // The amp/phase parameter that delivered this carrier suppression
         maxDBC_parameter = GetNewVal(iteration, step);
     }
+    // Log the reading
+    float32_t tone_dB, carrier_dB;
+    GetTXCalBins_dB(&tone_dB, &carrier_dB);
+    int32_t b = ED.currentBand[ED.activeVFO];
+    char line[128];
+    snprintf(line, sizeof(line), "CARRCAL,READ,%s,%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%d",
+             bands[b].name, (int)iteration, (int)step, (int)ED.DCOffsetI[b], (int)ED.DCOffsetQ[b],
+             (double)tone_dB, (double)carrier_dB, (double)(tone_dB - carrier_dB),
+             (double)GetTXCarrierVals(b), (double)maxDBC, (int)maxDBC_parameter);
+    LogCarrierCal(line);
+
     // Proceed to the next step in this iteration
     step++;
     

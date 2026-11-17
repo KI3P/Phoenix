@@ -67,6 +67,9 @@ static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for 
 static float32_t dBcVals[NUMBER_OF_BANDS];  // Carrier suppression values for each band
 static float32_t sideband_separation = 0.0;
 static float32_t carrier_suppression = 0.0;
+// The unsmoothed levels behind the latest reading (GetTXCalBins_dB)
+static float32_t lastWanted_dB = 0.0;
+static float32_t lastCarrier_dB = 0.0;
 static int32_t currentBand = -1;
 // The band the automatic run is working on, and its settings before the run
 // started on it, so that an aborted run can put them back
@@ -108,11 +111,27 @@ void InitializeTXIQCalibration(void){
     txiqSM.vars.acquisitionDuration_ms = 60;
 }
 
+/**
+ * @brief The first band at or after from that the radio may transmit on
+ * @param from Band number to start looking at
+ * @return The band, or -1 if there is none up to LAST_BAND
+ * @note The transmit calibrations (IQ and carrier null) skip the bands where
+ *       transmit is disabled (band_type other than HAM_BAND, as IsTxAllowed()):
+ *       nothing they found there would ever be used.
+ */
+int32_t NextTXCalBand(int32_t from){
+    if (from < FIRST_BAND) from = FIRST_BAND;
+    for (int32_t b = from; b <= LAST_BAND; b++)
+        if (bands[b].band_type == HAM_BAND)
+            return b;
+    return -1;
+}
+
 void ResetTXIQCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
-    currentBand = FIRST_BAND;
+    currentBand = NextTXCalBand(FIRST_BAND);
     savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
@@ -142,15 +161,15 @@ bool TXIQCalibrationAutoActive(void){
 }
 
 void AdjustTXIQBand(void){
-    if (bandCompleted[currentBand]){
-        // Was this the last band? If so, exit.
-        if (currentBand == LAST_BAND){
+    if ((currentBand < FIRST_BAND) || bandCompleted[currentBand]){
+        // Go on to the next band the radio may transmit on; if there is none, exit
+        int32_t next = (currentBand < FIRST_BAND) ? -1 : NextTXCalBand(currentBand + 1);
+        if (next < 0){
             TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO_COMPLETE);
             SetInterrupt(iPTT_RELEASED);
             return;
         }
-        // Increment to the next band.
-        currentBand++;
+        currentBand = next;
     }
     // Set the hardware to the current band
     ED.currentBand[ED.activeVFO] = currentBand;
@@ -255,15 +274,29 @@ void UpdateTXDeltaVal(void){
         if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
             sideband_separation = (upper-lower)*10;
             carrier_suppression = (upper-carrier)*10;
+            lastWanted_dB = upper*10;
         } else {
             sideband_separation = (lower-upper)*10;
             carrier_suppression = (lower-carrier)*10;
+            lastWanted_dB = lower*10;
         }
+        lastCarrier_dB = carrier*10;
         deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
         dBcVals[ED.currentBand[ED.activeVFO]] = 0.5*dBcVals[ED.currentBand[ED.activeVFO]] + 0.5*carrier_suppression;
         deltaCount = 0;
         
     }
+}
+
+/**
+ * @brief The levels behind the latest TX IQ / carrier reading, unsmoothed
+ * @param wanted_dB The tone in the wanted sideband, dB on the spectrum's scale
+ * @param carrier_dB The carrier bin, on the same scale
+ * @note GetTXCarrierVals() is wanted - carrier, smoothed over the readings
+ */
+void GetTXCalBins_dB(float32_t *wanted_dB, float32_t *carrier_dB){
+    *wanted_dB = lastWanted_dB;
+    *carrier_dB = lastCarrier_dB;
 }
 
 float32_t GetTXDeltaVals(int32_t band){

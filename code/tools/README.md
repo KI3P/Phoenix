@@ -15,6 +15,7 @@ read it back through test instruments on the bench.
 | [`set_radio_time.py`](#set_radio_timepy) | Set the radio's clock from the PC | radio |
 | [`Set-RadioTime.ps1`](#set-radiotimeps1) | The same, for Windows without Python | radio |
 | [`serial_diag.py`](#serial_diagpy) | Interactive CAT control + live diagnostic monitor | radio |
+| [`carrier_cal_log.py`](#carrier_cal_logpy) | Record and judge the automatic carrier null | radio (`DIRECT_COUPLED_TX`, dual VFO) |
 | [`usb_audio_test.py`](#usb_audio_testpy) | Send a test tone into the radio's USB audio input | radio |
 | [`siglent_capture.py`](#siglent_capturepy) | Bare two-channel capture from a networked SIGLENT scope | SIGLENT scope |
 | [`extract_filter_prototypes.py`](#extract_filter_prototypespy) | Recover analog specs from the old frozen filter tables | none |
@@ -417,6 +418,34 @@ If nothing appears: check that the instrumentation exists in the firmware you
 flashed, that you are on the diagnostic port rather than the CAT port, and that
 the radio is actually in USB transmit. If CAT does not respond: check the port
 and the 38400 baud rate, and try `id`.
+
+## `carrier_cal_log.py`
+
+Records the automatic carrier null's performance log and summarises it. The
+carrier null (Transmit IQ screen, button 14) exists only in `DIRECT_COUPLED_TX`
+builds and runs only on dual-VFO radios. Each step prints a `CARRCAL` line on
+the diagnostics port (`/dev/ttyACM0`): the I and Q offsets tried, the tone and
+carrier levels, the suppression the algorithm compares, and the best so far.
+The format is at the top of
+`src/PhoenixSketch/HardwareSm_TransmitCarrierCalibration.cpp`.
+
+```bash
+./venv/bin/python carrier_cal_log.py record --plot carrier.png   # then press 14 on the radio
+./venv/bin/python carrier_cal_log.py summary carrier_20261116_101500.csv --plot carrier.png
+```
+
+`record` saves the lines to `carrier_<date>_<time>.csv` (or `--out`) until the
+run ends, or HOME aborts it, or Ctrl+C. The summary has one row per band:
+offsets before and after, the final suppression, the value and best reading of
+each of the six passes (`I`/`Q` coarse, medium, fine), and flags: `invalid` (no
+reading above 0 dB, offset kept), `edge` (a fine pass kept the edge of its
+window, so the null may lie outside it), `lag` (the smoothed reading differs
+from the raw one by more than 3 dB at the kept value), `shallow` (final
+suppression under 30 dB). The plot shows each pass's readings against the
+offset, per band. Debug output goes quiet in USB audio builds (`AUDIO_INTERFACE`),
+where CAT shares the port, so record from a Dual Serial build.
+
+---
 
 ## `usb_audio_test.py`
 

@@ -1624,3 +1624,19 @@ follows Band +/−; Transmit IQ's run starts from 160 m. Found, not changed:
 - The carrier null (`DIRECT_COUPLED_TX`) nulls the simulated carrier to about 41 dBc on most
   bands, but on a varying few it stops at the coarse step (6.5 dBc) or leaves 0/0.
 See [[calibration-state-machines]].
+
+## [2026-11-16] decision | Transmit runs skip bands without transmit; carrier null log; walkthrough tool
+At the user's direction:
+- Transmit IQ and the carrier null skip every band where transmit is disabled (`band_type` not
+  `HAM_BAND`, as `IsTxAllowed()`): general coverage. `NextTXCalBand()`. The guide says so.
+- The carrier null prints a `CARRCAL` line per step on the diagnostics port (`Debug()`), for
+  judging it on a real radio; `code/tools/carrier_cal_log.py` records and summarises it. `Debug()`
+  is silent in USB audio builds, so the test needs a Dual Serial build (`usb=serial2`).
+- `code/test/CalWalkthrough_main.cpp` (`cal_walkthrough`, `cal_walkthrough_dct`) is the
+  calibration walkthrough, now with power/SWR (level 1: the 20 m reading went from −6.5 dB to
+  −0.5 dB against the wattmeter) and S-meter sections.
+The simulator's carrier log shows why the null stops short there: the simulated carrier starts
+6 dB above the tone, so with only one offset right the coarse readings sit near 0 dB, and a
+coarse pass with no reading above 0 dB keeps its offset. A carrier that starts below the tone, as
+expected on hardware, would not hit this; the hardware log will tell. See
+[[calibration-state-machines]].

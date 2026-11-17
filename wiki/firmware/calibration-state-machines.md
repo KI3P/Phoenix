@@ -76,6 +76,24 @@ after a finished run and after an abort). Until 2026-11-16 the Transmit IQ scree
 handlers also set it (`SetTXIQCurrentBand`, now removed), so a TX run started from the band on
 screen; it now covers every band like the RX run.
 
+**The transmit runs skip the bands without transmit.** Transmit IQ and the carrier null move
+between bands with `NextTXCalBand()`, which skips every band whose `band_type` is not
+`HAM_BAND`, the same test as `IsTxAllowed()`: general coverage, today. Their settings would never
+be used, and the loopback there read about 2 dB IRR, so the run stored the edge of its sweep
+(amplitude ≈ 0). Receive IQ still does every band. Since 2026-11-16.
+
+**Carrier null performance log.** Each step of the carrier null prints a `CARRCAL` line through
+`Debug()` (the diagnostics port of a Dual Serial build; silent with `AUDIO_INTERFACE`): band
+start, every reading (offsets, raw tone and carrier bins, raw and smoothed dBc, best so far),
+each pass's kept value and whether any reading was valid, the band result, aborts and the end.
+`code/tools/carrier_cal_log.py` records and summarises it, to judge the algorithm on a real
+radio. In the simulator the null reaches about 41 dB below the tone on most bands but stops at
+the coarse step (6.5 dB) or keeps 0/0 on a varying few; not yet explained.
+
+**Checking it all.** `code/test/CalWalkthrough_main.cpp` (targets `cal_walkthrough`,
+`cal_walkthrough_dct`) plays an operator through every calibration in the simulator, single and
+dual VFO, and checks the results, including each fix above.
+
 **Single vs dual VFO.** Only Transmit IQ differs. Dual-VFO boards loop the TX back into the
 receiver (`RFCalTransmitIQ`, 31.5 dB) and measure IRR/dBc themselves; button 16 runs the sweep,
 and on `DIRECT_COUPLED_TX` builds button 14 the carrier null. Single-VFO boards
