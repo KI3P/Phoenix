@@ -268,4 +268,16 @@ if(USE_SDL_DISPLAY)
     target_include_directories(calguide_screenshots PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(calguide_screenshots ${SDL2_LIBRARIES})
 
+    # A walk through every calibration in the simulator, checking each one:
+    #   SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy ./cal_walkthrough <dual|single> <output directory>
+    # cal_walkthrough_dct is the DIRECT_COUPLED_TX build, for the carrier null.
+    add_executable(cal_walkthrough CalWalkthrough_main.cpp ${SIMULATOR_SOURCES})
+    target_compile_definitions(cal_walkthrough PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS)
+    target_include_directories(cal_walkthrough PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(cal_walkthrough ${SDL2_LIBRARIES})
+    add_executable(cal_walkthrough_dct CalWalkthrough_main.cpp ${SIMULATOR_SOURCES})
+    target_compile_definitions(cal_walkthrough_dct PRIVATE USE_SDL_DISPLAY TIMING_ANALYSIS DIRECT_COUPLED_TX)
+    target_include_directories(cal_walkthrough_dct PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(cal_walkthrough_dct ${SDL2_LIBRARIES})
+
 endif()

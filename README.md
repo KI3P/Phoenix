@@ -337,7 +337,8 @@ The comprehensive unit tests, mocking functions, and their build files are locat
 The same directory also builds the **desktop radio simulator** (`RadioSimulator_main.cpp` → the
 `radio_simulator` target), which runs the firmware on a PC with an SDL-emulated display. A
 simulated bench supplies the test signals and the power bridge every calibration needs; run it
-with `--single` for single-VFO hardware.
+with `--single` for single-VFO hardware. The `cal_walkthrough` target plays an operator through
+every calibration in the simulator and checks the results (`CalWalkthrough_main.cpp`).
 
 The step-by-step guide to calibrating a finished radio (frequency, receive and transmit IQ, power
 and SWR, S-meter; single- and dual-VFO RF boards) is here:
