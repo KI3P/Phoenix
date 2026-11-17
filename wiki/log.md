@@ -1674,3 +1674,12 @@ direction. The coarse pass picked the 100-count step above the null on almost ev
 (160 m: −900 for a null at −990; 12 m: −1000 for −1110); the medium passes recover one step, not
 two: warm run 1 picked −800 on 20 m and every later pass searched −920 to −690. Fix pending a
 decision: let the spectrum settle before each reading, at least in the coarse passes.
+
+## [2026-11-17] decision | Carrier null accepted; its performance log removed
+The user accepted the carrier null's performance after the 150 ms coarse-pass run on the KI3P
+prototype (HF mean 45.0 dB, worst 37.0 dB below the tone) and asked for no further changes. The
+`CARRCAL` log, `GetTXCalBins_dB()`, `code/tools/carrier_cal_log.py` and the walkthrough's log
+capture are removed; the algorithm changes and the general-coverage skip stay. The recorded logs
+remain in `code/tools/` (untracked). The fixes of this work were verified in the simulator
+(`cal_walkthrough`); on the radio only the carrier null and the transmit band skip were
+exercised. See [[calibration-state-machines]].

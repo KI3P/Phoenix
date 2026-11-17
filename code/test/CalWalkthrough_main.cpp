@@ -23,7 +23,7 @@
  *            bench's wattmeter
  * - smeter:  the S-meter level offset
  * - carrier: (DIRECT_COUPLED_TX build, cal_walkthrough_dct) the carrier null,
- *            button 14; its CARRCAL performance log goes to carrier-<run>.csv
+ *            button 14
  *
  * Build: cmake -DUSE_SDL_DISPLAY=ON .. && make cal_walkthrough cal_walkthrough_dct
  * Run:   SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy ./cal_walkthrough <dual|single> <output directory>
@@ -548,17 +548,13 @@ static void CarrierNull(void){
     CHECK(!CarrierRunning() && InReceive(), "HOME stops the carrier run and unkeys");
     CHECK((ED.DCOffsetI[b] == I0[b]) && (ED.DCOffsetQ[b] == Q0[b]), "the band in progress keeps its old offsets");
 
-    // The full run, with its performance log
-    std::string logPath = outDir + "/carrier-" + runName + ".csv";
-    Serial.createFile(logPath.c_str());
+    // The full run
     EnterTXIQ();
     Press(14);
     bool visited[NUMBER_OF_BANDS] = {false};
     RunUntil([&](){ visited[ED.currentBand[ED.activeVFO]] = true; return !CarrierRunning(); },
              "the carrier run to finish");
     Settle(100);   // the run's PTT release
-    Serial.closeFile();
-    std::cout << "  performance log: " << logPath << std::endl;
     CHECK(!Keyed(), "unkeyed after the carrier run");
     int nulled = 0, total = 0;
     bool skipped = true;

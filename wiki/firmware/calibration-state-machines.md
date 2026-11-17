@@ -82,12 +82,12 @@ between bands with `NextTXCalBand()`, which skips every band whose `band_type` i
 be used, and the loopback there read about 2 dB IRR, so the run stored the edge of its sweep
 (amplitude ≈ 0). Receive IQ still does every band. Since 2026-11-16.
 
-**Carrier null performance log.** Each step of the carrier null prints a `CARRCAL` line through
-`Debug()` (the diagnostics port of a Dual Serial build; silent with `AUDIO_INTERFACE`): band
-start, every reading (offsets, raw tone and carrier bins, raw and smoothed dBc, best so far),
-each pass's kept value and whether any reading was valid, the band result, aborts and the end.
-`code/tools/carrier_cal_log.py` records and summarises it, to judge the algorithm on a real
-radio.
+**Carrier null performance log (removed).** From 2026-11-16 to 2026-11-17 the carrier null
+printed a `CARRCAL` line per step on the diagnostics port, recorded with a host script, to judge
+it on the KI3P prototype; both were removed once its performance was accepted. The logs are
+`code/tools/carrier_cal_KI3P_2026-11-1*.csv` (untracked). To instrument it again, the two commits
+to revert are "Transmit calibrations skip bands without transmit; carrier null log" (the log part)
+and its removal.
 
 **Carrier null algorithm (since 2026-11-16).** The first run on the KI3P prototype showed the
 original sweep failing: each band zeroed Q first, but that radio's Q null is near −1000, so the
@@ -101,6 +101,10 @@ twice each (ten passes); the first reading of each pass (after a large jump, smo
 caught up) is not used. Separately, some bands have a floor the offsets cannot move (30 m about
 22 dB: ±12 counts on either offset changed the reading by about 2 dB). The KI3P has no 4 m
 filter and 6 m is limited by its hardware, so those bands' results mean little there.
+The coarse passes wait 150 ms per step (`CARRIER_COARSE_DWELL_MS`), the others 60 ms: the
+spectrum blends each FFT frame with the previous ones, so at 60 ms a reading still carried the
+previous step's carrier and the coarse pick landed one or two 100-count steps past the null.
+Accepted on 2026-11-17 at 45 dB mean, 37 dB worst, below the tone over the HF bands.
 
 **Checking it all.** `code/test/CalWalkthrough_main.cpp` (targets `cal_walkthrough`,
 `cal_walkthrough_dct`) plays an operator through every calibration in the simulator, single and

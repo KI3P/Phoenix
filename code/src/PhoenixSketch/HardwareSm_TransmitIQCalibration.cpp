@@ -67,9 +67,6 @@ static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for 
 static float32_t dBcVals[NUMBER_OF_BANDS];  // Carrier suppression values for each band
 static float32_t sideband_separation = 0.0;
 static float32_t carrier_suppression = 0.0;
-// The unsmoothed levels behind the latest reading (GetTXCalBins_dB)
-static float32_t lastWanted_dB = 0.0;
-static float32_t lastCarrier_dB = 0.0;
 static int32_t currentBand = -1;
 // The band the automatic run is working on, and its settings before the run
 // started on it, so that an aborted run can put them back
@@ -274,29 +271,15 @@ void UpdateTXDeltaVal(void){
         if (bands[ED.currentBand[ED.activeVFO]].mode == USB){
             sideband_separation = (upper-lower)*10;
             carrier_suppression = (upper-carrier)*10;
-            lastWanted_dB = upper*10;
         } else {
             sideband_separation = (lower-upper)*10;
             carrier_suppression = (lower-carrier)*10;
-            lastWanted_dB = lower*10;
         }
-        lastCarrier_dB = carrier*10;
         deltaVals[ED.currentBand[ED.activeVFO]] = 0.5*deltaVals[ED.currentBand[ED.activeVFO]]+0.5*sideband_separation;
         dBcVals[ED.currentBand[ED.activeVFO]] = 0.5*dBcVals[ED.currentBand[ED.activeVFO]] + 0.5*carrier_suppression;
         deltaCount = 0;
         
     }
-}
-
-/**
- * @brief The levels behind the latest TX IQ / carrier reading, unsmoothed
- * @param wanted_dB The tone in the wanted sideband, dB on the spectrum's scale
- * @param carrier_dB The carrier bin, on the same scale
- * @note GetTXCarrierVals() is wanted - carrier, smoothed over the readings
- */
-void GetTXCalBins_dB(float32_t *wanted_dB, float32_t *carrier_dB){
-    *wanted_dB = lastWanted_dB;
-    *carrier_dB = lastCarrier_dB;
 }
 
 float32_t GetTXDeltaVals(int32_t band){

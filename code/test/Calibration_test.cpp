@@ -4,7 +4,6 @@
  *
  */
 
-#include <fstream>
 #include <gtest/gtest.h>
 #include "SDT.h"
 #include "PowerCalSm.h"
@@ -1426,9 +1425,8 @@ TEST_F(CalibrationTest, TXIQAutoRunSkipsBandsWithoutTransmit) {
     ED = savedED;
 }
 
-// The carrier null skips the bands without transmit too, and logs every step
-// on the diagnostics port for judging it on a real radio
-TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmitAndLogsEachStep) {
+// The carrier null skips the bands without transmit too
+TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmit) {
     auto savedED = ED;
     SetDualVFOs(true);
     MirroredSpectrum(FIRST_BAND);
@@ -1436,8 +1434,6 @@ TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmitAndLogsEachStep) 
     ED.DCOffsetQ[BAND_GENERAL] = -88;
     ED.DCOffsetI[FIRST_BAND] = 11;
     ED.DCOffsetQ[FIRST_BAND] = -22;
-    const char *logFile = "CarrierNull_log.txt";
-    Serial.createFile(logFile);
     InitializeTXCarrierCalibration();
     TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
     ASSERT_NE(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
@@ -1447,40 +1443,14 @@ TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmitAndLogsEachStep) 
         UpdateTXDeltaVal();
         TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
     }
-    Serial.closeFile();
     EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
-    int txBands = 0;
-    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++)
         EXPECT_EQ(visited[b], bands[b].band_type == HAM_BAND) << "band " << b;
-        if (bands[b].band_type == HAM_BAND) txBands++;
-    }
     EXPECT_EQ(ED.DCOffsetI[BAND_GENERAL], 77);
     EXPECT_EQ(ED.DCOffsetQ[BAND_GENERAL], -88);
-
-    // One BAND, a READ per step, ten PASS lines and a DONE per band; one END
-    std::ifstream in(logFile);
-    std::string line;
-    int nBand = 0, nRead = 0, nPass = 0, nDone = 0, nEnd = 0, nValid = 0;
-    std::string firstRead;
-    while (std::getline(in, line)){
-        if (line.rfind("CARRCAL,BAND,", 0) == 0) nBand++;
-        if (line.rfind("CARRCAL,READ,", 0) == 0){ nRead++; if (firstRead.empty()) firstRead = line; }
-        if (line.rfind("CARRCAL,PASS,", 0) == 0){ nPass++; if (line.back() == '1') nValid++; }
-        if (line.rfind("CARRCAL,DONE,", 0) == 0) nDone++;
-        if (line == "CARRCAL,END") nEnd++;
-    }
-    EXPECT_EQ(nBand, txBands);
-    EXPECT_EQ(nRead, txBands * (100 + 100 + 8 * 24));
-    EXPECT_EQ(nPass, txBands * 10);
-    EXPECT_EQ(nValid, 0);         // the flat mirrored spectrum: nothing stands out
-    EXPECT_EQ(nDone, txBands);
-    EXPECT_EQ(nEnd, 1);
-    // 160 m, pass 0, step 0: I at the bottom of the sweep, Q where it was stored;
-    // tone 10 dB, carrier 30 dB (the mock spectrum, x10)
-    EXPECT_EQ(firstRead.rfind("CARRCAL,READ,160M,0,0,-5000,-22,10.00,30.00,-20.00,", 0), 0u) << firstRead;
-    EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 11);   // restored: nothing stood out
+    // The flat mirrored spectrum: nothing stands out, so the offsets are restored
+    EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 11);
     EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], -22);
-    std::remove(logFile);
     while (GetInterrupt() != iNONE) {} // drop the PTT release the run queued
     ED = savedED;
 }

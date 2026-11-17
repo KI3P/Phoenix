@@ -243,7 +243,6 @@ int32_t NextTXCalBand(int32_t from);
 void AbortTXCarrierCalibration(void);
 float32_t GetTXDeltaVals(int32_t band);
 float32_t GetTXCarrierVals(int32_t band);
-void GetTXCalBins_dB(float32_t *wanted_dB, float32_t *carrier_dB);
 
 #endif //HARDWARESM_H
 
