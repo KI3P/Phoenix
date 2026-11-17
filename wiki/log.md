@@ -1662,3 +1662,15 @@ previous best offsets (−989/−985) without finding them better, so the null i
 move between runs (warm-up?), not tested. The reported dBc is the best of a pass's noisy
 readings, 3–5 dB above the pass median. 30 m's "22 dB floor" of the first run was the old
 algorithm stalling. 6 m (hardware-limited) kept I −4900, Q 0. See [[calibration-state-machines]].
+
+## [2026-11-17] query | Carrier null: two warm runs on the KI3P prototype disagree; spectrum lag
+Two back-to-back runs after warm-up (`carrier_cal_KI3P_2026-11-17_warm1/2.csv`, untracked): HF
+mean 41.7 and 44.0 dB below the tone (cold 39.5, the old algorithm 35.3), but bands disagree by
+up to 27 dB (20 m 21.9 vs 49.3), so warm-up drift does not explain the scatter. Cause: the
+readings lag the offset. The spectrum averages each FFT frame 0.7 new / 0.3 old in power
+(`DSP_FFT.cpp`, `LPFcoeff`), and the ×8 zoom gives only a few frames in the 60 ms step, so near
+the null the previous step's larger carrier dominates and the apparent peak moves in the sweep
+direction. The coarse pass picked the 100-count step above the null on almost every band and run
+(160 m: −900 for a null at −990; 12 m: −1000 for −1110); the medium passes recover one step, not
+two: warm run 1 picked −800 on 20 m and every later pass searched −920 to −690. Fix pending a
+decision: let the spectrum settle before each reading, at least in the coarse passes.
