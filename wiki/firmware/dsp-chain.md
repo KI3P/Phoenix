@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-07-30
 tags: [dsp, fft, fir, agc, noise-reduction, cw, openaudio, sample-rate]
 source_refs: []
-related: ["[[digital-mode]]", "[[overview]]", "[[real-time-constraints]]", "[[mode-state-machine]]", "[[display-subsystem]]", "[[code-heritage]]", "[[audio-io]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[tx-filter-hil-test]]"]
+related: ["[[digital-mode]]", "[[overview]]", "[[real-time-constraints]]", "[[mode-state-machine]]", "[[display-subsystem]]", "[[code-heritage]]", "[[audio-io]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[tx-filter-hil-test]]", "[[cessb]]"]
 ---
 
 # DSP Chain (Audio, FFT, FIR, Noise, CW)
@@ -67,6 +67,9 @@ measuring the transmit chain:
 - **`Q := I` right after `TXGain`** (`arm_copy_f32(data.I, data.Q, 256)`, `:1139`), so from there
   the chain is mono and only the microphone's **left** channel ever reaches the exciter. The
   Hilbert pair rebuilds the quadrature relationship downstream ([[ssb-phasing-method]]).
+- **Nothing in the chain limits PEP.** Past full scale, `arm_float_to_q15` in `PlayIQData`
+  saturates I and Q separately, a square clip that splatters. The CESSB proposal ([[cessb]],
+  #35) adds an envelope clipper at the 24 kHz node and moves `TXGain` after it.
 - **`TXGain` scales the exciter output by the requested power** (`:1101-1119`), via
   `CalculateSSBTXGain` on `ED.powerOutSSB[band]`. Any measurement of exciter amplitude is
   therefore only comparable at a fixed power setting.

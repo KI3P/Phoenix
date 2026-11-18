@@ -1700,3 +1700,22 @@ and counted every reclose: +19, +6, 0, +2, 0 for five clockwise clicks, −1 eac
 `Rotary_V12` is now Buxton's full-step state table per encoder, plus two rules for skipped states
 (fast spin, missed first edge). Rerun on the radio: ±1 on all ten clicks; fast spins of the
 Tune and Fine Tune knobs felt good to the user. Tests replay the recording. See [[front-panel]].
+
+## [2026-11-18] decision | CESSB proposal (#35)
+Proposal for Controlled Envelope SSB written on branch `cessb-proposal`: [[cessb]] (plan) and
+[[controlled-envelope-ssb]] (theory). It is backed by an offline model, `code/tools/cessb_model/`,
+built from the firmware's own coefficients. Its −3 dB transmit corner matches the gtest's
+(2726.9 against 2725.9 Hz at 192k, 2759.6 against 2759.7 Hz at 176.4k).
+
+Finding: W7PUA's zero-IF Z class filters with a real lowpass, so clip products in the opposite
+sideband survive. On W9GR voice at 6 dB drive they sit at −27 dBc, and the two-tone 2f₁−f₂
+product 500 Hz into the opposite sideband at −11 dBc. A "centred" variant (shift the channel to
+straddle DC, clip and filter at 1500 ± 1450 Hz, shift back; gc 1.9, 40 dB filter) gives
+−71 / −63 dBc, 1.3 % overshoot after the interpolators and +4.6 dB wanted-sideband power at
+equal PEP, against Z's +4.9 dB. Overdriving today's chain by the same 6 dB gives +2.5 dB, 41 %
+overshoot and −36 dBc out of channel, from the I/Q-separate q15 saturation.
+
+Recommended: a native `DataBlock` stage between `TXInterpolateBy2Again` and IQ correction,
+filters generated in Hz, `TXGain` moved after it so the ceiling equals the power setting (PEP),
+bypassed in digital and the calibration states, and Kenwood `PR`/`PL` over CAT. Also found a
+mic-gain unsigned wrap, logged in [[documentation-todos]]. No firmware changed.

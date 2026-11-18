@@ -3,8 +3,10 @@ title: Phoenix Wiki Index
 type: index
 status: stub
 created: 2026-06-08
-updated: 2026-11-14
+updated: 2026-11-18
 ---
+
+<!-- updated 2026-11-18: CESSB proposal (#35). New pages roadmap/cessb and theory/controlled-envelope-ssb, backed by the offline model in code/tools/cessb_model/. Linked from development-backlog, dsp-chain, ssb-phasing-method; mic-gain unsigned wrap noted in documentation-todos. -->
 
 <!-- updated 2026-11-14: ATU support, Phase 1 (manual control). New pages hardware/atu-board, firmware/atu-control, roadmap/atu-auto-tuning. Updated filter-boards (64-bit register mask fix), cat-control (AT command), built-in-test, i2c-bus-map, documentation-todos (MCP23X17 mock byte order). -->
 
@@ -80,6 +82,7 @@ fundamentals (no copy of the Purdum & Peter book). Code claims cited `file:line`
 - [[theory-overview]] — the DSP/SDR theory spine; signal path end to end, key numbers.
 - [[iq-quadrature-sampling]] — complex baseband; sign-of-frequency; image problem. *(draft)*
 - [[ssb-phasing-method]] — SSB by phasing: ±45° Hilbert TX pair + freq-domain RX. *(draft)*
+- [[controlled-envelope-ssb]] — CESSB (W9GR): envelope clip + overshoot control for more average power at the same PEP; why a zero-IF clipper needs its filter centred on the channel. *(draft)*
 - [[fast-convolution-filtering]] — FFT overlap-save channel filter; the Convolution-SDR core. *(draft)*
 - [[multirate-decimation]] — ÷8 RX / ÷16 TX polyphase rate changes; tap-count tradeoff; Hz-specified vs Fs-fraction stages. *(draft)*
 - [[iq-imbalance-correction]] — per-band amp/phase correction & 3-pass calibration sweep. *(draft)*
@@ -127,6 +130,7 @@ _Plans for future development, proposals, open questions._
   - [[manual-notch]] (#11) — 3-way notch (off/auto/manual); manual mode is new work.
   - [[usb-audio]] (#13) — bi-directional USB audio; **implemented and bench-verified** as [[digital-mode]]. *(superseded)*
   - [[openaudio-library]] (#14) — change OpenAudio for audio quality; foundational.
+  - [[cessb]] (#35) — Controlled Envelope SSB: native centred-variant port at the 24 kHz TX node, power setting becomes PEP, `PR`/`PL` over CAT; Phase 0 model done (+4.6 dB at 6 dB drive). *(draft)*
 
 ## Sources
 _One summary page per ingested raw source._
