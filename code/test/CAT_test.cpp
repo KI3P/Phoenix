@@ -31,6 +31,8 @@ char *NR_write(char* cmd);
 char *NR_read(char* cmd);
 char *NT_write(char* cmd);
 char *NT_read(char* cmd);
+char *PR_write(char* cmd);
+char *PR_read(char* cmd);
 char *PC_write(char* cmd);
 char *PC_read(char* cmd);
 char *PS_write(char* cmd);
@@ -3250,6 +3252,47 @@ TEST(CAT, DD_ParserReachesBothForms) {
     EXPECT_STREQ(command_parser(read_cmd), "DD042;");
 
     ED.digitalDriveLevel = saved;
+}
+
+// ============================================================================
+// PR - speech processor (CESSB) on/off
+// ============================================================================
+
+TEST(CAT, PR_SwitchesCESSB) {
+    const bool saved = ED.cessbEnabled;
+
+    char on[] = "PR1;";
+    EXPECT_STREQ(PR_write(on), "");
+    EXPECT_TRUE(ED.cessbEnabled);
+    char read1[] = "PR;";
+    EXPECT_STREQ(PR_read(read1), "PR1;");
+
+    char off[] = "PR0;";
+    EXPECT_STREQ(PR_write(off), "");
+    EXPECT_FALSE(ED.cessbEnabled);
+    char read0[] = "PR;";
+    EXPECT_STREQ(PR_read(read0), "PR0;");
+
+    ED.cessbEnabled = saved;
+}
+
+TEST(CAT, PR_RejectsOtherValues) {
+    const bool saved = ED.cessbEnabled;
+    ED.cessbEnabled = true;
+    char bad[] = "PR2;";
+    EXPECT_STREQ(PR_write(bad), "?;");
+    EXPECT_TRUE(ED.cessbEnabled) << "a rejected value must not change anything";
+    ED.cessbEnabled = saved;
+}
+
+TEST(CAT, PR_ParserReachesBothForms) {
+    const bool saved = ED.cessbEnabled;
+    char write_cmd[] = "PR1;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_TRUE(ED.cessbEnabled);
+    char read_cmd[] = "PR;";
+    EXPECT_STREQ(command_parser(read_cmd), "PR1;");
+    ED.cessbEnabled = saved;
 }
 
 // ============================================================================

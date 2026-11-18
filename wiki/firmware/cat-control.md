@@ -61,7 +61,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 > handler** — it becomes silently write-only. This is not hypothetical: it is exactly the bug
 > that made `FW;` unreadable for as long as `FW` has existed (see below).
 
-## Implemented commands (36)
+## Implemented commands (37)
 
 | Group | Commands |
 |---|---|
@@ -72,7 +72,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
 | SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
 | Antenna tuner | `AC` (Kenwood: start/stop tuning, network in/thru), `AT` (raw ATU relay state), `AX`/`AY` (tuner diagnostics); need `ATU_PRESENT` except `AC`, which reads `AC000;` without it; see [[atu-control]] |
-| DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX) |
+| DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX), `PR` (speech processor = CESSB on/off, `PR0;`/`PR1;`/`PR;`; branch `cessb-proposal`, see [[cessb]]) |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |
 | Misc | `AI` (auto-info), `PS` (`PS0;` powers off, `PS1;` is a silent no-op), `PD`, `DB` |
@@ -89,7 +89,9 @@ sending the real command gets our meaning instead.
 - **Renamed 2026-11-15:** `SR` → `XS` (sample rate). Kenwood `SR1;`/`SR2;` is a VFO/full reset
   (Hamlib `rig_reset`), which used to change the sample rate. `PR` → `HR` (hardware-register
   dump). Kenwood `PR` is the speech processor on/off, so a client polling the compressor got a
-  malformed `PR;` reply and caused a register dump on every poll.
+  malformed `PR;` reply and caused a register dump on every poll. Since 2026-11-18 (branch
+  `cessb-proposal`) `PR` is the real Kenwood command again: the speech processor, which in
+  Phoenix is CESSB ([[cessb]]).
 - **Fixed 2026-11-15:** `PS_write` ignored its parameter and shut the radio down on any `PSx;`,
   including Kenwood's power-*on* `PS1;` (Hamlib `set_powerstat(ON)`). It now shuts down only on
   `PS0;`, ignores `PS1;`, rejects anything else, and sends no answer (Kenwood set commands get none).

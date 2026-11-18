@@ -1737,3 +1737,21 @@ or disable CESSB:
     controller's delay line lines up with.
 - **Results:** 12 new gtests. The firmware's two-tone figures match the model to about
   0.6 dB (−62.7 / −29.2 dBc against −62.5 / −28.6). See [[cessb]] "Phase 1 as built".
+
+## [2026-11-18] query | CESSB on the bench: AD2 suite, 43/43 at the exciter
+Added CAT `PR` (speech processor = CESSB) and `code/tools/cessb_hil/`. The suite:
+- drives the mic from the AD2 with a 1 kHz tone sweep and three periodic stimuli (two-tone,
+  steady vowel, syllable-shaped vowel as the voice stand-in);
+- captures the exciter I/Q and A/Bs CESSB at every point;
+- reports the model's prediction for the identical signal.
+
+Results on the KI3P prototype:
+- the ceiling holds flat over 9 dB of overdrive and tracks the power setting
+  (−3.97 dB for −3.98 expected);
+- peaks stay within 3.1 % of the ceiling after the codec and analog exciter;
+- the voice stand-in gains +4.11 dB of talk power at 6 dB drive (model +4.08).
+
+The opposite sideband could not be resolved: the exciter's image moves between −40 and
+−63 dBc from capture to capture, CESSB on or off (logged in [[documentation-todos]]). New
+gtests cover both rates for 2f₁−f₂ (7 dB worse at 176.4 ksps) and check that the stage
+does not image the channel. See [[cessb]] Phase 3.

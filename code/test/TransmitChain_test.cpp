@@ -1549,6 +1549,36 @@ TEST(TransmitChainCESSB, TransparentBelowTheCeiling){
 }
 
 /**
+ * Below the ceiling the stage must not image the channel onto the other side
+ * of the carrier: its filters are complex bandpasses centred on the channel,
+ * and an image would add to the exciter's own (analog) image. Compared with the
+ * node's own image level, which is the Hilbert pair's.
+ */
+TEST(TransmitChainCESSB, DoesNotImageTheChannel){
+    uint8_t saved = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+    const float32_t tones[5] = {300.0f, 700.0f, 1000.0f, 1900.0f, 2600.0f};
+    for (int r = 0; r < 2; r++){
+        UseRate(rates[r]);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+        for (int k = 0; k < 5; k++){
+            const float32_t f[1] = {tones[k]}, a[1] = {0.04f};
+            CaptureNode(fs, f, a, 1, 12, 4, cI, cQ, oI, oQ);
+            const float32_t inW  = ComplexToneLevel(cI, cQ, 1024,  CH*tones[k], fs/8);
+            const float32_t inI  = ComplexToneLevel(cI, cQ, 1024, -CH*tones[k], fs/8);
+            const float32_t outW = ComplexToneLevel(oI, oQ, 1024,  CH*tones[k], fs/8);
+            const float32_t outI = ComplexToneLevel(oI, oQ, 1024, -CH*tones[k], fs/8);
+            const float32_t inDb = 20.0f*log10f(inI/inW), outDb = 20.0f*log10f(outI/outW);
+            printf("  %d sps %5.0f Hz: image before CESSB %6.1f dBc, after %6.1f dBc\n",
+                   SR[SampleRate].rate, tones[k], inDb, outDb);
+            EXPECT_LT(outDb, fmaxf(inDb + 1.0f, -60.0f))
+                << tones[k] << " Hz at " << SR[SampleRate].rate << " sps";
+        }
+    }
+    UseRate(saved);
+}
+
+/**
  * Two equal tones, each at the calibration level, peak at twice the ceiling:
  * 6 dB of drive. The envelope must come out at the ceiling, at the node and
  * after the interpolators to the DAC rate.
@@ -1591,18 +1621,26 @@ TEST(TransmitChainCESSB, CeilingHoldsWhenOverdriven){
  * of the carrier, at about -11 dBc here; the model puts the centred form near -63 dBc.
  */
 TEST(TransmitChainCESSB, OppositeSidebandStaysClean){
-    UseRate(SAMPLE_RATE_192K);
-    const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {0.08f, 0.08f};
-    CaptureNode(192000.0f, f, a, 2, 12, CESSB_CAPTURE, cI, cQ, oI, oQ);
-    const uint32_t N = 256*CESSB_CAPTURE;
-    const float32_t tone = 0.5f*(ComplexToneLevel(oI, oQ, N, CH*700.0f, 24000.0f)
-                               + ComplexToneLevel(oI, oQ, N, CH*1900.0f, 24000.0f));
-    const float32_t imdLow  = ComplexToneLevel(oI, oQ, N, -CH*500.0f, 24000.0f);
-    const float32_t imdHigh = ComplexToneLevel(oI, oQ, N, CH*3100.0f, 24000.0f);
-    printf("  2f1-f2 (-500 Hz): %.1f dBc, 2f2-f1 (3100 Hz): %.1f dBc\n",
-           20.0f*log10f(imdLow/tone), 20.0f*log10f(imdHigh/tone));
-    EXPECT_LT(20.0f*log10f(imdLow/tone), -55.0f);
-    EXPECT_LT(20.0f*log10f(imdHigh/tone), -24.0f);
+    uint8_t saved = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+    for (int r = 0; r < 2; r++){
+        UseRate(rates[r]);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+        const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {0.08f, 0.08f};
+        CaptureNode(fs, f, a, 2, 12, CESSB_CAPTURE, cI, cQ, oI, oQ);
+        const uint32_t N = 256*CESSB_CAPTURE;
+        const float32_t t1 = ComplexToneLevel(oI, oQ, N, CH*700.0f, fs/8);
+        const float32_t t2 = ComplexToneLevel(oI, oQ, N, CH*1900.0f, fs/8);
+        const float32_t tone = 0.5f*(t1 + t2);
+        const float32_t imdLow  = ComplexToneLevel(oI, oQ, N, -CH*500.0f, fs/8);
+        const float32_t imdHigh = ComplexToneLevel(oI, oQ, N, CH*3100.0f, fs/8);
+        printf("  %d sps: tones %+.2f dB apart; 2f1-f2 (-500 Hz): %.1f dBc, 2f2-f1 (3100 Hz): %.1f dBc\n",
+               SR[SampleRate].rate, 20.0f*log10f(t1/t2),
+               20.0f*log10f(imdLow/tone), 20.0f*log10f(imdHigh/tone));
+        EXPECT_LT(20.0f*log10f(imdLow/tone), -55.0f) << SR[SampleRate].rate << " sps";
+        EXPECT_LT(20.0f*log10f(imdHigh/tone), -24.0f) << SR[SampleRate].rate << " sps";
+    }
+    UseRate(saved);
 }
 
 /**

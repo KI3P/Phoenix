@@ -306,14 +306,55 @@ Where the build departs from the design above:
 - The menu toggle, persistence, the default (off) and the mic-gain clamp all behave as
   intended.
 
+## Phase 3: bench results (exciter I/Q, 2026-11-18)
+
+**Suite:** `code/tools/cessb_hil/`, run on the KI3P prototype.
+- The AD2 drives the mic input with repeatable periodic signals.
+- Ch1 and Ch2 capture the exciter's I and Q.
+- CAT `PR` switches CESSB off and on at every point.
+- Conditions: 176.4 ksps, 5 W, mic gain 5 dB.
+- Two full runs gave the same numbers to within 0.01 dB on the ceiling and 0.01 dB on
+  the voice-stand-in gain. 43/43 checks pass.
+
+| Result | Bench | Model / firmware |
+|---|---|---|
+| Ceiling, single tone, held over +9 dB of overdrive | flat to 0.002 dB | flat |
+| Ceiling follows the power setting (5 → 2 W) | −3.97 dB | −3.98 dB |
+| Unity gain below the ceiling (1 kHz, 50 mV) | +0.10 dB | passband ripple |
+| Voice stand-in (syllable "ah"), talk-power gain at 3 / 6 / 9 dB drive | +2.37 / **+4.11** / +5.24 dB | +2.57 / 4.08 / 5.15 |
+| Steady vowel "ah", same | +1.94 / 3.22 / 4.02 dB | +2.06 / 3.17 / 3.64 |
+| Peak with CESSB on, all stimuli and drives | ≤ 1.031 × ceiling | ≤ 1.014 (model stops at the DAC) |
+| Peak with CESSB off, same drives | up to 2.97 × | — |
+| Out of channel (3.3–6 kHz) with CESSB on | −47 to −58 dBc | — |
+| Two-tone 2f₁−f₂ (opposite SB) at 6 dB | −48 to −50 dBc | −55.8 dBc (gtest at 176.4k) |
+
+What the results show:
+- **Peak regrowth after the DAC is small.** The codec and analog exciter add about 1.5–2 %
+  of peak over the model's figure. That answers open question 3 at the exciter; the PA and
+  its filters remain unmeasured.
+- **The talk-power gain is as modelled.** The voice stand-in comes within 0.2 dB of the
+  model at 6 and 9 dB of drive.
+- **Not resolvable on the bench:** the opposite sideband. The exciter's own image of a tone
+  moves between about −40 and −63 dBc from one capture to the next, at every frequency,
+  CESSB on or off. That is a property of the radio, logged in [[documentation-todos]].
+  CESSB's contribution is −57 to −100 dBc (model) and the stage removes images (gtest
+  `DoesNotImageTheChannel`, −114 dBc). The 2f₁−f₂ reading is a fixed bench spur at −500 Hz
+  (−50 dBc at 0 dB drive, CESSB on or off) added to the DSP's −55.8 dBc.
+- **Found on the way:**
+  - The DSP's 2f₁−f₂ is 7 dB worse at 176.4 ksps than at 192 ksps (−55.8 against −62.7
+    dBc), in both the firmware and the model. `OppositeSidebandStaysClean` now checks both
+    rates.
+  - The AD2 is too coarse at a few millivolts (±1 dB between captures at 5 mV). The suite
+    ignores levels below 20 mV for the transparency check.
+
 ## Phases
 
 | Phase | Work | Done when |
 |---|---|---|
 | 0 | Offline model, variant choice, parameters (this branch) | ✅ `results/results.md` |
 | 1 | Fix mic gain; `DSP_CESSB.cpp`; filter design in `InitializeCESSB`; `TXGain` move; ceiling; bypass gating; Audio Options on/off toggle with storage; gtests | ✅ 2026-11-18, see [Phase 1 as built](#phase-1-as-built) |
-| 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`, wiki [[cat-control]] | CAT and menu tests; settings persist |
-| 3 | Bench and RF validation; tune the default drive and `gainCompensate` | HIL numbers within about 1 dB of the model; no PA splatter regression |
+| 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`, wiki [[cat-control]] | `PR` ✅ 2026-11-18 (needed by the bench suite); the level setting, `PL` and the meter remain |
+| 3 | Bench and RF validation; tune the default drive and `gainCompensate` | Exciter I/Q ✅ 2026-11-18 (see Phase 3 above); RF (PA splatter, PEP at the antenna) and on-air still to do |
 | 4 | User docs; wiki [[dsp-chain]] update; close #35 | — |
 
 ## Open questions

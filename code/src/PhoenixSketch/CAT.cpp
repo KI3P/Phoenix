@@ -73,6 +73,8 @@ char *NT_read(  char* cmd );
 char *PC_write( char* cmd );
 char *PC_read(  char* cmd );
 char *PD_read(  char* cmd );
+char *PR_write( char* cmd );
+char *PR_read(  char* cmd );
 char *PS_write( char* cmd );
 char *PS_read(  char* cmd );
 char *RX_write( char* cmd );
@@ -127,7 +129,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 39
+#define NUM_SUPPORTED_COMMANDS 40
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AC", 3+3,3, AC_write, AC_read },  // antenna tuner: TX-AT in/thru, start/stop tuning
@@ -150,6 +152,7 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON -- NOT a Kenwood keyword
         { "PC", 3+3,3, PC_write, PC_read }, // output power
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
+        { "PR", 3+1,3, PR_write, PR_read }, // speech processor (CESSB) 0=off 1=on
         { "PS", 3+1,3, PS_write, PS_read },  // Rig power on/off
         // RX; unkeys; RX0;/RX1; (main/sub receiver) are accepted too and behave
         // identically - Phoenix has one receiver. Both forms are writes.
@@ -709,6 +712,35 @@ char *NT_write( char* cmd ){
  */
 char *NT_read(  char* cmd ){
     return empty_string_p;
+}
+
+/**
+ * CAT command PR - speech processor on/off (ts_480_pc.pdf: PR P1; 0=off, 1=on)
+ *
+ * Phoenix's speech processor is Controlled Envelope SSB (DSP_CESSB.h), so this
+ * is the Audio Options "Enable/Disable CESSB" setting. It takes effect on the
+ * next transmit block, so it can be changed while transmitting.
+ *
+ * @param cmd CAT command string, PR0; or PR1;
+ * @return Empty string on success, "?;" for any other parameter
+ */
+char *PR_write( char* cmd ){
+    if ( cmd[2] != '0' && cmd[2] != '1' ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.cessbEnabled = ( cmd[2] == '1' );
+    return empty_string_p;
+}
+
+/**
+ * CAT command PR - read the speech processor (CESSB) state
+ * @param cmd CAT command string
+ * @return "PR0;" (off) or "PR1;" (on)
+ */
+char *PR_read( char* cmd ){
+    sprintf( obuf, "PR%d;", ED.cessbEnabled ? 1 : 0 );
+    return obuf;
 }
 
 /**
