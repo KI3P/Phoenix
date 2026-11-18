@@ -80,9 +80,9 @@ char *TX_write( char* cmd );
 char *VX_write( char* cmd );
 char *VX_read( char* cmd );
 char *ED_read(  char* cmd );
-char *PR_read( char* cmd);
-char *SR_write( char* cmd );
-char *SR_read(  char* cmd );
+char *HR_read( char* cmd);
+char *XS_write( char* cmd );
+char *XS_read(  char* cmd );
 char *DG_write( char* cmd );
 char *DG_read(  char* cmd );
 char *DR_write( char* cmd );
@@ -163,8 +163,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "TX", 3+1,3, TX_write, TX_write }, // set transceiver to transmit.
         { "VX", 3+1, 3, VX_write, VX_read }, // VOX write/read
         { "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
-        { "PR", 0,  3, unsupported_cmd, PR_read }, // print out the state of the hardware register -- NOT a Kenwood keyword
-        { "SR", 3+1,3, SR_write, SR_read }, // sample rate 0=176.4k 1=192k -- NOT a Kenwood keyword
+        { "HR", 0,  3, unsupported_cmd, HR_read }, // print out the state of the hardware register -- NOT a Kenwood keyword
+        { "XS", 3+1,3, XS_write, XS_read }, // sample rate 0=176.4k 1=192k -- NOT a Kenwood keyword
         { "CF", 3+1,3, CF_write, CF_read }, // receive CW audio filter index -- NOT a Kenwood keyword
         { "EQ", 3+5,3+2, EQ_write, EQ_read }, // receive equalizer cell -- NOT a Kenwood keyword
         { "FL", 3+4,3, FL_write, FL_read }, // DSP filter low cut -- NOT a Kenwood keyword
@@ -771,15 +771,24 @@ char *PD_read(  char* cmd ){
 }
 
 /**
- * CAT command PS - Turn radio power off
+ * CAT command PS - Set power status
+ *
+ * `PS0;` turns the radio off. `PS1;` (power on) does nothing: if we can read
+ * it, the radio is already on. Hamlib sends `PS1;` to power a rig on, so it
+ * must never shut down. Kenwood set commands get no answer.
+ *
  * @param cmd CAT command string
- * @return Response "PS0;" (requests shutdown from ATtiny)
+ * @return Empty string for PS0/PS1, "?;" for any other parameter
  */
 char *PS_write( char* cmd ){
-    // Ask the AtTiny to do it
-    ShutdownTeensy();
-    sprintf( obuf, "PS0;");
-    return obuf;    //Nope.  Not doing that.
+    if( cmd[2] == '0' ){
+        // Ask the AtTiny to do it
+        ShutdownTeensy();
+        return empty_string_p;
+    }
+    if( cmd[2] == '1' ) return empty_string_p;
+    sprintf( obuf, "?;");
+    return obuf;
 }
 
 /**
@@ -873,34 +882,34 @@ char *ED_read(  char* cmd  ){
 }
 
 /**
- * CAT command PR - Pretty print the contents of the hardware register (non-standard Kenwood command)
+ * CAT command HR - Pretty print the contents of the hardware register (non-standard Kenwood command)
  * @param cmd CAT command string
- * @return Response "PR;" after printing hardware register to Serial for debugging
+ * @return Response "HR;" after printing hardware register to Serial for debugging
  */
-char *PR_read(  char* cmd  ){
+char *HR_read(  char* cmd  ){
     buffer_pretty_print_last_entry();
-    sprintf( obuf, "PR;");
+    sprintf( obuf, "HR;");
     return obuf;
 }
 
-/** Sample rates reachable over CAT, in the order the SR parameter selects them.
+/** Sample rates reachable over CAT, in the order the XS parameter selects them.
  *  These are the two rates the front panel menu offers. */
-static const uint8_t SR_CAT_RATES[2] = { SAMPLE_RATE_176K, SAMPLE_RATE_192K };
-#define SR_CAT_RATE_COUNT 2
+static const uint8_t XS_CAT_RATES[2] = { SAMPLE_RATE_176K, SAMPLE_RATE_192K };
+#define XS_CAT_RATE_COUNT 2
 
 /**
- * CAT command SR - set the sample rate (non-standard Kenwood command)
+ * CAT command XS - set the sample rate (non-standard Kenwood command)
  *
- * `SR0;` selects 176.4 ksps, `SR1;` selects 192 ksps. Rejected while transmitting,
+ * `XS0;` selects 176.4 ksps, `XS1;` selects 192 ksps. Rejected while transmitting,
  * because ChangeSampleRate() reconfigures the I2S clock and rebuilds the whole
  * DSP chain.
  *
  * @param cmd CAT command string
  * @return Empty string on success, "?;" if the rate is out of range or the radio is not receiving
  */
-char *SR_write( char* cmd ){
+char *XS_write( char* cmd ){
     int p1 = cmd[2] - '0';
-    if( p1 < 0 || p1 >= SR_CAT_RATE_COUNT ){
+    if( p1 < 0 || p1 >= XS_CAT_RATE_COUNT ){
         sprintf( obuf, "?;");
         return obuf;
     }
@@ -911,19 +920,19 @@ char *SR_write( char* cmd ){
         sprintf( obuf, "?;");
         return obuf;
     }
-    ChangeSampleRate( SR_CAT_RATES[ p1 ] );
+    ChangeSampleRate( XS_CAT_RATES[ p1 ] );
     return empty_string_p;
 }
 
 /**
- * CAT command SR - read the sample rate (non-standard Kenwood command)
+ * CAT command XS - read the sample rate (non-standard Kenwood command)
  * @param cmd CAT command string
- * @return Response "SRn;" where n indexes SR_CAT_RATES, or "?;" if the radio is at some other rate
+ * @return Response "XSn;" where n indexes XS_CAT_RATES, or "?;" if the radio is at some other rate
  */
-char *SR_read( char* cmd ){
-    for( int i = 0; i < SR_CAT_RATE_COUNT; i++ ){
-        if( SampleRate == SR_CAT_RATES[ i ] ){
-            sprintf( obuf, "SR%d;", i);
+char *XS_read( char* cmd ){
+    for( int i = 0; i < XS_CAT_RATE_COUNT; i++ ){
+        if( SampleRate == XS_CAT_RATES[ i ] ){
+            sprintf( obuf, "XS%d;", i);
             return obuf;
         }
     }

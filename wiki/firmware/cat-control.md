@@ -75,11 +75,31 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX) |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |
-| Misc | `AI` (auto-info), `PS` (power on/off), `PD`, `DB` |
-| **Custom (non-Kenwood)** | `ED` (dump the `ED` config), `PR` (dump the `hardwareRegister`), **`SR`**, **`CF`**, **`EQ`**, **`FL`** |
+| Misc | `AI` (auto-info), `PS` (`PS0;` powers off, `PS1;` is a silent no-op), `PD`, `DB` |
+| **Custom (non-Kenwood)** | `ED` (dump the `ED` config), `HR` (dump the `hardwareRegister`), **`XS`**, **`CF`**, **`EQ`**, **`FL`** |
 
-`ED` and `PR` are Phoenix extensions explicitly marked "NOT a Kenwood keyword" — handy debug
+`ED` and `HR` are Phoenix extensions explicitly marked "NOT a Kenwood keyword" — handy debug
 dumps of [[persistent-config]] and the [[filter-boards]] `hardwareRegister`.
+
+### Kenwood conformance (checked 2026-11-15 against `code/docs/ts_480_pc.pdf`)
+
+Custom commands must use letter pairs the TS-480 spec does not define, or a Kenwood client
+sending the real command gets our meaning instead.
+
+- **Renamed 2026-11-15:** `SR` → `XS` (sample rate). Kenwood `SR1;`/`SR2;` is a VFO/full reset
+  (Hamlib `rig_reset`), which used to change the sample rate. `PR` → `HR` (hardware-register
+  dump). Kenwood `PR` is the speech processor on/off, so a client polling the compressor got a
+  malformed `PR;` reply and caused a register dump on every poll.
+- **Fixed 2026-11-15:** `PS_write` ignored its parameter and shut the radio down on any `PSx;`,
+  including Kenwood's power-*on* `PS1;` (Hamlib `set_powerstat(ON)`). It now shuts down only on
+  `PS0;`, ignores `PS1;`, rejects anything else, and sends no answer (Kenwood set commands get none).
+- **Known deviations, left as they are:**
+  - `MD`: Kenwood uses 4 = FM and 5 = AM. Ours uses 4 = AM and 5 = SAM, both ways; `IF` reports
+    both AM and SAM as 5, so `MD;` and `IF;` disagree in AM.
+  - `FW`: Kenwood's is the CW/FSK filter *width*, from a fixed list (SSB uses `SH`/`SL`). Ours is
+    the passband high cut in every mode.
+  - `NR`: Kenwood allows 0–2. We accept 3 (LMS), and `NR_write` doesn't validate the digit.
+  - `DB` is not a TS-480 command, though the table comment doesn't say so.
 
 ### DSP-settings commands (added 2026-07, `CAT.cpp:132-135`)
 
@@ -87,7 +107,7 @@ Added so [[filter-hil-test]] could drive settings that were previously **touchsc
 
 | Cmd | Set | Read | Meaning |
 |---|---|---|---|
-| `SR` | `SRn;` | `SR;` | Sample rate: `0` = 176.4 ksps, `1` = 192 ksps ([[sample-rate-switching]]). **Rejected while transmitting** — it reconfigures the I²S clock and rebuilds the whole DSP chain (`CAT.cpp:804-827`). |
+| `XS` | `XSn;` | `XS;` | Sample rate: `0` = 176.4 ksps, `1` = 192 ksps ([[sample-rate-switching]]). **Rejected while transmitting** — it reconfigures the I²S clock and rebuilds the whole DSP chain (`CAT.cpp:804-827`). |
 | `CF` | `CFn;` | `CF;` | Receive CW audio filter index 0–5 ([[cw-processing]]). |
 | `EQ` | `EQbbvvv;` | `EQbb;` | Receive equaliser cell `bb` = 00–13, level `vvv` = 000–100 ([[audio-equalizer]]). Note set/read lengths differ by design. |
 | `FL` | `FL####;` | `FL;` | DSP filter **low** cut — the mirror of `FW`'s high cut. |
@@ -120,7 +140,7 @@ Three non-Kenwood additions for [[digital-mode]]:
 before every transmission, so treating a modulation change as a request to leave digital mode
 would make the mode impossible to hold. Only `DG0;` or the front panel leaves it.
 
-**`SR` is refused while in digital mode**, because that mode pins the sample rate.
+**`XS` is refused while in digital mode**, because that mode pins the sample rate.
 
 ### Bridge-measurement commands (added 2026-10-24)
 
@@ -191,7 +211,7 @@ nor a tune mode to distinguish them.
 The same change closed a latent defect in `command_parser`: it evaluated
 `command[ set_len - 1 ]` and `command[ read_len - 1 ]` unconditionally, and nine entries carry a
 `0` in one of those fields, so the expression became `command[-1]` — an out-of-bounds read off the
-front of `catCommand[128]`. It never crashed, but `ID;`, `IF;`, `PD;`, `ED;` and `PR;` reached
+front of `catCommand[128]`. It never crashed, but `ID;`, `IF;`, `PD;`, `ED;` and `PR;` (now `HR;`) reached
 their read handlers only because the preceding byte happened not to be `';'`. Both tests are now
 guarded with `> 0`.
 
@@ -262,7 +282,7 @@ mode, RX/TX, etc.); `FA_read`/`MD_read`/`KS_read`/… each return one field.
   wrong, so assume others may be too.
 - A CAT command for **AGC mode** — the remaining gap for [[filter-hil-test]], which currently
   has to demand the operator set it by hand.
-- `SR` is interlocked against transmit, but the **menu path is not** ([[sample-rate-switching]]).
+- `XS` is interlocked against transmit, but the **menu path is not** ([[sample-rate-switching]]).
   Whether that asymmetry is deliberate.
 - The set/read-length constraint is a parser property enforced only by convention. Nothing
   fails at build time if a new command violates it — a static assertion over the table would

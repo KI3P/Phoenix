@@ -137,7 +137,7 @@ passed everything would look identical to a working radio.
 ## Coupling to the firmware
 
 - It needed CAT access to settings that were previously touchscreen-only — which is why the
-  `SR`, `CF`, `EQ` and `FL` commands were added ([[cat-control]]).
+  `SR` (now `XS`), `CF`, `EQ` and `FL` commands were added ([[cat-control]]).
 - ⚠️ `bandtable.py` **mirrors design constants from `DSP_FIR.cpp` and `Globals.cpp` by hand**.
   Nothing detects a firmware value edited without updating it. Re-check that file whenever the
   filter design constants change.

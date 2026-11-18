@@ -73,7 +73,7 @@ callable more than once.
 | Path | Where | Notes |
 |---|---|---|
 | Front panel | new **"Sample Rate"** primary menu, `MainBoard_DisplayMenus.cpp:580-611` | Two options, "192 ksps" / "176.4 ksps". `primaryMenu[]` grew 8 → **9** entries (`:602`, `MainBoard_Display.h:371`). |
-| CAT | `SR0;` = 176.4k, `SR1;` = 192k; `SR;` reads back | `CAT.cpp:801-838`. **Rejected while transmitting** — see [[cat-control]]. |
+| CAT | `XS0;` = 176.4k, `XS1;` = 192k; `XS;` reads back (was `SR` until 2026-11-15) | `CAT.cpp:801-838`. **Rejected while transmitting** — see [[cat-control]]. |
 | Boot | automatic | `InitializeStorage()` runs before `InitializeSignalProcessing()`/`InitializeAudio()` (`Globals.cpp:528-533`), so the restored rate is simply in force by the time the DSP is built. There is no "apply saved rate" step. |
 
 ## Display paths that assumed 192 kHz

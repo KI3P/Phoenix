@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 # --- Sample rates ----------------------------------------------------------
 # Globals.cpp SR[] and the SAMPLE_RATE_* macros in SDT.h. Only these two are
-# reachable from the front panel menu or the SR CAT command.
+# reachable from the front panel menu or the XS CAT command.
 SAMPLE_RATES_HZ = (192000, 176400)
 
 #: Combined decimation of the receive chain: DF1 * DF2 in ReceiveFilterConfig.

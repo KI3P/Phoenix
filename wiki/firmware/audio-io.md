@@ -100,7 +100,7 @@ divider chain (`n1`, `n2`, fractional `C`) for the requested rate.
 ### Changing the rate at run time
 
 This module owns the rate switch. **`ChangeSampleRate(uint8_t newRate)`** (`:519`) is the entry
-point for the "Sample Rate" menu and the `SR` CAT command — full sequence, and why each step is
+point for the "Sample Rate" menu and the `XS` CAT command — full sequence, and why each step is
 ordered where it is, on [[sample-rate-switching]]. In outline: compensate `centerFreq_Hz` for
 the change in the Fs/4 IF offset → `AudioNoInterrupts()` → `SetI2SFreq()` →
 `InitializeSignalProcessing()` → retune the oscillators → flush the four input queues →

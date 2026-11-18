@@ -32,7 +32,7 @@ and the audio library's graph clock is *exactly* 4× the USB audio block rate. N
 resampled and no Teensy core file is modified.
 
 **Two clocks, do not conflate them.** 176.4 ksps is the radio's ADC/DSP rate (what the SR
-menu and `SR0;` select). 44.1 kHz is the demodulated *audio* rate and what the USB endpoint
+menu and `XS0;` select). 44.1 kHz is the demodulated *audio* rate and what the USB endpoint
 declares to the PC. The second is not an independent choice — it is what Fs/4 equals at the
 first.
 
@@ -146,7 +146,7 @@ to the host, default 25 = −12 dB.
 - **`MD_read` / `IF_read`** report the plain sideband (1/2) in digital mode, so hamlib sees a
   sane mode rather than an unknown one.
 - **`TX;` / `RX;`** key and unkey digital transmit — this is how WSJT-X keys the rig.
-- **`SR`** is refused in digital mode, because the mode pins the rate.
+- **`XS`** is refused in digital mode, because the mode pins the rate.
 
 ## Build configuration
 
@@ -172,7 +172,7 @@ sync endpoint 0x86 — the isochronous feedback path the design relies on is liv
 Capture length is byte-exact (12 s = 2,116,844 B), so nothing is lost at the ALSA
 layer.
 
-**CAT.** `DG1;`/`DG0;`/`DG;` work; `SR;` returns `SR0;` (176.4 ksps) in digital
+**CAT.** `DG1;`/`DG0;`/`DG;` work; `XS;` returns `XS0;` (176.4 ksps) in digital
 mode; `MD;`, `FA;`, `IF;` all consistent. CAT is on `/dev/ttyACM0` — the only CDC
 port in this build.
 

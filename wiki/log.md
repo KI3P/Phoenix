@@ -1543,6 +1543,14 @@ each reading with `ATUTuneAlgoPhase()`. Also committed: the user's re-laid-out `
 and `UISm.drawio` (the generated code is unchanged) and the regenerated `ModeSm.sim.html`,
 which now has the ATU states. See [[atu-control]].
 
+## [2026-11-15] decision | CAT: Kenwood name collisions removed, PS1 no longer powers off
+Checked the CAT command table against the TS-480 spec (`code/docs/ts_480_pc.pdf`). Two custom
+commands reused Kenwood names: `SR` (Kenwood: reset) is now `XS` (sample rate) and `PR`
+(Kenwood: speech processor) is now `HR` (hardware-register dump). `PS_write` shut the radio
+down on any parameter, including Kenwood's power-on `PS1;`. It now acts only on `PS0;` and sends
+no answer. The filter HIL tool (`code/tools/filter_hil/radio.py`) sends `XS`. The `MD`, `FW` and
+`NR` deviations were recorded and deliberately left. See [[cat-control]].
+
 ## [2026-11-15] doc | Calibration guide for builders, and the calibration fixes it needed
 Added `code/docs/CalibrationGuide/Calibration_Guide.html`: a step-by-step operator's guide to
 calibrating a finished radio, in order (frequency → receive IQ → transmit IQ → power and SWR →

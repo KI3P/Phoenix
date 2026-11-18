@@ -30,7 +30,7 @@ from __future__ import annotations
 
 # --- Sample rates ----------------------------------------------------------
 # Globals.cpp SR[] and the SAMPLE_RATE_* macros in SDT.h. Only these two are
-# reachable from the front panel menu or the SR CAT command.
+# reachable from the front panel menu or the XS CAT command.
 SAMPLE_RATES_HZ = (192000, 176400)
 
 #: ReceiveFilterConfig::DF. The transmit chain decimates to the same audio rate

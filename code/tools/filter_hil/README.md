@@ -31,8 +31,8 @@ the speaker terminals unless the output is known to be single-ended.
 - **AGC must be off.** It compresses the amplitude differences the suite
   measures, so every filter skirt would read flat. There is no CAT command for
   it; set it from the radio's menu. The suite refuses to run otherwise.
-- **Firmware must have the `SR`, `CF`, `EQ` and `FL` CAT commands.** They were
-  added alongside this suite. `printf 'SR;' > /dev/ttyACM1` should answer rather
+- **Firmware must have the `XS`, `CF`, `EQ` and `FL` CAT commands.** They were
+  added alongside this suite. `printf 'XS;' > /dev/ttyACM1` should answer rather
   than returning `?;`.
 - **Do not touch the front panel while it runs.** Menu interaction triggers a
   settings save, which would make the test configuration permanent.
