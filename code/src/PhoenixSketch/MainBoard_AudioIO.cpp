@@ -230,7 +230,25 @@ void MuteMixerChannels(AudioMixer4 *mixer){
  * - Restoring settings from storage
  */
 void UpdateTransmitAudioGain(void){
-    sgtl5000_teensy.micGain(ED.currentMicGain);
+    sgtl5000_teensy.micGain(MicGainForCodec(ED.currentMicGain));
+}
+
+/**
+ * Convert the microphone gain setting to the value the SGTL5000 accepts.
+ *
+ * AudioControlSGTL5000::micGain() takes an unsigned dB value, and the codec can
+ * only add gain (preamp 0/20/30/40 dB plus up to 22.5 dB of input gain). The
+ * setting can be negative - the menu goes down to -10 and CAT MG to -40 - and a
+ * negative int passed straight through wraps to a huge unsigned value, which
+ * selects the maximum gain. Clamp instead: anything below 0 dB is 0 dB.
+ *
+ * @param gain_dB Requested microphone gain, ED.currentMicGain
+ * @return Gain for micGain(), 0 to 63 dB
+ */
+uint32_t MicGainForCodec(int32_t gain_dB){
+    if (gain_dB < 0) return 0;
+    if (gain_dB > 63) return 63;
+    return (uint32_t)gain_dB;
 }
 
 /**
@@ -332,7 +350,7 @@ void UpdateAudioIOState(void){
             // Microphone input starts
             Q_in_L_Ex.begin(); 
             Q_in_R_Ex.begin();
-            sgtl5000_teensy.micGain(ED.currentMicGain);
+            sgtl5000_teensy.micGain(MicGainForCodec(ED.currentMicGain));
 
             // Input is microphone
             SelectMixerChannel(&modeSelectInExL,0);

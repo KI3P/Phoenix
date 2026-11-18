@@ -22,7 +22,9 @@ is tagged **⚠ possible bug** so it stands out.
 ## Code/comment discrepancies & possible bugs
 
 ### Transmit audio (2026-11-18)
-- ⚠ **Negative mic gain wraps to maximum gain.** `AudioControlSGTL5000::micGain(unsigned int dB)`
+- ~~⚠ **Negative mic gain wraps to maximum gain.**~~ **Fixed (2026-11-18, `cessb-proposal`):**
+  `MicGainForCodec()` clamps the setting to 0–63 dB before `micGain()`. The three different
+  ranges remain. Original note: `AudioControlSGTL5000::micGain(unsigned int dB)`
   takes an unsigned value, but `ED.currentMicGain` can be negative: the menu allows −10…30
   (`MainBoard_DisplayMenus.cpp:463`) and CAT `MG` maps down to −40. A negative value reaches
   `micGain()` (`MainBoard_AudioIO.cpp:233`, `:335`) as a huge number, which selects the 40 dB

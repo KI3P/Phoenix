@@ -1118,7 +1118,8 @@ void PlayIQData(DataBlock *data){
 
 float32_t TXgainDSP;
 void TXGain(DataBlock *data){
-    // Apply the gain to the I channel
+    // Apply the gain to both channels. This runs after the Hilbert pair and CESSB,
+    // so the CESSB ceiling is fixed and TXGain maps it onto the requested power.
     float32_t gain_dB;
     if (ED.PA100Wactive)
         gain_dB = ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]];
@@ -1139,6 +1140,7 @@ void TXGain(DataBlock *data){
         TXgainDSP = override_dB;
     float32_t amp_factor = powf(10.0f,(TXgainDSP)/20.0);
     arm_scale_f32(data->I, amp_factor, data->I, data->N);
+    arm_scale_f32(data->Q, amp_factor, data->Q, data->N);
 }
 
 /**
@@ -1217,11 +1219,17 @@ DataBlock * TransmitProcessing(const char *fname){
     }
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
-    TXGain(&data); // apply the DSP gain factor
     arm_copy_f32(data.I,data.Q,256);
     TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
     HilbertTransform(&data,&TXfilters); // 128
     TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+    // Controlled envelope SSB: limit the envelope to the level that TXGain maps
+    // onto the requested power, so the power setting becomes PEP
+    if (CESSBActive())
+        CESSBProcess(&data);
+    else
+        CESSBSkipped();
+    TXGain(&data); // apply the DSP gain factor; linear, so after CESSB is equivalent
     // Perform IQ correction
     ApplyIQCorrection(&data,
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],

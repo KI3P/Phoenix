@@ -88,9 +88,12 @@ def centred_filter(fs: float, half_bw_hz: float = HALF_BW_HZ, taps: int = 123,
     """Lowpass for the centred variant, from the firmware's own CalcFIRCoeffs port.
 
     Designed in Hz at the node rate, so like FIR_int3 it holds its corners when
-    the radio runs at 176.4 ksps.
+    the radio runs at 176.4 ksps. CalcFIRCoeffs centres an odd-length design on a
+    half sample, which would misalign the overshoot controller's delay line, so
+    design one tap longer and drop the first: the rest is exactly symmetric.
+    This is what InitializeCESSB() in DSP_CESSB.cpp does.
     """
-    return normalize_dc(calc_fir_lowpass(taps, half_bw_hz, astop_db, fs))
+    return normalize_dc(calc_fir_lowpass(taps + 1, half_bw_hz, astop_db, fs)[1:])
 
 
 def cessb_c(z: np.ndarray, fs: float, sign: int, gain_compensate: float = GC_C,

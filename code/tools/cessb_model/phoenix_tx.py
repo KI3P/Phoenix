@@ -19,7 +19,12 @@ Not modelled:
   any CESSB measurement here.
 * The codec, the analog exciter and the PA.
 
-The rate-changing stages follow the CMSIS semantics the firmware relies on:
+All the FIR stages follow the CMSIS semantics the firmware relies on. The
+CMSIS FIR functions take their coefficient tables time-reversed, so a table h
+filters with h[::-1]. For the symmetric lowpasses that changes nothing, but for
+the +/-45 degree Hilbert pair it mirrors the spectrum: the audio comes out on
+negative frequencies (the LSB side) before SidebandSelection(), as the
+firmware's TransmitChainCESSB.ChannelIsWhereTheStageCentresIt test confirms.
 arm_fir_decimate_f32 filters then keeps every M-th output, and
 arm_fir_interpolate_f32 is zero-stuffing followed by the FIR, which the firmware
 then rescales by L (TXInterpolateBy*).
@@ -117,15 +122,20 @@ def normalize_dc(taps: np.ndarray) -> np.ndarray:
 # Rate changers with CMSIS semantics
 # --------------------------------------------------------------------------
 
+def arm_fir(h: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """arm_fir_f32 with coefficient table h: CMSIS stores the taps time-reversed."""
+    return signal.lfilter(h[::-1], 1.0, x)
+
+
 def fir_decimate(x: np.ndarray, h: np.ndarray, m: int) -> np.ndarray:
-    return signal.lfilter(h, 1.0, x)[m - 1::m]
+    return arm_fir(h, x)[m - 1::m]
 
 
 def fir_interpolate(x: np.ndarray, h: np.ndarray, l: int) -> np.ndarray:
     """Zero-stuff by L, filter, and apply the firmware's xL make-up gain."""
     up = np.zeros(len(x) * l, dtype=np.result_type(x, np.float64))
     up[::l] = x
-    return l * signal.lfilter(h, 1.0, up)
+    return l * arm_fir(h, up)
 
 
 # --------------------------------------------------------------------------
@@ -179,8 +189,8 @@ def mic_to_cessb_node(x_fs: np.ndarray, f: TxFilters) -> np.ndarray:
 def audio24_to_cessb_node(x24: np.ndarray, f: TxFilters) -> np.ndarray:
     """Real audio at Fs/8 (I == Q) -> complex I + jQ at Fs/8, after TXInterpolateBy2Again."""
     x12 = fir_decimate(x24, f.dec3, 2)
-    i12 = signal.lfilter(f.hilb_p45, 1.0, x12)
-    q12 = signal.lfilter(f.hilb_n45, 1.0, x12)
+    i12 = arm_fir(f.hilb_p45, x12)
+    q12 = arm_fir(f.hilb_n45, x12)
     return fir_interpolate(i12, f.int3, 2) + 1j * fir_interpolate(q12, f.int3, 2)
 
 
@@ -193,6 +203,8 @@ def cessb_node_to_dac(z24: np.ndarray, f: TxFilters) -> np.ndarray:
 
 def wanted_sign(f: TxFilters) -> int:
     """+1 if the chain (before SidebandSelection) puts the audio at positive frequencies.
+
+    It is -1 for the firmware's chain (see the module docstring).
 
     Found by experiment rather than assumed, so a sign convention slip in the
     model cannot silently swap 'wanted' and 'opposite' in every measurement.

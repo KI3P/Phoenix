@@ -94,6 +94,11 @@ class TestModelIsTheFirmwareChain(unittest.TestCase):
             # Same bound the firmware test asserts
             self.assertAlmostEqual(c192, 2760.0, delta=150.0)
 
+    def test_audio_is_on_the_lsb_side_like_the_firmware(self):
+        # TransmitChainCESSB.ChannelIsWhereTheStageCentresIt pins the same fact in
+        # the firmware, and DSP_CESSB.h's CESSB_CENTRE_HZ is negative because of it.
+        self.assertEqual(tx.wanted_sign(tx.TxFilters.for_rate(192000.0)), -1)
+
     def test_hilbert_pair_makes_one_sideband(self):
         f = tx.TxFilters.for_rate(192000.0)
         s = tx.wanted_sign(f)
@@ -103,6 +108,13 @@ class TestModelIsTheFirmwareChain(unittest.TestCase):
         want = abs(np.vdot(np.exp(2j * np.pi * s * 1000.0 * k / f.fs24), z))
         other = abs(np.vdot(np.exp(-2j * np.pi * s * 1000.0 * k / f.fs24), z))
         self.assertGreater(20 * np.log10(want / other), 35.0)
+
+
+class TestCentredFilter(unittest.TestCase):
+    def test_symmetric_about_a_whole_sample(self):
+        h = cessb.centred_filter(24000.0)
+        self.assertEqual(len(h) % 2, 1)
+        np.testing.assert_allclose(h, h[::-1], rtol=0, atol=1e-15)
 
 
 class TestCessbVariants(unittest.TestCase):

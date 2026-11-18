@@ -93,6 +93,13 @@ ModeSm_StateId GetAudioPreviousState(void);
 void UpdateTransmitAudioGain(void);
 
 /**
+ * @brief Convert the microphone gain setting to the SGTL5000's unsigned dB value
+ * @param gain_dB Requested gain (ED.currentMicGain), which may be negative
+ * @return Gain clamped to the codec's 0 to 63 dB
+ */
+uint32_t MicGainForCodec(int32_t gain_dB);
+
+/**
  * @brief Apply current sidetone volume setting 
  * @note Applies ED.sidetoneVolume to sidetone_oscillator object 
  * @note Called when user adjusts sidetone volume

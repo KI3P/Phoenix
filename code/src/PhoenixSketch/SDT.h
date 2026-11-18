@@ -328,6 +328,9 @@ extern struct config_t {
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
     int32_t currentMicGain = 20;   /** Gain of the mic used for SSB */
     int32_t digitalDriveLevel = 50; /** Drive level (0-100) applied to USB transmit audio in digital mode */
+    /** Controlled Envelope SSB on the SSB transmit chain (DSP_CESSB.h). Off by
+     *  default until it has been validated on the bench and on air. */
+    bool cessbEnabled = false;
     /** Level (0-100) applied to USB receive audio in digital mode.
      *
      * The receive audio arriving at the USB tap is unregulated: with AGC off the
@@ -765,6 +768,7 @@ struct AGCConfig {
 #include "DSP_Noise.h"
 #include "DSP_CWProcessing.h"
 #include "DSP.h"
+#include "DSP_CESSB.h"
 #include "MainBoard_AudioIO.h"
 #include "USBAudio.h"
 #include "FrontPanel.h"

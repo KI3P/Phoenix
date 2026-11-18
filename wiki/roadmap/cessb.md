@@ -21,8 +21,13 @@ CESSB"*, which asks to "improve SSB transmission by implementing controlled enve
 - The evidence for this proposal is the offline model in
   `code/tools/cessb_model/` (README there; numbers in `results/results.md`).
 
-**Status:** proposal. No firmware is changed yet. Phase 0 (the model) is done on branch
-`cessb-proposal`.
+**Status:** Phases 0 and 1 are done on branch `cessb-proposal`, as of 2026-11-18:
+- **Phase 0:** the offline model.
+- **Phase 1:** the DSP stage, the `TXGain` move, the mic-gain fix, an Audio Options menu
+  toggle and gtests. CESSB is **off by default** until the bench and on-air checks of
+  Phase 3.
+
+See [Phase 1 as built](#phase-1-as-built) for where the build departs from the design below.
 
 ## Summary
 
@@ -110,10 +115,10 @@ each at its best `gainCompensate`):
 |---|---:|---:|---:|
 | Wanted-sideband power gain at equal PEP | 4.88 dB | 4.59 dB | 2.48 dB |
 | Overshoot after the ×2, ×4 interpolators | 0.9 % | 1.3 % | 41.4 % |
-| Opposite sideband, voice | −27.4 dBc | **−71.3 dBc** | −23.8 dBc |
-| Out of channel (3.3–12 kHz, both sides) | −82.9 dBc | −86.4 dBc | −36.0 dBc |
-| Two-tone 2f₁−f₂ (−500 Hz, opposite SB) | −11.2 dBc | **−63.3 dBc** | — |
-| Two-tone 2f₂−f₁ (3100 Hz) | −26.2 dBc | −28.3 dBc | — |
+| Opposite sideband, voice | −27.4 dBc | **−71.0 dBc** | −23.8 dBc |
+| Out of channel (3.3–12 kHz, both sides) | −82.9 dBc | −86.2 dBc | −36.0 dBc |
+| Two-tone 2f₁−f₂ (500 Hz into the opposite SB) | −11.2 dBc | **−62.5 dBc** | — |
+| Two-tone 2f₂−f₁ (3100 Hz) | −26.2 dBc | −28.6 dBc | — |
 | −3 dB passband below ceiling, 192k / 176.4k | to 2725 / 2625 Hz | to 2700 / 2725 Hz | to 2700 / 2750 Hz |
 
 **Why the Z class leaves the opposite sideband dirty.** Its real lowpass passes −3 to +3 kHz.
@@ -188,7 +193,7 @@ delay line), so **5.2 ms** at 192k and 5.6 ms at 176.4k.
 - **`ED` fields:** `cessbEnabled` (bool) and `cessbDrive_dB` (int, 0–10). Persist them next to
   `currentMicGain` in `Storage.cpp` (`:141`, `:372`, `:623`, `:838`), with defaults
   "enabled" and a starting drive of 4–6 dB, to be tuned on air (Phase 3).
-- **Menu:** in the Microphone menu, add "Processor" (on/off) and "Proc level" next to
+- **Menu:** *(superseded for on/off: the toggle is under Audio Options, see [Phase 1 as built](#phase-1-as-built))* in the Microphone menu, add "Processor" (on/off) and "Proc level" next to
   "Mic gain" (`MainBoard_DisplayMenus.cpp:463-475`).
 - **Meter:** a processing meter on the TX state-of-health pane, beside the existing VU bar
   (`MainBoard_DisplayHome.cpp:1012`). Per block, show the pre-clip peak envelope relative to
@@ -245,13 +250,69 @@ firmware. Its −3 dB corner must match the gtest's to within 5 Hz; it does to a
   Both assume a linear chain.
 - **On air.** Get A/B reports at a fixed PEP.
 
+## Phase 1 as built
+
+**Files:**
+- `DSP_CESSB.cpp/.h` (new): the stage.
+- `DSP.cpp`: `TransmitProcessing()` and `TXGain()`.
+- `DSP_FFT.cpp`: `InitializeTransmitFilters()` calls `InitializeCESSB()`.
+- `MainBoard_DisplayMenus.cpp`: the Audio Options item.
+- `Storage.cpp`: the setting.
+- `MainBoard_AudioIO.cpp`: `MicGainForCodec()`.
+- `SDT.h`: the `ED.cessbEnabled` field.
+- Tests: `TransmitChainCESSB.*` in `code/test/TransmitChain_test.cpp`.
+
+**Order in `TransmitProcessing()`:**
+`… TXInterpolateBy2Again → CESSBProcess (if CESSBActive()) → TXGain (I and Q) → IQ correction …`
+
+Where the build departs from the design above:
+
+- **The menu toggle is under Audio Options, and "disable" means bypass** (the user's
+  decision). The item's label states the action, "Enable CESSB" or "Disable CESSB", as the
+  ATU menu's toggles do. When disabled, the stage does not run at all; the "limiter at 0 dB
+  drive" idea in section 4 is not used. `ED.cessbEnabled` defaults to `false` and persists
+  as `cessbEnabled`.
+- **There is no separate drive control yet.** Microphone gain sets how hard the voice hits
+  the ceiling. A processor-level setting, the meter and CAT `PR`/`PL` remain Phase 2.
+- **The channel is on *negative* frequencies at the node.** CMSIS FIR functions take their
+  coefficient tables time-reversed. That leaves the symmetric lowpasses unchanged, but it
+  mirrors the ±45° Hilbert pair, so before `SidebandSelection()` the audio sits on the LSB
+  side for either sideband. That fits the firmware's own remark that the maths selects LSB
+  by default. Hence `CESSB_CENTRE_HZ = −1500`. The Phase 0 model had used `lfilter`
+  without reversal and so was mirrored; it found the side by experiment, so its numbers
+  were unaffected, and it now reverses the taps too. The first firmware build shifted the
+  wrong way and filtered the voice away. The test
+  `ChannelIsWhereTheStageCentresIt` now pins the side.
+- **The filter is made exactly symmetric.** `CalcFIRCoeffs` centres an odd-length lowpass
+  on a half sample (taps 61 and 62 are equal for 123 taps). That would misalign the
+  overshoot controller's whole-sample delay line by half a sample. The fix is to design
+  124 taps and drop the first, which is 44 dB below the peak. The model does the same.
+  Its numbers barely moved: −71.0 against −71.3 dBc.
+- **The ceiling is `CESSB_CEILING = 0.1295`.** That is the node envelope of the 0.08,
+  800 Hz calibration tone with the default equaliser: 0.12955 at 192 ksps and 0.12949 at
+  176.4 ksps. `CeilingIsTheCalibrationTone` pins it to within 1 %.
+- **The mic gain is clamped.** `MicGainForCodec()` clamps to 0–63 dB before `micGain()`,
+  at both call sites.
+
+**gtest results, `TransmitChainCESSB.*`** (12 tests):
+- Two-tone at 6 dB drive: node peak 1.91 → 0.953 × ceiling, and 0.955 × ceiling at the DAC
+  rate.
+- Two-tone intermod: 2f₁−f₂ at −62.7 dBc and 2f₂−f₁ at −29.2 dBc. The model gives −62.5
+  and −28.6.
+- Unity gain within ±0.5 dB below the ceiling at 400–2500 Hz, at both rates.
+- Moving `TXGain` changes the output by less than 1e-5.
+- The bypass states are respected.
+- History is cleared after a skipped block.
+- The menu toggle, persistence, the default (off) and the mic-gain clamp all behave as
+  intended.
+
 ## Phases
 
 | Phase | Work | Done when |
 |---|---|---|
 | 0 | Offline model, variant choice, parameters (this branch) | ✅ `results/results.md` |
-| 1 | Fix mic gain; `DSP_CESSB.cpp`; filters in `InitializeTransmitFilterCoeffs`; `TXGain` move; `A_ref`; bypass gating; gtests | ctest green; no change with CESSB bypassed |
-| 2 | `ED` fields + storage, menu, meter, CAT `PR`/`PL`, wiki [[cat-control]] | CAT and menu tests; settings persist |
+| 1 | Fix mic gain; `DSP_CESSB.cpp`; filter design in `InitializeCESSB`; `TXGain` move; ceiling; bypass gating; Audio Options on/off toggle with storage; gtests | ✅ 2026-11-18, see [Phase 1 as built](#phase-1-as-built) |
+| 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`, wiki [[cat-control]] | CAT and menu tests; settings persist |
 | 3 | Bench and RF validation; tune the default drive and `gainCompensate` | HIL numbers within about 1 dB of the model; no PA splatter regression |
 | 4 | User docs; wiki [[dsp-chain]] update; close #35 | — |
 

@@ -445,7 +445,27 @@ void StartEqualizerAdjust(void){
     SetInterrupt(iEQUALIZER);
 }
 
-struct SecondaryMenuOption AudioOptions[11] = {
+// The CESSB item is a toggle whose label says what selecting it will do, as the
+// ATU menu's toggles do. CESSBMenuRefreshLabel() keeps it in step with ED.
+static char cessbLabel[16];
+
+/**
+ * Write the CESSB menu item's label for the current setting.
+ */
+void CESSBMenuRefreshLabel(void){
+    snprintf(cessbLabel, sizeof(cessbLabel), "%s", ED.cessbEnabled ? "Disable CESSB" : "Enable CESSB");
+}
+
+/**
+ * Menu callback to turn Controlled Envelope SSB on or off for SSB transmit.
+ * Flips ED.cessbEnabled; the transmit chain reads it every block.
+ */
+void ToggleCESSB(void){
+    ED.cessbEnabled = !ED.cessbEnabled;
+    CESSBMenuRefreshLabel();
+}
+
+struct SecondaryMenuOption AudioOptions[12] = {
     "AGC Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
     "AGC Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
     "AGC Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
@@ -457,6 +477,7 @@ struct SecondaryMenuOption AudioOptions[11] = {
     "Kim Noise Reduction", functionOption, NULL, (void *)SelectNRKim, NULL,
     "Spectral Noise Reduc.", functionOption, NULL, (void *)SelectNRSpectral, NULL,
     "LMS Noise Reduction", functionOption, NULL, (void *)SelectNRLMS, NULL,
+    cessbLabel, functionOption, NULL, (void *)ToggleCESSB, NULL,
 };
 
 // Microphone Options
@@ -756,6 +777,7 @@ void UpdateArrayVariables(void){
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
+    CESSBMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif
@@ -974,6 +996,7 @@ void DrawMainMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    CESSBMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif
@@ -1013,6 +1036,7 @@ void DrawSecondaryMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    CESSBMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif

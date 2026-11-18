@@ -1719,3 +1719,21 @@ Recommended: a native `DataBlock` stage between `TXInterpolateBy2Again` and IQ c
 filters generated in Hz, `TXGain` moved after it so the ceiling equals the power setting (PEP),
 bypassed in digital and the calibration states, and Kenwood `PR`/`PL` over CAT. Also found a
 mic-gain unsigned wrap, logged in [[documentation-todos]]. No firmware changed.
+
+## [2026-11-18] decision | CESSB Phase 1 built: stage, TXGain move, Audio Options toggle
+On branch `cessb-proposal`, after the user asked for a menu option under Audio Options to enable
+or disable CESSB:
+- **The stage:** `DSP_CESSB.cpp` runs in `TransmitProcessing()` after `TXInterpolateBy2Again`,
+  only in `SSB_TRANSMIT` with `ED.cessbEnabled` set. Disabled means bypassed. The setting is
+  off by default and persisted. `TXGain` now follows the stage and scales I and Q, so the
+  ceiling (`CESSB_CEILING` 0.1295, the calibration tone's node envelope) maps onto
+  `powerOutSSB` as PEP. Mic gain is clamped to 0–63 dB (`MicGainForCodec`).
+- **Two findings:**
+  - The audio is on *negative* frequencies at the node. CMSIS FIR coefficient tables are
+    time-reversed, which mirrors the Hilbert pair. The first build shifted the wrong way
+    and filtered the voice out, and the Phase 0 model had been mirrored as well.
+  - `CalcFIRCoeffs` centres odd-length filters on a half sample. The fix is to design 124
+    taps and drop the first, giving an exactly symmetric 123-tap filter that the overshoot
+    controller's delay line lines up with.
+- **Results:** 12 new gtests. The firmware's two-tone figures match the model to about
+  0.6 dB (−62.7 / −29.2 dBc against −62.5 / −28.6). See [[cessb]] "Phase 1 as built".

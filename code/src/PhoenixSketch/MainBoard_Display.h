@@ -273,6 +273,8 @@ void DecrementValue(void);
  * @note Ensures menu displays current band-specific settings
  */
 void UpdateArrayVariables(void);
+void CESSBMenuRefreshLabel(void);
+void ToggleCESSB(void);
 
 /**
  * @brief Turn button presses into a new frequency selection
