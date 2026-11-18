@@ -1735,7 +1735,7 @@ TEST(TransmitChainCESSB, MovingTXGainChangesNothing){
 
 TEST(TransmitChainCESSB, MenuTogglesTheSettingAndItsLabel){
     const bool saved = ED.cessbEnabled;
-    extern struct SecondaryMenuOption AudioOptions[12];
+    extern struct SecondaryMenuOption AudioOptions[13];
     const SecondaryMenuOption &item = AudioOptions[11];
     ED.cessbEnabled = false;
     CESSBMenuRefreshLabel();
@@ -1747,6 +1747,122 @@ TEST(TransmitChainCESSB, MenuTogglesTheSettingAndItsLabel){
     EXPECT_FALSE(ED.cessbEnabled);
     EXPECT_STREQ(item.label, "Enable CESSB");
     ED.cessbEnabled = saved;
+}
+
+// Peak envelope of a CESSB run's output, and the meter afterwards
+static float32_t RunTwoTone(float32_t eachAmp, int32_t drive_dB, float32_t *meter_dB){
+    const int32_t saved = ED.cessbDrive_dB;
+    ED.cessbDrive_dB = drive_dB;
+    const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {eachAmp, eachAmp};
+    CaptureNode(192000.0f, f, a, 2, 12, CESSB_CAPTURE, NULL, NULL, oI, oQ);
+    float32_t peak = 0.0f;
+    for (int n = 0; n < 256*CESSB_CAPTURE; n++) peak = fmaxf(peak, sqrtf(oI[n]*oI[n] + oQ[n]*oQ[n]));
+    if (meter_dB) *meter_dB = GetCESSBCompression_dB();
+    ED.cessbDrive_dB = saved;
+    return peak;
+}
+
+/**
+ * The processor level is gain ahead of the clipper. A two-tone peaking at half
+ * the ceiling (each tone at a quarter of the calibration level) passes at half
+ * the ceiling with no drive, and is held at the ceiling with 6 dB or more.
+ */
+TEST(TransmitChainCESSB, ProcessorLevelDrivesTheClipper){
+    UseRate(SAMPLE_RATE_192K);
+    const float32_t p0  = RunTwoTone(0.02f, 0, NULL);
+    const float32_t p6  = RunTwoTone(0.02f, 6, NULL);
+    const float32_t p10 = RunTwoTone(0.02f, 10, NULL);
+    printf("  two-tone at half the ceiling: peak %.3f / %.3f / %.3f x ceiling at 0 / 6 / 10 dB\n",
+           p0/CESSB_CEILING, p6/CESSB_CEILING, p10/CESSB_CEILING);
+    EXPECT_NEAR(p0/CESSB_CEILING, 0.5f, 0.05f);
+    EXPECT_GT(p6/CESSB_CEILING, 0.9f);
+    EXPECT_LT(p6/CESSB_CEILING, 1.03f);
+    EXPECT_LT(p10/CESSB_CEILING, 1.03f);
+
+    // Below the ceiling the level is plain gain: a quarter-ceiling tone, +6 dB
+    const int32_t saved = ED.cessbDrive_dB;
+    const float32_t f[1] = {1000.0f}, a[1] = {0.02f};
+    ED.cessbDrive_dB = 0;
+    CaptureNode(192000.0f, f, a, 1, 12, 4, NULL, NULL, oI, oQ);
+    const float32_t g0 = ComplexToneLevel(oI, oQ, 1024, CH*1000.0f, 24000.0f);
+    ED.cessbDrive_dB = 6;
+    CaptureNode(192000.0f, f, a, 1, 12, 4, NULL, NULL, oI, oQ);
+    const float32_t g6 = ComplexToneLevel(oI, oQ, 1024, CH*1000.0f, 24000.0f);
+    ED.cessbDrive_dB = saved;
+    EXPECT_NEAR(20.0f*log10f(g6/g0), 6.0f, 0.1f);
+}
+
+/**
+ * The compression meter reads how far the envelope going into the clipper
+ * exceeds the ceiling. A steady tone has a flat envelope, so it reads exactly
+ * the tone's level above the ceiling, plus the processor level.
+ */
+TEST(TransmitChainCESSB, CompressionMeterReadsDecibelsOverTheCeiling){
+    UseRate(SAMPLE_RATE_192K);
+    const int32_t saved = ED.cessbDrive_dB;
+    const struct { float32_t amp; int32_t drive; float32_t expect; } cases[] = {
+        {0.04f, 0, 0.0f},      // half the ceiling: nothing clipped
+        {0.16f, 0, 6.02f},     // twice the ceiling
+        {0.08f, 4, 4.0f},      // at the ceiling, 4 dB of processor level
+        {0.08f, 10, 10.0f},
+    };
+    for (auto &c : cases){
+        // Flush the transmit filters with silence and clear the meter, so the
+        // previous (louder) case's history cannot set this one's peak
+        const float32_t silent[1] = {0.0f};
+        const float32_t fz[1] = {1000.0f};
+        CaptureNode(192000.0f, fz, silent, 1, 12, 0, NULL, NULL, NULL, NULL);
+        CESSBSkipped();
+        ED.cessbDrive_dB = c.drive;
+        // 800 Hz, the calibration tone's frequency: the ceiling is defined there,
+        // and the default transmit equaliser is not flat
+        const float32_t f[1] = {800.0f}, a[1] = {c.amp};
+        CaptureNode(192000.0f, f, a, 1, 12, 4, NULL, NULL, oI, oQ);
+        const float32_t m = GetCESSBCompression_dB();
+        printf("  tone %.2f, level %ld dB: meter %.2f dB\n", c.amp, (long)c.drive, m);
+        EXPECT_NEAR(m, c.expect, 0.1f) << "amp " << c.amp << " drive " << c.drive;
+    }
+    ED.cessbDrive_dB = saved;
+
+    // Released when CESSB stops running
+    CESSBSkipped();
+    EXPECT_EQ(GetCESSBCompression_dB(), 0.0f);
+}
+
+TEST(TransmitChainCESSB, CompressionBarColours){
+    int16_t g, y, r;
+    CompressionBarWidths(0.0f, &g, &y, &r);
+    EXPECT_EQ(g + y + r, 0);
+    CompressionBarWidths(3.0f, &g, &y, &r);
+    EXPECT_EQ(g, 25); EXPECT_EQ(y, 0); EXPECT_EQ(r, 0);
+    CompressionBarWidths(7.5f, &g, &y, &r);
+    EXPECT_EQ(g, 50); EXPECT_EQ(y, 13); EXPECT_EQ(r, 0);
+    CompressionBarWidths(30.0f, &g, &y, &r);
+    EXPECT_EQ(g, 50); EXPECT_EQ(y, 25); EXPECT_EQ(r, 25);
+    CompressionBarWidths(-5.0f, &g, &y, &r);
+    EXPECT_EQ(g + y + r, 0);
+}
+
+TEST(TransmitChainCESSB, MenuHasTheProcessorLevel){
+    extern struct SecondaryMenuOption AudioOptions[13];
+    const SecondaryMenuOption &item = AudioOptions[12];
+    EXPECT_STREQ(item.label, "CESSB level (dB)");
+    ASSERT_NE(item.varPam, nullptr);
+    EXPECT_EQ(item.varPam->variable, &ED.cessbDrive_dB);
+    EXPECT_EQ(item.varPam->limits.i32.min, 0);
+    EXPECT_EQ(item.varPam->limits.i32.max, CESSB_DRIVE_MAX_DB);
+}
+
+TEST(TransmitChainCESSB, ProcessorLevelSurvivesSaveAndRestore){
+    InitializeStorage();
+    const int32_t saved = ED.cessbDrive_dB;
+    ED.cessbDrive_dB = 7;
+    SaveDataToStorage(false);
+    ED.cessbDrive_dB = 0;
+    RestoreDataFromStorage();
+    EXPECT_EQ(ED.cessbDrive_dB, 7);
+    ED.cessbDrive_dB = saved;
+    SaveDataToStorage(false);
 }
 
 TEST(TransmitChainCESSB, SettingSurvivesSaveAndRestore){
@@ -1766,6 +1882,7 @@ TEST(TransmitChainCESSB, SettingSurvivesSaveAndRestore){
 TEST(TransmitChainCESSB, DefaultsToOff){
     struct config_t fresh;
     EXPECT_FALSE(fresh.cessbEnabled);
+    EXPECT_EQ(fresh.cessbDrive_dB, 0);
 }
 
 /**

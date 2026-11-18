@@ -272,8 +272,9 @@ Where the build departs from the design above:
   ATU menu's toggles do. When disabled, the stage does not run at all; the "limiter at 0 dB
   drive" idea in section 4 is not used. `ED.cessbEnabled` defaults to `false` and persists
   as `cessbEnabled`.
-- **There is no separate drive control yet.** Microphone gain sets how hard the voice hits
-  the ceiling. A processor-level setting, the meter and CAT `PR`/`PL` remain Phase 2.
+- **The level control came in Phase 2.** In Phase 1, microphone gain alone set how hard
+  the voice hit the ceiling. The processor level, the meter and CAT `PR`/`PL`/`RM` are now
+  built; see [Phase 2 as built](#phase-2-as-built).
 - **The channel is on *negative* frequencies at the node.** CMSIS FIR functions take their
   coefficient tables time-reversed. That leaves the symmetric lowpasses unchanged, but it
   mirrors the ±45° Hilbert pair, so before `SidebandSelection()` the audio sits on the LSB
@@ -305,6 +306,39 @@ Where the build departs from the design above:
 - History is cleared after a skipped block.
 - The menu toggle, persistence, the default (off) and the mic-gain clamp all behave as
   intended.
+
+## Phase 2 as built
+
+All on branch `cessb-proposal`, 2026-11-18:
+
+- **Processor level, `ED.cessbDrive_dB`, 0–10 dB, default 0.** This is gain ahead of the
+  clipper (`CESSBDriveGain()`), on top of the mic gain. It appears in the menu as Audio
+  Options → "CESSB level (dB)", next to the on/off item. It is persisted as `cessbDrive_dB`.
+  The default of 0 keeps Phase 1's behaviour: the mic gain alone decides the processing
+  until the operator raises the level.
+- **Compression meter, `GetCESSBCompression_dB()`.** It reads the dB by which each block's
+  envelope going into the clipper exceeds the ceiling, held on peaks and released at about
+  9 dB/s. It resets when CESSB stops running.
+  - On the transmit state-of-health pane, with CESSB running, the Q bar is replaced by a
+    "C" bar covering 0–12 dB: green to 6 dB, yellow to 9, red beyond.
+  - The Q bar went because it duplicated I.
+- **CAT:**
+  - `PL P1P1P1 P2P2P2;`: P1 is the processor level at 10 per dB, rounded; P2 is stored and
+    echoed but changes nothing, because `PC` owns output power.
+  - `RM`: `RM2;` selects the COMP meter, and `RM;` reads it as `RM2nnnn;`, 0–10 dots at
+    2 dB per dot.
+  - SWR and ALC (`RM1`/`RM3`) can be selected but read `?;` rather than a value that isn't
+    one.
+- **gtests:**
+  - `ProcessorLevelDrivesTheClipper`: a two-tone at half the ceiling comes out at
+    0.48 / 0.95 / 0.97 × at 0 / 6 / 10 dB, and below the ceiling the level is +6.0 dB of gain.
+  - `CompressionMeterReadsDecibelsOverTheCeiling`: an 800 Hz tone reads 6.03 / 4.01 /
+    10.01 dB against 6 / 4 / 10 expected.
+  - Also: the bar colours, the menu item, persistence, the default, and `PL`/`RM` in
+    `CAT_test`.
+- **Bench (`cessb_hil` section 2b):** a tone 6 dB below the ceiling comes out at −5.77,
+  −2.76, −0.01 and −0.01 dB at levels 0, 3, 6 and 10 dB. `RM` read the expected dots at all
+  four meter points. 45/45 checks pass.
 
 ## Phase 3: bench results (exciter I/Q, 2026-11-18)
 
@@ -353,7 +387,7 @@ What the results show:
 |---|---|---|
 | 0 | Offline model, variant choice, parameters (this branch) | ✅ `results/results.md` |
 | 1 | Fix mic gain; `DSP_CESSB.cpp`; filter design in `InitializeCESSB`; `TXGain` move; ceiling; bypass gating; Audio Options on/off toggle with storage; gtests | ✅ 2026-11-18, see [Phase 1 as built](#phase-1-as-built) |
-| 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`, wiki [[cat-control]] | `PR` ✅ 2026-11-18 (needed by the bench suite); the level setting, `PL` and the meter remain |
+| 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`/`RM`, wiki [[cat-control]] | ✅ 2026-11-18, see [Phase 2 as built](#phase-2-as-built) |
 | 3 | Bench and RF validation; tune the default drive and `gainCompensate` | Exciter I/Q ✅ 2026-11-18 (see Phase 3 above); RF (PA splatter, PEP at the antenna) and on-air still to do |
 | 4 | User docs; wiki [[dsp-chain]] update; close #35 | — |
 

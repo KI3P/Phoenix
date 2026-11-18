@@ -75,6 +75,10 @@ char *PC_read(  char* cmd );
 char *PD_read(  char* cmd );
 char *PR_write( char* cmd );
 char *PR_read(  char* cmd );
+char *PL_write( char* cmd );
+char *PL_read(  char* cmd );
+char *RM_write( char* cmd );
+char *RM_read(  char* cmd );
 char *PS_write( char* cmd );
 char *PS_read(  char* cmd );
 char *RX_write( char* cmd );
@@ -129,7 +133,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 40
+#define NUM_SUPPORTED_COMMANDS 42
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AC", 3+3,3, AC_write, AC_read },  // antenna tuner: TX-AT in/thru, start/stop tuning
@@ -153,6 +157,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "PC", 3+3,3, PC_write, PC_read }, // output power
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
         { "PR", 3+1,3, PR_write, PR_read }, // speech processor (CESSB) 0=off 1=on
+        { "PL", 3+6,3, PL_write, PL_read }, // speech processor input/output level 000-100 each
+        { "RM", 3+1,3, RM_write, RM_read }, // meter: select 1/2/3, read; only 2 (COMP) is implemented
         { "PS", 3+1,3, PS_write, PS_read },  // Rig power on/off
         // RX; unkeys; RX0;/RX1; (main/sub receiver) are accepted too and behave
         // identically - Phoenix has one receiver. Both forms are writes.
@@ -740,6 +746,88 @@ char *PR_write( char* cmd ){
  */
 char *PR_read( char* cmd ){
     sprintf( obuf, "PR%d;", ED.cessbEnabled ? 1 : 0 );
+    return obuf;
+}
+
+// PL's output level. Accepted and echoed so a client reads back what it set, but
+// not acted on: output power belongs to PC.
+static int plOutputLevel = 50;
+
+/**
+ * CAT command PL - speech processor input and output levels
+ * (ts_480_pc.pdf: PL P1P1P1 P2P2P2; each 000-100)
+ *
+ * The input level is the CESSB processor level, ED.cessbDrive_dB, at 10 per dB:
+ * PL060xxx; is 6 dB of drive into the clipper. Values round to the nearest dB.
+ * The output level is stored and read back but changes nothing.
+ *
+ * @param cmd CAT command string, PLnnnmmm;
+ * @return Empty string on success, "?;" if either level is outside 000-100
+ */
+char *PL_write( char* cmd ){
+    for (int i = 2; i < 8; i++){
+        if (cmd[i] < '0' || cmd[i] > '9'){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    const int in  = (cmd[2]-'0')*100 + (cmd[3]-'0')*10 + (cmd[4]-'0');
+    const int out = (cmd[5]-'0')*100 + (cmd[6]-'0')*10 + (cmd[7]-'0');
+    if ( in > 100 || out > 100 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.cessbDrive_dB = ( in * CESSB_DRIVE_MAX_DB + 50 ) / 100;
+    plOutputLevel = out;
+    return empty_string_p;
+}
+
+/**
+ * CAT command PL - read the speech processor levels
+ * @param cmd CAT command string
+ * @return "PLnnnmmm;": nnn is the processor level (10 per dB), mmm the stored output level
+ */
+char *PL_read( char* cmd ){
+    sprintf( obuf, "PL%03ld%03d;", (long)( ED.cessbDrive_dB * 100 / CESSB_DRIVE_MAX_DB ), plOutputLevel );
+    return obuf;
+}
+
+// The meter RM reads. Phoenix implements only COMP (2); SWR (1) and ALC (3) can
+// be selected but read back as errors, rather than as a reading that is not one.
+static int rmSelected = 2;
+
+/**
+ * CAT command RM - select the meter (ts_480_pc.pdf: RM P1; 1=SWR, 2=COMP, 3=ALC)
+ * @param cmd CAT command string, RM1; to RM3;
+ * @return Empty string on success, "?;" otherwise
+ */
+char *RM_write( char* cmd ){
+    if ( cmd[2] < '1' || cmd[2] > '3' ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    rmSelected = cmd[2] - '0';
+    return empty_string_p;
+}
+
+/**
+ * CAT command RM - read the selected meter
+ *
+ * COMP is the CESSB compression meter, GetCESSBCompression_dB(), in the TS-480's
+ * 0-10 dots at 2 dB per dot (0-20 dB). It reads 0 whenever CESSB is not running.
+ *
+ * @param cmd CAT command string
+ * @return "RM2nnnn;" for COMP; "?;" for the meters Phoenix does not have
+ */
+char *RM_read( char* cmd ){
+    if ( rmSelected != 2 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    int dots = (int)( GetCESSBCompression_dB() / 2.0f + 0.5f );
+    if ( dots > 10 ) dots = 10;
+    if ( dots < 0 ) dots = 0;
+    sprintf( obuf, "RM2%04d;", dots );
     return obuf;
 }
 

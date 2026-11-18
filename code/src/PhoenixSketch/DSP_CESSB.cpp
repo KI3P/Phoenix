@@ -84,6 +84,10 @@ static double loPhase = 0.0;      // radians, kept in (-2*pi, 2*pi)
 static double loStep = 0.0;       // radians per sample
 static bool needsReset = true;
 
+// Compression meter: the block's largest envelope going into the clipper, in dB
+// above the ceiling, held on peaks and released at CESSB_METER_DECAY_DB per block
+static float32_t meter_dB = CESSB_METER_FLOOR_DB;
+
 /**
  * Clear the filter and delay-line history. Does not touch the coefficients.
  */
@@ -139,13 +143,27 @@ bool CESSBActive(void){
 
 void CESSBSkipped(void){
     needsReset = true;
+    meter_dB = CESSB_METER_FLOOR_DB;
+}
+
+float32_t CESSBDriveGain(void){
+    int32_t d = ED.cessbDrive_dB;
+    if (d < 0) d = 0;
+    if (d > CESSB_DRIVE_MAX_DB) d = CESSB_DRIVE_MAX_DB;
+    return powf(10.0f, (float32_t)d / 20.0f);
+}
+
+float32_t GetCESSBCompression_dB(void){
+    return (meter_dB > 0.0f) ? meter_dB : 0.0f;
 }
 
 void CESSBProcess(DataBlock *data){
     if (needsReset) ResetCESSB();
     float32_t *I = data->I;
     float32_t *Q = data->Q;
-    const float32_t toUnit = 1.0f / CESSB_CEILING;
+    // The processor level: gain ahead of the clipper, on top of the mic gain
+    const float32_t toUnit = CESSBDriveGain() / CESSB_CEILING;
+    float32_t blockPeak = 0.0f;
 
     // Local oscillator for this block, and the shift down, in the same pass
     for (uint32_t n = 0; n < CESSB_BLOCK_SIZE; n++){
@@ -165,6 +183,7 @@ void CESSBProcess(DataBlock *data){
 
         // Envelope clip: limit the magnitude, keep the phase
         const float32_t mag = sqrtf(xi * xi + xq * xq);
+        if (mag > blockPeak) blockPeak = mag;
         if (mag > 1.0f){
             xi /= mag;
             xq /= mag;
@@ -172,6 +191,12 @@ void CESSBProcess(DataBlock *data){
         I[n] = xi;
         Q[n] = xq;
     }
+
+    // Meter: how far above the ceiling the block's peak went, held and released
+    const float32_t peak_dB = (blockPeak > 1e-6f) ? 20.0f * log10f(blockPeak) : CESSB_METER_FLOOR_DB;
+    meter_dB -= CESSB_METER_DECAY_DB;
+    if (meter_dB < CESSB_METER_FLOOR_DB) meter_dB = CESSB_METER_FLOOR_DB;
+    if (peak_dB > meter_dB) meter_dB = peak_dB;
 
     // Remove the clipper's out-of-channel products
     arm_fir_f32(&clipFirI, I, I, CESSB_BLOCK_SIZE);

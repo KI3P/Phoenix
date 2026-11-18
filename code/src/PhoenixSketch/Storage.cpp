@@ -141,6 +141,7 @@ void SaveDataToStorage(bool savetosd){
     doc["currentMicGain"] = ED.currentMicGain;
     doc["digitalDriveLevel"] = ED.digitalDriveLevel;
     doc["cessbEnabled"] = ED.cessbEnabled;
+    doc["cessbDrive_dB"] = ED.cessbDrive_dB;
     doc["digitalRxLevel"] = ED.digitalRxLevel;
 
     // Band-specific arrays
@@ -373,6 +374,7 @@ void RestoreDataFromStorage(void){
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
     ED.digitalDriveLevel = doc["digitalDriveLevel"] | ED.digitalDriveLevel;
     ED.cessbEnabled = doc["cessbEnabled"] | ED.cessbEnabled;
+    ED.cessbDrive_dB = doc["cessbDrive_dB"] | ED.cessbDrive_dB;
     ED.digitalRxLevel = doc["digitalRxLevel"] | ED.digitalRxLevel;
 
     if (doc["dbm_calibration"].is<JsonArray>()) {
@@ -625,6 +627,7 @@ void RestoreDataFromSDCard(void){
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
     ED.digitalDriveLevel = doc["digitalDriveLevel"] | ED.digitalDriveLevel;
     ED.cessbEnabled = doc["cessbEnabled"] | ED.cessbEnabled;
+    ED.cessbDrive_dB = doc["cessbDrive_dB"] | ED.cessbDrive_dB;
     ED.digitalRxLevel = doc["digitalRxLevel"] | ED.digitalRxLevel;
 
     if (doc["dbm_calibration"].is<JsonArray>()) {
@@ -841,6 +844,7 @@ void PrintEDToSerial(void){
     Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
     Serial.print("digitalDriveLevel: "); Serial.println(ED.digitalDriveLevel);
     Serial.print("cessbEnabled:      "); Serial.println(ED.cessbEnabled);
+    Serial.print("cessbDrive_dB:     "); Serial.println(ED.cessbDrive_dB);
     Serial.print("digitalRxLevel:    "); Serial.println(ED.digitalRxLevel);
     Serial.print("dbm_calibration: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {

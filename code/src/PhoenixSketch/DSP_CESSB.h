@@ -67,6 +67,15 @@ If not, see <https://www.gnu.org/licenses/>.
  *  ED.powerOutSSB. Pinned by TransmitChainCESSB.CeilingIsTheCalibrationTone. */
 #define CESSB_CEILING 0.1295f
 
+/** Largest processor level (drive into the clipper), dB. */
+#define CESSB_DRIVE_MAX_DB 10
+
+/** Compression meter release per block (~11 ms), dB: about 9 dB/s. */
+#define CESSB_METER_DECAY_DB 0.1f
+
+/** Bottom of the compression meter's internal range, dB re the ceiling. */
+#define CESSB_METER_FLOOR_DB (-60.0f)
+
 /** Samples of delay the stage adds: the clipper filter's group delay plus
  *  the overshoot controller's delay line. */
 #define CESSB_DELAY_SAMPLES ((CESSB_FIR_TAPS - 1) / 2 + (CESSB_FIR_TAPS - 1) / 2 + 2)
@@ -100,6 +109,20 @@ bool CESSBActive(void);
  * @param data CESSB_BLOCK_SIZE complex samples (data->I, data->Q)
  */
 void CESSBProcess(DataBlock *data);
+
+/**
+ * @brief Linear gain the processor level (ED.cessbDrive_dB) puts ahead of the clipper
+ * @return 10^(drive/20), with the drive clamped to 0..CESSB_DRIVE_MAX_DB
+ */
+float32_t CESSBDriveGain(void);
+
+/**
+ * @brief How hard the voice is hitting the ceiling: the compression meter
+ * @return dB by which the envelope going into the clipper exceeded the ceiling,
+ *         held on peaks and released at about 9 dB/s; 0 when nothing is clipped
+ *         or CESSB is not running
+ */
+float32_t GetCESSBCompression_dB(void);
 
 /**
  * @brief Note that a transmit block went by without CESSBProcess()

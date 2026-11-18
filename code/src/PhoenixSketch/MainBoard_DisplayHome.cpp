@@ -985,6 +985,42 @@ void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
         tft.fillRect(x0+1+widthgreen+widthyellow, y0+1,widthred, 20, RA8875_RED);
 }
 
+/** Full scale of the CESSB compression bar, dB above the ceiling. */
+#define COMP_BAR_FULL_DB   12.0f
+/** Green up to here: the 3-6 dB of processing W7PUA and W9GR recommend. */
+#define COMP_BAR_GREEN_DB  6.0f
+/** Yellow up to here; red beyond, where the voice starts to sound processed. */
+#define COMP_BAR_YELLOW_DB 9.0f
+
+/**
+ * Width in pixels (0-100) of each colour of the CESSB compression bar.
+ * Separated from the drawing so it can be tested.
+ */
+void CompressionBarWidths(float32_t comp_dB, int16_t *green, int16_t *yellow, int16_t *red){
+    float32_t db = comp_dB;
+    if (db < 0.0f) db = 0.0f;
+    if (db > COMP_BAR_FULL_DB) db = COMP_BAR_FULL_DB;
+    const int16_t total  = (int16_t)(100.0f * db / COMP_BAR_FULL_DB + 0.5f);
+    const int16_t gLimit = (int16_t)(100.0f * COMP_BAR_GREEN_DB / COMP_BAR_FULL_DB + 0.5f);
+    const int16_t yLimit = (int16_t)(100.0f * COMP_BAR_YELLOW_DB / COMP_BAR_FULL_DB + 0.5f);
+    *green  = (total < gLimit) ? total : gLimit;
+    *yellow = (total < yLimit) ? total - *green : yLimit - gLimit;
+    if (*yellow < 0) *yellow = 0;
+    *red    = total - *green - *yellow;
+}
+
+/**
+ * The CESSB compression meter: how far the voice is pushed past the ceiling.
+ */
+void DrawCompressionBar(int16_t x0, int16_t y0, float32_t comp_dB){
+    int16_t g, y, r;
+    CompressionBarWidths(comp_dB, &g, &y, &r);
+    tft.drawRect(x0, y0, 100, 22, RA8875_WHITE);
+    if (g > 0) tft.fillRect(x0+1, y0+1, g, 20, RA8875_GREEN);
+    if (y > 0) tft.fillRect(x0+1+g, y0+1, y, 20, RA8875_YELLOW);
+    if (r > 0) tft.fillRect(x0+1+g+y, y0+1, r, 20, RA8875_RED);
+}
+
 /**
  * Render the state of health pane showing DSP load and system status. Use this pane for
  * VU meters of transmit amplitude in SSB transmit mode.
@@ -1007,10 +1043,17 @@ void DrawStateOfHealthPane(void) {
         tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
         tft.print("I");
         tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0);
-        tft.print("Q");
+        // With CESSB running, Q (which tracks I closely) gives way to the
+        // compression meter: "C", dB of clipping, 0-12 dB across the bar
+        const bool cessb = CESSBActive();
+        tft.print(cessb ? "C" : "Q");
         //Debug(GetOutIRMS()); // uncomment to print the RMS values on the Serial line
         DrawVUBar(PaneStateOfHealth.x0+20, PaneStateOfHealth.y0+7, GetOutIRMS());
-        DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
+        if (cessb)
+            DrawCompressionBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20,
+                               PaneStateOfHealth.y0+7, GetCESSBCompression_dB());
+        else
+            DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
 
         PaneStateOfHealth.stale = false;
         return;

@@ -465,7 +465,14 @@ void ToggleCESSB(void){
     CESSBMenuRefreshLabel();
 }
 
-struct SecondaryMenuOption AudioOptions[12] = {
+// CESSB processor level: dB of gain ahead of the clipper (DSP_CESSB.h)
+VariableParameter cessbDrive = {
+    .variable = &ED.cessbDrive_dB,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = CESSB_DRIVE_MAX_DB, .step = 1}}
+};
+
+struct SecondaryMenuOption AudioOptions[13] = {
     "AGC Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
     "AGC Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
     "AGC Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
@@ -478,6 +485,7 @@ struct SecondaryMenuOption AudioOptions[12] = {
     "Spectral Noise Reduc.", functionOption, NULL, (void *)SelectNRSpectral, NULL,
     "LMS Noise Reduction", functionOption, NULL, (void *)SelectNRLMS, NULL,
     cessbLabel, functionOption, NULL, (void *)ToggleCESSB, NULL,
+    "CESSB level (dB)", variableOption, &cessbDrive, NULL, NULL,
 };
 
 // Microphone Options

@@ -331,6 +331,10 @@ extern struct config_t {
     /** Controlled Envelope SSB on the SSB transmit chain (DSP_CESSB.h). Off by
      *  default until it has been validated on the bench and on air. */
     bool cessbEnabled = false;
+    /** CESSB processor level: gain ahead of the clipper, 0 to CESSB_DRIVE_MAX_DB dB.
+     *  The microphone gain sets the voice level; this sets how much of it is
+     *  pushed past the ceiling. */
+    int32_t cessbDrive_dB = 0;
     /** Level (0-100) applied to USB receive audio in digital mode.
      *
      * The receive audio arriving at the USB tap is unregulated: with AGC off the

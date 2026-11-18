@@ -21,6 +21,8 @@ CAT     ------- /dev/ttyACM0       (single-port USB build; --cat-port otherwise)
 ```
 
 - **Firmware:** needs CAT `PR`, so the CESSB branch from commit "CESSB: CAT PR" onwards.
+  The processor-level and meter checks also need `PL` and `RM` (Phase 2); without them
+  those checks are skipped with a warning.
   For the KI3P prototype, flash with `KI3P_prototype.patch` applied.
 - **Radio state:** the radio must be in SSB (USB or LSB) and receiving.
 - **Dummy load:** the radio is keyed for about 1.5 minutes at the set SSB power, so fit a
@@ -51,6 +53,11 @@ Exit codes: `0` pass, `1` fail, `2` error, `3` aborted.
    - below the ceiling, on and off agree (only at AWG levels ≥ 20 mV; see below).
 2. **Power tracking.** Halving the SSB power must move the ceiling by
    `10·log10(P½/P)`, because `TXGain` maps the ceiling onto the requested power (PEP).
+2b. **Processor level and meter** (needs Phase 2 firmware: CAT `PL` and `RM`). A tone 6 dB
+   below the ceiling, at levels 0, 3, 6 and 10 dB, must come out 6 dB below, 3 dB below,
+   then at the ceiling. The compression meter read over `RM` must show the dB over the
+   ceiling at 2 dB per dot. The rest of the run uses level 0 dB, and the original `PL` is
+   restored at the end.
 3. **Stimuli,** each at 0, 3, 6 and 9 dB above the ceiling, CESSB off and on. All are
    periodic, so one period fits the AWG's 4096-sample buffer and every run gets the same
    signal:

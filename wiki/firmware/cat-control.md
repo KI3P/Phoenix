@@ -61,7 +61,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 > handler** — it becomes silently write-only. This is not hypothetical: it is exactly the bug
 > that made `FW;` unreadable for as long as `FW` has existed (see below).
 
-## Implemented commands (37)
+## Implemented commands (39)
 
 | Group | Commands |
 |---|---|
@@ -72,7 +72,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
 | SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
 | Antenna tuner | `AC` (Kenwood: start/stop tuning, network in/thru), `AT` (raw ATU relay state), `AX`/`AY` (tuner diagnostics); need `ATU_PRESENT` except `AC`, which reads `AC000;` without it; see [[atu-control]] |
-| DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX), `PR` (speech processor = CESSB on/off, `PR0;`/`PR1;`/`PR;`; branch `cessb-proposal`, see [[cessb]]) |
+| DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX), `PR` (speech processor = CESSB on/off, `PR0;`/`PR1;`/`PR;`), `PL` (processor input level = CESSB level, 10 per dB; output level stored, not used), `RM` (meter: only `RM2` COMP, the CESSB compression meter at 2 dB per dot; `RM1`/`RM3` read `?;`). Branch `cessb-proposal`, see [[cessb]] |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |
 | Misc | `AI` (auto-info), `PS` (`PS0;` powers off, `PS1;` is a silent no-op), `PD`, `DB` |

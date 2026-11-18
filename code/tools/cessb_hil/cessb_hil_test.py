@@ -99,6 +99,25 @@ def set_power(radio: Radio, watts: int) -> None:
     time.sleep(0.2)
 
 
+def get_pl(radio: Radio) -> tuple[int, int]:
+    m = query(radio, "PL;", r"PL(\d{3})(\d{3});")
+    return int(m.group(1)), int(m.group(2))
+
+
+def set_level_db(radio: Radio, drive_db: int, out: int = 50) -> None:
+    """Set the CESSB processor level over PL (10 per dB on the input level)."""
+    radio.send(f"PL{int(drive_db) * 10:03d}{out:03d};", expect_reply=False)
+    time.sleep(0.2)
+    got = get_pl(radio)[0]
+    if got != int(drive_db) * 10:
+        raise CatError(f"PL did not take: asked {drive_db * 10:03d}, read {got:03d}")
+
+
+def read_comp_dots(radio: Radio) -> int:
+    radio.send("RM2;", expect_reply=False)
+    return int(query(radio, "RM;", r"RM2(\d{4});").group(1))
+
+
 def get_md(radio: Radio) -> int:
     return int(query(radio, "MD;", r"MD(\d);").group(1))
 
@@ -156,6 +175,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--scope-offset", type=float, default=1.6)
     p.add_argument("--settle", type=float, default=0.3)
     p.add_argument("--no-power-check", action="store_true")
+    p.add_argument("--no-level-check", action="store_true",
+                   help="skip the processor level (PL) and meter (RM) checks")
+    p.add_argument("--max-level-error-db", type=float, default=0.5)
     # Limits
     p.add_argument("--max-overshoot-pct", type=float, default=5.0,
                    help="peak envelope allowed above the ceiling with CESSB on "
@@ -233,6 +255,16 @@ def run(args) -> int:
             restores.append(("CESSB", lambda: radio.send(f"PR{1 if pr0 else 0};",
                                                          expect_reply=False)))
             restores.append(("power", lambda: set_power(radio, pc0)))
+            try:
+                pl0 = get_pl(radio)
+            except CatError:
+                pl0 = None
+                doc["warnings"].append("this firmware has no PL: the processor level "
+                                       "and meter checks need CESSB Phase 2")
+            if pl0 is not None:
+                restores.append(("processor level", lambda: radio.send(
+                    f"PL{pl0[0]:03d}{pl0[1]:03d};", expect_reply=False)))
+                set_level_db(radio, 0, pl0[1])      # the rest of the run is at 0 dB
             if args.mic_gain is not None:
                 mg0 = get_mg(radio)
                 restores.append(("mic gain", lambda: radio.set_mic_gain_pct(mg0)))
@@ -348,6 +380,46 @@ def run(args) -> int:
                            abs(err) <= args.max_power_error_db)
             elif not args.no_power_check:
                 doc["warnings"].append("power tracking skipped: SSB power below 2 W")
+
+            # -- 2b. processor level and compression meter -------------------------
+            if pl0 is not None and not args.no_level_check:
+                log("\n== 2b. Processor level (PL) and compression meter (RM) ==")
+                set_cessb(radio, True, args.settle)
+                lv = {}
+                # A tone 6 dB below the ceiling: the level should lift it 6 dB, to
+                # the ceiling and no further.
+                ad2.set_tone(TONE_HZ, 0.5 * knee_v)
+                for d in (0, 3, 6, 10):
+                    set_level_db(radio, d)
+                    time.sleep(args.settle)
+                    e = A.median_envelope(ad2.capture().analytic(swap), args.scope_rate)
+                    lv[d] = A.db(e / C)
+                    log(f"  tone at -6 dB, level {d:2d} dB: output {lv[d]:+.2f} dB re ceiling")
+                expect = {0: -6.0, 3: -3.0, 6: 0.0, 10: 0.0}
+                worst = max(abs(lv[d] - expect[d]) for d in lv)
+                checks.add("level.gain", "processor level",
+                           "Processor level is gain into the clipper (worst error)",
+                           worst, args.max_level_error_db, "dB",
+                           worst <= args.max_level_error_db)
+                # The meter: dB over the ceiling, 2 dB per dot
+                meter = []
+                for amp_x, d in ((0.5, 0), (2.0, 0), (2.0, 4), (1.0, 10)):
+                    ad2.set_tone(TONE_HZ, amp_x * knee_v)
+                    set_level_db(radio, d)
+                    time.sleep(1.0)          # the meter releases at ~9 dB/s
+                    dots = read_comp_dots(radio)
+                    over = max(0.0, A.db(amp_x) + d)
+                    want = min(10, int(over / 2.0 + 0.5))
+                    meter.append({"tone_x_knee": amp_x, "level_db": d,
+                                  "expected_dots": want, "dots": dots})
+                    log(f"  tone {amp_x:.1f} x knee, level {d:2d} dB: RM {dots} dots "
+                        f"(expected {want}, {over:.1f} dB over)")
+                worst_dots = max(abs(m["dots"] - m["expected_dots"]) for m in meter)
+                checks.add("level.meter", "processor level",
+                           "Compression meter over CAT RM (worst error)",
+                           worst_dots, 1, "dots", worst_dots <= 1)
+                set_level_db(radio, 0, pl0[1])
+                doc["processor_level"] = {"output_re_ceiling_db": lv, "meter": meter}
 
             # -- 3. stimuli ----------------------------------------------------------
             from cessb_hil.predict import predict

@@ -1755,3 +1755,15 @@ The opposite sideband could not be resolved: the exciter's image moves between �
 −63 dBc from capture to capture, CESSB on or off (logged in [[documentation-todos]]). New
 gtests cover both rates for 2f₁−f₂ (7 dB worse at 176.4 ksps) and check that the stage
 does not image the channel. See [[cessb]] Phase 3.
+
+## [2026-11-18] decision | CESSB Phase 2 built: processor level, compression meter, PL and RM
+On branch `cessb-proposal`:
+- **Processor level:** `ED.cessbDrive_dB`, 0–10 dB of gain into the clipper, default 0.
+  It is the Audio Options item "CESSB level (dB)", persisted, and set over CAT `PL`
+  (10 per dB).
+- **Compression meter:** dB over the ceiling, peak-held, released at about 9 dB/s. It is
+  shown as a "C" bar in place of Q on the transmit pane while CESSB runs, and read over
+  CAT `RM2` at 2 dB per dot.
+- **Results:** gtests read the meter to within 0.03 dB. On the KI3P prototype the bench
+  suite's new section confirms the level is gain up to the ceiling (worst error 0.24 dB)
+  and the meter's dots are exact. 45/45 checks pass. See [[cessb]] "Phase 2 as built".
