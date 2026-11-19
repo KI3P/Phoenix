@@ -94,11 +94,76 @@ Exit codes: `0` pass, `1` fail, `2` error, `3` aborted.
   exciter, so it includes whatever peak regrowth they add. The model, which stops at the
   DAC, gives 1.0–1.4 %.
 
+## At RF: `cessb_rf_test.py`
+
+The same AD2 stimuli, but measured at the transmitter's output with the CMU200,
+after the RF board, the PA and the low-pass filters.
+
+```
+AD2 W1     ------> radio microphone input
+TX output  ------> dummy load, 60 dB tap ------> CMU200 RF1
+CAT        ------- /dev/ttyACM0
+```
+
+- **Radio:** on the band to test (20 m by default; checked, never changed), in SSB.
+  Main-board I/Q connected to the RF board. Dummy load.
+- **CMU200:** driven through the bench's own driver
+  (`~/Sync/Ham/015_CMU200_Control/mcp_server/cmu200.py`; `CMU200_DRIVER_DIR` to move it).
+  Release the MCP server's hold on the GPIB adapter first (`release_instrument`). The
+  tools venv needs `pyusb`.
+- **Peak and average:** the CMU200's NPOWer meter with its 1 MHz filter gives the average
+  and the largest instantaneous power: PEP. Checked on the bench: a steady tone reads
+  max − avg = 0.23 dB, a linear two-tone 3.04–3.16 dB (theory 3.01).
+- **Never overdriven with CESSB off.** CESSB off is measured only below the ceiling: the
+  transparency points (≥ 3 dB below) and the linear reference (`--ref-db`, −1 dB).
+- **Keyed per section**, unkeyed for `--rest` seconds between sections.
+
+```bash
+./venv/bin/python cessb_hil/cessb_rf_test.py                    # ~6 min, ~3 min key-down
+./venv/bin/python cessb_hil/cessb_rf_test.py --stimuli two_tone --drives 6
+./venv/bin/python cessb_hil/test_cessb_rf.py                    # self-tests, no hardware
+```
+
+It measures:
+
+1. **The ceiling:** the held PEP must equal the power setting through the tap (±1 dB,
+   which covers the tap's tolerance), be flat, and agree with CESSB off below the ceiling.
+2. **Power tracking:** a 40 % setting moves the held PEP by 10·log10(0.4).
+3. **Stimuli:**
+   - PEP against the ceiling;
+   - talk-power gain at equal PEP, computed as PAPR of the reference minus PAPR with CESSB on;
+   - average watts;
+   - narrow spectra (±7 kHz, 100 Hz RBW): opposite sideband, out of channel, carrier, and
+     the two-tone's odd-order products;
+   - a wide max-hold sweep (±25 kHz) for the syllable.
+
+**Spectral limits are set by the transmitter, not CESSB.** At RF the PA's own
+intermodulation sets the floor. On the KI3P prototype at 5 W, the linear two-tone with
+CESSB off already has 2f1−f2 at −30 dBc (−36 dB re PEP), and its out-of-channel power is
+−48 dB re PEP. The RF chain also compresses about 1 dB over the top 7 dB below full power.
+CESSB's own out-of-channel output is −97 dBc in the model.
+
+- **Two-tone (steady):** with CESSB on, the opposite sideband, 2f1−f2 and out-of-channel
+  power may exceed the linear two-tone reference by at most `--max-rise-db` (3 dB).
+- **Voice (`syllable_ah`):** with CESSB on, out-of-channel power in dB re PEP must stay
+  below the linear two-tone's from the same run. This asks whether processed voice
+  splatters less than the transmitter's standard IMD test signal. The opposite sideband
+  is still compared with the voice's own linear reference.
+- **Why voice isn't compared with its own linear reference for out-of-channel power:**
+  CESSB raises average power about 4–6 dB at equal PEP, so the PA's intermodulation
+  rises with it; at 9 dB drive that is about 4–8 dB more out-of-channel power re PEP than
+  linear voice. Also, a ratio to the wanted-band power scattered by several dB between runs
+  for the bursty syllable (4-sweep averages).
+
 ## Files
 
 | File | Purpose |
 |---|---|
-| `cessb_hil_test.py` | The runner |
+| `cessb_hil_test.py` | The runner (exciter I/Q) |
+| `cessb_rf_test.py` | The RF runner (CMU200 at the antenna connector) |
+| `rf.py` | CMU200 NPOWer/spectrum access and spectrum measurements |
+| `rf_report.py` | Markdown and plots for the RF runner |
+| `test_cessb_rf.py` | Self-tests for `rf.py` |
 | `stimuli.py` | The periodic test signals |
 | `analysis.py` | Envelope, PAPR, spectral and product measurements on captured I/Q |
 | `predict.py` | The model's prediction for the same stimulus, via `../cessb_model` |

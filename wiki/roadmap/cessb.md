@@ -3,7 +3,7 @@ title: "Dev: Controlled Envelope SSB (#35)"
 type: roadmap
 status: draft
 created: 2026-11-18
-updated: 2026-11-18
+updated: 2026-11-19
 tags: [development, proposal, transmit, ssb, cessb, speech-processing, dsp, cat]
 source_refs: []
 related: ["[[controlled-envelope-ssb]]", "[[development-backlog]]", "[[dsp-chain]]", "[[ssb-phasing-method]]", "[[runtime-filter-design]]", "[[digital-mode]]", "[[automatic-power-swr-calibration]]", "[[tx-filter-hil-test]]", "[[cat-control]]", "[[real-time-constraints]]"]
@@ -381,6 +381,52 @@ What the results show:
   - The AD2 is too coarse at a few millivolts (±1 dB between captures at 5 mV). The suite
     ignores levels below 20 mV for the transparency check.
 
+## Phase 3: RF results (antenna connector, 2026-11-19)
+
+**Suite:** `code/tools/cessb_hil/cessb_rf_test.py`.
+- The same AD2 stimuli; the transmitter feeds a dummy load with a 60 dB tap into CMU200 RF1.
+- Conditions: KI3P prototype, 14.175 MHz USB, 5 W, 176.4 ksps.
+- Peak and average power come from the CMU200's NPOWer meter (1 MHz filter, max = PEP).
+  Validated first: a steady tone reads max − avg = 0.23 dB, a linear two-tone 3.04–3.16 dB.
+- CESSB off is only ever measured below the ceiling, so the PA is never overdriven.
+- Final run: 25/25 checks pass. Report: `results/cessb_rf_20261119_071034.md`.
+
+| Result | RF | Exciter bench / model |
+|---|---|---|
+| Held PEP, overdriven tone | **5.06 W** for a 5 W setting (+0.05 dB through a nominal 60 dB tap), flat to 0.009 dB | flat to 0.002 dB |
+| CESSB on vs off below the ceiling | within 0.06 dB | +0.10 dB |
+| Held PEP, 5 → 2 W setting | −3.58 dB (−3.98 expected) | −3.97 dB |
+| Voice stand-in, talk-power gain at equal PEP, 3 / 6 / 9 dB drive | +2.66 / **+4.48** / +5.69 dB (repeat run: 4.43 / 5.38 at 6 / 9) | bench +2.37 / 4.11 / 5.24; model +2.57 / 4.08 / 5.15 |
+| Voice stand-in, average power at 5 W PEP | 0.23 W linear → 0.51 / 0.79 / 1.08 W | — |
+| PEP with CESSB on, all stimuli and drives | 0.03–0.77 dB **below** the ceiling | ≤ 1.031 × ceiling at the exciter |
+| Two-tone 2f₁−f₂, CESSB off (linear) / on at 6 dB | −29.9 / −30.8 dBc | −55.8 dBc DSP |
+| Out-of-channel power re PEP: linear two-tone / linear voice / voice on at 6 dB / at 9 dB | −48.1 / −71.5 / −72.9 / −59.9 dB | CESSB alone: −97 dBc (model) |
+| Wide sweep (±25 kHz, max hold), voice at 9 dB | nothing above the analyzer floor (about −77 dB re PEP) beyond ±4 kHz | — |
+
+What the results show:
+- **The power setting is PEP at the antenna.** That is the Phase 1 design goal, now measured.
+- **No peak regrowth through the PA.** Peaks land at or below the ceiling. The PA
+  compresses its brief peaks slightly; a two-tone's peaks land about 0.5–0.7 dB under the
+  steady tone's level.
+- **The talk-power gain survives to RF**, within 0.4–0.5 dB of the model (slightly better).
+- **The transmitter, not CESSB, sets the spectrum.**
+  - The PA's own two-tone IMD3 is −36 dB re PEP at 5 W on 20 m.
+  - The RF chain compresses about 1 dB over the top 7 dB below full power: tone steps of
+    1.5 dB give +1.3 to +1.4 dB at RF, against +1.53 at the exciter.
+  - CESSB raises voice average power 4–6 dB at equal PEP, so PA intermodulation rises with
+    it: at 9 dB drive, out-of-channel power is about 4–12 dB above linear voice. It is still
+    12 dB or more below the linear two-tone, the transmitter's standard IMD test signal.
+  - The suite's voice splatter check therefore compares against that two-tone figure.
+    Comparing against the voice's own linear reference scattered by several dB between runs
+    for the bursty stimulus.
+- **The power-setting error at 2 W** (−3.58 dB against −3.98 dB) is the radio's power
+  calibration at low power on 20 m, not CESSB: the exciter tracked to 0.01 dB.
+- **Found on the way:**
+  - A faulty cable between the main board and the RF board made the transmitter
+    double-sideband (both sidebands equal at −34.6 dBm). After the repair: the opposite
+    sideband is −48.5 dBc and the carrier −34 dBc for a 1 kHz tone.
+  - CAT `BU;` is band *up*, not a read. Sending it as a query moved the radio to 17 m.
+
 ## Phases
 
 | Phase | Work | Done when |
@@ -388,7 +434,7 @@ What the results show:
 | 0 | Offline model, variant choice, parameters (this branch) | ✅ `results/results.md` |
 | 1 | Fix mic gain; `DSP_CESSB.cpp`; filter design in `InitializeCESSB`; `TXGain` move; ceiling; bypass gating; Audio Options on/off toggle with storage; gtests | ✅ 2026-11-18, see [Phase 1 as built](#phase-1-as-built) |
 | 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`/`RM`, wiki [[cat-control]] | ✅ 2026-11-18, see [Phase 2 as built](#phase-2-as-built) |
-| 3 | Bench and RF validation; tune the default drive and `gainCompensate` | Exciter I/Q ✅ 2026-11-18 (see Phase 3 above); RF (PA splatter, PEP at the antenna) and on-air still to do |
+| 3 | Bench and RF validation; tune the default drive and `gainCompensate` | Exciter I/Q ✅ 2026-11-18; RF at 20 m ✅ 2026-11-19 (see the Phase 3 sections above); other bands and on-air still to do |
 | 4 | User docs; wiki [[dsp-chain]] update; close #35 | — |
 
 ## Open questions

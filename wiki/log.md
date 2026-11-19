@@ -1767,3 +1767,16 @@ On branch `cessb-proposal`:
 - **Results:** gtests read the meter to within 0.03 dB. On the KI3P prototype the bench
   suite's new section confirms the level is gain up to the ceiling (worst error 0.24 dB)
   and the meter's dots are exact. 45/45 checks pass. See [[cessb]] "Phase 2 as built".
+
+## [2026-11-19] query | CESSB at RF: 25/25 at the antenna connector on 20 m
+Added `code/tools/cessb_hil/cessb_rf_test.py`, which measures peak and average power with
+the CMU200's NPOWer meter and spectra through a 60 dB tap. Results on the KI3P prototype
+at 14.175 MHz, 5 W:
+- the held PEP is 5.06 W for a 5 W setting;
+- there is no peak regrowth through the PA;
+- the voice stand-in gains +4.48 dB of talk power at 6 dB drive (model +4.08).
+
+The PA sets the spectrum: its linear two-tone IMD3 is −36 dB re PEP, and voice processed
+by CESSB splatters 12 dB or more less than that two-tone. On the way, found a faulty
+main-board-to-RF-board cable (double sideband) and that CAT `BU;` is band up. See [[cessb]]
+"Phase 3: RF results".
