@@ -21,11 +21,21 @@ CESSB"*, which asks to "improve SSB transmission by implementing controlled enve
 - The evidence for this proposal is the offline model in
   `code/tools/cessb_model/` (README there; numbers in `results/results.md`).
 
-**Status:** Phases 0 and 1 are done on branch `cessb-proposal`, as of 2026-11-18:
+**Status:** as of 2026-11-19, Phases 0–2 are done on branch `cessb-proposal` (not yet
+merged), and Phase 3 is done at the exciter and at RF on 20 m:
 - **Phase 0:** the offline model.
 - **Phase 1:** the DSP stage, the `TXGain` move, the mic-gain fix, an Audio Options menu
-  toggle and gtests. CESSB is **off by default** until the bench and on-air checks of
-  Phase 3.
+  toggle and gtests. CESSB is **off by default**, which was decided on 2026-11-19 and is
+  permanent: it is opt-in.
+- **Phase 2:** the processor level, the C-bar compression meter, and CAT `PR`, `PL`
+  and `RM`.
+- **Phase 3:**
+  - exciter bench 45/45;
+  - RF at the antenna connector 25/25 (5.06 W PEP for 5 W; +4.5 dB talk power at 6 dB);
+  - CPU measured on the radio, 678 µs per block.
+  Other bands and on-air reports are still to do.
+- **Phase 4:** user documentation is drafted in `code/docs/CESSB_Report.html`. Still to do:
+  the PR to `nightly` and closing #35.
 
 See [Phase 1 as built](#phase-1-as-built) for where the build departs from the design below.
 
@@ -208,9 +218,21 @@ delay line), so **5.2 ms** at 192k and 5.6 ms at 176.4k.
 
 ### 6. Budget
 
-- **CPU:** 4 FIRs × 123 taps × 256 samples, about 126 k MACs, plus about 30 operations per
-  sample (`|z|`, sqrt, divide, 3-way max, the shift). That is about **0.2 ms per 10.7 ms
-  block**, roughly 2 % of the loop. Confirm with `/timing-measurement`.
+- **CPU, measured 2026-11-19** on the KI3P prototype (600 MHz, 176.4 ksps, o1lto):
+  - **Method:** the M7 cycle counter (`ARM_DWT_CYCCNT`) read around `CESSBProcess` and
+    around the whole of `TransmitProcessing`. This was temporary instrumentation, since
+    reverted; the radio's flag pins can't reach a scope.
+  - **The stage:** **678 µs per block** on average (655 µs minimum, 690 µs maximum), at
+    level 0 or level 6, with voice into the dummy load. The estimate above was 0.2 ms; the
+    four 123-tap FIRs (about 126 k MACs) dominate.
+  - **The whole transmit DSP:** 1.48 ms with CESSB off and 2.16 ms with it on, per
+    2048-sample block every 11.6 ms. So transmit DSP goes from 13 % to 19 % of real time
+    (CESSB alone is 5.8 %; 6.4 % at 192 ksps, where blocks come every 10.7 ms).
+  - **No new loop jitter:** the longest gap between blocks was 17–18 ms with CESSB off and
+    on alike.
+  - **Compared with W7PUA:** his class takes 211 µs per 2.67 ms at 48 ksps, 7.9 %.
+  - **If it is ever needed:** a cheaper option would be a shorter FIR, which would need the
+    model rerun first.
 - **Memory:** two FIR state pairs of (256+122) floats, two 64-sample complex delay lines and a
   123-tap coefficient table: about 7 KB in `TransmitFilterConfig` (`SDT.h:627`).
 - **Stack:** keep the scratch buffers static, not on the stack. [[memory-layout-and-stack]]
@@ -295,7 +317,7 @@ Where the build departs from the design above:
 - **The mic gain is clamped.** `MicGainForCodec()` clamps to 0–63 dB before `micGain()`,
   at both call sites.
 
-**gtest results, `TransmitChainCESSB.*`** (12 tests):
+**gtest results, `TransmitChainCESSB.*`** (12 tests at Phase 1; 18 after Phase 2):
 - Two-tone at 6 dB drive: node peak 1.91 → 0.953 × ceiling, and 0.955 × ceiling at the DAC
   rate.
 - Two-tone intermod: 2f₁−f₂ at −62.7 dBc and 2f₂−f₁ at −29.2 dBc. The model gives −62.5
@@ -435,18 +457,21 @@ What the results show:
 | 1 | Fix mic gain; `DSP_CESSB.cpp`; filter design in `InitializeCESSB`; `TXGain` move; ceiling; bypass gating; Audio Options on/off toggle with storage; gtests | ✅ 2026-11-18, see [Phase 1 as built](#phase-1-as-built) |
 | 2 | Processor-level (drive) setting, meter, CAT `PR`/`PL`/`RM`, wiki [[cat-control]] | ✅ 2026-11-18, see [Phase 2 as built](#phase-2-as-built) |
 | 3 | Bench and RF validation; tune the default drive and `gainCompensate` | Exciter I/Q ✅ 2026-11-18; RF at 20 m ✅ 2026-11-19 (see the Phase 3 sections above); other bands and on-air still to do |
-| 4 | User docs; wiki [[dsp-chain]] update; close #35 | — |
+| 4 | User docs; wiki [[dsp-chain]] update; close #35 | [[dsp-chain]] ✅; user guide drafted in `code/docs/CESSB_Report.html` §6; PR to `nightly` and closing #35 to do |
 
 ## Open questions
 
-1. **On by default?** The recommendation is enabled, at a moderate drive. Even at 0 dB drive
-   it replaces q15 splatter with a clean PEP limit. It does change the on-air sound for
-   existing users. Should KI3P decide?
+1. ~~**On by default?**~~ **Decided 2026-11-19: off by default.** CESSB is opt-in through
+   Audio Options or CAT `PR1;`, so existing users' on-air sound does not change. This is
+   what Phase 1 shipped (`ED.cessbEnabled = false`), and the gtest
+   `TransmitChainCESSB.DefaultsToOff` checks it.
 2. **`A_ref` and the equaliser.** The SSB power calibration tone passes through `BandEQ`, so
    the calibration includes the EQ gain at 800 Hz *at the time it was run*. Should `A_ref`
    follow the current EQ (compute that cell sum at 800 Hz when filters are initialised), or
    be taken as flat?
-3. **Regrowth after the DAC.** The SGTL5000 reconstruction filter, the exciter's analog
+3. ~~**Regrowth after the DAC.**~~ **Answered 2026-11-18/19: no margin needed.** At the
+   exciter, peaks land at ≤ 1.035 × the ceiling; at RF, at or below the ceiling (the PA
+   compresses them). See the Phase 3 sections. The original question: The SGTL5000 reconstruction filter, the exciter's analog
    stages and the PA low-pass filters are not linear-phase. Only the bench can say how much
    of the 1.3 % comes back. If it is a lot, the remedy is a lower ceiling (a margin) rather
    than more DSP.
@@ -455,5 +480,6 @@ What the results show:
    acceptable as documented behaviour?
 5. **AM.** Phoenix has no AM transmit (the transmit states are SSB, CW and digital), so
    CESSB is SSB-only.
-6. **`gainCompensate` at 2.2.** It gives lower overshoot (0.8 %) for the same power in the
+6. ~~**`gainCompensate` at 2.2.**~~ **Answered: keep 1.9.** Overshoot is ≤ 3.5 % at the
+   exciter and nil at RF, so 2.2's lower overshoot buys nothing. The original question: It gives lower overshoot (0.8 %) for the same power in the
    model. Should it be the default, pending the bench?

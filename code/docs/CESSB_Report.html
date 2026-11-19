@@ -223,7 +223,7 @@ after CESSB. Every stage it moved past is linear, so with CESSB off the output i
 <tr><td>Compression meter</td><td>dB by which each block's envelope into the clipper exceeds the ceiling, peak-held, released at about 9 dB/s</td><td>Drives the "C" bar and CAT <code>RM2</code>.</td></tr>
 <tr><td>When it runs</td><td>Only in <code>SSB_TRANSMIT</code> with CESSB enabled. History is cleared on the first block after a gap.</td><td>Digital modes and the calibration states need a linear chain. Clearing the history stops a new transmission starting with 5 ms of the previous one.</td></tr>
 <tr><td>Memory</td><td>About 13 KB of buffers in OCRAM (<code>DMAMEM</code>)</td><td>As plain statics in DTCM they left only 2.7 KB of stack, below the radio's measured peak stack use; now it is 15.9 KB (13.1 KB with the ATU enabled).</td></tr>
-<tr><td>Cost</td><td>4 × 123-tap FIRs on 256 samples per block, about 126 k MACs: an estimated 0.2 ms per 10.7 ms block</td><td>Not yet measured on the radio. Latency is 124 samples: 5.2 ms at 192 ksps, 5.6 ms at 176.4 ksps.</td></tr>
+<tr><td>Cost</td><td>4 × 123-tap FIRs on 256 samples per block, about 126 k MACs: measured <strong>678 µs per block</strong> (690 µs max), every 11.6 ms at 176.4 ksps</td><td>5.8 % of real time; the whole transmit DSP goes from 1.48 to 2.16 ms per block. Latency is 124 samples: 5.2 ms at 192 ksps, 5.6 ms at 176.4 ksps.</td></tr>
 </table></div>
 
 <h3>Controls added</h3>
@@ -259,7 +259,7 @@ controller. The differences are in how the stage is built into the radio and how
 <tr><td>Metering</td><td><code>getLevels()</code>: power and peak before and after, polled by the sketch</td><td>Compression in dB over the ceiling: C bar and <code>RM2</code></td></tr>
 <tr><td>Bypass</td><td><code>setProcessing(false)</code> (added for digital modes by KF5N)</td><td>Automatic by mode (digital and calibration never run it), plus menu and <code>PR</code></td></tr>
 <tr><td>Sideband</td><td><code>setSideband()</code> inside the class</td><td>Phoenix's existing <code>SidebandSelection()</code> after the stage</td></tr>
-<tr><td>Cost</td><td>211 µs per 128-sample block at 48 ksps on Teensy 4.0 (whole class, including its own SSB generation)</td><td>About 0.2 ms per 10.7 ms block, estimated (clipper and controller only)</td></tr>
+<tr><td>Cost</td><td>211 µs per 128-sample block at 48 ksps on Teensy 4.0 (whole class, including its own SSB generation)</td><td>678 µs per 11.6 ms block measured on the radio, 5.8 % (clipper and controller only; Phoenix's own chain makes the SSB). W7PUA's is 7.9 %</td></tr>
 </table></div>
 
 <h3>Measured difference: same chain, same signals</h3>
@@ -564,7 +564,7 @@ recent syllable rather than the average. It goes empty as soon as CESSB is not r
   after calibrating, the ceiling and the power setting drift apart by that amount.</li>
   <li><strong>The exciter's image floor on the KI3P prototype</strong> (−40 to −63 dBc,
   varying from one capture to the next) is under investigation. It is independent of CESSB.</li>
-  <li><strong>CPU time is estimated,</strong> about 0.2 ms per block, not yet measured on the radio.</li>
+  <li><strong>Off by default.</strong> CESSB is opt-in, so existing users' on-air sound does not change until they enable it.</li>
   <li><strong>Still to do:</strong> user documentation (Phase 4), then closing #35.</li>
 </ul>
 

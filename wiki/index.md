@@ -130,7 +130,7 @@ _Plans for future development, proposals, open questions._
   - [[manual-notch]] (#11) — 3-way notch (off/auto/manual); manual mode is new work.
   - [[usb-audio]] (#13) — bi-directional USB audio; **implemented and bench-verified** as [[digital-mode]]. *(superseded)*
   - [[openaudio-library]] (#14) — change OpenAudio for audio quality; foundational.
-  - [[cessb]] (#35) — Controlled Envelope SSB: native centred-variant port at the 24 kHz TX node, power setting becomes PEP, `PR`/`PL`/`RM` over CAT; Phases 0–2 built; validated at the exciter and at RF on 20 m (5.06 W PEP for 5 W, +4.5 dB talk power at 6 dB drive). *(draft)*
+  - [[cessb]] (#35) — Controlled Envelope SSB: native centred-variant port at the 24 kHz TX node, power setting becomes PEP, `PR`/`PL`/`RM` over CAT; Phases 0–2 built; validated at the exciter and at RF on 20 m (5.06 W PEP for 5 W, +4.5 dB talk power at 6 dB drive, 678 µs per block); off by default. *(draft)*
 
 ## Sources
 _One summary page per ingested raw source._

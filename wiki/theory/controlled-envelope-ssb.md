@@ -3,7 +3,7 @@ title: Controlled Envelope SSB (CESSB)
 type: concept
 status: draft
 created: 2026-11-18
-updated: 2026-11-18
+updated: 2026-11-19
 tags: [ssb, transmit, cessb, clipper, speech-processing, papr, dsp]
 source_refs: []
 related: ["[[cessb]]", "[[ssb-phasing-method]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]", "[[multirate-decimation]]"]
@@ -87,3 +87,5 @@ in exchange, about 0.3 dB of talk power is lost ([[cessb]]).
 | Drive ratio into the clipper | 1.5 → about 3 dB, 2.0 → about 4 dB, 2.5 → 4–5 dB; 3 is excessive | W7PUA |
 | CPU, whole Z class | 211 µs per 128-sample block at 48 ksps on a Teensy 4.0 | W7PUA header |
 | Phoenix model, centred, 6 dB drive | +4.6 dB wanted-sideband power at equal PEP; 1.3 % overshoot; opposite sideband −71 dBc | [[cessb]] |
+| Phoenix on the radio (KI3P prototype), voice stand-in, 6 dB drive | talk-power gain +4.2 dB at the exciter, +4.5 dB at the antenna (model +4.1 on the same signal); PEP at RF held at the 5 W setting, no overshoot through the PA | [[cessb]] Phase 3 |
+| CPU, Phoenix stage | 678 µs per 2048-sample block (11.6 ms at 176.4 ksps), 5.8 % of real time; measured | [[cessb]] Budget |

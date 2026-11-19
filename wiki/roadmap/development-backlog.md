@@ -3,7 +3,7 @@ title: Development Backlog
 type: roadmap
 status: draft
 created: 2026-06-09
-updated: 2026-07-31
+updated: 2026-11-19
 tags: [development, backlog, features, github-issues, index]
 source_refs: []
 related: ["[[documentation-todos]]", "[[transmit-spectrum]]", "[[manual-notch]]", "[[usb-audio]]", "[[digital-mode]]", "[[openaudio-library]]", "[[cessb]]"]
@@ -25,7 +25,7 @@ separately.
 | [#11](https://github.com/KI3P/Phoenix/issues/11) | Manual notch filter | Auto-notch scaffolding exists; manual mode unimplemented | Med | [[manual-notch]] |
 | ~~[#13](https://github.com/KI3P/Phoenix/issues/13)~~ | Bi-directional USB audio | **Done (2026-07-31)** — shipped as [[digital-mode]], verified on the bench in both directions | — | [[usb-audio]] *(superseded)* |
 | [#14](https://github.com/KI3P/Phoenix/issues/14) | Change OpenAudio library | Foundational; proposal to evaluate | High | [[openaudio-library]] |
-| [#35](https://github.com/KI3P/Phoenix/issues/35) | Implement CESSB | **Proposal + offline model (2026-11-18)**; no firmware yet | Med | [[cessb]] |
+| [#35](https://github.com/KI3P/Phoenix/issues/35) | Implement CESSB | **Built on `cessb-proposal` (2026-11-19), not yet merged:** stage, menu, level, C bar, CAT `PR`/`PL`/`RM`, off by default. Validated at the exciter and at RF on 20 m. On-air reports and a PR to `nightly` remain | Med | [[cessb]] |
 
 ## Two natural tracks
 

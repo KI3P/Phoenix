@@ -1780,3 +1780,23 @@ The PA sets the spectrum: its linear two-tone IMD3 is −36 dB re PEP, and voice
 by CESSB splatters 12 dB or more less than that two-tone. On the way, found a faulty
 main-board-to-RF-board cable (double sideband) and that CAT `BU;` is band up. See [[cessb]]
 "Phase 3: RF results".
+
+## [2026-11-19] decision | CESSB CPU time measured; off by default
+CESSB's CPU time was measured on the KI3P prototype with the M7 cycle counter (temporary
+instrumentation, reverted):
+- `CESSBProcess`: 678 µs mean, 690 µs maximum, per 2048-sample block (11.6 ms at
+  176.4 ksps).
+- `TransmitProcessing`: from 1.48 ms with CESSB off to 2.16 ms with it on, about 19 % of
+  real time.
+- No change to the longest interval between blocks.
+- The 0.2 ms design estimate was low by a factor of 3.4; the four 123-tap FIRs dominate.
+
+Decided with the user: CESSB stays **off by default**, as built. Open questions 3
+(regrowth) and 6 (`gainCompensate`) are closed by the bench and RF results. See [[cessb]]
+"Budget" and "Open questions".
+Also brought the rest of the wiki up to date with the built feature:
+- [[development-backlog]]: #35 was still listed as a proposal.
+- [[cessb]]: the status line and the Phase 4 row.
+- [[controlled-envelope-ssb]]: added the measured results and CPU cost.
+- [[real-time-constraints]]: added the transmit DSP cost, and the smallest stack is now
+  13 KB.
