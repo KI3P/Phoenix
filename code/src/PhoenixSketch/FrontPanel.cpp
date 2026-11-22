@@ -157,49 +157,29 @@ static void interrupt2() {
         int change;
         switch(pin) {
             case 8:
-                e1.updateA(state);
-                change = e1.process();
-                if (change>0) SetInterrupt(iVOLUME_INCREASE);
-                if (change<0) SetInterrupt(iVOLUME_DECREASE);
-                break;
             case 9:
-                e1.updateB(state);
+                e1.update(state);
                 change = e1.process();
                 if (change>0) SetInterrupt(iVOLUME_INCREASE);
                 if (change<0) SetInterrupt(iVOLUME_DECREASE);
                 break;
             case 10:
-                e2.updateA(state);
-                change = e2.process();
-                if (change>0) SetInterrupt(iFILTER_INCREASE);
-                if (change<0) SetInterrupt(iFILTER_DECREASE);
-                break;
             case 11:
-                e2.updateB(state);
+                e2.update(state);
                 change = e2.process();
                 if (change>0) SetInterrupt(iFILTER_INCREASE);
                 if (change<0) SetInterrupt(iFILTER_DECREASE);
                 break;
             case 12:
-                e3.updateA(state);
-                change = e3.process();
-                if (change>0) SetInterrupt(iCENTERTUNE_INCREASE);
-                if (change<0) SetInterrupt(iCENTERTUNE_DECREASE);
-                break;
             case 13:
-                e3.updateB(state);
+                e3.update(state);
                 change = e3.process();
                 if (change>0) SetInterrupt(iCENTERTUNE_INCREASE);
                 if (change<0) SetInterrupt(iCENTERTUNE_DECREASE);
                 break;
             case 14:
-                e4.updateA(state);
-                change = e4.process();
-                if (change>0) SetInterrupt(iFINETUNE_INCREASE);
-                if (change<0) SetInterrupt(iFINETUNE_DECREASE);
-                break;
             case 15:
-                e4.updateB(state);
+                e4.update(state);
                 change = e4.process();
                 if (change>0) SetInterrupt(iFINETUNE_INCREASE);
                 if (change<0) SetInterrupt(iFINETUNE_DECREASE);

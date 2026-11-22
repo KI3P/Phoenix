@@ -3,9 +3,18 @@ title: Phoenix Wiki Index
 type: index
 status: stub
 created: 2026-06-08
-updated: 2026-07-31
+updated: 2026-11-18
 ---
 
+<!-- updated 2026-11-18: CESSB proposal (#35). New pages roadmap/cessb and theory/controlled-envelope-ssb, backed by the offline model in code/tools/cessb_model/. Linked from development-backlog, dsp-chain, ssb-phasing-method; mic-gain unsigned wrap noted in documentation-todos. -->
+
+<!-- updated 2026-11-14: ATU support, Phase 1 (manual control). New pages hardware/atu-board, firmware/atu-control, roadmap/atu-auto-tuning. Updated filter-boards (64-bit register mask fix), cat-control (AT command), built-in-test, i2c-bus-map, documentation-todos (MCP23X17 mock byte order). -->
+
+<!-- updated 2026-11-11 (3rd): new decision page firmware/build-toolchain (upgrade to Teensyduino 1.62 / GCC 15.2.1; isolated trial method; per-setting results at 528 and 600 MHz; GCC 15 warning fixes). Updated og-startup-hang, memory-layout-and-stack, spi-display-hang, hardware-platform, documentation-todos. -->
+<!-- updated 2026-11-11 (2nd): new decision page firmware/og-startup-hang (Debug -Og builds never start: Teensyduino 1.59 reset_PFD gates the FlexSPI clock then reads a flash literal; HardFault; fixed in TD 1.60). Updated memory-layout-and-stack, hardware-platform, documentation-todos. -->
+<!-- updated 2026-11-11: two new decision pages, firmware/memory-layout-and-stack (the ~8 s reboot loop on some Optimize settings = stack overflow; FlexRAM bank split; ZoomFFTExe VLAs moved to DMAMEM) and firmware/spi-display-hang (freeze with USB alive = LPSPI at 240 MHz losing a byte; root moved to 132 MHz). Updated hardware-platform, display-subsystem, zoom-fft, real-time-constraints, cat-control (%lld fix), documentation-todos. -->
+<!-- updated 2026-11-03: V1.5.0. New firmware/automatic-power-swr-calibration (the AUTO branch of PowerCalSm: load/open/short session, three levels, validated on two radios). Updated calibration-state-machines, tune-frequency-control (shaped-tanh LM fit), hardware-state-machine, persistent-config, filter-boards, display-subsystem, rf-board (PLLB sharing fix), cat-control (newline/time-sync fix), swr-bridge-measured-behaviour (code/tools/swr lives on swr_cal_redux). -->
+<!-- updated 2026-10-23: ingested raw/AD8307.pdf → sources/ad8307-datasheet + new theory/log-amp-power-detection; detector front end of filter-board-electronics rewritten from a net trace (pad values and unfitted diode option owner-confirmed). 50 content pages + 2 sources. -->
 <!-- updated 2026-07-29 (2nd pass): 48 content pages (firmware 26, theory 12, hardware 4, roadmap 6) + 1 source (7 schematics). Added firmware/tx-filter-hil-test for the new transmit HIL suite; recorded the finding that the 48-tap FIR transmit stages are only rate-independent to ~1.2 % (vs 0.3 % for the IIR receive stages) in runtime-filter-design + multirate-decimation + filter-hil-test, since it bounds any rate-invariance tolerance. Also: TX;/RX; parameterless-write trap and the missing equalizerXmt command in cat-control; Hilbert-not-regenerated rationale + bench suppression measurement in ssb-phasing-method; TransmitProcessing ordering notes in dsp-chain; TX EQ testability corollary in audio-equalizer. -->
 <!-- updated 2026-07-31 (2nd pass): pre-release consistency lint. No new pages. Integrated digital mode into the pages whose code it changed but which had not mentioned it — hardware-state-machine (DIGITAL_STATES in both switch tables), persistent-config (the two new ED fields), overview (USBAudio.cpp, ModeSm role) — and closed out development-backlog #13. See log. -->
 <!-- updated 2026-07-31: 48 content pages; digital-mode verified on hardware both directions (RX and TX); three bugs found and fixed on the bench (CAT sideband selection, play-queue prefill, unbounded record queue). Earlier, 2026-07-30: added firmware/digital-mode (USB audio mode); roadmap/usb-audio superseded by it. Earlier, 2026-07-29: 47 content pages; V1.4RC merge brought the rx-dsp-176k-stage-test work in. Added firmware/sample-rate-switching, firmware/runtime-filter-design, firmware/filter-hil-test. Corrected the now-false "SampleRate is never reassigned / rate-independence is dormant" claim in theory/multirate-decimation (+ documentation-todos). Earlier: added firmware/rapid-tune-mute-freeze; split board *electronics* into hardware/rf-board-electronics + hardware/filter-board-electronics; deci→centi-Hz; added firmware/audio-io. -->
@@ -28,6 +37,10 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[spectrum-refresh-floor]] — why refresh ≈ NCHUNKS×T_loop; the 11.7→18.8 fps optimization. *(draft)*
 - [[rapid-tune-mute-freeze]] — `MUTE_ON_RAPID_TUNE`: mute audio + freeze spectrum on fast tuning; Fine Tune keeps only the blue bar moving. *(draft)*
 - [[code-heritage]] — lineage from DD4WH Teensy Convolution SDR; contributor list; GPLv3.
+- [[memory-layout-and-stack]] — why some Optimize settings rebooted every ~8 s: the stack is the DTCM left after 32 KB code banks (~17.5 KB on 11-bank builds) and `ZoomFFTExe` put 16 KB of VLAs on it; now DMAMEM, peak 3.5 KB. Per-setting results at 528 MHz. *(stable)*
+- [[spi-display-hang]] — freeze with USB alive and CAT silent: the LPSPI at Teensyduino's 240 MHz clock root lost a byte and `SPI.transfer()` spun forever in an RA8875 call; 8 hangs/10 min → 0 at 132 MHz. How it was located; hypotheses ruled out. *(stable)*
+- [[og-startup-hang]] — why Debug (`-Og`) builds never reach USB: Teensyduino 1.59's `reset_PFD()` gates PLL3 PFD0, the flash clock, then loads a literal from flash → HardFault. Fixed in TD 1.60. OCRAM breadcrumbs and the PROGRAM-button reflash trap. *(stable)*
+- [[build-toolchain]] — Teensyduino 1.62 / GCC 15.2.1 since 2026-11-11: how the upgrade was trialled in isolation, which Optimize settings pass at 528 and 600 MHz, the two GCC 15 warning fixes. *(stable)*
 
 **Sample rate & filter design** _(V1.4.0)_
 - [[sample-rate-switching]] — 192 / 176.4 ksps selectable at run time and persisted; `ChangeSampleRate()`, the Fs/4 dial compensation, menu + `SR` CAT paths. *(draft)*
@@ -39,14 +52,16 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 - [[mode-state-machine]] — ModeSm: SSB/CW × RX/TX, iambic keyer, calibration entry (generated). *(draft)*
 - [[digital-mode]] — DIGITAL (USB audio) mode for FT8/WSJT-X: DIGITAL_STATES composite, forced 176.4 ksps, 4:1 USB pacer. RX and TX verified on the bench. *(draft)*
 - [[ui-state-machine]] — UISm: splash→home→menu stack + tool screens (DFE/EQ/BIT/cal) (generated). *(draft)*
-- [[tune-frequency-control]] — Tune.cpp: frequency math (Fs/4 shift, fine tune, CW offset) + PA power-cal math. Not a state machine. *(draft)*
+- [[tune-frequency-control]] — Tune.cpp: frequency math (Fs/4 shift, fine tune, CW offset) + PA power-cal math (shaped-tanh curve, Levenberg–Marquardt fit). Not a state machine. *(draft)*
 - [[hardware-state-machine]] — HardwareSm (hand-written) maps mode→RF/tune hardware; drives 4 cal sub-machines. *(draft)*
-- [[calibration-state-machines]] — the 4 generated cal SMs: 3 identical minimize-sweeps + PowerCalSm curve-fit. *(draft)*
+- [[calibration-state-machines]] — the 4 generated cal SMs: 3 identical minimize-sweeps + PowerCalSm (MANUAL curve-fit + AUTO branch); HOME aborts, single vs dual VFO; operator guide in `code/docs/CalibrationGuide/`. *(draft)*
+- [[automatic-power-swr-calibration]] — V1.5.0: one session calibrates the PA curve, SSB gain and SWR bridge on 160–6 m from a load, an open and a short (+ 0/2/8 wattmeter readings per band); main-loop service keys the radio; validated on two radios. *(stable)*
 - [[built-in-test]] — startup I²C presence self-test (BIT struct → status screen). *(draft)*
 
 **Hardware-abstraction modules** _(the code; physical electronics live under Hardware below)_
 - [[rf-board]] — `RFBoard.cpp` API: Si5351 3-VFO quadrature LO (phase-reg vs <3.2 MHz timed-delay), attenuators, T/R, cal loopback → electronics in [[rf-board-electronics]]. *(draft)*
 - [[filter-boards]] — `BPFBoard`/`LPFBoard` API: BPF + LPF/RF-back-end relays via shared hardwareRegister; AD7991 SWR/power math → electronics in [[filter-board-electronics]]. *(draft)*
+- [[atu-control]] — `ATUBoard.cpp` behind `ATU_PRESENT`: manual control of the K9HZ tuner from the ATU menu and the `AT` CAT command; boots bypassed; no relay changes while transmitting → hardware in [[atu-board]]. *(draft)*
 - [[front-panel]] — 2×MCP23017 encoders/buttons/LEDs; two-tier ISR+1ms-timer I²C servicing (encoder-i2c-speed branch). *(draft)*
 
 **Signal processing & UI**
@@ -57,7 +72,7 @@ _Modules, architecture, state machines, DSP chains, design decisions, code herit
 
 **Control flow & config**
 - [[main-loop]] — Loop.cpp: `loop()` sequence + interrupt FIFO + CW key/PTT handling.
-- [[cat-control]] — CAT.cpp: Kenwood (TS-480) emulation, **29**-command dispatch table on SerialUSB1; custom ED/PR dumps + SR/CF/EQ/FL DSP settings; the `MD` sideband-mirroring fix. *(draft)*
+- [[cat-control]] — CAT.cpp: Kenwood (TS-480) emulation, **29**-command dispatch table on SerialUSB1; custom ED/PR dumps + SR/CF/EQ/FL DSP settings; the `MD` sideband-mirroring fix; the `%lld` → `ld` reply fix (2026-11-11). *(draft)*
 - [[persistent-config]] — the `ED` struct (single source of truth) → JSON on LittleFS+SD; Config.h/Globals/ParamSave. *(draft)*
 
 ## Theory
@@ -67,6 +82,7 @@ fundamentals (no copy of the Purdum & Peter book). Code claims cited `file:line`
 - [[theory-overview]] — the DSP/SDR theory spine; signal path end to end, key numbers.
 - [[iq-quadrature-sampling]] — complex baseband; sign-of-frequency; image problem. *(draft)*
 - [[ssb-phasing-method]] — SSB by phasing: ±45° Hilbert TX pair + freq-domain RX. *(draft)*
+- [[controlled-envelope-ssb]] — CESSB (W9GR): envelope clip + overshoot control for more average power at the same PEP; why a zero-IF clipper needs its filter centred on the channel. *(draft)*
 - [[fast-convolution-filtering]] — FFT overlap-save channel filter; the Convolution-SDR core. *(draft)*
 - [[multirate-decimation]] — ÷8 RX / ÷16 TX polyphase rate changes; tap-count tradeoff; Hz-specified vs Fs-fraction stages. *(draft)*
 - [[iq-imbalance-correction]] — per-band amp/phase correction & 3-pass calibration sweep. *(draft)*
@@ -76,6 +92,7 @@ fundamentals (no copy of the Purdum & Peter book). Code claims cited `file:line`
 - [[audio-equalizer]] — 14-band parallel filterbank (RX + TX audio); centre-frequency table; cells generated per rate. *(draft)*
 - [[tx-carrier-null]] — LO-leakage suppression via per-band DC offset (distinct from image). *(draft)*
 - [[zoom-fft]] — spectrum-display zoom via IIR decimation (raw 192 kHz → 375 Hz base bin; rate-dependent). *(draft)*
+- [[log-amp-power-detection]] — how the AD8307 bridge measures power: what the slope and offset absorb, why 160 m and the top end are exceptions, and why modulated signals read low (mean of log). *(draft)*
 
 ## Hardware
 _The physical T41-EP platform the firmware drives: boards, chips, buses, power. Distinct from
@@ -88,21 +105,36 @@ the firmware/ module pages (which describe the code). Derived from `Config.h` + 
 - [[rf-board-electronics]] — RF board silicon: dual/single Si5351 LO + revisions, PE4312
   attenuators (GPIO-bit→pin table, designators), ADT/PSA/MAR mixer front end, I/Q amps. *(draft)*
 - [[filter-board-electronics]] — BPF/LPF/PA back-end chips: MASWSS switches, CD74HC4514/74HC237
-  decoders + ULN2803/HF41F relays, external per-band LPF board, AD8307/AD7991 SWR sensing. *(draft)*
+  decoders + ULN2803/HF41F relays, external per-band LPF board, AD8307/AD7991 SWR sensing
+  (detector front end, compensated pad modelled against the VNA, unfitted diode option). *(draft)*
+- [[atu-board]] — K9HZ 100 W antenna tuner: relay-switched L-network (8 L, 8 C, LC/CL, balun,
+  bypass), control board on Wire2 at 0x20/0x21, register bits 33–51, and the VNA
+  characterisation (strays, lead inductance, coil self-resonances). *(draft)*
+- [[swr-bridge-measured-behaviour]] — bench tests of two radios (Oct–Nov 2026): the SWR error
+  was AD7991 readout crosstalk, fixed by discarding two conversions per channel switch; radio 1
+  then calibrates (100 Ω 1.97–2.04, 200 Ω 3.96–4.22 on 160–20 m) and its bridge leaks
+  −42/−40/−31/−22 dB; radio 2's original L44 leaked, and its rebuild (2026-11-02) brought it
+  to −41/−37/−30 dB on 40/20/10 m; forward power to 0.1–0.2 dB per band, and to about
+  ±1.5 dB from per-band defaults once builds match; open: the 10 m ceiling readings, radio 2's
+  10 m PA oscillation. October leak investigation kept as history. *(draft)*
 
 ## Roadmap
 _Plans for future development, proposals, open questions._
 
 - [[documentation-todos]] — running list of wiki pages to write + code/comment discrepancies
   and possible bugs found while documenting (incl. a ⚠ possible NR channel-routing bug).
+- [[atu-auto-tuning]] — Phase 2 of ATU support: the probe → estimate → robust-jump tuning
+  algorithm from the characterisation report, and how it would fit the firmware. *(draft)*
 - [[development-backlog]] — software-dev tasks mirroring the open GitHub issues (index).
   - [[transmit-spectrum]] (#10) — see the TX spectrum; largely built, needs verify.
   - [[manual-notch]] (#11) — 3-way notch (off/auto/manual); manual mode is new work.
   - [[usb-audio]] (#13) — bi-directional USB audio; **implemented and bench-verified** as [[digital-mode]]. *(superseded)*
   - [[openaudio-library]] (#14) — change OpenAudio for audio quality; foundational.
+  - [[cessb]] (#35) — Controlled Envelope SSB: native centred-variant port at the 24 kHz TX node, power setting becomes PEP, `PR`/`PL`/`RM` over CAT; Phases 0–2 built; validated at the exciter and at RF on 20 m (5.06 W PEP for 5 W, +4.5 dB talk power at 6 dB drive, 678 µs per block); off by default. *(draft)*
 
 ## Sources
 _One summary page per ingested raw source._
 
 - [[t41-ep-schematics]] — the seven KiCad board schematics (main/RF/attenuator/dual-clock/BPF/
   LPF-control/LPF-filter); the first physical-hardware source. *(draft)*
+- [[ad8307-datasheet]] — Analog Devices AD8307 log amp, Rev. F: slope/intercept spread, conformance, the 1.5 MHz offset-loop corner, output ripple, power-meter application. *(draft)*

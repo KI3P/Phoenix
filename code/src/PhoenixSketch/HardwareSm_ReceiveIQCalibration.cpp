@@ -62,6 +62,11 @@ static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static float32_t deltaVals[NUMBER_OF_BANDS];  // Sideband separation values for each band
 static float32_t sideband_separation = 0.0;
 static int32_t currentBand = -1;
+// The band the automatic run is working on, and its settings before the run
+// started on it, so that an aborted run can put them back
+static int32_t savedBand = -1;
+static float32_t savedAmp = 1.0f;
+static float32_t savedPhase = 0.0f;
 static bool finalMeasurement = false;  // Flag to indicate final measurement at optimal point
 
 /**
@@ -103,10 +108,31 @@ void ResetRXIQCalBand(void){
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
     currentBand = FIRST_BAND;
+    savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
     iteration = 0;
     maxSBS = 0;
+}
+
+/**
+ * @brief Stop an automatic RX IQ run, if one is in progress
+ * @note The band being swept is left with a trial amplitude or phase, so its
+ *       settings from before the run are restored. Bands already completed keep
+ *       their new values.
+ */
+void AbortRXIQCalibration(void){
+    if (rxiqSM.state_id != ReceiveIQCalSm_StateId_STANDBY){
+        if ((savedBand >= FIRST_BAND) && (savedBand <= LAST_BAND) && !bandCompleted[savedBand]){
+            ED.IQAmpCorrectionFactor[savedBand] = savedAmp;
+            ED.IQPhaseCorrectionFactor[savedBand] = savedPhase;
+        }
+    }
+    InitializeRXIQCalibration();
+}
+
+bool RXIQCalibrationAutoActive(void){
+    return rxiqSM.state_id != ReceiveIQCalSm_StateId_STANDBY;
 }
 
 void AdjustRXIQBand(void){
@@ -124,6 +150,12 @@ void AdjustRXIQBand(void){
     UpdateRFHardwareState();
 
     Debug(String("Calibrating RXIQ band ") + String(bands[currentBand].name));
+    // Remember this band's settings in case the run is aborted
+    if (savedBand != currentBand){
+        savedBand = currentBand;
+        savedAmp = ED.IQAmpCorrectionFactor[currentBand];
+        savedPhase = ED.IQPhaseCorrectionFactor[currentBand];
+    }
     // Start by setting the phase to 0
     ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0f;
 
@@ -173,6 +205,13 @@ void AdjustRXIQCalSetting(void){
         return;
     }
     finalMeasurement = false;
+    // Each pass starts from the setting it sweeps around. If no reading in
+    // the pass is above 0 dB (a broken loopback), the setting stays where it
+    // was, rather than taking the best value of the previous pass
+    if (step == 0){
+        int32_t b = ED.currentBand[ED.activeVFO];
+        maxSBS_parameter = (iteration%2 == 0) ? ED.IQAmpCorrectionFactor[b] : ED.IQPhaseCorrectionFactor[b];
+    }
     // Change the appropriate parameter
     SetAmpPhase(iteration,step); 
 

@@ -24,7 +24,7 @@ ModeSm sequences the cal hardware).
 
 ## States (`UISm.h:35-50`)
 
-13 states under `ROOT`:
+14 states under `ROOT`:
 
 | State | Screen | Renderer |
 |---|---|---|
@@ -35,7 +35,8 @@ ModeSm sequences the cal hardware).
 | `UPDATE` | parameter-adjust editor | (per-parameter) |
 | `FREQ_ENTRY` | **Direct Frequency Entry (DFE)** | `MainBoard_DisplayDFE` |
 | `EQUALIZER` | 14-band TX/RX EQ editor | `MainBoard_DisplayEqualizer` |
-| `BIT` | Built-In Test results | — |
+| `BIT` | Built-In Test results | `DrawBIT()` |
+| `ATU_STATUS` | ATU tuning status table (ATU menu; only reachable with `ATU_PRESENT`) | `DrawATUStatusTable()` |
 | `CALIBRATE_FREQUENCY` | frequency cal screen | `MainBoard_DisplayCalibration_Frequency` |
 | `CALIBRATE_POWER` | power cal screen | `…_Power` |
 | `CALIBRATE_RX_IQ` | RX I/Q cal screen | `…_RXIQ` |
@@ -52,7 +53,7 @@ All dispatched from [[main-loop]] (`UISm_dispatch_event(&uiSM, …)`):
 | `DO` | 1 ms `TimerInterrupt()` (`Loop.cpp:356`) — splash timeout |
 | `MENU` / `SELECT` / `HOME` | button presses in `HandleButtonPress` (`Loop.cpp:419/413/425…`) |
 | `DFE` | button (`Loop.cpp:564`) |
-| `EQUALIZER`, `BIT`, `CALIBRATE_FREQUENCY/POWER/RX_IQ/TX_IQ` | menu actions (`Loop.cpp:1350-1386`) |
+| `EQUALIZER`, `BIT`, `ATU_STATUS`, `CALIBRATE_FREQUENCY/POWER/RX_IQ/TX_IQ` | menu actions (`Loop.cpp:1350-1386`; `ATU_STATUS` via `iATUSTATUSDISPLAY`) |
 
 ## Transition map (verified from `UISm.cpp`)
 
@@ -65,6 +66,7 @@ HOME ──MENU──▶ MAIN_MENU ──SELECT──▶ SECONDARY_MENU ──SE
    ├─DFE───────────▶ FREQ_ENTRY ─┐
    ├─EQUALIZER─────▶ EQUALIZER  ─┤
    ├─BIT───────────▶ BIT        ─┼─ each returns to HOME on the HOME event
+   ├─ATU_STATUS────▶ ATU_STATUS ─┤
    ├─CALIBRATE_FREQUENCY ▶ … ────┤
    ├─CALIBRATE_POWER     ▶ … ────┤
    ├─CALIBRATE_RX_IQ     ▶ … ────┤
@@ -110,3 +112,10 @@ reaching for StateSmith.
 - `mainMenuLength`/`secondMenuLength` are UISm state variables while the arrays they describe
   live in the display module. Nothing links the two at compile time, so a menu added without
   updating the length would silently truncate — check how they are kept in step.
+
+## Regenerating (2026-11-15)
+`ATU_STATUS` was added to `UISm.drawio` and regenerated with
+`ss.cli run -h -b --no-ask -i UISm.drawio`, which runs only that diagram. Without `-i`, `-b`
+rebuilds every machine; with StateSmith 0.20 the only change in the others was the version
+line. States and events are numbered alphabetically, so adding one renumbers the enums; nothing
+depends on the values.

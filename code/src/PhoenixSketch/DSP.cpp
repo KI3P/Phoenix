@@ -70,6 +70,7 @@ void PerformSignalProcessing(void){
     }
     // Read the SWR in all the possible transmit states
     switch (modeSM.state_id){
+        case (ModeSm_StateId_ATU_TUNE_MARK):
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CALIBRATE_OFFSET_MARK):
         case (ModeSm_StateId_CALIBRATE_TX_IQ_MARK):
@@ -188,7 +189,9 @@ void ClearAudioBuffers(void){
  */
 void IQPhaseCorrection(float32_t *I_buffer, float32_t *Q_buffer, 
                         float32_t factor, uint32_t blocksize) {
-    float32_t temp_buffer[blocksize];
+    // Scratch in OCRAM rather than an 8 KB VLA on the stack (see ZoomFFTExe).
+    static float32_t DMAMEM temp_buffer[READ_BUFFER_SIZE];
+    if (blocksize > READ_BUFFER_SIZE) return;
     if (factor < 0.0) {  // mix a bit of I into Q
         arm_scale_f32(I_buffer, factor, temp_buffer, blocksize);
         arm_add_f32(Q_buffer, temp_buffer, Q_buffer, blocksize);
@@ -615,10 +618,16 @@ void AMDecodeSAM(DataBlock *data){
         while (phzerror >= TWO_PI) phzerror -= TWO_PI;
         while (phzerror < 0.0) phzerror += TWO_PI;
     }
-    SAM_carrier =  (omega2 * (float32_t)data->sampleRate_Hz) / (2 * TWO_PI);
-    SAM_carrier_freq_offset = 0.95 * SAM_carrier_freq_offset + 0.05 * (10 * SAM_carrier);   
+    // omega2 is the carrier's offset in radians per sample: in Hz, omega2 * fs / 2 pi.
+    // (It used to be divided by 4 pi and multiplied by 10, which read 5x the offset.)
+    SAM_carrier =  (omega2 * (float32_t)data->sampleRate_Hz) / TWO_PI;
+    SAM_carrier_freq_offset = 0.95 * SAM_carrier_freq_offset + 0.05 * SAM_carrier;
 }
 
+/**
+ * The SAM PLL's carrier offset from the tuned frequency, in Hz, smoothed.
+ * Positive when the carrier is above the dial.
+ */
 float32_t GetSAMCarrierOffset(void){
     return SAM_carrier_freq_offset;
 }
@@ -1109,7 +1118,8 @@ void PlayIQData(DataBlock *data){
 
 float32_t TXgainDSP;
 void TXGain(DataBlock *data){
-    // Apply the gain to the I channel
+    // Apply the gain to both channels. This runs after the Hilbert pair and CESSB,
+    // so the CESSB ceiling is fixed and TXGain maps it onto the requested power.
     float32_t gain_dB;
     if (ED.PA100Wactive)
         gain_dB = ED.PowerCal_100W_DSP_Gain_correction_dB[ED.currentBand[ED.activeVFO]];
@@ -1124,8 +1134,13 @@ void TXGain(DataBlock *data){
     // gain_dB: the band-dependent gain factor needed to get this band to the setpoint
     // txGain_dB: the gain factor needed to adjust from the setpoint to the 
     // requested power
+    // The automatic power calibration sets the total gain directly
+    float32_t override_dB;
+    if (GetSSBGainOverride(&override_dB))
+        TXgainDSP = override_dB;
     float32_t amp_factor = powf(10.0f,(TXgainDSP)/20.0);
     arm_scale_f32(data->I, amp_factor, data->I, data->N);
+    arm_scale_f32(data->Q, amp_factor, data->Q, data->N);
 }
 
 /**
@@ -1204,11 +1219,17 @@ DataBlock * TransmitProcessing(const char *fname){
     }
     TXDecimateBy2(&data,&TXfilters);// 512 in, 256 out
     BandEQ(&data, &RXfilters, TX);
-    TXGain(&data); // apply the DSP gain factor
     arm_copy_f32(data.I,data.Q,256);
     TXDecimateBy2Again(&data,&TXfilters); // 256 in, 128 out
     HilbertTransform(&data,&TXfilters); // 128
     TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+    // Controlled envelope SSB: limit the envelope to the level that TXGain maps
+    // onto the requested power, so the power setting becomes PEP
+    if (CESSBActive())
+        CESSBProcess(&data);
+    else
+        CESSBSkipped();
+    TXGain(&data); // apply the DSP gain factor; linear, so after CESSB is equivalent
     // Perform IQ correction
     ApplyIQCorrection(&data,
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],

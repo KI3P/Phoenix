@@ -15,6 +15,24 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state);
 
 static void ROOT_enter(ModeSm* sm);
 
+static void ATU_TUNE_STATES_enter(ModeSm* sm);
+
+static void ATU_TUNE_STATES_exit(ModeSm* sm);
+
+static void ATU_TUNE_STATES_atu_tune_end(ModeSm* sm);
+
+static void ATU_TUNE_MARK_enter(ModeSm* sm);
+
+static void ATU_TUNE_MARK_exit(ModeSm* sm);
+
+static void ATU_TUNE_MARK_atu_carrier_off(ModeSm* sm);
+
+static void ATU_TUNE_SPACE_enter(ModeSm* sm);
+
+static void ATU_TUNE_SPACE_exit(ModeSm* sm);
+
+static void ATU_TUNE_SPACE_atu_carrier_on(ModeSm* sm);
+
 static void CALIBRATION_STATES_enter(ModeSm* sm);
 
 static void CALIBRATION_STATES_exit(ModeSm* sm);
@@ -75,6 +93,8 @@ static void CALIBRATE_TX_IQ_MARK_enter(ModeSm* sm);
 
 static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm);
 
+static void CALIBRATE_TX_IQ_MARK_calibrate_exit(ModeSm* sm);
+
 static void CALIBRATE_TX_IQ_MARK_do(ModeSm* sm);
 
 static void CALIBRATE_TX_IQ_MARK_ptt_released(ModeSm* sm);
@@ -104,6 +124,8 @@ static void NORMAL_STATES_InitialState_transition(ModeSm* sm);
 static void CW_RECEIVE_enter(ModeSm* sm);
 
 static void CW_RECEIVE_exit(ModeSm* sm);
+
+static void CW_RECEIVE_atu_tune_start(ModeSm* sm);
 
 static void CW_RECEIVE_dah_pressed(ModeSm* sm);
 
@@ -185,6 +207,8 @@ static void SSB_RECEIVE_enter(ModeSm* sm);
 
 static void SSB_RECEIVE_exit(ModeSm* sm);
 
+static void SSB_RECEIVE_atu_tune_start(ModeSm* sm);
+
 static void SSB_RECEIVE_ptt_pressed(ModeSm* sm);
 
 static void SSB_RECEIVE_to_cw_mode(ModeSm* sm);
@@ -244,6 +268,38 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
         // STATE: ModeSm
         case ModeSm_StateId_ROOT:
             // No events handled by this state (or its ancestors).
+            break;
+        
+        // STATE: ATU_TUNE_STATES
+        case ModeSm_StateId_ATU_TUNE_STATES:
+            switch (event_id)
+            {
+                case ModeSm_EventId_ATU_TUNE_END: ATU_TUNE_STATES_atu_tune_end(sm); break;
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: ATU_TUNE_MARK
+        case ModeSm_StateId_ATU_TUNE_MARK:
+            switch (event_id)
+            {
+                case ModeSm_EventId_ATU_CARRIER_OFF: ATU_TUNE_MARK_atu_carrier_off(sm); break;
+                case ModeSm_EventId_ATU_TUNE_END: ATU_TUNE_STATES_atu_tune_end(sm); break; // First ancestor handler for this event
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
+            break;
+        
+        // STATE: ATU_TUNE_SPACE
+        case ModeSm_StateId_ATU_TUNE_SPACE:
+            switch (event_id)
+            {
+                case ModeSm_EventId_ATU_CARRIER_ON: ATU_TUNE_SPACE_atu_carrier_on(sm); break;
+                case ModeSm_EventId_ATU_TUNE_END: ATU_TUNE_STATES_atu_tune_end(sm); break; // First ancestor handler for this event
+                
+                default: break; // to avoid "unused enumeration value in switch" warning
+            }
             break;
         
         // STATE: CALIBRATION_STATES
@@ -323,6 +379,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
             switch (event_id)
             {
                 case ModeSm_EventId_DO: CALIBRATE_TX_IQ_MARK_do(sm); break;
+                case ModeSm_EventId_CALIBRATE_EXIT: CALIBRATE_TX_IQ_MARK_calibrate_exit(sm); break;
                 case ModeSm_EventId_PTT_RELEASED: CALIBRATE_TX_IQ_MARK_ptt_released(sm); break;
                 
                 default: break; // to avoid "unused enumeration value in switch" warning
@@ -363,6 +420,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_DAH_PRESSED: CW_RECEIVE_dah_pressed(sm); break;
                 case ModeSm_EventId_DIT_PRESSED: CW_RECEIVE_dit_pressed(sm); break;
                 case ModeSm_EventId_TO_DIGITAL_MODE: CW_RECEIVE_to_digital_mode(sm); break;
+                case ModeSm_EventId_ATU_TUNE_START: CW_RECEIVE_atu_tune_start(sm); break;
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
@@ -509,6 +567,7 @@ void ModeSm_dispatch_event(ModeSm* sm, ModeSm_EventId event_id)
                 case ModeSm_EventId_PTT_PRESSED: SSB_RECEIVE_ptt_pressed(sm); break;
                 case ModeSm_EventId_TO_DIGITAL_MODE: SSB_RECEIVE_to_digital_mode(sm); break;
                 case ModeSm_EventId_TO_CW_MODE: SSB_RECEIVE_to_cw_mode(sm); break;
+                case ModeSm_EventId_ATU_TUNE_START: SSB_RECEIVE_atu_tune_start(sm); break;
                 case ModeSm_EventId_CALIBRATE_FREQUENCY: NORMAL_STATES_calibrate_frequency(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_RX_IQ: NORMAL_STATES_calibrate_rx_iq(sm); break; // First ancestor handler for this event
                 case ModeSm_EventId_CALIBRATE_TX_IQ: NORMAL_STATES_calibrate_tx_iq(sm); break; // First ancestor handler for this event
@@ -543,6 +602,12 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state)
     {
         switch (sm->state_id)
         {
+            case ModeSm_StateId_ATU_TUNE_STATES: ATU_TUNE_STATES_exit(sm); break;
+            
+            case ModeSm_StateId_ATU_TUNE_MARK: ATU_TUNE_MARK_exit(sm); break;
+            
+            case ModeSm_StateId_ATU_TUNE_SPACE: ATU_TUNE_SPACE_exit(sm); break;
+            
             case ModeSm_StateId_CALIBRATION_STATES: CALIBRATION_STATES_exit(sm); break;
             
             case ModeSm_StateId_CALIBRATE_FREQUENCY: CALIBRATE_FREQUENCY_exit(sm); break;
@@ -600,6 +665,143 @@ static void exit_up_to_state_handler(ModeSm* sm, ModeSm_StateId desired_state)
 static void ROOT_enter(ModeSm* sm)
 {
     sm->state_id = ModeSm_StateId_ROOT;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state ATU_TUNE_STATES
+////////////////////////////////////////////////////////////////////////////////
+
+static void ATU_TUNE_STATES_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_ATU_TUNE_STATES;
+}
+
+static void ATU_TUNE_STATES_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_ROOT;
+}
+
+static void ATU_TUNE_STATES_atu_tune_end(ModeSm* sm)
+{
+    // ATU_TUNE_STATES behavior
+    // uml: 1. ATU_TUNE_END [ATUTuneReturnCW()] TransitionTo(CW_RECEIVE)
+    if (ATUTuneReturnCW())
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CW_RECEIVE`.
+        NORMAL_STATES_enter(sm);
+        CW_RECEIVE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for ATU_TUNE_STATES
+    
+    // ATU_TUNE_STATES behavior
+    // uml: 2. ATU_TUNE_END TransitionTo(SSB_RECEIVE)
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `SSB_RECEIVE`.
+        NORMAL_STATES_enter(sm);
+        SSB_RECEIVE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for ATU_TUNE_STATES
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state ATU_TUNE_MARK
+////////////////////////////////////////////////////////////////////////////////
+
+static void ATU_TUNE_MARK_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_ATU_TUNE_MARK;
+    
+    // ATU_TUNE_MARK behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for ATU_TUNE_MARK
+}
+
+static void ATU_TUNE_MARK_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_ATU_TUNE_STATES;
+}
+
+static void ATU_TUNE_MARK_atu_carrier_off(ModeSm* sm)
+{
+    // ATU_TUNE_MARK behavior
+    // uml: ATU_CARRIER_OFF TransitionTo(ATU_TUNE_SPACE)
+    {
+        // Step 1: Exit states until we reach `ATU_TUNE_STATES` state (Least Common Ancestor for transition).
+        ATU_TUNE_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `ATU_TUNE_SPACE`.
+        ATU_TUNE_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for ATU_TUNE_MARK
+    
+    // No ancestor handles this event.
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// event handlers for state ATU_TUNE_SPACE
+////////////////////////////////////////////////////////////////////////////////
+
+static void ATU_TUNE_SPACE_enter(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_ATU_TUNE_SPACE;
+    
+    // ATU_TUNE_SPACE behavior
+    // uml: enter / { UpdateHardwareState(); }
+    {
+        // Step 1: execute action `UpdateHardwareState();`
+        UpdateHardwareState();
+    } // end of behavior for ATU_TUNE_SPACE
+}
+
+static void ATU_TUNE_SPACE_exit(ModeSm* sm)
+{
+    sm->state_id = ModeSm_StateId_ATU_TUNE_STATES;
+}
+
+static void ATU_TUNE_SPACE_atu_carrier_on(ModeSm* sm)
+{
+    // ATU_TUNE_SPACE behavior
+    // uml: ATU_CARRIER_ON TransitionTo(ATU_TUNE_MARK)
+    {
+        // Step 1: Exit states until we reach `ATU_TUNE_STATES` state (Least Common Ancestor for transition).
+        ATU_TUNE_SPACE_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `ATU_TUNE_MARK`.
+        ATU_TUNE_MARK_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for ATU_TUNE_SPACE
+    
+    // No ancestor handles this event.
 }
 
 
@@ -1046,6 +1248,27 @@ static void CALIBRATE_TX_IQ_MARK_exit(ModeSm* sm)
     sm->state_id = ModeSm_StateId_CALIBRATION_STATES;
 }
 
+static void CALIBRATE_TX_IQ_MARK_calibrate_exit(ModeSm* sm)
+{
+    // CALIBRATE_TX_IQ_MARK behavior
+    // uml: CALIBRATE_EXIT TransitionTo(CALIBRATION_STATES.<ExitPoint>(done))
+    {
+        // Step 1: Exit states until we reach `CALIBRATION_STATES` state (Least Common Ancestor for transition).
+        CALIBRATE_TX_IQ_MARK_exit(sm);
+        
+        // Step 2: Transition action: ``.
+        
+        // Step 3: Enter/move towards transition target `CALIBRATION_STATES.<ExitPoint>(done)`.
+        // CALIBRATION_STATES.<ExitPoint>(done) is a pseudo state and cannot have an `enter` trigger.
+        
+        // Finish transition by calling pseudo state transition function.
+        CALIBRATION_STATES_ExitPoint_done__transition(sm);
+        return; // event processing immediately stops when a transition finishes. No other behaviors for this state are checked.
+    } // end of behavior for CALIBRATE_TX_IQ_MARK
+    
+    // No ancestor handles this event.
+}
+
 static void CALIBRATE_TX_IQ_MARK_do(ModeSm* sm)
 {
     // CALIBRATE_TX_IQ_MARK behavior
@@ -1277,6 +1500,29 @@ static void CW_RECEIVE_enter(ModeSm* sm)
 static void CW_RECEIVE_exit(ModeSm* sm)
 {
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
+}
+
+static void CW_RECEIVE_atu_tune_start(ModeSm* sm)
+{
+    // CW_RECEIVE behavior
+    // uml: ATU_TUNE_START [IsTxAllowed()] / { SetATUTuneReturnCW(true); } TransitionTo(ATU_TUNE_SPACE)
+    if (IsTxAllowed())
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
+        
+        // Step 2: Transition action: `SetATUTuneReturnCW(true);`.
+        SetATUTuneReturnCW(true);
+        
+        // Step 3: Enter/move towards transition target `ATU_TUNE_SPACE`.
+        ATU_TUNE_STATES_enter(sm);
+        ATU_TUNE_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for CW_RECEIVE
+    
+    // No ancestor handles this event.
 }
 
 static void CW_RECEIVE_dah_pressed(ModeSm* sm)
@@ -1972,6 +2218,29 @@ static void SSB_RECEIVE_exit(ModeSm* sm)
     sm->state_id = ModeSm_StateId_NORMAL_STATES;
 }
 
+static void SSB_RECEIVE_atu_tune_start(ModeSm* sm)
+{
+    // SSB_RECEIVE behavior
+    // uml: ATU_TUNE_START [IsTxAllowed()] / { SetATUTuneReturnCW(false); } TransitionTo(ATU_TUNE_SPACE)
+    if (IsTxAllowed())
+    {
+        // Step 1: Exit states until we reach `ROOT` state (Least Common Ancestor for transition).
+        exit_up_to_state_handler(sm, ModeSm_StateId_ROOT);
+        
+        // Step 2: Transition action: `SetATUTuneReturnCW(false);`.
+        SetATUTuneReturnCW(false);
+        
+        // Step 3: Enter/move towards transition target `ATU_TUNE_SPACE`.
+        ATU_TUNE_STATES_enter(sm);
+        ATU_TUNE_SPACE_enter(sm);
+        
+        // Step 4: complete transition. Ends event dispatch. No other behaviors are checked.
+        return;
+    } // end of behavior for SSB_RECEIVE
+    
+    // No ancestor handles this event.
+}
+
 static void SSB_RECEIVE_ptt_pressed(ModeSm* sm)
 {
     // SSB_RECEIVE behavior
@@ -2082,6 +2351,9 @@ char const * ModeSm_state_id_to_string(ModeSm_StateId id)
     switch (id)
     {
         case ModeSm_StateId_ROOT: return "ROOT";
+        case ModeSm_StateId_ATU_TUNE_STATES: return "ATU_TUNE_STATES";
+        case ModeSm_StateId_ATU_TUNE_MARK: return "ATU_TUNE_MARK";
+        case ModeSm_StateId_ATU_TUNE_SPACE: return "ATU_TUNE_SPACE";
         case ModeSm_StateId_CALIBRATION_STATES: return "CALIBRATION_STATES";
         case ModeSm_StateId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
         case ModeSm_StateId_CALIBRATE_OFFSET_MARK: return "CALIBRATE_OFFSET_MARK";
@@ -2113,6 +2385,10 @@ char const * ModeSm_event_id_to_string(ModeSm_EventId id)
 {
     switch (id)
     {
+        case ModeSm_EventId_ATU_CARRIER_OFF: return "ATU_CARRIER_OFF";
+        case ModeSm_EventId_ATU_CARRIER_ON: return "ATU_CARRIER_ON";
+        case ModeSm_EventId_ATU_TUNE_END: return "ATU_TUNE_END";
+        case ModeSm_EventId_ATU_TUNE_START: return "ATU_TUNE_START";
         case ModeSm_EventId_CALIBRATE_EXIT: return "CALIBRATE_EXIT";
         case ModeSm_EventId_CALIBRATE_FREQUENCY: return "CALIBRATE_FREQUENCY";
         case ModeSm_EventId_CALIBRATE_POWER: return "CALIBRATE_POWER";

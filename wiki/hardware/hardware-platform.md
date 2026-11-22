@@ -3,10 +3,10 @@ title: Hardware Platform (T41-EP)
 type: hardware
 status: stable
 created: 2026-06-14
-updated: 2026-07-29
+updated: 2026-11-11
 tags: [hardware, teensy, t41-ep, board-stack, codec, i2c, platform, sample-rate]
 source_refs: [sources/t41-ep-schematics]
-related: ["[[overview]]", "[[i2c-bus-map]]", "[[rf-board-electronics]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[filter-boards]]", "[[front-panel]]", "[[display-subsystem]]", "[[hardware-state-machine]]", "[[audio-io]]", "[[sample-rate-switching]]", "[[filter-hil-test]]"]
+related: ["[[overview]]", "[[i2c-bus-map]]", "[[rf-board-electronics]]", "[[filter-board-electronics]]", "[[rf-board]]", "[[filter-boards]]", "[[front-panel]]", "[[display-subsystem]]", "[[hardware-state-machine]]", "[[audio-io]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]", "[[og-startup-hang]]", "[[build-toolchain]]"]
 ---
 
 # Hardware Platform (T41-EP)
@@ -27,7 +27,18 @@ board, follow the firmware module links; this page describes the silicon and how
   [[fast-convolution-filtering]]).
 - **Memory used by Phoenix:** tightly-coupled RAM for DSP buffers; `DMAMEM` region for audio
   DMA buffers (the cold-boot uninitialized-`DMAMEM` class of bug is noted in
-  [[fast-convolution-filtering]] and [[noise-reduction]]).
+  [[fast-convolution-filtering]] and [[noise-reduction]]). The 512 KB FlexRAM is split into
+  16 × 32 KB banks of code (ITCM) and data (DTCM). The stack gets whatever DTCM the variables
+  leave, so the Optimize setting changes the stack size in 32 KB steps. Some settings left only
+  ~17.5 KB, which overflowed and rebooted the radio: see [[memory-layout-and-stack]].
+- **Toolchain:** Teensyduino 1.62 (GCC 15.2.1) since 2026-11-11; see [[build-toolchain]].
+- **SPI (display):** LPSPI4 drives the RA8875. Teensyduino's `SPI.begin()` (1.59 and 1.62) clocks the
+  LPSPI at 240 MHz (PLL3 PFD0 ÷ 3), which occasionally lost a received byte and froze the main
+  loop. Phoenix moves it to 132 MHz (PLL2 ÷ 4) after display init: see [[spi-display-hang]].
+- **Program flash clock:** FlexSPI runs from PLL3 PFD0 (720 MHz ÷ 5 = 144 MHz, read from
+  `CCM_CSCMR1`), so startup code must never gate that PFD while running from flash.
+  Teensyduino 1.59 does exactly that in `reset_PFD()`, which kills Debug (`-Og`) builds (fixed
+  in 1.60): see [[og-startup-hang]].
 - **Storage:** on-chip program flash hosts a **LittleFS** filesystem (~1 MB) for the JSON
   config; an optional **SD card** (Teensy 4.1 built-in socket) mirrors it. See
   [[persistent-config]] — there is **no true EEPROM** despite the historical `EEPROMData` name.
@@ -166,3 +177,5 @@ I²S/MCLK routing have all been traced — see Resolved below and the module pag
 - **Power/SWR = 2 AD8307 log detectors (U14 fwd, U19 rev) → AD7991 CH0/CH1**, ref = REF3440 on
   Vin3/Vref. Net-traced 2026-06-14; the default firmware log conversion is **correct** (no bug
   — the linear formula belongs to the unused analog-diode path). → [[filter-board-electronics]]
+  Detector behaviour (slope/intercept spread, frequency, conformance) → [[ad8307-datasheet]],
+  [[log-amp-power-detection]].

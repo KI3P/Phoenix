@@ -483,10 +483,68 @@ VariableParameter digrx = {
     .limits = {.i32 = {.min = 0, .max=100, .step=1}}
 };
 
-struct SecondaryMenuOption MicOptions[3] = {
+// The SSB transmit audio source item cycles microphone -> single tone ->
+// two-tone, and its label shows the source in use. Not saved (see
+// SetTXAudioSource()). TXSourceMenuRefreshLabel() keeps it in step.
+static char txSourceLabel[24];
+
+/**
+ * Write the transmit audio source menu item's label for the current source.
+ */
+void TXSourceMenuRefreshLabel(void){
+    const char *name;
+    switch (GetTXAudioSource()){
+        case TX_SOURCE_SINGLE_TONE: name = "1 kHz tone"; break;
+        case TX_SOURCE_TWO_TONE:    name = "2-tone IMD"; break;
+        case TX_SOURCE_MIC:
+        default:                    name = "Microphone"; break;
+    }
+    snprintf(txSourceLabel, sizeof(txSourceLabel), "TX src: %s", name);
+}
+
+/**
+ * Menu callback to step the SSB transmit audio source to the next one:
+ * microphone, 1 kHz test tone, 700 + 1900 Hz two-tone, then back to microphone.
+ */
+void CycleTXAudioSource(void){
+    SetTXAudioSource(((int32_t)GetTXAudioSource() + 1) % TX_SOURCE_COUNT);
+    TXSourceMenuRefreshLabel();
+}
+
+// The CESSB item is a toggle whose label says what selecting it will do, as the
+// ATU menu's toggles do. CESSBMenuRefreshLabel() keeps it in step with ED.
+static char cessbLabel[16];
+
+/**
+ * Write the CESSB menu item's label for the current setting.
+ */
+void CESSBMenuRefreshLabel(void){
+    snprintf(cessbLabel, sizeof(cessbLabel), "%s", ED.cessbEnabled ? "Disable CESSB" : "Enable CESSB");
+}
+
+/**
+ * Menu callback to turn Controlled Envelope SSB on or off for SSB transmit.
+ * Flips ED.cessbEnabled; the transmit chain reads it every block.
+ */
+void ToggleCESSB(void){
+    ED.cessbEnabled = !ED.cessbEnabled;
+    CESSBMenuRefreshLabel();
+}
+
+// CESSB processor level: dB of gain ahead of the clipper (DSP_CESSB.h)
+VariableParameter cessbDrive = {
+    .variable = &ED.cessbDrive_dB,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = CESSB_DRIVE_MAX_DB, .step = 1}}
+};
+
+struct SecondaryMenuOption MicOptions[6] = {
     "Mic gain", variableOption, &micg, NULL, NULL,
     "USB drive", variableOption, &digdrive, NULL, NULL,
     "USB RX level", variableOption, &digrx, NULL, NULL,
+    txSourceLabel, functionOption, NULL, (void *)CycleTXAudioSource, NULL,
+    cessbLabel, functionOption, NULL, (void *)ToggleCESSB, NULL,
+    "CESSB level (dB)", variableOption, &cessbDrive, NULL, NULL,
 };
 
 // Calibration Menu
@@ -590,10 +648,14 @@ void RestoreReceiveEQ(void){
     }
 }
 
-struct SecondaryMenuOption DiagnosticOptions[3] = {
+// "Buffer print" prints the last hardware register write (LPF and BPF bands, antenna,
+// TX/RX and VFO bits, attenuators) over Debug(); "Print stored data" prints every field of
+// the stored configuration (ED), calibrations included, over Serial
+struct SecondaryMenuOption DiagnosticOptions[4] = {
     "I2C BIT test", functionOption, NULL, (void *)GotoDisplayBIT, NULL,
     "Restore receive EQ", functionOption, NULL, (void *)RestoreReceiveEQ, NULL,
     "Buffer print", functionOption, NULL, (void *)buffer_pretty_print_last_entry, NULL,
+    "Print stored data", functionOption, NULL, (void *)PrintEDToSerial, NULL,
 };
 
 // Sample Rate Menu
@@ -616,9 +678,116 @@ struct SecondaryMenuOption SampleRateOptions[2] = {
     "176.4 ksps", functionOption, NULL, (void *)SelectSampleRate176, NULL,
 };
 
+#ifdef ATU_PRESENT
+extern bool redrawMenu;          // defined with the menu navigation, below
+// ATU menu. Everything acts on the antenna selected for this band (RF Options ->
+// Antenna): the ATU can be bypassed or enabled, and the output connector chosen, per
+// antenna; the memory is per band and antenna. Manual relay control is over CAT (AT).
+// Toggles are function items whose labels say what selecting them will do.
+static char atuEnableLabel[24];
+static char atuClearLabel[32];
+static char atuOutputLabel[24];
+static bool atuClearArmed = false;       // "Clear memory" pressed once; see ATUMenuClearIsArmed()
+static uint32_t atuClearArmed_ms = 0;    // millis() of that press
+#define ATU_CLEAR_ARM_MS 10000           // a second press within this long clears
 
-// Primary menu structure
-struct PrimaryMenuOption primaryMenu[9] = {
+/**
+ * True if "Clear memory" has been pressed once and a second press would still clear.
+ * The first press lapses after ATU_CLEAR_ARM_MS.
+ */
+static bool ATUMenuClearIsArmed(void){
+    if (atuClearArmed && ((uint32_t)(millis() - atuClearArmed_ms) >= ATU_CLEAR_ARM_MS)) atuClearArmed = false;
+    return atuClearArmed;
+}
+
+/**
+ * Write the ATU menu's changing labels for the current antenna's state.
+ */
+void ATUMenuRefreshLabels(void){
+    int32_t ant = ATUCurrentAntenna();
+    snprintf(atuEnableLabel, sizeof(atuEnableLabel), "%s", ATUAntennaEnabled(ant) ? "Bypass ATU" : "Enable ATU");
+    if (ATUMenuClearIsArmed())
+        snprintf(atuClearLabel, sizeof(atuClearLabel), "Press again to clear");
+    else
+        snprintf(atuClearLabel, sizeof(atuClearLabel), "Clear memory, ant %ld", (long)ant);
+    snprintf(atuOutputLabel, sizeof(atuOutputLabel), "Output: %s", ATUAntennaBalun(ant) ? "balun" : "coax");
+}
+
+/**
+ * Cancel a pending "press again to clear" (the menu moved off the item).
+ */
+void ATUMenuDisarm(void){
+    atuClearArmed = false;
+}
+
+/**
+ * Menu callback: bypass the ATU on this antenna, or enable it again.
+ */
+void ATUMenuToggleEnable(void){
+    int32_t ant = ATUCurrentAntenna();
+    ATUSetEnabled(ant, !ATUAntennaEnabled(ant));
+}
+
+/**
+ * Menu callback: show the tuning status table (UI state ATU_STATUS; HOME returns).
+ */
+void ATUMenuShowTable(void){
+    SetInterrupt(iATUSTATUSDISPLAY);
+}
+
+/**
+ * Menu callback: clear the memory of every band for this antenna. The first press
+ * arms and re-opens the menu on this item; a second press within ATU_CLEAR_ARM_MS
+ * clears.
+ */
+void ATUMenuClearAntenna(void){
+    if (ATUMenuClearIsArmed()){
+        atuClearArmed = false;
+        ATUMemoryClearAntenna(ATUCurrentAntenna());
+        return;
+    }
+    atuClearArmed = true;
+    atuClearArmed_ms = (uint32_t)millis();
+    // Selecting a function item has just gone home; come back to this item
+    UISm_dispatch_event(&uiSM, UISm_EventId_MENU);
+    UISm_dispatch_event(&uiSM, UISm_EventId_SELECT);
+    redrawMenu = true;
+}
+
+/**
+ * Menu callback: retune, as front-panel button 16. The home screen shows progress.
+ */
+void ATUMenuTune(void){
+    ATURetune();
+}
+
+/**
+ * Menu callback: switch this antenna between the coax and the balun output.
+ */
+void ATUMenuToggleOutput(void){
+    int32_t ant = ATUCurrentAntenna();
+    ATUSetBalunOut(ant, !ATUAntennaBalun(ant));
+}
+
+VariableParameter atuTunePower = {
+    .variable = &ED.ATU_TunePower_W,
+    .type = TYPE_F32,
+    .limits = {.f32 = {.min = 0.5f, .max = 10.0f, .step = 0.5f}}
+};
+
+struct SecondaryMenuOption ATUOptions[ATU_MENU_ITEMS] = {
+    atuEnableLabel, functionOption, NULL, (void *)ATUMenuToggleEnable, NULL,
+    "Tuning status table", functionOption, NULL, (void *)ATUMenuShowTable, NULL,
+    atuClearLabel, functionOption, NULL, (void *)ATUMenuClearAntenna, NULL,
+    "Tune", functionOption, NULL, (void *)ATUMenuTune, NULL,
+    "Tune power (W)", variableOption, &atuTunePower, NULL, NULL,
+    atuOutputLabel, functionOption, NULL, (void *)ATUMenuToggleOutput, NULL,
+};
+#endif // ATU_PRESENT
+
+// Primary menu structure. NUM_PRIMARY_MENUS (MainBoard_Display.h) must match.
+// Keep the order: tests rely on RF Options at 0 and Calibration at 6.
+struct PrimaryMenuOption primaryMenu[] = {
     "RF Options", RFSet, sizeof(RFSet)/sizeof(RFSet[0]),
     "CW Options", CWOptions, sizeof(CWOptions)/sizeof(CWOptions[0]),
     "Microphone", MicOptions, sizeof(MicOptions)/sizeof(MicOptions[0]),
@@ -628,6 +797,9 @@ struct PrimaryMenuOption primaryMenu[9] = {
     "Calibration", CalOptions, sizeof(CalOptions)/sizeof(CalOptions[0]),
     "Diagnostics", DiagnosticOptions, sizeof(DiagnosticOptions)/sizeof(DiagnosticOptions[0]),
     "Sample Rate", SampleRateOptions, sizeof(SampleRateOptions)/sizeof(SampleRateOptions[0]),
+#ifdef ATU_PRESENT
+    "ATU", ATUOptions, sizeof(ATUOptions)/sizeof(ATUOptions[0]),
+#endif
 };
 
 /**
@@ -642,6 +814,11 @@ void UpdateArrayVariables(void){
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
+    CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
+#ifdef ATU_PRESENT
+    ATUMenuRefreshLabels();
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -657,6 +834,9 @@ bool redrawMenu = true;          // Flag to trigger menu redraw
  * Advance to the next primary menu category (with wrap-around).
  */
 void IncrementPrimaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     primaryMenuIndex++;
     if (primaryMenuIndex >= sizeof(primaryMenu)/sizeof(primaryMenu[0]))
         primaryMenuIndex = 0;
@@ -668,6 +848,9 @@ void IncrementPrimaryMenu(void){
  * Move to the previous primary menu category (with wrap-around).
  */
 void DecrementPrimaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     if (primaryMenuIndex == 0)
         primaryMenuIndex = sizeof(primaryMenu)/sizeof(primaryMenu[0]) - 1;
     else
@@ -680,6 +863,9 @@ void DecrementPrimaryMenu(void){
  * Advance to the next secondary menu option within current category (with wrap-around).
  */
 void IncrementSecondaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     secondaryMenuIndex++;
     if (secondaryMenuIndex >= primaryMenu[primaryMenuIndex].length)
         secondaryMenuIndex = 0;
@@ -690,6 +876,9 @@ void IncrementSecondaryMenu(void){
  * Move to the previous secondary menu option within current category (with wrap-around).
  */
 void DecrementSecondaryMenu(void){
+#ifdef ATU_PRESENT
+    ATUMenuDisarm();
+#endif
     if (secondaryMenuIndex == 0)
         secondaryMenuIndex = primaryMenu[primaryMenuIndex].length - 1;
     else
@@ -845,6 +1034,11 @@ void DrawMainMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
+#ifdef ATU_PRESENT
+    ATUMenuRefreshLabels();
+#endif
     tft.fillRect(1, 5, 650, 460, RA8875_BLACK);
     tft.drawRect(1, 5, 650, 460, RA8875_YELLOW);
 
@@ -881,6 +1075,11 @@ void DrawSecondaryMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
+#ifdef ATU_PRESENT
+    ATUMenuRefreshLabels();
+#endif
 
     tft.fillRect(1,  5, 650, 460, RA8875_BLACK);
     tft.drawRect(1,  5, 650, 460, RA8875_YELLOW);

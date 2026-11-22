@@ -40,6 +40,16 @@ bool IsTxAllowed(void) {
     return bands[ED.currentBand[ED.activeVFO]].band_type == HAM_BAND;
 }
 
+static bool atuTuneReturnCW = false;
+
+void SetATUTuneReturnCW(bool cw){
+    atuTuneReturnCW = cw;
+}
+
+bool ATUTuneReturnCW(void){
+    return atuTuneReturnCW;
+}
+
 bool IsSSBTransmit(void) {
     return (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) ||
            (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT);

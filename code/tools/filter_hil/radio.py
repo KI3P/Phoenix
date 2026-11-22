@@ -7,7 +7,7 @@ both directions, with no line ending.
 Two things about the CAT protocol shape this module:
 
 * **Many writes return nothing.** ``CAT.cpp`` suppresses empty responses, so
-  waiting for a reply after ``AG``/``MD``/``NR``/``FW``/``SR``/``CF``/``EQ``/``FL``
+  waiting for a reply after ``AG``/``MD``/``NR``/``FW``/``XS``/``CF``/``EQ``/``FL``
   costs the full read timeout every time. A sweep issues hundreds of these, so
   :data:`SILENT_WRITES` tells :meth:`Radio.cat` to skip the read entirely.
 
@@ -39,7 +39,7 @@ DIAG_PORT = "/dev/ttyACM0"
 
 #: Commands whose write form produces no reply. Waiting on these wastes the
 #: whole read timeout per command.
-SILENT_WRITES = {"AG", "MD", "NR", "NT", "FW", "FL", "SR", "CF", "EQ", "DB", "KS", "MG", "VX", "AI"}
+SILENT_WRITES = {"AG", "MD", "NR", "NT", "FW", "FL", "XS", "CF", "EQ", "DB", "KS", "MG", "VX", "AI"}
 
 #: Commands that take no parameter and yet are *writes*, not reads.
 #:
@@ -55,7 +55,7 @@ SILENT_SHORT_WRITES = {"TX", "RX"}
 #: the selected offset, so the injection frequency must include it.
 CW_TONE_OFFSETS_HZ = (400.0, 562.5, 656.5, 750.0, 843.75)
 
-#: SR command parameter -> sample rate in Hz.
+#: XS command parameter -> sample rate in Hz.
 SR_CAT_ARG = {176400: 0, 192000: 1}
 #: ED.sampleRate index -> sample rate in Hz (SDT.h SAMPLE_RATE_* macros).
 SR_ED_INDEX = {12: 176400, 13: 192000}
@@ -387,12 +387,12 @@ class Radio:
     # -- radio settings ----------------------------------------------------
 
     def get_sample_rate(self) -> int:
-        reply = self.expect("SR;")
+        reply = self.expect("XS;")
         idx = int(reply[2])
         for rate, arg in SR_CAT_ARG.items():
             if arg == idx:
                 return rate
-        raise CatError(f"unrecognised SR reply {reply!r}")
+        raise CatError(f"unrecognised XS reply {reply!r}")
 
     def set_sample_rate(self, rate_hz: int, settle_s: float = 2.0) -> None:
         """Switch sample rate and confirm the radio took it.
@@ -402,7 +402,7 @@ class Radio:
         """
         if rate_hz not in SR_CAT_ARG:
             raise CatError(f"{rate_hz} is not a CAT-selectable sample rate")
-        self.send(f"SR{SR_CAT_ARG[rate_hz]};", expect_reply=False)
+        self.send(f"XS{SR_CAT_ARG[rate_hz]};", expect_reply=False)
         time.sleep(settle_s)
         actual = self.get_sample_rate()
         if actual != rate_hz:

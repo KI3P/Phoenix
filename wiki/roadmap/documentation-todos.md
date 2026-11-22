@@ -3,10 +3,10 @@ title: Documentation TODOs & Open Questions
 type: roadmap
 status: draft
 created: 2026-06-08
-updated: 2026-07-29
+updated: 2026-11-14
 tags: [todo, open-questions, discrepancies, wiki-maintenance]
 source_refs: []
-related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]"]
+related: ["[[index]]", "[[iq-imbalance-correction]]", "[[multirate-decimation]]", "[[noise-reduction]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[tx-filter-hil-test]]", "[[memory-layout-and-stack]]", "[[spi-display-hang]]", "[[og-startup-hang]]", "[[build-toolchain]]"]
 ---
 
 # Documentation TODOs & Open Questions
@@ -20,6 +20,57 @@ This is a planning surface, not a defect tracker — but anything that looks lik
 is tagged **⚠ possible bug** so it stands out.
 
 ## Code/comment discrepancies & possible bugs
+
+### Transmit audio (2026-11-18)
+- ~~⚠ **Negative mic gain wraps to maximum gain.**~~ **Fixed (2026-11-18, `cessb-proposal`):**
+  `MicGainForCodec()` clamps the setting to 0–63 dB before `micGain()`. The three different
+  ranges remain. Original note: `AudioControlSGTL5000::micGain(unsigned int dB)`
+  takes an unsigned value, but `ED.currentMicGain` can be negative: the menu allows −10…30
+  (`MainBoard_DisplayMenus.cpp:463`) and CAT `MG` maps down to −40. A negative value reaches
+  `micGain()` (`MainBoard_AudioIO.cpp:233`, `:335`) as a huge number, which selects the 40 dB
+  preamp and the maximum input gain. The encoder, menu and CAT also use three different
+  ranges. Found while scoping [[cessb]]; fix in its Phase 1, because CESSB drive depends on
+  mic level.
+
+- ⚠ **Exciter image rejection jumps between captures (KI3P prototype).** Measured at the
+  exciter I/Q with the AD2 (`code/tools/cessb_hil`, 176.4 ksps, USB, 5 W): the image of a
+  steady tone reads anywhere from about −40 to −63 dBc from one 0.5 s capture to the next,
+  at 300, 700, 1000, 2000 and 2600 Hz alike, with CESSB on or off. A one-sample I/Q skew
+  was ruled out, since the image does not rise with frequency. The −63 dBc end matches the
+  Hilbert pair's own image (gtest: −64.6 dBc at 700 Hz), so the TX IQ correction sometimes
+  cancels the analog imbalance and sometimes does not. Not yet investigated: something
+  in the exciter's I/Q timing or the DAC, or a measurement artefact.
+- **`all_CAT_tests` run as one process fails 11 tests** (`BU`/`BD`/`MD`/`PC` writes);
+  each passes under ctest, which runs them separately, and they fail identically without
+  the new `PR` tests. Some test leaves state the next depends on. Pre-existing.
+
+### Unit-test mocks (2026-11-14)
+- **⚠ The `Adafruit_MCP23X17` mock has GPIOA and GPIOB swapped in `readGPIOAB()`.** It returns
+  GPIOA in the high byte. The real library (`Adafruit_BusIO_Register`, LSB first) and
+  `FrontPanel.cpp:134` put it in the low byte, and `GetRFMCPRegisters()`'s own comment agrees.
+  `CheckThatHardwareRegisterMatchesActualHardware()` in `Radio_test.cpp` and
+  `Calibration_test.cpp` encodes the mock's order ("a is upper half"). Fixing the mock means
+  fixing those two helpers too. Found while adding [[atu-control]], whose tests avoid the issue.
+
+### Build settings & platform (2026-11-11)
+- ~~⚠ Some Optimize settings reboot the radio every ~8 s.~~ **Fixed (`7e3c8d9`).** Stack
+  overflow from 16 KB of VLAs in `ZoomFFTExe()`. See [[memory-layout-and-stack]].
+- ~~⚠ Radio freezes (CAT silent, no reboot).~~ **Fixed (`fbdd06f`).** LPSPI at 240 MHz lost an
+  SPI byte. See [[spi-display-hang]].
+- ~~⚠ Debug (`-Og`) builds hang hard.~~ **Diagnosed; core bug, not Phoenix.** Teensyduino
+  1.59's `reset_PFD()` gates the clock to the flash, then reads a constant from flash. Fixed
+  upstream in Teensyduino 1.60. See [[og-startup-hang]].
+- ~~Consider upgrading Teensyduino 1.59 → 1.62.~~ **Done 2026-11-11.** Every setting that fits
+  passes at 528 and 600 MHz, `-Og` included; the SPI fix is still needed and still works. Two
+  GCC 15 warnings were fixed (Si5351 `new[]`/`delete`, zoom label buffer). See
+  [[build-toolchain]].
+- **Teensyduino's SPI clock root (240 MHz)** is probably worth reporting to PJRC: it affects
+  any Teensy 4 SPI user. Not reported yet. Also confirm the datasheet's LPSPI_CLK_ROOT limit,
+  which [[spi-display-hang]] assumes rather than quotes.
+- ~~`code/.vscode/arduino.json` says 600 MHz / Fast with LTO, untested after the fixes.~~
+  **Tested on 1.62:** 45 s pass for every setting at 600 MHz, plus a 10 min soak of Fast with
+  LTO ([[build-toolchain]]). 720 MHz and above were not re-tested.
+- **Untested:** whether the SPI hang rate depended on CPU speed through core voltage.
 
 ### Hardware (from T41-EP schematics, ingested 2026-06-14)
 - ~~⚠ AD8307 (log) vs linear power math.~~ — **RESOLVED, not a bug (2026-06-14).** Net trace +
@@ -206,7 +257,8 @@ is tagged **⚠ possible bug** so it stands out.
 - ~~**Built-in test (BIT)**~~ — **done** ([[built-in-test]]: startup I²C presence flags →
   status screen). Remaining: is it re-runnable / extensible to functional checks?
 - ~~**Calibration sub-state-machines**~~ — **done** ([[calibration-state-machines]]: 3 identical
-  minimize-sweep SMs + PowerCalSm curve-fit, with state/event maps). Remaining: per-SM `Vars`;
+  minimize-sweep SMs + PowerCalSm curve-fit, with state/event maps; PowerCalSm's MANUAL and AUTO
+  branches updated for V1.5.0). Remaining: per-SM `Vars`;
   whether the 3 identical SMs share one diagram.
 
 **All previously-listed "not yet written" pages are now drafts.**
@@ -215,7 +267,8 @@ is tagged **⚠ possible bug** so it stands out.
 - [[hardware-state-machine]]: full state maps of the 4 cal sub-SMs (above);
   `RFCalTransmitIQSingleVFO` external-analyzer flow.
 - [[rf-board]]: local Etherkit-Si5351 library modifications vs. upstream.
-- [[filter-boards]]: full LPF band↔BCD table; directional-coupler / per-band power calibration.
+- [[filter-boards]]: full LPF band↔BCD table. (Directional-coupler / per-band power calibration:
+  **done 2026-11-03**, [[automatic-power-swr-calibration]].)
 - [[front-panel]]: per-button id→physical-label map; measured latency win from the branch.
 - [[display-subsystem]]: waterfall colour-map / `psdnew`→pixel mapping; touch input;
   `primaryMenu[8]` contents.
@@ -243,7 +296,8 @@ is tagged **⚠ possible bug** so it stands out.
 - ~~[[rf-board]]~~ — **done** (Si5351 quadrature VFO incl. the <3.2 MHz timed-delay path,
   attenuators, T/R switching, cal loopback). Remaining: local Etherkit-lib modifications.
 - ~~[[filter-boards]]~~ — **done** (BPF/LPF/back-end relays via shared hardwareRegister, AD7991
-  SWR/power math). Remaining: full LPF band↔BCD table; coupler calibration.
+  SWR/power math). Remaining: full LPF band↔BCD table. Coupler calibration done
+  ([[automatic-power-swr-calibration]]).
 - ~~[[front-panel]]~~ — **done** (2×MCP23017, Rotary_V12 encoders, two-tier ISR+1ms-timer
   servicing = the encoder-i2c-speed branch design). Remaining: per-button id→label map.
 - ~~[[display-subsystem]]~~ — **done** (Pane dirty-flag model, 13 home panes enumerated,

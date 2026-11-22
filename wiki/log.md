@@ -1102,3 +1102,751 @@ first port. Also missing from the bug list: the `bands[].mode` sideband inversio
 Verified while checking: both firmware configurations compile clean (`usb=serial2` and
 `usb=serialmidiaudio`, 600 MHz, o1lto), and 779/779 unit tests pass — 776 committed plus 3
 uncommitted transmit-chain tests in the working tree.
+
+## [2026-10-22] query | SWR coupler placement and forward-path flatness
+Owner confirmed the directional coupler sits after the band LPF, so harmonics do not reach the
+AD8307s. Recorded in [[filter-board-electronics]] together with the forward-path frequency
+response from the owner's VNA files: coupler flat within 0.15 dB across HF, but the as-built
+J23 → forward-detector path rises 2.6 dB from 160 m to 10 m. Context: planning a calibration in
+which the bridge, once calibrated on one band, measures every band's PA curve automatically
+(`code/tools/swr_calibration_50_open_short.ipynb`, Section 10). The per-band forward offset
+would then be carried across bands with this VNA table. Its board-to-board spread is the open
+question, along with the AD8307's log conformance above the range where its slope is fitted.
+
+## [2026-10-23] query | AD8307 slope and offset versus frequency
+Asked whether the bridge's slope error term should be constant with frequency and the offset
+term frequency-dependent. Mostly yes. Everything ahead of each AD8307 is linear, and a linear
+gain is a pure offset in the log domain. Nothing loads the detector output, so the slope is
+the chip's own. The AD8307 datasheet (Rev. B, external, not ingested) shows the 10 MHz and
+100 MHz transfer curves overlapping. Above 100 MHz the line moves down but stays nearly
+parallel, and the datasheet gives no frequency condition for slope or intercept. Caveat: the
+conformance error depends on the detector input level, and the path loss differs by 6 dB
+across the bands. Top-end readings on 10 m and 6 m therefore reach the detector's +10 dBm
+conformance bump, so a slope fitted over a range that includes that top end will look
+band-dependent. Recorded in [[filter-board-electronics]].
+
+## [2026-10-23] query | Correction: AD8307 front end, OFS loop, diode option
+The owner put the AD8307 datasheet (Rev. F) into `raw/`, and the control-board schematic was
+net-traced around the detectors. Yesterday's note in [[filter-board-electronics]] had three
+errors, all corrected:
+- The 0.1 µF is on INM, not OUT.
+- OUT also carries a diode-detector stuffing option (D1/D2 peak detectors, RV19/RV27, R26/R29),
+  which appears to be the `USE_ANALOG_SWR` hardware.
+- The claim that the chip adds no frequency dependence across 1.8–54 MHz was wrong. OFS is
+  open, which puts the offset loop's high-pass corner at about 1.5 MHz, just below 160 m.
+
+The pad is frequency-compensated (10 pF across the series arm, 22 nH in the shunt arms), which
+likely explains the rise in the VNA path response. Full ingest of the datasheet (source page,
+index) is pending the owner's go-ahead, per the ingest procedure.
+
+## [2026-10-23] ingest | AD8307 datasheet (Analog Devices, Rev. F)
+Ingested `raw/AD8307.pdf` → [[ad8307-datasheet]]. Its spec table is identical to Rev. B.
+
+Owner confirmations:
+- Only the AD8307s are fitted. The D1/D2 diode-detector option is not.
+- Pad values (blank in the schematic): R17/R22 = 499 Ω, R16/R18/R24/R25 = 56.2 Ω.
+
+Pages:
+- **New [[log-amp-power-detection]].** The log law and the firmware's inverse; which error
+  term absorbs what; why the fitted slope can look band-dependent (conformance error vs
+  detector input level; the 1.5 MHz offset loop near 160 m); SWR needing only the slope
+  ratio and the offset difference; modulated signals reading low by the mean of the log
+  (two-tone ≈ 3 dB below average power, derived); 2f output ripple.
+- **[[filter-board-electronics]].** Rewrote the detector front end with the confirmed values.
+  A π-pad model plus the in-circuit coupler matches the J23 → forward-detector VNA sweep to
+  0.1 dB on every band (160 m −45.90 vs −45.89 dB; 6 m −39.96 vs −39.93 dB). The rise comes
+  from the 10 pF across the 499 Ω (zero at 32 MHz); the 22 nH barely matters. Board spread
+  is modelled as 0.38 dB/pF on 10 m and 0.59 dB/pF on 6 m, but negligible from 160 m to
+  20 m. The `…after_attenuator` VNA file does not fit this build, so it is probably an
+  earlier one.
+- **[[filter-boards]].** Calibration-term notes; corrected the `USE_ANALOG_SWR` paragraph,
+  because the diodes are a stuffing option on the same board.
+- **Cross-links:** [[t41-ep-schematics]], [[hardware-platform]],
+  [[calibration-state-machines]], and the index.
+
+Open questions:
+- Whether 160 m differs because of the open OFS pin. Test: compare the gain-step slope on
+  160 m with 40 m.
+- The 10 m / 6 m path spread across boards.
+
+## [2026-10-24] decision | CAT commands for the SWR bridge bench series
+Added three non-Kenwood CAT commands so `code/tools/swr/swr_bench_measure.py` can take the SWR
+bridge calibration series (`swr_bench_measurements.csv`, notebook Section 11) under CAT control:
+- `BR`: raw bridge statistics, accumulated from the unsmoothed AD7991 readings;
+- `XA`: CW attenuation override, for the attenuator-limit rows that `PC`'s whole watts cannot
+  reach;
+- `DD`: the digital transmit drive.
+
+Fixed two `PC` bugs found on the way: in digital mode it set the CW power, which that mode does
+not use, and it dropped the hundreds digit. Recorded in [[cat-control]]. 16 new unit tests, all
+passing. Committed in 583c4b5 without the owner's local KI3P prototype LPF remapping, which
+stays out of the repository; all 812 unit tests pass on that commit.
+
+## [2026-10-24] query | SWR bridge bench tests on two radios
+Measured radio 1 once and radio 2 twice with `code/tools/swr/swr_bench_measure.py`. Radio 2's
+second session is the "radio 3" sheet, with the loads moved from the external coupler's output
+to the radio's own connector. Findings are filed in [[swr-bridge-measured-behaviour]]:
+- **Forward power:** a per-band wattmeter calibration gives ±0.25 dB on radio 1 and ±0.5 dB on
+  radio 2, which shows AD8307 conformance curvature. It drifts 0.3–0.5 dB between sessions.
+- **Shortcuts fail.** Gain-step slopes read 2–7 % low, because the transmitter is not
+  dB-linear. VNA offset transfer between bands is off by up to 3.3 dB. This contradicts
+  [[filter-board-electronics]]; both claims are annotated there.
+- **SWR reads 30–90 % high on both radios.** The bridge leaks 10–20 dB more in the radio than on
+  the VNA bench, and magnitude-only detectors cannot calibrate that out. A same-radio A/B
+  showed the external coupler was not the cause on 40 m and 20 m. The shifted-balance-impedance
+  explanation (from radio 1) was rejected.
+- **Faults:**
+  - radio 2's PA oscillates into a short on 10 m;
+  - a stuck-DIGITAL-transmit fault (keyed, no tone) needed a power cycle;
+  - radio 1 rebooted on a static discharge.
+
+Script changes made along the way: rows grouped by the load on the connector, a tone check on
+every DIGITAL row, DIGITAL left before band changes, and oscillation detection that skips the
+load. Open: the source of the in-radio leak.
+
+## [2026-10-25] query | L44 coupler modelled from its winding
+The owner described L44's winding: a 1:10 current transformer and a 10:1 voltage transformer
+on one BN-43-202 binocular. They also confirmed that the diode-detector option is not
+populated (R20/R28, D1/D2, C149/C156, RV19/RV27, R26/R29), so each coupled port sees only its
+pad. Corrected [[filter-board-electronics]] and [[t41-ep-schematics]], which had both ports
+terminated in 52.3 Ω. Added `code/tools/swr/l44_coupler_model.py`, a nodal circuit model of the
+coupler. Findings are in [[swr-bridge-measured-behaviour]]:
+- each port's null depends on the other port's load and the turns ratio;
+- a correctly built L44 should leak −30 to −37 dB;
+- the radios' leak needs about 15 pF or 300 nH of stray coupling;
+- the out-of-circuit bench sweep of L44 leaks at radio 2's level, so the surroundings matter
+  more than the windings.
+
+## [2026-10-31] decision | L44 fixture re-measured; coupler wiring model
+Re-measured L44 alone in its perfboard fixture with the S-A-A-2 VNA (four paths, other ports on
+50 Ω; files in `023_SAAV2-VNA_MCP/data/fixture_2026-10-31_*`). It leaks −29.8/−25.0/−19.5 dB on
+40/20/10 m, 13–14 dB less than the original `RF_in_to_*.s2p` sweep, which is withdrawn with the
+results built on it (the 31 nH mutual fit, the 2.8 dB rms load fit). The owner gave L44's
+construction: radio 2 has 20 turns per core (explaining its 6 dB lower forward offset), radio 1
+10 turns with its core 20 mm up. Added `code/tools/swr/l44_peec_model.py` (core by turns, air by
+Neumann, capacitance per turn): it matches the fixture both ways and explains radio 2's leak and
+load readings as capacitance between its crowded windings and the thick wires. Radio 1 stays
+unexplained. Updated [[swr-bridge-measured-behaviour]]; the SWR technical report (Claude Doc,
+revision 77) and its local copy were updated to match.
+
+
+## [2026-11-01] decision | SWR error traced to AD7991 readout crosstalk; discarded-conversion fix
+Radio 1 re-measured after the owner rebuilt its L44 (flush, screened through lines grounded at
+one end): `code/tools/swr/swr_bench_measurements_radio1_l44_flush.csv`, loads on the connector
+(100/200 Ω re-taken after a first take on the external coupler). The bare 50 Ω load improved
+(40 m 1.35 → 1.10), but 100/200 Ω read as before. One return-loss factor, 0.666, fits all bands.
+- **AD2 test:** probes on U20 pins 3/4 (`code/tools/swr/detector_readout/`) showed the
+  detector voltages give correct SWR (100 Ω 1.94–2.02, 200 Ω 3.9–4.3 on 160–20 m). The radio's
+  ADC mixes the channels: ADC_F = 0.83 Vf + 0.14 Vr, ADC_R = 0.18 Vf + 0.80 Vr, so the
+  differential gain is 0.65. Bridge leaks at the pins are −42/−40/−31/−22 dB (160/40/20/10 m).
+- **Withdrawn:** the October "in-radio leak", radio 2's winding-capacitance fit and radio 1's
+  −9 dB extra leak. All were fitted to compressed readings.
+- **Fix:** `AD7991::readADCsingle()` discards the first conversion after a channel switch (9
+  new tests, 821/821 pass). Flashed to radio 1 (serialmidiaudio + the local KI3P patch);
+  verification at the pins is pending.
+- **Updated:** [[swr-bridge-measured-behaviour]], [[filter-board-electronics]], [[filter-boards]],
+  index. The SWR technical report (Claude Doc, revision 84) and its local copy were updated.
+
+## [2026-11-01] decision | AD7991 fix verified: two discarded conversions per channel switch
+Re-probed U20's pins on radio 1 with the new firmware.
+- **One discard:** the cross terms fell from 0.144/0.186 to 0.022/0.042, about their squares.
+- **Two discards** (now the default, `AD7991_DEFAULT_DISCARDS`): they fell to 0.007/−0.008, and
+  the Vf−Vr gain (0.972) equals the common-mode gain (0.971).
+- **Loads:** with the open/short reference, radio 1's ADC reads 100 Ω as 2.01–2.09 and 200 Ω
+  as 3.9–4.3 on 160–20 m, as the pins do. 10 m reads 2.17–2.26 / 4.07–4.22 from the bridge's
+  own −22 dB leak.
+- **Cost:** a bridge update now takes about 3 ms (Wire2 at 100 kHz), while transmitting only.
+- **Updated:** [[swr-bridge-measured-behaviour]], [[filter-board-electronics]], [[filter-boards]].
+  The SWR technical report (Claude Doc, revision 91) and its local copy were updated.
+
+## [2026-11-01] decision | Bench series on the fixed firmware: SWR calibrates
+Repeated radio 1's 144-row series with two discarded AD7991 conversions per channel switch
+(`code/tools/swr/swr_bench_measurements_radio1_adcfix.csv`).
+- **Loads:** with the wattmeter forward calibration and the open/short reflected calibration,
+  100 Ω reads 1.97–2.04 and 200 Ω 3.96–4.22 on 160–20 m, against 2.8–3.0 and 5.9–7.0 before
+  the fix. 10 m reads 2.26–2.42 / 4.29–4.73, within the bench-VNA range.
+- **Calibration:** the open and short agree within 0.04 dB on 160–20 m, and the drift checks
+  repeat within 0.08 dB.
+- **Open:** the 10 m forward fit stays poor (0.69 dB rms).
+- **Updated:** [[swr-bridge-measured-behaviour]]. The SWR technical report (Claude Doc,
+  revision 93) and its local copy were updated.
+
+## [2026-11-01] lint | Restructured swr-bridge-measured-behaviour around the current state
+Rewrote [[swr-bridge-measured-behaviour]] to match the restructured SWR technical report
+(Claude Doc revision 101).
+- **Current state first:** summary, the readout error and its fix, the calibration on the
+  fixed firmware with a pointer to `code/docs/swr_calibration_approach.md`, open issues (now
+  including the 10 m ceiling over-read) and implications.
+- **History:** the October measurement sections are kept verbatim under "History: the October
+  2026 investigation", with a note on what still holds.
+- **Index:** the entry was updated to match.
+
+## [2026-11-02] decision | Radio 2's L44 leak confirmed and removed by the rebuild
+Three bench series on radio 2 with the fixed firmware: original build, after removing
+C147/C154 and adding 100 pF across the detector inputs, and after rebuilding L44 with
+screened through lines (`code/tools/swr/swr_bench_measurements_radio2_{adcfix,c154_out,l44_shielded}.csv`).
+- **The leak was in L44:** the 50 Ω load read SWR 1.11/1.23/1.48 on 40/20/10 m, unchanged by
+  the capacitor step, and 1.02/1.03/1.07 after the L44 rebuild.
+- **The capacitor step moved the forward offsets** (+3.1 dB on 10 m), bringing the two
+  radios to an almost constant 1 dB apart; the L44 rebuild moved them by 0.4 dB at most.
+- **Radio 2's PA oscillates into a 10 m short** in every build.
+- **Partly reinstated:** the October explanation of radio 2's leak (capacitance from the
+  through line to its windings) fits the fix, though the leak was smaller than claimed then.
+- **Updated:** [[swr-bridge-measured-behaviour]] (new section "Radio 2's rework"),
+  [[filter-board-electronics]] (open questions), `code/docs/swr_calibration_approach.md`
+  (three calibration levels, defaults and accuracy recomputed from both rebuilt radios), and
+  the SWR technical report.
+
+## [2026-11-03] lint | V1.5.0: the automatic power and SWR calibration, and the fixes since V1.4.1
+Brought the wiki up to date with `nightly` for V1.5.0. Since 2026-11-02 the automatic
+calibration has been completed, validated on both radios and merged into `nightly`. A few
+smaller fixes from main (PRs #32 and #34) came in with it.
+- **New page:** [[automatic-power-swr-calibration]]. It covers the code, the three levels, the
+  load/open/short session, how the main-loop service keys the radio, what is stored, the
+  uncalibrated defaults and open items. It summarises `code/docs/PowerCalibration/AutoCalibration.md`
+  and `AutoCalibrationDesign.md`, which stay authoritative.
+- **Updated:**
+  - [[calibration-state-machines]]: `PowerCalSm` now has MANUAL and AUTO branches, with new
+    events `RETRY`/`SKIP`. `ACQUISITION`, `READ_AND_ADJUST` and `NEXT_POINT` no longer exist.
+    The "SWR not correctable by calibration" claim is marked superseded.
+  - [[tune-frequency-control]]: the shaped tanh P = P_sat·tanh((k·x)^s)^(1/s), with a
+    Levenberg–Marquardt fit in dB replacing the Gauss–Newton fit in mW.
+  - [[hardware-state-machine]]: the fifth partial, `HardwareSm_PowerAutoCalibration.cpp`.
+  - [[persistent-config]]: `PowerCal_*_shape`, `SWR_CalLevel`, `SWR_CalDate`,
+    `SWR_CouplerTurns`, and the measured uncalibrated defaults.
+  - [[filter-boards]], [[display-subsystem]]: bridge statistics and the AUTO screen.
+  - [[rf-board]]: the shared-PLLB fix between CW and SSB transmit (5acf4b6).
+  - [[cat-control]]: newline-terminated bytes are not CAT, so the time-sync packet and CRLF
+    clients now work on the single-port audio build (ab69673).
+  - [[swr-bridge-measured-behaviour]], [[log-amp-power-detection]]: the procedure is now
+    implemented in firmware. The `code/tools/swr/` bench files cited there live on the
+    `swr_cal_redux` branch, not in `nightly`.
+  - [[documentation-todos]], index.
+
+## [2026-11-11] decision | Stack overflow and SPI hang behind the "bad optimiser settings"
+Investigated why some Arduino Optimize / CPU speed settings made the radio misbehave. All
+measurements were made on the bench radio with fixes committed to `nightly` (`7e3c8d9`,
+`fbdd06f`, `38b26c3`, `ebe42f7`). There were two separate faults:
+- **Reboot every ~8 s** was a stack overflow into the MPU guard at `_ebss`. FlexRAM is
+  allocated in 32 KB banks, so 11-bank builds (`-O1`, `-O2`, `-O2 LTO`, `-Og`) had ~17.5 KB of
+  stack, against a measured 17.1–17.6 KB peak. The peak was almost all `ZoomFFTExe()`'s 16 KB
+  of VLAs. `-O2 LTO` was 184 B over. The VLAs moved to `static DMAMEM`, cutting peak use to
+  3,552 B. CPU speed did not change the layout. New page [[memory-layout-and-stack]].
+- **Freeze with USB alive** was the main loop spinning in `SPIClass::transfer()` inside an
+  RA8875 call, waiting for a byte the LPSPI lost. It was located with a GPT2 PC-sampling
+  interrupt. Pushing one byte from that interrupt recovered it every time. Clock root
+  240 MHz: 8 hangs in 10 min; 132 MHz: 0. The per-transaction CR toggle, the `REF` flag and
+  the stack fix were ruled out by measurement. New page [[spi-display-hang]].
+- **Also:** CAT `FA;`/`FB;`/`IF;` and two display labels used `%lld`, which the Teensy's
+  printf does not support. They are now cast to `long` and printed with `%ld`
+  ([[cat-control]]).
+- **Updated:** [[hardware-platform]], [[display-subsystem]], [[zoom-fft]],
+  [[real-time-constraints]], [[cat-control]], [[documentation-todos]] (open: the `-Og` hard
+  hang, a PJRC report, re-checking at 600 MHz), index.
+
+## [2026-11-11] decision | Debug (-Og) builds hang in Teensyduino 1.59 startup
+The open `-Og` item from the entry above is now diagnosed. It is a core bug, not Phoenix, and
+nothing in the repo changed.
+- **Symptom:** the kernel log shows no USB device at all after upload, which places the hang
+  in `ResetHandler2()` before `usb_init()`.
+- **Ruled out:** the forum theory blaming the `configure_cache()` `SCB_CCR` write's cache-line
+  position. Adding `dsb`/`isb` and aligning the write with `.balign 32` both still hung.
+- **Located:** OCRAM breadcrumbs at `0x2027FF40`, which survive a reflash, in a scratchpad
+  copy of the core. They showed a HardFault at the literal-pool load in `reset_PFD()`.
+  `CCM_CSCMR1` confirms FlexSPI is clocked from PLL3 PFD0, which that function gates.
+- **Fix:** making `reset_PFD()` `FASTRUN` booted `-Og` and passed the 45 s CAT check (23/23).
+  Upstream fixed it in commits `2b87070`, `f4d7aa6` and `a78bc7c`, first released in
+  Teensyduino 1.60 (1.62 is current).
+- **Also:** the Teensy Loader's Auto mode re-flashes the last hex on a PROGRAM press. That
+  explains the earlier "needs two presses".
+- **New page:** [[og-startup-hang]].
+- **Updated:** [[memory-layout-and-stack]], [[hardware-platform]], [[documentation-todos]]
+  (new item: upgrade to 1.62 and re-test), index.
+
+## [2026-11-11] decision | Upgrade to Teensyduino 1.62 (GCC 15.2.1)
+Following [[og-startup-hang]], the development machine moved from Teensyduino 1.59 / GCC 11.3.1
+to 1.62 / GCC 15.2.1.
+- **Trial first:** 1.62 was installed into a separate `arduino-cli` data directory and every
+  Optimize setting built and flashed from there, before `~/.arduino15` was touched.
+- **Results:** every setting that fits passed the 45 s CAT check at both 528 and 600 MHz, `-Og`
+  included. Fast with LTO also passed 10 min (300/300) at each speed. `-O3` is still ~48 KB
+  over RAM1. Stack headroom is within a few hundred bytes of 1.59. The SPI library still sets
+  240 MHz, so the 132 MHz fix stays.
+- **GCC 15 warnings fixed:** the Si5351 register arrays (`new[]` freed with `delete`) are now
+  local arrays, and the zoom label buffer went from 4 to 5 bytes. Unit tests are unchanged:
+  873/903, the same 30 failures from the uncommitted KI3P prototype edits.
+- **New page:** [[build-toolchain]].
+- **Updated:** [[og-startup-hang]], [[memory-layout-and-stack]], [[spi-display-hang]],
+  [[hardware-platform]], [[documentation-todos]] (the upgrade and 600 MHz items closed), index.
+
+## [2026-11-14] decision | ATU support, Phase 1: manual control
+The K9HZ antenna tuner's standalone driver moved into PhoenixSketch, behind a new `Config.h`
+flag `ATU_PRESENT` (off by default). Phase 1 is manual control only; automatic tuning is
+Phase 2.
+- **Prerequisite fix (commit `c25c602`):** the LPF, BPF and attenuator setters masked
+  `hardwareRegister` with 32-bit literals, which cleared bits 32–63 on every band change. That
+  already reset `TXVFOBIT`, and would have wiped the ATU bits 33–51. They now use 64-bit masks,
+  with a regression test per board.
+- **Added:**
+  - the driver, with init at boot (bypassed)
+  - two BIT rows
+  - an ATU menu (network, caps position, balun, L and C masks, bypass all)
+  - the `AT` CAT command
+  - a TX interlock (`ATUChangeAllowed`)
+  - `code/tools/atu_vna/atu_cat.py`
+- **Tests:** `all_ATU_tests` (18 tests) is the only target built with `ATU_PRESENT`. All 925
+  tests pass with the flag off and with it on. The Teensy build compiles both ways; the flag
+  adds about 1.9 kB of code.
+- **Found:** the `Adafruit_MCP23X17` test mock swaps GPIOA/GPIOB in `readGPIOAB()`. Recorded in
+  [[documentation-todos]] and left unchanged.
+- **New pages:** [[atu-board]], [[atu-control]], [[atu-auto-tuning]].
+- **Updated:** [[filter-boards]], [[cat-control]], [[built-in-test]], [[i2c-bus-map]],
+  [[documentation-todos]], index.
+
+## [2026-11-14] decision | ATU Phase 1 verified on hardware
+The radio was flashed with `ATU_PRESENT` enabled and the ATU installed. Both expanders were
+found at boot. `AT;` read the bypassed state with readback equal to the register, and the owner
+confirmed that every ATU menu item switched its relays as expected. Phase 1 (manual control) is
+done; next is [[atu-auto-tuning]]. Updated [[atu-control]].
+  CAT check: `atu_cat.py` walked every relay plus full masks and an LC/CL setting, 49/49 with
+  readback = register.
+  Transmit interlock (KI3P prototype build, dummy load, SSB keyed by `TX;` with no audio): `AT`
+  writes were refused (`?;`) while transmitting. The relay state (network in line) survived
+  RX→TX→RX and a band change up and back. 13/13 checks passed.
+
+## [2026-11-14] decision | ATU Phase 2 stage A: tuner model in firmware, benchmarked
+`ATUModel.cpp` ports `tools/atu_vna/model.py`: a per-frequency precompute (double) of the line
+products for every L code and the bank admittance for every C code, a chunked search of all
+131,072 settings into a top-300 heap, and robust selection over 6 fixed perturbed coil sets.
+- **Accuracy:** matches the Python model to 3×10⁻⁷ in Γ on 432 golden cases.
+- **Speed** (`AX1;`, KI3P prototype at 600 MHz): precompute 4.9 ms, search 18 ms, robust pick
+  ≤ 0.14 ms.
+- **Cross-check:** 30+j40 Ω at 7.1 MHz → LC/15/32, as in the report.
+- **Plan:** Phase 2 is planned in [[atu-auto-tuning]] as stages A–F.
+
+## [2026-11-14] decision | ATU Phase 2 stage B: tune engine and carrier states
+New ModeSm states `ATU_TUNE_SPACE` / `ATU_TUNE_MARK`, entered from SSB or CW receive and
+returning there. `ATUTune.cpp` is a non-blocking engine run from `loop()`: relays switch only
+with the carrier off, and the T/R relay is held in TX for the whole program. CAT `AX0` aborts,
+`AX2` runs the READ diagnostic, and `AX;` reports.
+- **Bench:** repeatability ±0.001 in |Γ|; bypass 0.047 against 0.04 on the VNA.
+- **Bridge against model:** within 0.02 above |Γ| 0.6, up to 0.07 high near a match (bridge leak
+  plus load mismatch). Details in [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU Phase 2 stage C: the tuning algorithm
+`ATUTuneAlgo.cpp`: bypass check → 4 probes → LM load estimate → chunked robust jump →
+accept/re-estimate → polish/climb, each slice a few ms.
+- **Host simulation** (coils 5 % off, 0.03 bridge leak): median 6 readings and 0.02–0.04 SWR
+  above the best possible on 80/40/20/10 m.
+- **Bench:** a dummy load stays bypassed. See [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU bench: resistive loads; CL model unreliable above 15 MHz
+100 Ω and 200 Ω on the antenna connector, tuned on 80/40/20/10 m.
+- **80 and 40 m:** 6 readings, 0.7 s, SWR 1.06–1.21.
+- **20 m:** 1.21 on 100 Ω. On 200 Ω, 1.6–2.0: a model coverage hole at the estimated load,
+  because the output path rotates the load by 3.5–5.5 ns.
+- **10 m:** reached 1.30–1.42, but only by fallback hill-climb (43–46 readings, 4.5 s).
+- **15 m (200 Ω):** SWR 5.1.
+- **Cause:** offline fits of the probe readings show the bridge is consistent with the LC model
+  on 10 m (0.012 rms), but the CL model is 0.3 off. Report §3.5 predicted this.
+- **Changes:** elements limited to 75 % of resonance, no repeated jumps, and the fourth probe is
+  LC above 15 MHz.
+- **Next:** the CL path needs re-measuring with the VNA and a refit. Deferred until the other
+  tests are done. Details in [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU Phase 2 stage D: per-band, per-antenna memory
+ED gains the ATU memory (packed relays, frequency and SWR per band and antenna), the tune power
+and an auto-apply flag. The hook in `HandleTuneState()` applies stored settings on band or
+antenna change, in receive only. A tune tries the stored setting first and stores its result.
+New menu items, and CAT `AX5;` to forget an entry.
+- **Bench (KI3P prototype, 200 Ω):** every check passed. A re-tune from memory takes 1 reading.
+- Updated [[atu-control]] and [[atu-auto-tuning]].
+
+## [2026-11-14] decision | ATU Phase 2 stage E: per-band bridge scale calibration
+The first coil calibration solved L4–L8 3–16 % high. The cause was the SWR bridge, which reads
+|Γ| high by a factor that depends on the band.
+- **Rework (owner's choice, "bridge scale only"):** each band's scale comes from reference
+  capacitors into the dummy load. It is stored in `ED.ATU_GammaScale` and divides every tuner
+  reading. Coils are measured and reported (`AX7`) but not applied. ED is saved after the
+  operator's band is back. New CAT commands `AX8` and `AX9`.
+- **Bench (KI3P prototype):**
+  - Scales: 80 m 1.020, 40 m 1.047, 30 m 1.055, 20 m 1.076.
+  - 160 m (1.088) and 17 m (1.150) each rest on one capacitor and look unreliable. The 160 m
+    coils say the scale there is about 1.0.
+  - 15/12/10 m behave like an additive leak and are rejected.
+  - Persistence across a reboot was verified.
+- **Open:** require at least two references that agree. Details in [[atu-auto-tuning]]; CAT
+  table in [[atu-control]].
+
+## [2026-11-15] decision | ATU: replace the model-based tuner with a measured search
+The model-based tuner (stages A, C and E) needed a VNA fit of one board and a per-band bridge
+calibration. Builders with hand-wound coils can't do either, and the bench had already shown it
+failing where the model was wrong (CL above 15 MHz).
+- **New approach:** a search that uses only measured |Γ|, on branch `ATU_search` (from stage
+  B, with stage D memory cherry-picked).
+  - It walks the L-network's valley floor (best C for each single-element L), then refines
+    with a pattern search.
+  - It stops at SWR 1.2 or after 120 readings, never repeats a reading, and reports
+    `ATU_FAIL_NO_MATCH` but keeps the best setting when it can't reach 1.5.
+- **Model:** it stays only as the host-test plant. `tools/atu_vna/search_sim.py` mirrors the
+  search offline.
+- **Bench (KI3P prototype):** 100 Ω and 200 Ω reach SWR 1.04–1.41 on 80–10 m in 16–73
+  readings (1.7–6.4 s).
+  - It beats the model tuner on 20 m (1.25 vs 1.6–2.0) and 15 m (1.37 vs 5.1).
+  - Memory re-tunes take 1 reading.
+  - Readings were cut from 114 to 99 ms.
+- **CAT:** `AY` pages the readings. `AX1`, `AX4` and `AX6`–`AX9` are gone.
+
+Details in [[atu-auto-tuning]]; CAT table in [[atu-control]].
+
+## [2026-11-15] decision | ATU stage F: button 16 retunes, status on the home screen, Kenwood AC
+The user asked for L and C beside SWR/PWR, antenna-specific settings, and button 16 (SPARE) to
+tune and store. The stored setting is applied on band or antenna selection (stage D already
+did this per band × antenna), so a tune is now always a retune: a fresh search, with no
+memory-first step. Commits on `ATU_search`: `02700ef` (always search), `6e0d3cc` (button 16),
+`2c39d77` (display: nominal µH/pF, `TUNING n…`, red refusal reasons for 3 s), `cbee6ec`
+(Kenwood `AC`). Verified on the KI3P prototype into 200 Ω. Updated [[atu-control]] and
+[[atu-auto-tuning]].
+
+## [2026-11-15] decision | ATU menu simplified; bypass and output per antenna; status table
+The user found the eleven-item ATU menu confusing and asked for Bypass/Enable, a status table,
+clear memory for this antenna, Tune and Tune power. Added a sixth item, Output coax/balun, after
+finding that the tuner forced K18 to coax on every reading, which would have moved a
+balanced-fed antenna to the wrong connector. User's choices: bypass per antenna; a retune
+re-enables; clearing needs two presses; the table shows one row per ham band. Commits
+`fcd481e`, `94a3f61` and `b620f34` on `ATU_search`, verified on the prototype. Manual relay
+control is now CAT-only (`AT`). Updated [[atu-control]], [[ui-state-machine]] and
+[[atu-auto-tuning]].
+
+## [2026-11-15] review | ATU branch reviewed against nightly: three fixes, search split into phases
+Review of `ATU_search` against `nightly` before merging. Each bug was first shown by a failing
+test:
+- A retune of a bypassed antenna that was stopped or failed left the antenna enabled but
+  bypassed, with its stored setting unapplied. It now falls back to the stored setting.
+- A band or antenna change over CAT during a tune was not noticed: the tune ran on, stored its
+  result under the band it started on, and left that setting on the new band. The engine now
+  ends with `ATU_FAIL_STATE`, stores nothing and applies the new band's setting.
+- Clearing an antenna's memory while transmitting left the cleared setting on the relays until
+  the next band change. It is now bypassed on the way back to receive.
+
+Readability, with no change in behaviour: `TuneNext()` in `ATUTuneAlgo.cpp` is split into one
+function per phase (the reading sequences of the 150 simulated tunes are identical before and
+after), duplicate element tables removed from `ATUBoard.cpp`, stale comments corrected.
+Updated [[atu-control]].
+
+## [2026-11-15] doc | ATU tuning algorithm write-up with Smith charts
+Added `code/docs/ATU_Tuning_Algorithm.html`: an illustrated description of the search, with
+Smith charts and |Γ| maps of the code space drawn from the firmware's own search run against
+the board model. It is built by `code/tools/atu_vna/build_tuning_doc.py` from data written by
+the test `ATUTuneAlgoTest.DocFigureData` (skipped unless `ATU_DOC_DIR` is set), which labels
+each reading with `ATUTuneAlgoPhase()`. Also committed: the user's re-laid-out `ModeSm.drawio`
+and `UISm.drawio` (the generated code is unchanged) and the regenerated `ModeSm.sim.html`,
+which now has the ATU states. See [[atu-control]].
+
+## [2026-11-15] decision | CAT: Kenwood name collisions removed, PS1 no longer powers off
+Checked the CAT command table against the TS-480 spec (`code/docs/ts_480_pc.pdf`). Two custom
+commands reused Kenwood names: `SR` (Kenwood: reset) is now `XS` (sample rate) and `PR`
+(Kenwood: speech processor) is now `HR` (hardware-register dump). `PS_write` shut the radio
+down on any parameter, including Kenwood's power-on `PS1;`. It now acts only on `PS0;` and sends
+no answer. The filter HIL tool (`code/tools/filter_hil/radio.py`) sends `XS`. The `MD`, `FW` and
+`NR` deviations were recorded and deliberately left. See [[cat-control]].
+
+## [2026-11-15] doc | Calibration guide for builders, and the calibration fixes it needed
+Added `code/docs/CalibrationGuide/Calibration_Guide.html`: a step-by-step operator's guide to
+calibrating a finished radio, in order (frequency → receive IQ → transmit IQ → power and SWR →
+S-meter), with the equipment for each step, a front-panel button map per screen (inline SVG
+from `make_button_maps.py`) and simulator screenshots (`make_screenshots.sh`, which runs the new
+`calguide_screenshots` target and `autocal_screenshots`). It covers single- and dual-VFO RF
+boards: only Transmit IQ differs (dual: internal loop and button 16; single: by hand against an
+external analyser). Linked from the README.
+
+Firmware fixes made first, each with unit tests:
+- Frequency calibration reset the Si5351 but cleared only the RX VFO cache, so the TX/CW LO
+  could stay off until the frequency moved; it now calls `ResetVFOState()` ([[rf-board]]).
+- HOME while keyed in Transmit IQ left ModeSm in calibration: `CALIBRATE_TX_IQ_MARK` now handles
+  `CALIBRATE_EXIT` (ModeSm.drawio regenerated). HOME also stops a running automatic RX IQ, TX IQ
+  or carrier-null run, restores the band in progress and releases the PTT the run engaged.
+- Single-VFO Transmit IQ keyed at 0 dB attenuation first, then at 31.5 dB whatever the screen
+  said; it now starts at 31.5 dB and every key-down applies the screen's value.
+- Button 14 (carrier null, `DIRECT_COUPLED_TX`) now needs a dual-VFO radio.
+- A sweep pass with no reading above 0 dB wrote the previous pass's best value (e.g. amplitude
+  −0.049) into every band; each pass now starts from the setting it sweeps around.
+- The Receive IQ screen's "Current Band" pane did not redraw on Band +/− when the bands had
+  equal settings (as on an uncalibrated radio), so it showed the old band.
+See [[calibration-state-machines]].
+
+Simulator: the RX IQ test tone and the TX loopback were mirrored relative to the firmware, so
+both automatic IQ runs failed in simulation (Delta/IRR about −26 dB). The user confirmed the
+automatic IQ calibration works on hardware, so the simulator was corrected: RX IQ now uses the
+`RXIQ_USB` tone, and the mock's TX loopback no longer swaps I and Q. Both runs now converge
+(RX amplitude ≈ 1.11, Delta 52–65 dB; TX amplitude ≈ 0.906, IRR 71–76 dB).
+
+Observed, not changed: the Transmit IQ automatic run starts from the band on the screen
+(the band buttons call `SetTXIQCurrentBand`), whereas Receive IQ always does every band. The
+guide tells the operator to select 160 m first.
+
+## [2026-11-16] decision | Calibration guide: single-VFO analyser on RF board J6
+At the user's direction, the single-VFO Transmit IQ procedure takes the analyser signal from the
+RF board's TX output, J6 (before the PA), through a cheap 10–20 dB attenuator, instead of from
+the antenna connector through a 20 W attenuator; wattmeter readings in the power calibration are
+described as set with the Filter encoder. Recorded J6 in [[rf-board-electronics]].
+
+## [2026-11-16] decision | Transmit IQ automatic run covers every band, like Receive IQ
+The Transmit IQ automatic run (button 16) started from the band shown on the screen, because the
+screen's Band +/- handlers set the run's band counter (`SetTXIQCurrentBand`). The user asked for
+it to match Receive IQ, which always starts from 160 m: the calls and the setter are removed
+(and the unused `SetTXCarrierCurrentBand`). Test `TXIQAutoRunStartsFromFirstBand`. The guide's
+"select 160 m first" instruction is gone. See [[calibration-state-machines]].
+
+## [2026-11-16] decision | Radio simulator: a simulated bench for every calibration
+At the user's request, `radio_simulator` gets what each calibration needs, in a shared
+`code/test/SimBench.h` that the screenshot tools also use:
+- The test signals switch in each calibration screen and the operator's input source comes back
+  afterwards (before, the Transmit IQ loopback stayed on and the receiver went quiet).
+- `--single` makes the mock Si5351 answer at 0x60, so the firmware detects single-VFO hardware.
+- Radio 2's power bridge (moved from `AutoCalScreenshots_main.cpp`) answers the AD7991; the `c`
+  key changes the connector (load, open, short); the console prints the wattmeter's reading.
+- Frequency calibration: a frequency standard on the dial, offset by a simulated crystal error
+  (`--xtal-ppb`, default 2500) less the correction the firmware programs (the mock Si5351 now
+  keeps it). The error nulls at a correction of 2500.
+Finding: the SAM error readout is 5× the carrier offset, opposite sign. See
+[[synchronous-am-detection]].
+
+## [2026-11-16] decision | SAM error readout in hertz; calibration walkthrough in the simulator
+At the user's direction the SAM carrier offset (`GetSAMCarrierOffset()`, the frequency
+calibration screen's Error and the home screen's Err) now reads in Hz: it read 5× the offset.
+The guide's "between −1 and +1" target is unchanged (now ±1 Hz). See [[synchronous-am-detection]].
+
+A scripted walk through every calibration in the simulator (dual and single VFO, and a
+`DIRECT_COUPLED_TX` build) confirmed the earlier fixes: TX/CW VFOs reprogrammed after a
+frequency calibration; HOME while keyed and during each automatic run (RX IQ, TX IQ, carrier
+null) stops, unkeys and restores the band in progress; single-VFO Transmit IQ keys at the
+screen's attenuation (31.5 dB first); button 14 inert on single VFO; Receive IQ's band pane
+follows Band +/−; Transmit IQ's run starts from 160 m. Found, not changed:
+- The no-valid-reading protection has a gap: the first amplitude pass of both IQ sweeps runs
+  0.0–2.0 (100 steps of 0.02; the comments say 0.5–1.5), and any reading above 0 dB counts.
+  With the RX test tone on the wrong sideband, amplitude 0 read +25 dB and most bands ended at
+  amplitude −0.0495.
+- Transmit IQ's run ends on the general-coverage band, where the loopback gives about 2 dB
+  IRR, and stores amplitude ≈ 0 / phase at the sweep edge there.
+- The carrier null (`DIRECT_COUPLED_TX`) nulls the simulated carrier to about 41 dBc on most
+  bands, but on a varying few it stops at the coarse step (6.5 dBc) or leaves 0/0.
+See [[calibration-state-machines]].
+
+## [2026-11-16] decision | Transmit runs skip bands without transmit; carrier null log; walkthrough tool
+At the user's direction:
+- Transmit IQ and the carrier null skip every band where transmit is disabled (`band_type` not
+  `HAM_BAND`, as `IsTxAllowed()`): general coverage. `NextTXCalBand()`. The guide says so.
+- The carrier null prints a `CARRCAL` line per step on the diagnostics port (`Debug()`), for
+  judging it on a real radio; `code/tools/carrier_cal_log.py` records and summarises it. `Debug()`
+  is silent in USB audio builds, so the test needs a Dual Serial build (`usb=serial2`).
+- `code/test/CalWalkthrough_main.cpp` (`cal_walkthrough`, `cal_walkthrough_dct`) is the
+  calibration walkthrough, now with power/SWR (level 1: the 20 m reading went from −6.5 dB to
+  −0.5 dB against the wattmeter) and S-meter sections.
+The simulator's carrier log shows why the null stops short there: the simulated carrier starts
+6 dB above the tone, so with only one offset right the coarse readings sit near 0 dB, and a
+coarse pass with no reading above 0 dB keeps its offset. A carrier that starts below the tone, as
+expected on hardware, would not hit this; the hardware log will tell. See
+[[calibration-state-machines]].
+
+## [2026-11-16] decision | Carrier null: four changes after the KI3P prototype run
+The first hardware log (`code/tools/carrier_cal_KI3P_2026-11-16.csv`, untracked) showed the
+coarse I pass discarded on 8 of 12 bands (Q zeroed at band start, null near −1000, nothing
+above 0 dB), 6 m losing its stored Q, and noise choosing medium passes. At the user's direction:
+start from the stored offsets; a pass is valid when its best reading is 3 dB above the pass's
+median; a band with no valid pass gets its old offsets back; medium and fine passes run twice.
+The simulator now nulls every band to about 41 dB (was 6.5 dB on two). The user notes the KI3P
+has no 4 m filter and 6 m is hardware-limited. Rerun on the radio pending (it dropped off USB).
+See [[calibration-state-machines]].
+
+## [2026-11-17] query | Carrier null rerun on the KI3P prototype
+Second hardware run with the new algorithm (`code/tools/carrier_cal_KI3P_2026-11-17.csv`,
+untracked), radio flashed and run within a minute of power-up. Every HF band converged; carrier
+below the tone (best reading of the last pass) 31.7–47.4 dB, mean 39.5, against 22.5–47.9, mean
+35.3, the evening before: 30 m +24.7, 17 m +20.0, 20 m +15.7, 12 m +9.1, 80 m +5.0 dB, but 160 m
+−10.0, 40 m −7.6, 60 m −5.7, 15 m −5.4, 10 m −3.3 dB. The coarse passes stood out on every HF
+band. Reading noise in the fine passes is 0.5–2 dB, and on 160 m the fine passes swept the
+previous best offsets (−989/−985) without finding them better, so the null itself appears to
+move between runs (warm-up?), not tested. The reported dBc is the best of a pass's noisy
+readings, 3–5 dB above the pass median. 30 m's "22 dB floor" of the first run was the old
+algorithm stalling. 6 m (hardware-limited) kept I −4900, Q 0. See [[calibration-state-machines]].
+
+## [2026-11-17] query | Carrier null: two warm runs on the KI3P prototype disagree; spectrum lag
+Two back-to-back runs after warm-up (`carrier_cal_KI3P_2026-11-17_warm1/2.csv`, untracked): HF
+mean 41.7 and 44.0 dB below the tone (cold 39.5, the old algorithm 35.3), but bands disagree by
+up to 27 dB (20 m 21.9 vs 49.3), so warm-up drift does not explain the scatter. Cause: the
+readings lag the offset. The spectrum averages each FFT frame 0.7 new / 0.3 old in power
+(`DSP_FFT.cpp`, `LPFcoeff`), and the ×8 zoom gives only a few frames in the 60 ms step, so near
+the null the previous step's larger carrier dominates and the apparent peak moves in the sweep
+direction. The coarse pass picked the 100-count step above the null on almost every band and run
+(160 m: −900 for a null at −990; 12 m: −1000 for −1110); the medium passes recover one step, not
+two: warm run 1 picked −800 on 20 m and every later pass searched −920 to −690. Fix pending a
+decision: let the spectrum settle before each reading, at least in the coarse passes.
+
+## [2026-11-17] decision | Carrier null accepted; its performance log removed
+The user accepted the carrier null's performance after the 150 ms coarse-pass run on the KI3P
+prototype (HF mean 45.0 dB, worst 37.0 dB below the tone) and asked for no further changes. The
+`CARRCAL` log, `GetTXCalBins_dB()`, `code/tools/carrier_cal_log.py` and the walkthrough's log
+capture are removed; the algorithm changes and the general-coverage skip stay. The recorded logs
+remain in `code/tools/` (untracked). The fixes of this work were verified in the simulator
+(`cal_walkthrough`); on the radio only the carrier null and the transmit band skip were
+exercised. See [[calibration-state-machines]].
+
+## [2026-11-17] decision | Encoder decoder replaced: a chattering contact counted once per chatter
+One clockwise click of the Filter knob jumped several menu items; anticlockwise was fine. An edge
+log on the KI3P prototype (Filter encoder, 1 ms service, temporary, now removed) showed contact A
+reopening many times as it closed on clockwise clicks; the old decoder stayed armed after a step
+and counted every reclose: +19, +6, 0, +2, 0 for five clockwise clicks, −1 each anticlockwise.
+`Rotary_V12` is now Buxton's full-step state table per encoder, plus two rules for skipped states
+(fast spin, missed first edge). Rerun on the radio: ±1 on all ten clicks; fast spins of the
+Tune and Fine Tune knobs felt good to the user. Tests replay the recording. See [[front-panel]].
+
+## [2026-11-18] decision | CESSB proposal (#35)
+Proposal for Controlled Envelope SSB written on branch `cessb-proposal`: [[cessb]] (plan) and
+[[controlled-envelope-ssb]] (theory). It is backed by an offline model, `code/tools/cessb_model/`,
+built from the firmware's own coefficients. Its −3 dB transmit corner matches the gtest's
+(2726.9 against 2725.9 Hz at 192k, 2759.6 against 2759.7 Hz at 176.4k).
+
+Finding: W7PUA's zero-IF Z class filters with a real lowpass, so clip products in the opposite
+sideband survive. On W9GR voice at 6 dB drive they sit at −27 dBc, and the two-tone 2f₁−f₂
+product 500 Hz into the opposite sideband at −11 dBc. A "centred" variant (shift the channel to
+straddle DC, clip and filter at 1500 ± 1450 Hz, shift back; gc 1.9, 40 dB filter) gives
+−71 / −63 dBc, 1.3 % overshoot after the interpolators and +4.6 dB wanted-sideband power at
+equal PEP, against Z's +4.9 dB. Overdriving today's chain by the same 6 dB gives +2.5 dB, 41 %
+overshoot and −36 dBc out of channel, from the I/Q-separate q15 saturation.
+
+Recommended: a native `DataBlock` stage between `TXInterpolateBy2Again` and IQ correction,
+filters generated in Hz, `TXGain` moved after it so the ceiling equals the power setting (PEP),
+bypassed in digital and the calibration states, and Kenwood `PR`/`PL` over CAT. Also found a
+mic-gain unsigned wrap, logged in [[documentation-todos]]. No firmware changed.
+
+## [2026-11-18] decision | CESSB Phase 1 built: stage, TXGain move, Audio Options toggle
+On branch `cessb-proposal`, after the user asked for a menu option under Audio Options to enable
+or disable CESSB:
+- **The stage:** `DSP_CESSB.cpp` runs in `TransmitProcessing()` after `TXInterpolateBy2Again`,
+  only in `SSB_TRANSMIT` with `ED.cessbEnabled` set. Disabled means bypassed. The setting is
+  off by default and persisted. `TXGain` now follows the stage and scales I and Q, so the
+  ceiling (`CESSB_CEILING` 0.1295, the calibration tone's node envelope) maps onto
+  `powerOutSSB` as PEP. Mic gain is clamped to 0–63 dB (`MicGainForCodec`).
+- **Two findings:**
+  - The audio is on *negative* frequencies at the node. CMSIS FIR coefficient tables are
+    time-reversed, which mirrors the Hilbert pair. The first build shifted the wrong way
+    and filtered the voice out, and the Phase 0 model had been mirrored as well.
+  - `CalcFIRCoeffs` centres odd-length filters on a half sample. The fix is to design 124
+    taps and drop the first, giving an exactly symmetric 123-tap filter that the overshoot
+    controller's delay line lines up with.
+- **Results:** 12 new gtests. The firmware's two-tone figures match the model to about
+  0.6 dB (−62.7 / −29.2 dBc against −62.5 / −28.6). See [[cessb]] "Phase 1 as built".
+
+## [2026-11-18] query | CESSB on the bench: AD2 suite, 43/43 at the exciter
+Added CAT `PR` (speech processor = CESSB) and `code/tools/cessb_hil/`. The suite:
+- drives the mic from the AD2 with a 1 kHz tone sweep and three periodic stimuli (two-tone,
+  steady vowel, syllable-shaped vowel as the voice stand-in);
+- captures the exciter I/Q and A/Bs CESSB at every point;
+- reports the model's prediction for the identical signal.
+
+Results on the KI3P prototype:
+- the ceiling holds flat over 9 dB of overdrive and tracks the power setting
+  (−3.97 dB for −3.98 expected);
+- peaks stay within 3.1 % of the ceiling after the codec and analog exciter;
+- the voice stand-in gains +4.11 dB of talk power at 6 dB drive (model +4.08).
+
+The opposite sideband could not be resolved: the exciter's image moves between −40 and
+−63 dBc from capture to capture, CESSB on or off (logged in [[documentation-todos]]). New
+gtests cover both rates for 2f₁−f₂ (7 dB worse at 176.4 ksps) and check that the stage
+does not image the channel. See [[cessb]] Phase 3.
+
+## [2026-11-18] decision | CESSB Phase 2 built: processor level, compression meter, PL and RM
+On branch `cessb-proposal`:
+- **Processor level:** `ED.cessbDrive_dB`, 0–10 dB of gain into the clipper, default 0.
+  It is the Audio Options item "CESSB level (dB)", persisted, and set over CAT `PL`
+  (10 per dB).
+- **Compression meter:** dB over the ceiling, peak-held, released at about 9 dB/s. It is
+  shown as a "C" bar in place of Q on the transmit pane while CESSB runs, and read over
+  CAT `RM2` at 2 dB per dot.
+- **Results:** gtests read the meter to within 0.03 dB. On the KI3P prototype the bench
+  suite's new section confirms the level is gain up to the ceiling (worst error 0.24 dB)
+  and the meter's dots are exact. 45/45 checks pass. See [[cessb]] "Phase 2 as built".
+
+## [2026-11-19] query | CESSB at RF: 25/25 at the antenna connector on 20 m
+Added `code/tools/cessb_hil/cessb_rf_test.py`, which measures peak and average power with
+the CMU200's NPOWer meter and spectra through a 60 dB tap. Results on the KI3P prototype
+at 14.175 MHz, 5 W:
+- the held PEP is 5.06 W for a 5 W setting;
+- there is no peak regrowth through the PA;
+- the voice stand-in gains +4.48 dB of talk power at 6 dB drive (model +4.08).
+
+The PA sets the spectrum: its linear two-tone IMD3 is −36 dB re PEP, and voice processed
+by CESSB splatters 12 dB or more less than that two-tone. On the way, found a faulty
+main-board-to-RF-board cable (double sideband) and that CAT `BU;` is band up. See [[cessb]]
+"Phase 3: RF results".
+
+## [2026-11-19] decision | CESSB CPU time measured; off by default
+CESSB's CPU time was measured on the KI3P prototype with the M7 cycle counter (temporary
+instrumentation, reverted):
+- `CESSBProcess`: 678 µs mean, 690 µs maximum, per 2048-sample block (11.6 ms at
+  176.4 ksps).
+- `TransmitProcessing`: from 1.48 ms with CESSB off to 2.16 ms with it on, about 19 % of
+  real time.
+- No change to the longest interval between blocks.
+- The 0.2 ms design estimate was low by a factor of 3.4; the four 123-tap FIRs dominate.
+
+Decided with the user: CESSB stays **off by default**, as built. Open questions 3
+(regrowth) and 6 (`gainCompensate`) are closed by the bench and RF results. See [[cessb]]
+"Budget" and "Open questions".
+Also brought the rest of the wiki up to date with the built feature:
+- [[development-backlog]]: #35 was still listed as a proposal.
+- [[cessb]]: the status line and the Phase 4 row.
+- [[controlled-envelope-ssb]]: added the measured results and CPU cost.
+- [[real-time-constraints]]: added the transmit DSP cost, and the smallest stack is now
+  13 KB.
+
+## [2026-11-21] decision | SSB transmit test-tone source (menu "TX src", CAT `TT`)
+Added a transmit audio source setting for testing SSB performance: microphone, a single
+1 kHz tone, or a 700 + 1900 Hz two-tone signal. Decided with the user:
+- The tones are injected at the microphone input mixers (ports 2/3), so they pass through
+  the whole chain, EQ and CESSB included.
+- The setting is not saved; the radio always starts on the microphone.
+- Frequencies and levels are fixed. The single tone is at the calibration-tone level, so
+  the output equals the power setting; for the two-tone, PEP equals the power setting.
+- A non-Kenwood CAT command `TT` sets and reads it.
+
+The sidetone and calibration oscillators were not reused, because their levels belong to
+other settings. See [[cat-control]] "SSB transmit test tone".
+
+## [2026-11-21] query | Test-tone source checked at RF on radio 2
+Flashed radio 2 (no KI3P patch). With the CMU200 on the 60 dB tap:
+- `TT1`/`TT2` give the expected spectra and power.
+- At 2–5 W the two-tone PEP is the setting within 0.25 dB, with max − avg 3.0 dB.
+- IMD3 is about −38 dB re PEP. At the 10 W setting the output compresses to 8.1–8.4 W PEP
+  and IMD3 rises to −33.5 dB re PEP.
+- The tones are unbalanced by 0.6 dB (passband), and switching while keyed works.
+
+Corrected an earlier claim that the −500 Hz IMD3 product is filtered: it is RF-chain
+distortion and measures the same as +3100 Hz. Details in [[cat-control]].
+
+
+## [2026-11-22] decision | CESSB menu items moved to the Microphone menu
+At the user's request, "Enable/Disable CESSB" and "CESSB level (dB)" moved from Audio Options
+to the Microphone menu, after "TX src" (`MicOptions[4]` and `[5]` in
+`MainBoard_DisplayMenus.cpp`; Audio Options is back to 11 items). Behaviour, storage and CAT
+`PR`/`PL` are unchanged. The `TransmitChainCESSB` menu tests now index `MicOptions`. Updated
+[[dsp-chain]], [[cessb]] and `code/docs/CESSB_Report.html`.
+
+## [2026-11-22] query | CESSB two-tone splatter matrix at RF, radio 2
+At the user's request, a two-tone splatter matrix at the antenna connector: mic gain 10/15/20 dB
+× CESSB off/3 dB/6 dB, 14.100 MHz USB, 5 W, 176.4 ksps, 60 dB coupler to CMU200 RF1.
+- **Stimulus:** the firmware two-tone (`TT2`). A temporary firmware change, reverted and
+  reflashed afterwards, scaled it by 10^((MG − 20)/20). At 20 dB it is at its normal level
+  (PEP = setting), so CESSB off never overdrives the PA.
+- **Script:** `code/tools/cessb_hil/cessb_splatter_matrix.py`; table and figure from
+  `splatter_report.py`.
+- **Results:** in `code/docs/CESSB_Report.html` §5.5.
+  - The PA sets most of the splatter: outside-channel power is −43 dB re PEP at 0.6 W and
+    −34 dB at 4.8 W with CESSB off.
+  - When CESSB clips, the lower side and the IMD5/IMD7 products do not change.
+  - Only 2f2−f1 at 3100 Hz grows: −38.0 dB re PEP (off) → −34.1 (+3 dB drive) → −31.9 (+6).
+    It sits in the transition band above CESSB's 2950 Hz filter edge. Total outside-channel
+    power rises 2.1 / 3.7 dB.
+- **CAT quirk:** `MG` doesn't round-trip. `MG086` sets 20 dB but reads back as `MG085`, and
+  writing `MG085` sets 19 dB.

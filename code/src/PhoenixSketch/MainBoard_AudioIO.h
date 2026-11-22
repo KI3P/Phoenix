@@ -32,6 +32,48 @@ If not, see <https://www.gnu.org/licenses/>.
 // TX IQ calibration oscillator - used for transmit IQ calibration
 extern AudioSynthWaveformSine transmitIQcal_oscillator;
 
+// SSB transmit test-tone oscillators, injected at the microphone input mixers
+// (channels 2 and 3) in place of the microphone. See SetTXAudioSource().
+extern AudioSynthWaveformSine testToneA_oscillator;
+extern AudioSynthWaveformSine testToneB_oscillator;
+// The microphone input mixers, exposed so the unit tests can check the routing
+extern AudioMixer4 modeSelectInExL;
+extern AudioMixer4 modeSelectInExR;
+
+// Test-tone parameters. The single tone has the amplitude of the TX IQ / power
+// calibration tone (40/500), so it comes out at the power setting. Each of the
+// two tones has half that, so the two-tone envelope peaks at the same level: PEP
+// equals the power setting and each tone is 6 dB below PEP.
+#define TEST_TONE_SINGLE_HZ        1000.0f
+#define TEST_TONE_SINGLE_AMPLITUDE 0.08f
+#define TEST_TONE_TWO_A_HZ         700.0f
+#define TEST_TONE_TWO_B_HZ         1900.0f
+#define TEST_TONE_TWO_AMPLITUDE    0.04f
+
+/**
+ * Audio source for SSB transmit. Not saved: the radio always starts on the
+ * microphone, so it can never come up putting a test tone on the air.
+ */
+enum TXAudioSource {
+    TX_SOURCE_MIC = 0,          ///< The microphone (normal operation)
+    TX_SOURCE_SINGLE_TONE = 1,  ///< One tone, TEST_TONE_SINGLE_HZ
+    TX_SOURCE_TWO_TONE = 2,     ///< Two equal tones for IMD tests, TEST_TONE_TWO_A_HZ + TEST_TONE_TWO_B_HZ
+    TX_SOURCE_COUNT = 3
+};
+
+/**
+ * @brief Select the SSB transmit audio source: microphone, single tone or two-tone
+ * @param source One of TXAudioSource; out-of-range values are ignored
+ * @return true if the source was accepted
+ * @note Takes effect immediately, including while transmitting
+ */
+bool SetTXAudioSource(int32_t source);
+
+/**
+ * @brief The current SSB transmit audio source
+ */
+TXAudioSource GetTXAudioSource(void);
+
 /**
  * @brief Configure I2S sample rate via PLL clock calculations
  * @param freq Desired sample rate in Hz (typically 48000, 96000, or 192000)
@@ -54,7 +96,7 @@ void InitializeAudio(void);
 
 /**
  * @brief Recompute oscillator frequencies that are specified relative to the sample rate
- * @note Sets the sidetone and TX IQ calibration oscillator frequencies for SR[SampleRate]
+ * @note Sets the sidetone, TX IQ calibration and test-tone oscillator frequencies for SR[SampleRate]
  * @note Called by InitializeAudio() and whenever the sample rate changes
  */
 void UpdateSampleRateDependentOscillators(void);
@@ -91,6 +133,13 @@ ModeSm_StateId GetAudioPreviousState(void);
  * @note Called when user adjusts mic gain or when transitioning to SSB transmit mode
  */
 void UpdateTransmitAudioGain(void);
+
+/**
+ * @brief Convert the microphone gain setting to the SGTL5000's unsigned dB value
+ * @param gain_dB Requested gain (ED.currentMicGain), which may be negative
+ * @return Gain clamped to the codec's 0 to 63 dB
+ */
+uint32_t MicGainForCodec(int32_t gain_dB);
 
 /**
  * @brief Apply current sidetone volume setting 

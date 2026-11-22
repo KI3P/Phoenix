@@ -53,6 +53,14 @@ static int64_t CWVFOFreq_cHz;
 si5351_clock CLKCW  = SI5351_CLK6;
 #define CLKCWSINGLEVFO SI5351_CLK2
 
+// On dual-VFO boards the TX quadrature outputs (CLK4/CLK5) and the CW output (CLK6)
+// share PLLB. CLK6 is an integer-only divider, so setting it retunes PLLB to suit the
+// CW frequency, which also moves the TX outputs. Track which output PLLB was last
+// tuned for, so that each setter knows when its cached frequency is no longer what
+// the chip is producing.
+enum PLLBOwner { PLLB_UNSET, PLLB_TX, PLLB_CW };
+static PLLBOwner pllbOwner = PLLB_UNSET;
+
 #define XMIT_SSB 1
 #define XMIT_CW  0
 #define CAL_OFF 0
@@ -66,8 +74,8 @@ static uint8_t mcpB_old = 0x00;
 // Macros to get and set the relevant parts of the hardware register
 #define RF_GPA_RXATT_STATE (uint8_t)((hardwareRegister >> RXATTLSB) & 0x0000003F)
 #define RF_GPB_TXATT_STATE (uint8_t)((hardwareRegister >> TXATTLSB) & 0x0000003F)
-#define SET_RF_GPA_RXATT(val) (hardwareRegister = (hardwareRegister & 0xF03FFFFF) | (((uint64_t)val & 0x0000003F) << RXATTLSB));buffer_add()
-#define SET_RF_GPB_TXATT(val) (hardwareRegister = (hardwareRegister & 0xFFC0FFFF) | (((uint64_t)val & 0x0000003F) << TXATTLSB));buffer_add()
+#define SET_RF_GPA_RXATT(val) (hardwareRegister = (hardwareRegister & ~(0x3FULL << RXATTLSB)) | (((uint64_t)val & 0x0000003F) << RXATTLSB));buffer_add()
+#define SET_RF_GPB_TXATT(val) (hardwareRegister = (hardwareRegister & ~(0x3FULL << TXATTLSB)) | (((uint64_t)val & 0x0000003F) << TXATTLSB));buffer_add()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Functions that are only visible from within this file
@@ -306,7 +314,10 @@ errno_t SetTXAttenuation(float32_t txAttenuation_dB){
 
 void SetFrequencyCorrectionFactor(int32_t corr){
     int64_t freq = GetRXVFOFrequency();
-    RXVFOFreq_cHz = 0;
+    // The reset leaves every output without a frequency, so forget all the
+    // cached VFO settings: the next Set*VFOFrequency call must reprogram the
+    // chip even if its frequency is unchanged
+    ResetVFOState();
 
     si5351.reset();
     si5351.init(SI5351_LOAD_CAPACITANCE, Si_5351_crystal, corr);
@@ -536,8 +547,13 @@ void SetTXVFOFrequency(int64_t frequency_cHz){
         SetRXVFOFrequency(frequency_cHz);
         return;
     }
-    // No need to change if it's already at this setting
-    if (frequency_cHz == TXVFOFreq_cHz) return;
+    // No need to change if it's already at this setting and the CW VFO hasn't
+    // retuned PLLB since
+    if ((frequency_cHz == TXVFOFreq_cHz) && (pllbOwner == PLLB_TX)) return;
+    // If the CW VFO retuned PLLB, take the full reprogramming path below so the
+    // I and Q outputs are realigned by the PLL reset
+    if (pllbOwner != PLLB_TX) oldtxMultiple = 0;
+    pllbOwner = PLLB_TX;
     TXVFOFreq_cHz = frequency_cHz;
     int64_t ClkSetFreq = frequency_cHz;
     txmultiple = EvenDivisor(ClkSetFreq / SI5351_FREQ_MULT);
@@ -634,7 +650,8 @@ void DisableTXVFOOutput(void){
  * The frequency is stored and set in centi-Hertz units (Hz × 100) for high precision.
  *
  * Optimization: Skips the Si5351 write if the requested frequency matches the
- * current setting, preventing unnecessary I2C transactions.
+ * current setting, preventing unnecessary I2C transactions. On dual-VFO boards
+ * the write still happens if the TX VFO has retuned the shared PLLB since.
  *
  * In CW mode, this frequency typically includes an offset for the sidetone pitch
  * (e.g., centerFreq + 700Hz for a 700Hz tone). The tune state machine handles
@@ -647,13 +664,16 @@ void DisableTXVFOOutput(void){
  * @see Tune.cpp for CW frequency offset handling
  */
 void SetCWVFOFrequency(int64_t frequency_cHz){
-    // No need to change if it's already at this setting
-    if (frequency_cHz == CWVFOFreq_cHz) return;
+    // No need to change if it's already at this setting, unless this is a dual-VFO
+    // board and the TX VFO has retuned PLLB since
+    if ((frequency_cHz == CWVFOFreq_cHz) && (!dualVFO || (pllbOwner == PLLB_CW))) return;
     CWVFOFreq_cHz = frequency_cHz;
-    if (dualVFO)
+    if (dualVFO){
         si5351.set_freq(CWVFOFreq_cHz, CLKCW);
-    else
+        pllbOwner = PLLB_CW;
+    } else {
         si5351.set_freq(CWVFOFreq_cHz, CLKCWSINGLEVFO);
+    }
 }
 
 /**
@@ -995,7 +1015,8 @@ uint16_t GetRFMCPRegisters(void){
  *
  * Resets the static VFO multiple tracking variables to force fresh
  * frequency calculations on the next SetRXVFOFrequency() or SetTXVFOFrequency() call.
- * This is used by unit tests to ensure clean state between test runs.
+ * Used after an Si5351 reset (SetFrequencyCorrectionFactor), and by unit tests
+ * to ensure clean state between test runs.
  */
 void ResetVFOState(void){
     oldrxMultiple = 0;
@@ -1003,4 +1024,5 @@ void ResetVFOState(void){
     RXVFOFreq_cHz = 0;
     TXVFOFreq_cHz = 0;
     CWVFOFreq_cHz = 0;
+    pllbOwner = PLLB_UNSET;
 }

@@ -1,0 +1,495 @@
+{
+ "started": "20261118_172306",
+ "args": {
+  "cat_port": "/dev/ttyACM0",
+  "cat_baud": 38400,
+  "modulation": "usb",
+  "drives": "6",
+  "stimuli": "two_tone",
+  "mic_gain": null,
+  "min_amplitude": 0.002,
+  "max_amplitude": 0.25,
+  "sweep_step_db": 1.5,
+  "detect_amplitude": 0.02,
+  "scope_rate": 100000.0,
+  "capture": 0.5,
+  "scope_range": 5.0,
+  "scope_offset": 1.6,
+  "settle": 0.3,
+  "no_power_check": false,
+  "max_overshoot_pct": 5.0,
+  "max_transparency_db": 0.3,
+  "max_hold_spread_db": 1.0,
+  "max_power_error_db": 0.5,
+  "max_imd_opposite_dbc": -40.0,
+  "max_opposite_dbc": -35.0,
+  "max_ooc_dbc": -45.0,
+  "min_syllable_gain_db": 3.0,
+  "out_dir": "/home/oliver/Sync/Ham/T41/Software/Phoenix/code/tools/cessb_hil/results",
+  "no_plots": false,
+  "quiet": false
+ },
+ "warnings": [],
+ "radio": {
+  "md": 1,
+  "cessb": false,
+  "power_w": 5,
+  "rate_hz": 176400
+ },
+ "wiring": {
+  "swap": true,
+  "wiring": "Ch1 -> Q, Ch2 -> I (compensated in software)",
+  "sideband_sign": -1,
+  "sideband_sign_expected": -1,
+  "sideband_sign_as_expected": true,
+  "sideband_flipped": true,
+  "measured_on": "USB",
+  "suppression_at_1k_db": 36.31812401392049,
+  "detect_amplitude_v": 0.02,
+  "dc_ch1_v": 1.5813304511171478,
+  "dc_ch2_v": 1.584183634661707,
+  "trials": {
+   "LSB": {
+    "modulation": 1,
+    "f_signed_hz": -1000.0002096866423,
+    "amplitude_v": 0.03733398280285372,
+    "level_dbv": -28.557913538181335,
+    "sign": -1
+   },
+   "USB": {
+    "modulation": 0,
+    "f_signed_hz": 1001.2131779017355,
+    "amplitude_v": 0.029398840948084183,
+    "level_dbv": -30.633395826977157,
+    "sign": 1
+   }
+  }
+ },
+ "tone_sweep": [
+  {
+   "amplitude_v": 0.002,
+   "off_v": 0.0017904040408160313,
+   "on_v": 0.0022399043481579287,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.002377004454874037,
+   "off_v": 0.0018310289665904506,
+   "on_v": 0.0019278850850431698,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0028250750892455092,
+   "off_v": 0.002150051633659679,
+   "on_v": 0.002372182625161247,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0033576080362451217,
+   "off_v": 0.002803520379599545,
+   "on_v": 0.003119021190991723,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0039905246299377604,
+   "off_v": 0.004083207534486023,
+   "on_v": 0.004583734251805756,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0047427474113233125,
+   "off_v": 0.005610955978712152,
+   "on_v": 0.006221068543600701,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0056367658625289105,
+   "off_v": 0.0071966032024189655,
+   "on_v": 0.007938224024081172,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.006699308783156557,
+   "off_v": 0.009351032163139528,
+   "on_v": 0.010202699357794994,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.00796214341106995,
+   "off_v": 0.011926084212349461,
+   "on_v": 0.012881978503975962,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.009463025179229617,
+   "off_v": 0.015363154570802532,
+   "on_v": 0.016272190828745085,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.01124682650380699,
+   "off_v": 0.018709826429166465,
+   "on_v": 0.019658821777528788,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.013366878351372303,
+   "off_v": 0.023076005917429282,
+   "on_v": 0.024038523538903997,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.015886564694485645,
+   "off_v": 0.028436529145575977,
+   "on_v": 0.02933054528393914,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.018881217525718485,
+   "off_v": 0.03483585933345623,
+   "on_v": 0.03562926491637034,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.022440369086039292,
+   "off_v": 0.04173944380985599,
+   "on_v": 0.0426040044114321,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.02667042864326651,
+   "off_v": 0.050278734517324945,
+   "on_v": 0.05120816879221498,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0316978638492223,
+   "off_v": 0.0605598201163847,
+   "on_v": 0.061605392117874344,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.03767298178979605,
+   "off_v": 0.07296321901542113,
+   "on_v": 0.07388094163693326,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.04477442277136684,
+   "off_v": 0.086946533130865,
+   "on_v": 0.08790376566332839,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.05321450119597625,
+   "off_v": 0.10389831512337466,
+   "on_v": 0.10508908321532803,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.06324555320336767,
+   "off_v": 0.12412556148407555,
+   "on_v": 0.12557162305568953,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.07516748085768893,
+   "off_v": 0.14864689496120473,
+   "on_v": 0.14892349643845543,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.08933671843019274,
+   "off_v": 0.17653784932618888,
+   "on_v": 0.14837098836393955,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.10617688884619782,
+   "off_v": 0.21066570738619267,
+   "on_v": 0.14837683810498592,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.12619146889603883,
+   "off_v": 0.2512190977048001,
+   "on_v": 0.1483501647157242,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.14997884186649138,
+   "off_v": 0.3003930477791599,
+   "on_v": 0.14837720739882074,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.17825018762674938,
+   "off_v": 0.3581253843017436,
+   "on_v": 0.148391596588532,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.21185074503545812,
+   "off_v": 0.4281046695958727,
+   "on_v": 0.1483706300387563,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  }
+ ],
+ "ceiling": {
+  "found": true,
+  "ceiling_v": 0.1483732873693638,
+  "limited_points": 5,
+  "limited_spread_db": 0.0024254939747181386,
+  "first_limited_index": 23,
+  "linear_points": 22
+ },
+ "tone_gain_v_per_v": 1.5606706979187153,
+ "knee_amplitude_v": 0.09507020767880885,
+ "power_tracking": {
+  "p_full_w": 5,
+  "p_half_w": 2,
+  "measured_db": -3.9788852316041945,
+  "expected_db": -3.979400086720376
+ },
+ "stimuli": {
+  "two_tone": {
+   "reference": {
+    "peak_x_ceiling": 0.6309767758045789,
+    "papr_db": 3.2580312057924528,
+    "opposite_dbc": -42.46888284198349,
+    "out_of_channel_dbc": -48.94010848191279,
+    "awg_v_per_peak": 0.5077446468360294
+   },
+   "rows": [
+    {
+     "drive_db": 6.0,
+     "amplitude_v": 0.1503145677714623,
+     "off": {
+      "peak_x_ceiling": 2.010269515115089,
+      "papr_db": 3.1077791219063395,
+      "talk_power_gain_db": 0.15065767697871912,
+      "opposite_dbc": -48.99478181592429,
+      "out_of_channel_dbc": -59.51621061507733,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.14741355248529947,
+      "tone_balance_db": 0.48796700347934824,
+      "imd3_low_dbc": -57.47914955316265,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -54.07369436117754,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -64.15840269992876,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -69.95688425671668,
+      "imd5_high_hz": -4300.0
+     },
+     "on": {
+      "peak_x_ceiling": 0.9698090636042909,
+      "papr_db": 3.0486204778385666,
+      "talk_power_gain_db": 0.20790527044998086,
+      "opposite_dbc": -41.14179733943902,
+      "out_of_channel_dbc": -53.781656863975186,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.07152947231387087,
+      "tone_balance_db": 0.7897362153329984,
+      "imd3_low_dbc": -48.43820068353839,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -31.317077048739712,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -57.54163053660727,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -64.14075595133804,
+      "imd5_high_hz": -4300.0
+     },
+     "model": {
+      "peak": 0.9513928705014258,
+      "papr_db": 2.9448645871761707,
+      "wanted_papr_db": 2.946929986884506,
+      "opposite_dbc": -58.59692073901873,
+      "out_of_channel_dbc": -92.31384324251059,
+      "talk_power_gain_db": 0.06753836085033305
+     }
+    }
+   ],
+   "model": {
+    "reference": {
+     "peak": 1.0009435693468882,
+     "papr_db": 3.0142490584660147,
+     "wanted_papr_db": 3.014468347734839,
+     "opposite_dbc": -66.94375447765617,
+     "out_of_channel_dbc": -112.93414703421635
+    },
+    "6.0": {
+     "peak": 0.9513928705014258,
+     "papr_db": 2.9448645871761707,
+     "wanted_papr_db": 2.946929986884506,
+     "opposite_dbc": -58.59692073901873,
+     "out_of_channel_dbc": -92.31384324251059,
+     "talk_power_gain_db": 0.06753836085033305
+    }
+   }
+  }
+ },
+ "key_down_s": 63.56782830506563,
+ "restored": true,
+ "checks": [
+  {
+   "id": "rig.sideband_flip",
+   "group": "rig",
+   "description": "Commanding the other sideband moves the transmitted tone across DC",
+   "value": null,
+   "limit": null,
+   "units": "",
+   "passed": true,
+   "skipped": false,
+   "message": "the tone changed sides between LSB and USB, so the wiring order is unambiguous"
+  },
+  {
+   "id": "rig.suppression",
+   "group": "rig",
+   "description": "Both exciter outputs are connected and in quadrature",
+   "value": 36.31812401392049,
+   "limit": 25.0,
+   "units": "db",
+   "passed": true,
+   "skipped": false,
+   "message": "36.3 dB of opposite-sideband suppression at 1000 Hz"
+  },
+  {
+   "id": "ceiling.found",
+   "group": "ceiling",
+   "description": "CESSB holds a 1 kHz tone at a ceiling",
+   "value": null,
+   "limit": null,
+   "units": "",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ceiling.hold_flat",
+   "group": "ceiling",
+   "description": "Held output is flat above the ceiling (spread)",
+   "value": 0.0024254939747181386,
+   "limit": 1.0,
+   "units": "dB",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ceiling.transparent",
+   "group": "ceiling",
+   "description": "Below the ceiling CESSB on and off agree (worst)",
+   "value": 1.9455684692284734,
+   "limit": 0.3,
+   "units": "dB",
+   "passed": false,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ceiling.tracks_power",
+   "group": "ceiling",
+   "description": "Ceiling moves with the power setting (error)",
+   "value": 0.0005148551161813231,
+   "limit": 0.5,
+   "units": "dB",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.two_tone@6dB",
+   "group": "hold",
+   "description": "two_tone@6dB: peak with CESSB on",
+   "value": -3.0190936395709134,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.two_tone@6dB",
+   "group": "spectrum",
+   "description": "two_tone@6dB: out-of-channel, CESSB on",
+   "value": -53.781656863975186,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "imd.two_tone@6dB",
+   "group": "spectrum",
+   "description": "two_tone@6dB: 2f1-f2 in the opposite sideband, CESSB on",
+   "value": -48.43820068353839,
+   "limit": -40.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  }
+ ],
+ "overall": "FAIL",
+ "duration_s": 69.90504257800058
+}

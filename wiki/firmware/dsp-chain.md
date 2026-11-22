@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-07-30
 tags: [dsp, fft, fir, agc, noise-reduction, cw, openaudio, sample-rate]
 source_refs: []
-related: ["[[digital-mode]]", "[[overview]]", "[[real-time-constraints]]", "[[mode-state-machine]]", "[[display-subsystem]]", "[[code-heritage]]", "[[audio-io]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[tx-filter-hil-test]]"]
+related: ["[[digital-mode]]", "[[overview]]", "[[real-time-constraints]]", "[[mode-state-machine]]", "[[display-subsystem]]", "[[code-heritage]]", "[[audio-io]]", "[[runtime-filter-design]]", "[[sample-rate-switching]]", "[[tx-filter-hil-test]]", "[[cessb]]"]
 ---
 
 # DSP Chain (Audio, FFT, FIR, Noise, CW)
@@ -67,6 +67,16 @@ measuring the transmit chain:
 - **`Q := I` right after `TXGain`** (`arm_copy_f32(data.I, data.Q, 256)`, `:1139`), so from there
   the chain is mono and only the microphone's **left** channel ever reaches the exciter. The
   Hilbert pair rebuilds the quadrature relationship downstream ([[ssb-phasing-method]]).
+- **CESSB and `TXGain` follow the interpolate-by-2 at the Fs/8 node** (branch
+  `cessb-proposal`, #35). `CESSBProcess()` runs only in `SSB_TRANSMIT` with
+  `ED.cessbEnabled` set (Microphone → Enable/Disable CESSB; off by default). It limits
+  the envelope to the calibration tone's level, and `TXGain`, now scaling both I and Q
+  after it, maps that level onto the requested power. With CESSB off, nothing limits PEP:
+  past full scale, `arm_float_to_q15` in `PlayIQData` saturates I and Q separately, a
+  square clip that splatters. See [[cessb]].
+- **At the Fs/8 node the audio is on negative frequencies** (the LSB side) for either
+  sideband. CMSIS FIR functions take time-reversed coefficient tables, which mirrors the
+  ±45° Hilbert pair, and `SidebandSelection()` only flips it for USB afterwards.
 - **`TXGain` scales the exciter output by the requested power** (`:1101-1119`), via
   `CalculateSSBTXGain` on `ED.powerOutSSB[band]`. Any measurement of exciter amplitude is
   therefore only comparable at a fixed power setting.

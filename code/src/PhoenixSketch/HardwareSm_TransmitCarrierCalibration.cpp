@@ -26,44 +26,67 @@ If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "SDT.h"
+#include <algorithm>
 
 TransmitCarrierCalSm txcarrSM;
 
 /**
  * TX Carrier Auto-Tune Algorithm
  *
- * Systematically sweeps DC offsets for I and Q to maximize carrier suppresion (dBc).
+ * Sweeps the I and Q DC offsets, one at a time, to maximise the carrier
+ * suppression (dBc: how far the carrier is below the tone). Each band starts
+ * from its stored offsets. Ten passes ("iterations"), even ones sweeping I and
+ * odd ones Q:
+ *   - 0, 1: coarse, -5000 to +4900 in steps of 100
+ *   - 2, 3 and again 4, 5: medium, 24 steps of 10 around the value kept
+ *   - 6, 7 and again 8, 9: fine, 24 steps of 1 around the value kept
+ * Each step size runs I and Q twice (from the medium passes on): I and Q
+ * interact when one of them is far off, so the second round refines the first.
  *
- * Three-pass approach with progressively finer resolution:
+ * A pass keeps its best reading only if that reading stands out: at least
+ * CARRIER_MIN_CONTRAST_DB above the median of the pass. A pass that is flat
+ * (a broken loopback, the other offset far off, or a floor the offsets cannot
+ * move) keeps the value it swept around instead of a value picked by noise. A
+ * band with no such pass at all gets back the offsets it had before the run.
+ * The first reading of every pass follows a large jump in the offset and is
+ * not used.
  *
- * Pass 1 (Coarse):
- *   - Iteration 0: I DC offset -5000 to 5000 in 100 steps
- *   - Iteration 1: Q DC offset -5000 to 5000 in 100 steps
- *
- * Pass 2 (Medium):
- *   - Iteration 2: I DC offset ±12 steps of 10 around Pass 1 optimum
- *   - Iteration 3: Q DC offset ±12 steps of 10 around Pass 1 optimum
- *
- * Pass 3 (Fine):
- *   - Iteration 4: I DC offset ±12 steps of 1 around Pass 2 optimum
- *   - Iteration 5: Q DC offset ±12 steps of 1 around Pass 2 optimum
- *
- * For each iteration, measures carrier suppression and records best-performing value.
- * Automatically advances through all bands.
+ * Each step waits before its reading: CARRIER_COARSE_DWELL_MS in the coarse
+ * passes, CARRIER_DWELL_MS in the others. The spectrum blends each FFT frame
+ * with the previous ones, so a reading still carries some of the previous
+ * step's carrier; near the null that leftover dominates and shifts the peak in
+ * the sweep direction. In the coarse passes the shift reached two 100-count
+ * steps on the KI3P prototype (2026-11-17), which put the null outside every
+ * later window; there the longer wait matters most.
  */
-static int16_t center[] =  {0,                  0,                         0,  0,  0,  0 };
-static int8_t NSteps[]  =  {(int)((5000+5000)/100),(int)((5000+5000)/100),24, 24, 24, 24 };
-static int16_t Delta[] =   {100,               100,                       10, 10,  1,  1 };
-static float32_t maxDBC = 0.0;
-static int16_t maxDBC_parameter = 0.0;
+#define CARRIER_DWELL_MS 60
+#define CARRIER_COARSE_DWELL_MS 150
+#define CARRIER_COARSE_PASSES 2
+#define CARRIER_PASSES 10
+#define CARRIER_MIN_CONTRAST_DB 3.0f
+#define CARRIER_MAX_STEPS 100
+static int16_t center[CARRIER_PASSES] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const int8_t NSteps[CARRIER_PASSES] = {(5000+5000)/100, (5000+5000)/100, 24, 24, 24, 24, 24, 24, 24, 24};
+static const int16_t Delta[CARRIER_PASSES] = {100, 100, 10, 10, 10, 10, 1, 1, 1, 1};
+static float32_t maxDBC = -1e9f;           // best reading of the pass so far
+static int16_t maxDBC_parameter = 0;       // the offset that gave it
+static int16_t passStartValue = 0;         // the offset the pass sweeps around
+static float32_t passReadings[CARRIER_MAX_STEPS];
+static int8_t nPassReadings = 0;
+static bool bandAnyValid = false;          // some pass on this band stood out
 static int8_t iteration = 0;
 static int8_t step = 0;
 static bool bandCompleted[NUMBER_OF_BANDS]; // all should start as false
 static int32_t currentBand = -1;
+// The band the automatic run is working on, and its offsets before the run
+// started on it, so that an aborted run can put them back
+static int32_t savedBand = -1;
+static int32_t savedI = 0;
+static int32_t savedQ = 0;
 
 /**
  * @brief Calculate parameter value for given iteration and step
- * @param iter Iteration number (0-5)
+ * @param iter Iteration number (0 to CARRIER_PASSES-1)
  * @param stp Step number within iteration
  * @return Calculated amplitude or phase value
  */
@@ -92,34 +115,50 @@ static void SetOffset(int8_t iter, int8_t stp){
  */
 void InitializeTXCarrierCalibration(void){
     TransmitCarrierCalSm_start(&txcarrSM);
-    txcarrSM.vars.acquisitionDuration_ms = 60;
-}
-
-void SetTXCarrierCurrentBand(int32_t band){
-    currentBand = band;
+    txcarrSM.vars.acquisitionDuration_ms = CARRIER_DWELL_MS;
 }
 
 void ResetTXCarrierCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
-    currentBand = FIRST_BAND;
+    // Only the bands the radio may transmit on (see NextTXCalBand)
+    currentBand = NextTXCalBand(FIRST_BAND);
+    savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
     iteration = 0;
-    maxDBC = 0;
+    maxDBC = -1e9f;
+    nPassReadings = 0;
+    bandAnyValid = false;
+}
+
+/**
+ * @brief Stop an automatic carrier null run, if one is in progress
+ * @note Restores the I/Q offsets of the band being swept and releases the PTT
+ *       the run engaged. Bands already completed keep their new values.
+ */
+void AbortTXCarrierCalibration(void){
+    if (txcarrSM.state_id != TransmitCarrierCalSm_StateId_STANDBY){
+        if ((savedBand >= FIRST_BAND) && (savedBand <= LAST_BAND) && !bandCompleted[savedBand]){
+            ED.DCOffsetI[savedBand] = savedI;
+            ED.DCOffsetQ[savedBand] = savedQ;
+        }
+        SetInterrupt(iPTT_RELEASED);
+    }
+    InitializeTXCarrierCalibration();
 }
 
 void AdjustTXCarrierBand(void){
-    if (bandCompleted[currentBand]){
-        // Was this the last band? If so, exit.
-        if (currentBand == LAST_BAND){
+    if ((currentBand < FIRST_BAND) || bandCompleted[currentBand]){
+        // Go on to the next band the radio may transmit on; if there is none, exit
+        int32_t next = (currentBand < FIRST_BAND) ? -1 : NextTXCalBand(currentBand + 1);
+        if (next < 0){
             TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO_COMPLETE);
             SetInterrupt(iPTT_RELEASED);
             return;
         }
-        // Increment to the next band.
-        currentBand++;
+        currentBand = next;
     }
     // Set the hardware to the current band
     ED.currentBand[ED.activeVFO] = currentBand;
@@ -130,8 +169,14 @@ void AdjustTXCarrierBand(void){
     UpdateRFHardwareState();
 
     Debug(String("Calibrating TX Carrier band ") + String(bands[currentBand].name));
-    // Start by setting the Q offset to 0
-    ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = 0;
+    // Remember this band's offsets in case the run is aborted
+    if (savedBand != currentBand){
+        savedBand = currentBand;
+        savedI = ED.DCOffsetI[currentBand];
+        savedQ = ED.DCOffsetQ[currentBand];
+    }
+    // Start from the band's stored offsets: the first pass sweeps I with Q
+    // where it was, which on a calibrated radio is near its null
     // Go to find minimum loop
     TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_FIND_MINIMUM);
 }
@@ -139,7 +184,18 @@ void AdjustTXCarrierBand(void){
 void ResetTXCarrierCalSettings(void){
     step = 0;
     iteration = 0;
-    maxDBC = 0;
+    maxDBC = -1e9f;
+    nPassReadings = 0;
+    bandAnyValid = false;
+}
+
+/** The median of the pass's readings (0 if there are none) */
+static float32_t PassMedian(void){
+    if (nPassReadings == 0) return 0.0f;
+    float32_t sorted[CARRIER_MAX_STEPS];
+    std::copy(passReadings, passReadings + nPassReadings, sorted);
+    std::sort(sorted, sorted + nPassReadings);
+    return sorted[nPassReadings / 2];
 }
 
 void SetTXCarrierVals(int32_t band, float32_t value);
@@ -148,49 +204,68 @@ static float32_t maxDBC_save;
 void AdjustTXCarrierCalSetting(void){
     // Have we completed all the steps in this iteration?
     if (step >= NSteps[iteration]){
-        // Set the parameter we were changing to the minimum value
+        // Keep the best reading's offset if it stood out from the pass, else
+        // the offset the pass swept around
+        float32_t median = PassMedian();
+        bool valid = (nPassReadings > 0) && (maxDBC - median >= CARRIER_MIN_CONTRAST_DB);
+        int16_t kept = valid ? maxDBC_parameter : passStartValue;
+        if (valid) bandAnyValid = true;
         if (iteration%2 == 0){
-            ED.DCOffsetI[ED.currentBand[ED.activeVFO]] = maxDBC_parameter;
+            ED.DCOffsetI[currentBand] = kept;
         } else {
-            ED.DCOffsetQ[ED.currentBand[ED.activeVFO]] = maxDBC_parameter;
+            ED.DCOffsetQ[currentBand] = kept;
         }
-        // The next time we step around the amplitude or phase, use this as our starting point
+        // The next pass on this offset sweeps around the value kept
         int8_t nextIndex = iteration + 2;
-        if (nextIndex < (int8_t)(sizeof(center)/sizeof(center[0])))
-            center[nextIndex] = maxDBC_parameter;
+        if (nextIndex < CARRIER_PASSES)
+            center[nextIndex] = kept;
 
         // Go to the next iteration
         step = 0;
         iteration++;
         maxDBC_save = maxDBC;
-        maxDBC = 0.0;
+        maxDBC = -1e9f;
+        nPassReadings = 0;
     }
     // Have we completed all the iterations and ready to go to the next band?
-    if (iteration >= (int8_t)(sizeof(center)/sizeof(center[0]))){
-        // Set the parameter we were changing to the minimum value
-        if ((iteration-1)%2 == 0){
-            ED.DCOffsetI[currentBand] = maxDBC_parameter;
-        } else {
-            ED.DCOffsetQ[currentBand] = maxDBC_parameter;
+    if (iteration >= CARRIER_PASSES){
+        // A band on which nothing stood out gets its old offsets back
+        if (!bandAnyValid){
+            ED.DCOffsetI[currentBand] = savedI;
+            ED.DCOffsetQ[currentBand] = savedQ;
         }
         SetTXCarrierVals(currentBand, maxDBC_save);
         bandCompleted[currentBand] = true;
         TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_MIN_EXIT);
         return;
     }
+    // Each pass starts from the setting it sweeps around
+    if (step == 0){
+        int32_t b = ED.currentBand[ED.activeVFO];
+        passStartValue = (iteration%2 == 0) ? ED.DCOffsetI[b] : ED.DCOffsetQ[b];
+        maxDBC_parameter = passStartValue;
+    }
     // Change the appropriate parameter
     SetOffset(iteration,step); 
+    txcarrSM.vars.acquisitionDuration_ms = (iteration < CARRIER_COARSE_PASSES) ? CARRIER_COARSE_DWELL_MS
+                                                                              : CARRIER_DWELL_MS;
     // Go to read data state after waiting for txcarrSM.vars.acquisitionDuration_ms
     TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_READ_DELTA);
 }
 
 void ReadTXCarrierDelta(void){
-    bool ignore = (iteration == 0) && (step == 0);
-    if ((GetTXCarrierVals(ED.currentBand[ED.activeVFO]) > maxDBC) && !ignore){
-        // The value of the carrier suppression
-        maxDBC = GetTXCarrierVals(ED.currentBand[ED.activeVFO]);
-        // The amp/phase parameter that delivered this carrier suppression
-        maxDBC_parameter = GetNewVal(iteration, step);
+    // The first reading of a pass follows a large jump in the offset, and the
+    // smoothed reading has not caught up with it
+    bool ignore = (step == 0);
+    float32_t reading = GetTXCarrierVals(ED.currentBand[ED.activeVFO]);
+    if (!ignore){
+        if (nPassReadings < CARRIER_MAX_STEPS) passReadings[nPassReadings++] = reading;
+        if (reading > maxDBC){
+            // The value of the carrier suppression
+            maxDBC = reading;
+            // The offset that delivered this carrier suppression
+            maxDBC_parameter = GetNewVal(iteration, step);
+        }
     }
     // Proceed to the next step in this iteration
     step++;

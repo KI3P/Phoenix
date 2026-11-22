@@ -86,7 +86,7 @@ void SelectCalibrationMenu(void){
 
     // Verify that we're on the calibration secondary menu
     EXPECT_EQ(uiSM.state_id, UISm_StateId_SECONDARY_MENU);
-    extern struct PrimaryMenuOption primaryMenu[9];
+    extern struct PrimaryMenuOption primaryMenu[NUM_PRIMARY_MENUS];
     extern size_t primaryMenuIndex;
     EXPECT_STREQ(primaryMenu[primaryMenuIndex].label, "Calibration");
 }
@@ -836,8 +836,9 @@ TEST_F(CalibrationTest, Test20WFitInPowerCal) {
     // After recording the third point, curve fit is automatically calculated
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
-    EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]],14790,50);
-    EXPECT_NEAR(ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
+    // The least-squares tanh fit in dB (FitPowerCurve, 2026-11-02; scipy agrees)
+    EXPECT_NEAR(ED.PowerCal_20W_Psat_mW[ED.currentBand[ED.activeVFO]],14743,50);
+    EXPECT_NEAR(ED.PowerCal_20W_kindex[ED.currentBand[ED.activeVFO]],17.30,0.5);
 
     // But we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
@@ -905,8 +906,9 @@ TEST_F(CalibrationTest, Test100WFitInPowerCal) {
     // After recording the third point, curve fit is automatically calculated
     // Test whether the correct parameters have been set to the correct levels
     // Note: The fit algorithm is highly sensitive to initial conditions and numerical precision
-    EXPECT_NEAR(ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]],77050,600);
-    EXPECT_NEAR(ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]],16.178,0.5);
+    // The least-squares tanh fit in dB (FitPowerCurve, 2026-11-02; scipy agrees)
+    EXPECT_NEAR(ED.PowerCal_100W_Psat_mW[ED.currentBand[ED.activeVFO]],77373,600);
+    EXPECT_NEAR(ED.PowerCal_100W_kindex[ED.currentBand[ED.activeVFO]],17.30,0.5);
 
     // But we should still be in CALIBRATE_POWER_SPACE (no automatic state transition)
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_POWER_SPACE);
@@ -1074,6 +1076,451 @@ TEST_F(CalibrationTest, CalibrateTransmitIQState) {
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
     Serial.println("4-In home state");
 
+}
+
+// HOME while the PTT is held in Transmit IQ calibration: the radio must leave
+// calibration and return to receive, not stay keyed in a calibration state
+TEST_F(CalibrationTest, HomeWhileKeyedInTXIQExitsToReceive) {
+    SetDualVFOs(true);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    SetInterrupt(iPTT_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    CheckThatRegisterStateIsReceive();
+}
+
+// HOME during the automatic Transmit IQ run (button 16): the run stops, the PTT
+// it engaged is released, and the band it was sweeping gets its settings back
+TEST_F(CalibrationTest, HomeDuringTXIQAutoRunRestoresBandAndUnkeys) {
+    SetDualVFOs(true);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    ED.IQXAmpCorrectionFactor[FIRST_BAND] = 1.07f;
+    ED.IQXPhaseCorrectionFactor[FIRST_BAND] = 0.03f;
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+    EXPECT_TRUE(TXIQCalibrationAutoActive());
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+
+    // Let the sweep run for a while on the first band
+    for (int k=0; k<500; k++){
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+        if (k % 20 == 0){ loop(); }
+    }
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_TRUE((ED.IQXAmpCorrectionFactor[FIRST_BAND] != 1.07f) ||
+                (ED.IQXPhaseCorrectionFactor[FIRST_BAND] != 0.03f));
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    EXPECT_FALSE(TXIQCalibrationAutoActive());
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    CheckThatRegisterStateIsReceive();
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[FIRST_BAND], 0.03f);
+
+    // The stopped run does not touch the settings any more
+    for (int k=0; k<200; k++)
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[FIRST_BAND], 0.03f);
+}
+
+// HOME during the automatic Receive IQ run (button 16): the run stops and the
+// band it was sweeping gets its settings back
+TEST_F(CalibrationTest, HomeDuringRXIQAutoRunRestoresBand) {
+    ScrollAndSelectCalibrateReceiveIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    ED.IQAmpCorrectionFactor[FIRST_BAND] = 0.93f;
+    ED.IQPhaseCorrectionFactor[FIRST_BAND] = -0.02f;
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_TRUE(RXIQCalibrationAutoActive());
+
+    for (int k=0; k<500; k++){
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+        if (k % 20 == 0){ loop(); }
+    }
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_TRUE((ED.IQAmpCorrectionFactor[FIRST_BAND] != 0.93f) ||
+                (ED.IQPhaseCorrectionFactor[FIRST_BAND] != -0.02f));
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    EXPECT_FALSE(RXIQCalibrationAutoActive());
+    EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    EXPECT_FLOAT_EQ(ED.IQAmpCorrectionFactor[FIRST_BAND], 0.93f);
+    EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], -0.02f);
+
+    for (int k=0; k<200; k++)
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+    EXPECT_FLOAT_EQ(ED.IQAmpCorrectionFactor[FIRST_BAND], 0.93f);
+    EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], -0.02f);
+}
+
+// Single-VFO Transmit IQ transmits through the PA into the antenna connector.
+// It must start at full attenuation, and every key-down must use the attenuation
+// the screen shows, not 0 dB on the first key-down and 31.5 dB after
+TEST_F(CalibrationTest, SingleVFOTXIQKeysAtTheDisplayedAttenuation) {
+    extern float32_t attLevel;
+    SetDualVFOs(false);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    EXPECT_NEAR(attLevel, 31.5, 0.00001);
+    EXPECT_NEAR(GetTXIQAttenuation(), 31.5, 0.00001);
+
+    // First key-down
+    SetInterrupt(iPTT_PRESSED);
+    loop(); MyDelay(10);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    EXPECT_NEAR(GetTXAttenuation(), 31.5, 0.01);
+    SetInterrupt(iPTT_RELEASED);
+    loop(); MyDelay(10);
+
+    // Less attenuation, set while unkeyed (on direct-coupled builds the fine
+    // tune encoder sets the I offset instead, and the attenuation stays put)
+#ifndef DIRECT_COUPLED_TX
+    for (int i = 0; i < 4; i++){
+        SetInterrupt(iFINETUNE_DECREASE);
+        loop(); MyDelay(10);
+    }
+    EXPECT_NEAR(attLevel, 29.5, 0.00001);
+
+    // The next two key-downs use it
+    for (int n = 0; n < 2; n++){
+        SetInterrupt(iPTT_PRESSED);
+        loop(); MyDelay(10);
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+        EXPECT_NEAR(GetTXAttenuation(), 29.5, 0.01);
+        SetInterrupt(iPTT_RELEASED);
+        loop(); MyDelay(10);
+        EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    }
+#endif
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    SetDualVFOs(true);
+}
+
+#ifdef DIRECT_COUPLED_TX
+// The automatic carrier null (button 14) reads the carrier through the receiver,
+// which a single-VFO radio cannot do: there it must do nothing
+TEST_F(CalibrationTest, CarrierNullOnlyOnDualVFO) {
+    SetDualVFOs(false);
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+    SetButton(14);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+
+    SetDualVFOs(true);
+    extern size_t primaryMenuIndex;
+    extern size_t secondaryMenuIndex;
+    primaryMenuIndex = 0;
+    secondaryMenuIndex = 0;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+    SetButton(14);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);
+    EXPECT_NE(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<3; k++){ loop(); MyDelay(10); }
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+}
+#endif
+
+// The automatic Transmit IQ run calibrates every band from the first, like the
+// Receive IQ run, whichever band the operator selected on the screen before it
+TEST_F(CalibrationTest, TXIQAutoRunStartsFromFirstBand) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    ED.PA100Wactive = false;
+    ScrollAndSelectCalibrateTransmitIQ();
+    for (int k=0; k<20; k++){ loop(); MyDelay(10); }
+
+    // Move to another band with the band buttons (at least one press)
+    int presses = 0;
+    do {
+        SetButton(BAND_UP);
+        SetInterrupt(iBUTTON_PRESSED);
+        loop(); MyDelay(10);
+    } while ((++presses <= NUMBER_OF_BANDS) && (ED.currentBand[ED.activeVFO] != BAND_40M));
+    ASSERT_EQ(ED.currentBand[ED.activeVFO], BAND_40M);
+
+    SetButton(16);
+    SetInterrupt(iBUTTON_PRESSED);
+    loop(); MyDelay(10);
+    loop(); MyDelay(10);   // the PTT press the run queued
+    ASSERT_TRUE(TXIQCalibrationAutoActive());
+    for (int k = 0; k < 10; k++)
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    EXPECT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+
+    SetButton(HOME_SCREEN);
+    SetInterrupt(iBUTTON_PRESSED);
+    for (int k=0; k<4; k++){ loop(); MyDelay(10); }
+    EXPECT_FALSE(TXIQCalibrationAutoActive());
+    EXPECT_EQ(modeSM.state_id, ModeSm_StateId_SSB_RECEIVE);
+    ED = savedED;
+}
+
+// The automatic sweeps keep, for each pass, the setting with the largest reading
+// above 0 dB. When no reading beats 0 dB (a broken or mirrored loopback), a pass
+// must leave its setting alone, not write a value left over from the last pass.
+// A mirrored spectrum makes every reading negative: the receive image bin (128)
+// is above the wanted bin (384), the transmit image above the wanted tone
+// (256 -/+ 17 by sideband), and the carrier (256) above both.
+static void MirroredSpectrum(int32_t band){
+    for (int i = 0; i < SPECTRUM_RES; i++) psdnew[i] = 1.0f;
+    psdnew[128] = 2.0f;
+    psdnew[256] = 3.0f;
+    bool usb = (bands[band].mode == USB);
+    psdnew[256 + 17] = usb ? 1.0f : 2.0f;
+    psdnew[256 - 17] = usb ? 2.0f : 1.0f;
+}
+
+TEST_F(CalibrationTest, RXIQAutoKeepsSettingWhenNoReadingIsValid) {
+    auto savedED = ED; // the sweep goes on to the next band: put everything back after
+    MirroredSpectrum(FIRST_BAND);
+    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+    ED.IQAmpCorrectionFactor[FIRST_BAND] = 1.07f;
+    ED.IQPhaseCorrectionFactor[FIRST_BAND] = 0.03f;
+    InitializeRXIQCalibration();
+    ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_AUTO);
+    ASSERT_TRUE(RXIQCalibrationAutoActive());
+    // Run until the first band is done and the sweep moves on
+    for (int k = 0; (k < 200000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND); k++){
+        UpdateRXDeltaVal();
+        ReceiveIQCalSm_dispatch_event(&rxiqSM, ReceiveIQCalSm_EventId_DO);
+    }
+    EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    // The amplitude is untouched; the phase is where each band's sweep starts it
+    EXPECT_FLOAT_EQ(ED.IQAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQPhaseCorrectionFactor[FIRST_BAND], 0.0f);
+    AbortRXIQCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
+TEST_F(CalibrationTest, TXIQAutoKeepsSettingWhenNoReadingIsValid) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    MirroredSpectrum(FIRST_BAND);
+    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+    ED.IQXAmpCorrectionFactor[FIRST_BAND] = 1.07f;
+    ED.IQXPhaseCorrectionFactor[FIRST_BAND] = 0.03f;
+    InitializeTXIQCalibration();
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
+    ASSERT_TRUE(TXIQCalibrationAutoActive());
+    for (int k = 0; (k < 200000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND); k++){
+        UpdateTXDeltaVal();
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    }
+    EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[FIRST_BAND], 1.07f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[FIRST_BAND], 0.0f);
+    AbortTXIQCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
+TEST_F(CalibrationTest, CarrierNullAutoKeepsSettingWhenNoReadingIsValid) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    MirroredSpectrum(FIRST_BAND);
+    ED.currentBand[ED.activeVFO] = FIRST_BAND;
+    ED.DCOffsetI[FIRST_BAND] = 123;
+    ED.DCOffsetQ[FIRST_BAND] = -45;
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    for (int k = 0; (k < 400000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND); k++){
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+    }
+    EXPECT_NE(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    // Nothing stood out on the band: both offsets as they were before the run
+    EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 123);
+    EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], -45);
+    AbortTXCarrierCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
+}
+
+// Transmit is disabled outside the amateur bands (IsTxAllowed), so the
+// transmit calibrations skip those bands: general coverage is the last band
+TEST_F(CalibrationTest, NextTXCalBandSkipsBandsWithoutTransmit) {
+    EXPECT_EQ(NextTXCalBand(FIRST_BAND), FIRST_BAND);
+    EXPECT_EQ(bands[BAND_GENERAL].band_type, MISC_BAND);
+    EXPECT_EQ(NextTXCalBand(BAND_GENERAL), -1);
+    EXPECT_EQ(NextTXCalBand(LAST_BAND + 1), -1);
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
+        int32_t n = NextTXCalBand(b);
+        if (n < 0) continue;
+        EXPECT_GE(n, b);
+        EXPECT_EQ(bands[n].band_type, HAM_BAND) << "band " << n;
+    }
+}
+
+TEST_F(CalibrationTest, TXIQAutoRunSkipsBandsWithoutTransmit) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    MirroredSpectrum(FIRST_BAND);
+    ED.IQXAmpCorrectionFactor[BAND_GENERAL] = 1.23f;
+    ED.IQXPhaseCorrectionFactor[BAND_GENERAL] = -0.04f;
+    InitializeTXIQCalibration();
+    TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO);
+    ASSERT_TRUE(TXIQCalibrationAutoActive());
+    bool visited[NUMBER_OF_BANDS] = {false};
+    for (int k = 0; (k < 3000000) && TXIQCalibrationAutoActive(); k++){
+        visited[ED.currentBand[ED.activeVFO]] = true;
+        UpdateTXDeltaVal();
+        TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_DO);
+    }
+    EXPECT_FALSE(TXIQCalibrationAutoActive());
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++)
+        EXPECT_EQ(visited[b], bands[b].band_type == HAM_BAND) << "band " << b;
+    EXPECT_FLOAT_EQ(ED.IQXAmpCorrectionFactor[BAND_GENERAL], 1.23f);
+    EXPECT_FLOAT_EQ(ED.IQXPhaseCorrectionFactor[BAND_GENERAL], -0.04f);
+    while (GetInterrupt() != iNONE) {} // drop the PTT release the run queued
+    ED = savedED;
+}
+
+// The carrier null skips the bands without transmit too
+TEST_F(CalibrationTest, CarrierNullRunSkipsBandsWithoutTransmit) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    MirroredSpectrum(FIRST_BAND);
+    ED.DCOffsetI[BAND_GENERAL] = 77;
+    ED.DCOffsetQ[BAND_GENERAL] = -88;
+    ED.DCOffsetI[FIRST_BAND] = 11;
+    ED.DCOffsetQ[FIRST_BAND] = -22;
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    ASSERT_NE(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    bool visited[NUMBER_OF_BANDS] = {false};
+    for (int k = 0; (k < 6000000) && (txcarrSM.state_id != TransmitCarrierCalSm_StateId_STANDBY); k++){
+        visited[ED.currentBand[ED.activeVFO]] = true;
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+    }
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++)
+        EXPECT_EQ(visited[b], bands[b].band_type == HAM_BAND) << "band " << b;
+    EXPECT_EQ(ED.DCOffsetI[BAND_GENERAL], 77);
+    EXPECT_EQ(ED.DCOffsetQ[BAND_GENERAL], -88);
+    // The flat mirrored spectrum: nothing stands out, so the offsets are restored
+    EXPECT_EQ(ED.DCOffsetI[FIRST_BAND], 11);
+    EXPECT_EQ(ED.DCOffsetQ[FIRST_BAND], -22);
+    while (GetInterrupt() != iNONE) {} // drop the PTT release the run queued
+    ED = savedED;
+}
+
+// A model of the loopback: a fixed tone, and a carrier whose level depends on
+// how far the I and Q offsets are from the band's null. Far from it (as with
+// the offsets at 0) the carrier is above the tone, as on the KI3P prototype.
+static int16_t modelNullI = -990, modelNullQ = -1010;
+static void CarrierModelSpectrum(void){
+    int32_t b = ED.currentBand[ED.activeVFO];
+    float32_t dI = (float32_t)(ED.DCOffsetI[b] - modelNullI);
+    float32_t dQ = (float32_t)(ED.DCOffsetQ[b] - modelNullQ);
+    float32_t carrier_dB = 20.0f * log10f(sqrtf(dI * dI + dQ * dQ) + 0.5f) - 30.0f;
+    for (int i = 0; i < SPECTRUM_RES; i++) psdnew[i] = -2.0f;
+    psdnew[256 + 17] = 2.0f;           // the tone, 20 dB, in either sideband
+    psdnew[256 - 17] = 2.0f;
+    psdnew[256] = carrier_dB / 10.0f;
+}
+
+TEST_F(CalibrationTest, CarrierNullFindsANullThatStartsAboveTheTone) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){ ED.DCOffsetI[b] = 0; ED.DCOffsetQ[b] = 0; }
+    CarrierModelSpectrum();
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    for (int k = 0; (k < 6000000) && (txcarrSM.state_id != TransmitCarrierCalSm_StateId_STANDBY); k++){
+        CarrierModelSpectrum();
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+    }
+    EXPECT_EQ(txcarrSM.state_id, TransmitCarrierCalSm_StateId_STANDBY);
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
+        if (bands[b].band_type != HAM_BAND) continue;
+        EXPECT_NEAR(ED.DCOffsetI[b], modelNullI, 2) << "band " << b;
+        EXPECT_NEAR(ED.DCOffsetQ[b], modelNullQ, 2) << "band " << b;
+        EXPECT_GT(GetTXCarrierVals(b), 40.0f) << "band " << b;
+    }
+    while (GetInterrupt() != iNONE) {} // drop the PTT release the run queued
+    ED = savedED;
+}
+
+// The spectrum lags the offset, so the coarse passes, where a lag can put the
+// null outside every later window, wait 150 ms per step; the others 60 ms
+TEST_F(CalibrationTest, CarrierNullCoarsePassesWaitLonger) {
+    auto savedED = ED;
+    SetDualVFOs(true);
+    CarrierModelSpectrum();
+    InitializeTXCarrierCalibration();
+    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+    ASSERT_EQ(ED.currentBand[ED.activeVFO], FIRST_BAND);
+    int ticks = 0;
+    bool saw150 = false, saw60 = false;
+    while ((ticks < 200000) && (ED.currentBand[ED.activeVFO] == FIRST_BAND)){
+        CarrierModelSpectrum();
+        UpdateTXDeltaVal();
+        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_DO);
+        if (txcarrSM.vars.acquisitionDuration_ms == 150) saw150 = true;
+        if (txcarrSM.vars.acquisitionDuration_ms == 60) saw60 = true;
+        ticks++;
+    }
+    EXPECT_TRUE(saw150);
+    EXPECT_TRUE(saw60);
+    // 1 ms per tick: two coarse passes of 100 steps at 150 ms, eight of 24 at 60 ms
+    const int expected = 2 * 100 * 150 + 8 * 24 * 60;
+    EXPECT_GE(ticks, expected);
+    EXPECT_LE(ticks, expected * 11 / 10);
+    AbortTXCarrierCalibration();
+    while (GetInterrupt() != iNONE) {} // drop the PTT release it queued
+    ED = savedED;
 }
 
 TEST_F(CalibrationTest, FilterEncoderChangesTXIQPhase) {
@@ -1267,6 +1714,10 @@ TEST_F(CalibrationTest, FinetuneEncoderChangesTXAttenuation) {
     // Verify we're in the correct state
     EXPECT_EQ(uiSM.state_id, UISm_StateId_CALIBRATE_TX_IQ);
     EXPECT_EQ(modeSM.state_id, ModeSm_StateId_CALIBRATE_TX_IQ_SPACE);
+
+    // The screen opens at full attenuation; start mid-range so both directions move
+    EXPECT_NEAR(attLevel, 31.5, 0.00001);
+    attLevel = 15.0;
 
     // Get the current band and store initial XAttenSSB value
     int32_t currentBand = ED.currentBand[ED.activeVFO];

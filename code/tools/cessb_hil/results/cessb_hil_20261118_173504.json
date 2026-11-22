@@ -1,0 +1,1364 @@
+{
+ "started": "20261118_173504",
+ "args": {
+  "cat_port": "/dev/ttyACM0",
+  "cat_baud": 38400,
+  "modulation": "usb",
+  "drives": "0,3,6,9",
+  "stimuli": "two_tone,vowel_ah,syllable_ah",
+  "mic_gain": null,
+  "min_amplitude": 0.005,
+  "min_accurate_amplitude": 0.02,
+  "max_amplitude": 0.25,
+  "sweep_step_db": 1.5,
+  "detect_amplitude": 0.02,
+  "scope_rate": 100000.0,
+  "capture": 0.5,
+  "scope_range": 5.0,
+  "scope_offset": 1.6,
+  "settle": 0.3,
+  "no_power_check": false,
+  "max_overshoot_pct": 5.0,
+  "max_transparency_db": 0.3,
+  "max_hold_spread_db": 1.0,
+  "max_power_error_db": 0.5,
+  "max_imd_opposite_dbc": -40.0,
+  "max_opposite_dbc": -25.0,
+  "max_ooc_dbc": -45.0,
+  "min_syllable_gain_db": 3.0,
+  "out_dir": "/home/oliver/Sync/Ham/T41/Software/Phoenix/code/tools/cessb_hil/results",
+  "no_plots": false,
+  "quiet": false
+ },
+ "warnings": [],
+ "radio": {
+  "md": 1,
+  "cessb": false,
+  "power_w": 5,
+  "rate_hz": 176400
+ },
+ "wiring": {
+  "swap": true,
+  "wiring": "Ch1 -> Q, Ch2 -> I (compensated in software)",
+  "sideband_sign": -1,
+  "sideband_sign_expected": -1,
+  "sideband_sign_as_expected": true,
+  "sideband_flipped": true,
+  "measured_on": "USB",
+  "suppression_at_1k_db": 35.21958334510601,
+  "detect_amplitude_v": 0.02,
+  "dc_ch1_v": 1.6003283879442547,
+  "dc_ch2_v": 1.6023550553393149,
+  "trials": {
+   "LSB": {
+    "modulation": 1,
+    "f_signed_hz": -1000.0003543647123,
+    "amplitude_v": 0.03785554933803761,
+    "level_dbv": -28.43740894402746,
+    "sign": -1
+   },
+   "USB": {
+    "modulation": 0,
+    "f_signed_hz": 1000.0003210590341,
+    "amplitude_v": 0.03857467204992126,
+    "level_dbv": -28.27395514976289,
+    "sign": 1
+   }
+  }
+ },
+ "tone_sweep": [
+  {
+   "amplitude_v": 0.005,
+   "off_v": 0.008456122934846537,
+   "on_v": 0.007499426068022402,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.005942511137185092,
+   "off_v": 0.008583373055911695,
+   "on_v": 0.009092314583307632,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.007062687723113772,
+   "off_v": 0.011052316475837907,
+   "on_v": 0.011575729344998141,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.008394020090612802,
+   "off_v": 0.013794810594357498,
+   "on_v": 0.014319970500203932,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0099763115748444,
+   "off_v": 0.01728525674831455,
+   "on_v": 0.017811922087634553,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.011856868528308279,
+   "off_v": 0.02061180245048551,
+   "on_v": 0.021256895486562677,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.014091914656322273,
+   "off_v": 0.025285702082541932,
+   "on_v": 0.025966174244071036,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.01674827195789139,
+   "off_v": 0.030715841631179255,
+   "on_v": 0.03139523309125773,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.01990535852767487,
+   "off_v": 0.03745571152757475,
+   "on_v": 0.03818865306681886,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.023657562948074036,
+   "off_v": 0.044563866320622134,
+   "on_v": 0.04543407756839127,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.02811706625951747,
+   "off_v": 0.053603558765349085,
+   "on_v": 0.05448613048039744,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.03341719587843075,
+   "off_v": 0.06446055884019321,
+   "on_v": 0.06534790507289093,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0397164117362141,
+   "off_v": 0.07739584060994828,
+   "on_v": 0.07832880186946756,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.0472030438142962,
+   "off_v": 0.09201430959124919,
+   "on_v": 0.0931765832426949,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.056100922715098214,
+   "off_v": 0.1101082297358037,
+   "on_v": 0.11126745065995404,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.06667607160816626,
+   "off_v": 0.13150107496446573,
+   "on_v": 0.1327675417766219,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.07924465962305574,
+   "off_v": 0.15715941578846582,
+   "on_v": 0.14826867143144495,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.09418245447449011,
+   "off_v": 0.18672385693487287,
+   "on_v": 0.1482920603240105,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.11193605692841709,
+   "off_v": 0.22279621104938413,
+   "on_v": 0.14828625717654517,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.13303625298994062,
+   "off_v": 0.265810985383747,
+   "on_v": 0.14829388341880595,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.15811388300841914,
+   "off_v": 0.31757231959011273,
+   "on_v": 0.14831296617288475,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.1879187021442223,
+   "off_v": 0.3785910806174707,
+   "on_v": 0.14829334695362978,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  },
+  {
+   "amplitude_v": 0.22334179607548182,
+   "off_v": 0.4529521513297434,
+   "on_v": 0.14827008233543337,
+   "off_clipped": false,
+   "on_clipped": false,
+   "clean": true
+  }
+ ],
+ "ceiling": {
+  "found": true,
+  "ceiling_v": 0.1482913072114598,
+  "limited_points": 5,
+  "limited_spread_db": 0.002511837974751411,
+  "first_limited_index": 18,
+  "linear_points": 15
+ },
+ "tone_gain_v_per_v": 1.906442097144633,
+ "knee_amplitude_v": 0.07778432265714369,
+ "power_tracking": {
+  "p_full_w": 5,
+  "p_half_w": 2,
+  "measured_db": -3.974030959136904,
+  "expected_db": -3.979400086720376
+ },
+ "stimuli": {
+  "two_tone": {
+   "reference": {
+    "peak_x_ceiling": 0.5169904486131288,
+    "papr_db": 3.264616713147074,
+    "opposite_dbc": -41.48635094630123,
+    "out_of_channel_dbc": -47.09977621599343,
+    "awg_v_per_peak": 0.5072988355251488
+   },
+   "rows": [
+    {
+     "drive_db": 0.0,
+     "amplitude_v": 0.07522800746687565,
+     "off": {
+      "peak_x_ceiling": 1.0033653057575422,
+      "papr_db": 3.165426142846318,
+      "talk_power_gain_db": 0.09968848757292914,
+      "opposite_dbc": -48.860736385735294,
+      "out_of_channel_dbc": -54.25410216440256,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.07305322689401558,
+      "tone_balance_db": 0.4774175884175471,
+      "imd3_low_dbc": -51.313350830152885,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -50.965730514808094,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -57.96255074802861,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -64.47814406743247,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -42.47082880412157,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "on": {
+      "peak_x_ceiling": 1.015555447601038,
+      "papr_db": 3.2345626642582657,
+      "talk_power_gain_db": 0.03026256882910916,
+      "opposite_dbc": -41.09757539111595,
+      "out_of_channel_dbc": -54.196007810391876,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.07335473043317378,
+      "tone_balance_db": 0.4402553307298981,
+      "imd3_low_dbc": -51.023240225470886,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -56.45830986799542,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -58.49030896063211,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -64.7899126920297,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -38.901717264807345,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "model": {
+      "peak": 1.0056610685990737,
+      "papr_db": 3.0577864796650562,
+      "wanted_papr_db": 3.0580063496516603,
+      "opposite_dbc": -101.9699029217142,
+      "out_of_channel_dbc": -112.19600584810655,
+      "talk_power_gain_db": -0.04353800191682122
+     }
+    },
+    {
+     "drive_db": 3.0,
+     "amplitude_v": 0.10626238495412277,
+     "off": {
+      "peak_x_ceiling": 1.416563677046068,
+      "papr_db": 3.117151424552703,
+      "talk_power_gain_db": 0.14797780670861105,
+      "opposite_dbc": -49.11616796556444,
+      "out_of_channel_dbc": -57.365739108205254,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.10368678529999184,
+      "tone_balance_db": 0.4833926014867724,
+      "imd3_low_dbc": -55.78483070552367,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -54.504149216468434,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -62.167414663962,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -66.40717147964682,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -45.46774827674142,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "on": {
+      "peak_x_ceiling": 1.0012786786513481,
+      "papr_db": 3.1031097128328606,
+      "talk_power_gain_db": 0.1612122435979484,
+      "opposite_dbc": -41.25324044873877,
+      "out_of_channel_dbc": -54.85214055957612,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.07340911924919288,
+      "tone_balance_db": 0.6036897847799029,
+      "imd3_low_dbc": -50.93680388003328,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -36.07404001201701,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -60.09717529599204,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -64.02532149996327,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -43.57146243303686,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "model": {
+      "peak": 0.9790151416340862,
+      "papr_db": 2.975576048601523,
+      "wanted_papr_db": 2.976464807239933,
+      "opposite_dbc": -63.04521431064706,
+      "out_of_channel_dbc": -90.41753421879527,
+      "talk_power_gain_db": 0.03800354049490595
+     }
+    },
+    {
+     "drive_db": 6.0,
+     "amplitude_v": 0.15009960832885447,
+     "off": {
+      "peak_x_ceiling": 2.007205289168147,
+      "papr_db": 3.0909454582671056,
+      "talk_power_gain_db": 0.17417663476674816,
+      "opposite_dbc": -47.82158816080689,
+      "out_of_channel_dbc": -60.579662320069815,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.14740734981957007,
+      "tone_balance_db": 0.48578884779386977,
+      "imd3_low_dbc": -59.04993539056281,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -54.31271607585886,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -64.62255769103758,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -71.16804679448035,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -45.80097460783696,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "on": {
+      "peak_x_ceiling": 0.9681214897028741,
+      "papr_db": 3.0325242732440287,
+      "talk_power_gain_db": 0.23071708175432137,
+      "opposite_dbc": -41.564165179891376,
+      "out_of_channel_dbc": -55.00684330519939,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.07149165132741309,
+      "tone_balance_db": 0.8072367143489735,
+      "imd3_low_dbc": -49.63240859411995,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -31.253587033723136,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -57.86227017239558,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -65.44392764953002,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -42.627200044954286,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "model": {
+      "peak": 0.9513928705014258,
+      "papr_db": 2.9448645871761707,
+      "wanted_papr_db": 2.946929986884506,
+      "opposite_dbc": -58.59692073901873,
+      "out_of_channel_dbc": -92.31384324251059,
+      "talk_power_gain_db": 0.06753836085033305
+     }
+    },
+    {
+     "drive_db": 9.0,
+     "amplitude_v": 0.21202133219767721,
+     "off": {
+      "peak_x_ceiling": 2.8596367809923,
+      "papr_db": 3.0906008342652216,
+      "talk_power_gain_db": 0.17450800286849555,
+      "opposite_dbc": -46.973918435856284,
+      "out_of_channel_dbc": -62.588606727565406,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.2099868951953237,
+      "tone_balance_db": 0.49183470083438263,
+      "imd3_low_dbc": -63.180126283569926,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -53.32401593886189,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -69.89075317156222,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -73.34791525308971,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -44.12653758514902,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "on": {
+      "peak_x_ceiling": 0.9543496237165259,
+      "papr_db": 3.029095083777902,
+      "talk_power_gain_db": 0.2333534929190777,
+      "opposite_dbc": -41.706661502492004,
+      "out_of_channel_dbc": -55.319868730279666,
+      "scope_clipped": false,
+      "clean": true,
+      "tone_v": 0.07047052279319435,
+      "tone_balance_db": 1.0184796337468653,
+      "imd3_low_dbc": -49.60661470999531,
+      "imd3_low_hz": 500.0,
+      "imd3_high_dbc": -29.50567433404256,
+      "imd3_high_hz": -3100.0,
+      "imd5_low_dbc": -60.19919617541067,
+      "imd5_low_hz": 1700.0,
+      "imd5_high_dbc": -64.57351111200825,
+      "imd5_high_hz": -4300.0,
+      "imd3_low_mirror_dbc": -40.92046735040181,
+      "imd3_low_mirror_hz": -500.0
+     },
+     "model": {
+      "peak": 0.9341529722765294,
+      "papr_db": 2.903240448253681,
+      "wanted_papr_db": 2.9062118473920426,
+      "opposite_dbc": -56.827167629606194,
+      "out_of_channel_dbc": -83.82523412294653,
+      "talk_power_gain_db": 0.10825650034279644
+     }
+    }
+   ],
+   "model": {
+    "reference": {
+     "peak": 1.0009435693468882,
+     "papr_db": 3.0142490584660147,
+     "wanted_papr_db": 3.014468347734839,
+     "opposite_dbc": -66.94375447765617,
+     "out_of_channel_dbc": -112.93414703421635
+    },
+    "0.0": {
+     "peak": 1.0056610685990737,
+     "papr_db": 3.0577864796650562,
+     "wanted_papr_db": 3.0580063496516603,
+     "opposite_dbc": -101.9699029217142,
+     "out_of_channel_dbc": -112.19600584810655,
+     "talk_power_gain_db": -0.04353800191682122
+    },
+    "3.0": {
+     "peak": 0.9790151416340862,
+     "papr_db": 2.975576048601523,
+     "wanted_papr_db": 2.976464807239933,
+     "opposite_dbc": -63.04521431064706,
+     "out_of_channel_dbc": -90.41753421879527,
+     "talk_power_gain_db": 0.03800354049490595
+    },
+    "6.0": {
+     "peak": 0.9513928705014258,
+     "papr_db": 2.9448645871761707,
+     "wanted_papr_db": 2.946929986884506,
+     "opposite_dbc": -58.59692073901873,
+     "out_of_channel_dbc": -92.31384324251059,
+     "talk_power_gain_db": 0.06753836085033305
+    },
+    "9.0": {
+     "peak": 0.9341529722765294,
+     "papr_db": 2.903240448253681,
+     "wanted_papr_db": 2.9062118473920426,
+     "opposite_dbc": -56.827167629606194,
+     "out_of_channel_dbc": -83.82523412294653,
+     "talk_power_gain_db": 0.10825650034279644
+    }
+   }
+  },
+  "vowel_ah": {
+   "reference": {
+    "peak_x_ceiling": 0.5364861430599832,
+    "papr_db": 5.981915143060403,
+    "opposite_dbc": -32.68039722176455,
+    "out_of_channel_dbc": -47.41054539139344,
+    "awg_v_per_peak": 0.48886379630077575
+   },
+   "rows": [
+    {
+     "drive_db": 0.0,
+     "amplitude_v": 0.07249425140179884,
+     "off": {
+      "peak_x_ceiling": 1.0264285472815133,
+      "papr_db": 6.002372259148059,
+      "talk_power_gain_db": -0.017751888340548305,
+      "opposite_dbc": -37.966146509741854,
+      "out_of_channel_dbc": -53.08103914210659,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.0030231443844821,
+      "papr_db": 5.78381702595828,
+      "talk_power_gain_db": 0.2011947059857908,
+      "opposite_dbc": -38.09491638901351,
+      "out_of_channel_dbc": -53.68193041015332,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 0.9916956485267112,
+      "papr_db": 5.477718754431611,
+      "wanted_papr_db": 5.70883400357798,
+      "opposite_dbc": -86.46335284034433,
+      "out_of_channel_dbc": -105.92900064504035,
+      "talk_power_gain_db": 0.01134409164430128
+     }
+    },
+    {
+     "drive_db": 3.0,
+     "amplitude_v": 0.10240085187436161,
+     "off": {
+      "peak_x_ceiling": 1.4659736070461034,
+      "papr_db": 6.019697914132363,
+      "talk_power_gain_db": -0.03461265871162311,
+      "opposite_dbc": -40.17845762864856,
+      "out_of_channel_dbc": -56.95247697968873,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.030696061009847,
+      "papr_db": 4.037598877527378,
+      "talk_power_gain_db": 1.9368345340246815,
+      "opposite_dbc": -39.635999697767645,
+      "out_of_channel_dbc": -55.84612923096749,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 0.9765825526109173,
+      "papr_db": 3.315914811667064,
+      "wanted_papr_db": 3.6614964749911953,
+      "opposite_dbc": -75.19564077800511,
+      "out_of_channel_dbc": -99.14805295764057,
+      "talk_power_gain_db": 2.058681620231086
+     }
+    },
+    {
+     "drive_db": 6.0,
+     "amplitude_v": 0.1446450478738891,
+     "off": {
+      "peak_x_ceiling": 2.0867387999726867,
+      "papr_db": 6.028921333224806,
+      "talk_power_gain_db": -0.04358306098150244,
+      "opposite_dbc": -42.07379863768766,
+      "out_of_channel_dbc": -59.27446183510635,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.0232981253439557,
+      "papr_db": 2.7167459820806013,
+      "talk_power_gain_db": 3.2214418511692853,
+      "opposite_dbc": -41.051701847122345,
+      "out_of_channel_dbc": -56.99978408248811,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 1.0103131602261466,
+      "papr_db": 2.1013146809708236,
+      "wanted_papr_db": 2.5486711862705587,
+      "opposite_dbc": -73.33864660617957,
+      "out_of_channel_dbc": -93.43212797447664,
+      "talk_power_gain_db": 3.1715069089517227
+     }
+    },
+    {
+     "drive_db": 9.0,
+     "amplitude_v": 0.20431656076562407,
+     "off": {
+      "peak_x_ceiling": 2.9720447691940928,
+      "papr_db": 6.016276495564298,
+      "talk_power_gain_db": -0.03090111828083053,
+      "opposite_dbc": -43.272948479660144,
+      "out_of_channel_dbc": -63.6293165771285,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.0198131872381857,
+      "papr_db": 1.8909427738425189,
+      "talk_power_gain_db": 4.021624090996473,
+      "opposite_dbc": -41.743142805084084,
+      "out_of_channel_dbc": -58.372844634786425,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 1.0104235171507692,
+      "papr_db": 1.58957982812918,
+      "wanted_papr_db": 2.081146452377115,
+      "opposite_dbc": -66.38110509183362,
+      "out_of_channel_dbc": -93.57132838411438,
+      "talk_power_gain_db": 3.6390316428451666
+     }
+    }
+   ],
+   "model": {
+    "reference": {
+     "peak": 1.0015672332731729,
+     "papr_db": 5.338685191361612,
+     "wanted_papr_db": 5.720178095222281,
+     "opposite_dbc": -67.24274914196742,
+     "out_of_channel_dbc": -95.48495319945887
+    },
+    "0.0": {
+     "peak": 0.9916956485267112,
+     "papr_db": 5.477718754431611,
+     "wanted_papr_db": 5.70883400357798,
+     "opposite_dbc": -86.46335284034433,
+     "out_of_channel_dbc": -105.92900064504035,
+     "talk_power_gain_db": 0.01134409164430128
+    },
+    "3.0": {
+     "peak": 0.9765825526109173,
+     "papr_db": 3.315914811667064,
+     "wanted_papr_db": 3.6614964749911953,
+     "opposite_dbc": -75.19564077800511,
+     "out_of_channel_dbc": -99.14805295764057,
+     "talk_power_gain_db": 2.058681620231086
+    },
+    "6.0": {
+     "peak": 1.0103131602261466,
+     "papr_db": 2.1013146809708236,
+     "wanted_papr_db": 2.5486711862705587,
+     "opposite_dbc": -73.33864660617957,
+     "out_of_channel_dbc": -93.43212797447664,
+     "talk_power_gain_db": 3.1715069089517227
+    },
+    "9.0": {
+     "peak": 1.0104235171507692,
+     "papr_db": 1.58957982812918,
+     "wanted_papr_db": 2.081146452377115,
+     "opposite_dbc": -66.38110509183362,
+     "out_of_channel_dbc": -93.57132838411438,
+     "talk_power_gain_db": 3.6390316428451666
+    }
+   }
+  },
+  "syllable_ah": {
+   "reference": {
+    "peak_x_ceiling": 0.5407255019268833,
+    "papr_db": 12.25787247028093,
+    "opposite_dbc": -27.07355729824952,
+    "out_of_channel_dbc": -40.042987573756506,
+    "awg_v_per_peak": 0.4850310400091475
+   },
+   "rows": [
+    {
+     "drive_db": 0.0,
+     "amplitude_v": 0.07192588696109034,
+     "off": {
+      "peak_x_ceiling": 1.0242719325133103,
+      "papr_db": 12.28668780303141,
+      "talk_power_gain_db": -0.017200658821003856,
+      "opposite_dbc": -33.47868090004981,
+      "out_of_channel_dbc": -45.88348648907804,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.024952664857233,
+      "papr_db": 12.275723103940955,
+      "talk_power_gain_db": -0.005048785498413366,
+      "opposite_dbc": -33.99867328359628,
+      "out_of_channel_dbc": -46.903440872661776,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 1.0023946296644997,
+      "papr_db": 11.697429823685697,
+      "wanted_papr_db": 11.925911318716425,
+      "opposite_dbc": -92.96841015233083,
+      "out_of_channel_dbc": -114.64124956296033,
+      "talk_power_gain_db": 0.012399540441673906
+     }
+    },
+    {
+     "drive_db": 3.0,
+     "amplitude_v": 0.10159801576283234,
+     "off": {
+      "peak_x_ceiling": 1.469944046544462,
+      "papr_db": 12.368075603284625,
+      "talk_power_gain_db": -0.09629364288049125,
+      "opposite_dbc": -36.88484614523193,
+      "out_of_channel_dbc": -49.142647204807574,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.0304043434887897,
+      "papr_db": 9.894100175195543,
+      "talk_power_gain_db": 2.3728109466617298,
+      "opposite_dbc": -36.686751991275194,
+      "out_of_channel_dbc": -49.44459184997947,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 0.9782399580241935,
+      "papr_db": 9.074728424842741,
+      "wanted_papr_db": 9.373118901884071,
+      "opposite_dbc": -78.40916035262495,
+      "out_of_channel_dbc": -99.99529545060268,
+      "talk_power_gain_db": 2.5651919572740276
+     }
+    },
+    {
+     "drive_db": 6.0,
+     "amplitude_v": 0.14351101172417507,
+     "off": {
+      "peak_x_ceiling": 2.0838698335827543,
+      "papr_db": 12.336024391369435,
+      "talk_power_gain_db": -0.06316427570941485,
+      "opposite_dbc": -39.99668221344648,
+      "out_of_channel_dbc": -52.169624879773664,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.0242965317686352,
+      "papr_db": 8.137683478738758,
+      "talk_power_gain_db": 4.109429771905228,
+      "opposite_dbc": -38.636721641644584,
+      "out_of_channel_dbc": -51.31042348372418,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 1.0135493717114967,
+      "papr_db": 7.482816164036588,
+      "wanted_papr_db": 7.855144297041587,
+      "opposite_dbc": -76.5405975873449,
+      "out_of_channel_dbc": -97.49248173408847,
+      "talk_power_gain_db": 4.083166562116512
+     }
+    },
+    {
+     "drive_db": 9.0,
+     "amplitude_v": 0.20271469212719356,
+     "off": {
+      "peak_x_ceiling": 2.9725578648198705,
+      "papr_db": 12.387554069049497,
+      "talk_power_gain_db": -0.11413396567174416,
+      "opposite_dbc": -42.449956605342976,
+      "out_of_channel_dbc": -54.92602084161036,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "on": {
+      "peak_x_ceiling": 1.0297588479003994,
+      "papr_db": 6.9818611462024975,
+      "talk_power_gain_db": 5.240479380781639,
+      "opposite_dbc": -39.84250869027844,
+      "out_of_channel_dbc": -52.51689628824166,
+      "scope_clipped": false,
+      "clean": true
+     },
+     "model": {
+      "peak": 1.0136378655288587,
+      "papr_db": 6.366871519658988,
+      "wanted_papr_db": 6.788731685374943,
+      "opposite_dbc": -70.19209508684638,
+      "out_of_channel_dbc": -97.60733184609721,
+      "talk_power_gain_db": 5.149579173783156
+     }
+    }
+   ],
+   "model": {
+    "reference": {
+     "peak": 1.0015657319907736,
+     "papr_db": 11.557178850883535,
+     "wanted_papr_db": 11.938310859158099,
+     "opposite_dbc": -66.28496824911258,
+     "out_of_channel_dbc": -89.84256420438058
+    },
+    "0.0": {
+     "peak": 1.0023946296644997,
+     "papr_db": 11.697429823685697,
+     "wanted_papr_db": 11.925911318716425,
+     "opposite_dbc": -92.96841015233083,
+     "out_of_channel_dbc": -114.64124956296033,
+     "talk_power_gain_db": 0.012399540441673906
+    },
+    "3.0": {
+     "peak": 0.9782399580241935,
+     "papr_db": 9.074728424842741,
+     "wanted_papr_db": 9.373118901884071,
+     "opposite_dbc": -78.40916035262495,
+     "out_of_channel_dbc": -99.99529545060268,
+     "talk_power_gain_db": 2.5651919572740276
+    },
+    "6.0": {
+     "peak": 1.0135493717114967,
+     "papr_db": 7.482816164036588,
+     "wanted_papr_db": 7.855144297041587,
+     "opposite_dbc": -76.5405975873449,
+     "out_of_channel_dbc": -97.49248173408847,
+     "talk_power_gain_db": 4.083166562116512
+    },
+    "9.0": {
+     "peak": 1.0136378655288587,
+     "papr_db": 6.366871519658988,
+     "wanted_papr_db": 6.788731685374943,
+     "opposite_dbc": -70.19209508684638,
+     "out_of_channel_dbc": -97.60733184609721,
+     "talk_power_gain_db": 5.149579173783156
+    }
+   }
+  }
+ },
+ "key_down_s": 93.74796002311632,
+ "restored": true,
+ "checks": [
+  {
+   "id": "rig.sideband_flip",
+   "group": "rig",
+   "description": "Commanding the other sideband moves the transmitted tone across DC",
+   "value": null,
+   "limit": null,
+   "units": "",
+   "passed": true,
+   "skipped": false,
+   "message": "the tone changed sides between LSB and USB, so the wiring order is unambiguous"
+  },
+  {
+   "id": "rig.suppression",
+   "group": "rig",
+   "description": "Both exciter outputs are connected and in quadrature",
+   "value": 35.21958334510601,
+   "limit": 25.0,
+   "units": "db",
+   "passed": true,
+   "skipped": false,
+   "message": "35.2 dB of opposite-sideband suppression at 1000 Hz"
+  },
+  {
+   "id": "ceiling.found",
+   "group": "ceiling",
+   "description": "CESSB holds a 1 kHz tone at a ceiling",
+   "value": null,
+   "limit": null,
+   "units": "",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ceiling.hold_flat",
+   "group": "ceiling",
+   "description": "Held output is flat above the ceiling (spread)",
+   "value": 0.002511837974751411,
+   "limit": 1.0,
+   "units": "dB",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ceiling.transparent",
+   "group": "ceiling",
+   "description": "Below the ceiling CESSB on and off agree (worst)",
+   "value": 0.1679770471797398,
+   "limit": 0.3,
+   "units": "dB",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ceiling.tracks_power",
+   "group": "ceiling",
+   "description": "Ceiling moves with the power setting (error)",
+   "value": 0.0053691275834717445,
+   "limit": 0.5,
+   "units": "dB",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.two_tone@0dB",
+   "group": "hold",
+   "description": "two_tone@0dB: peak with CESSB on",
+   "value": 1.5555447601037997,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.two_tone@0dB",
+   "group": "spectrum",
+   "description": "two_tone@0dB: out-of-channel, CESSB on",
+   "value": -54.196007810391876,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "imd.two_tone@0dB",
+   "group": "spectrum",
+   "description": "two_tone@0dB: 2f1-f2 in the opposite sideband, CESSB on",
+   "value": -51.023240225470886,
+   "limit": -40.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.two_tone@3dB",
+   "group": "hold",
+   "description": "two_tone@3dB: peak with CESSB on",
+   "value": 0.12786786513481196,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.two_tone@3dB",
+   "group": "spectrum",
+   "description": "two_tone@3dB: out-of-channel, CESSB on",
+   "value": -54.85214055957612,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "imd.two_tone@3dB",
+   "group": "spectrum",
+   "description": "two_tone@3dB: 2f1-f2 in the opposite sideband, CESSB on",
+   "value": -50.93680388003328,
+   "limit": -40.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.two_tone@6dB",
+   "group": "hold",
+   "description": "two_tone@6dB: peak with CESSB on",
+   "value": -3.187851029712585,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.two_tone@6dB",
+   "group": "spectrum",
+   "description": "two_tone@6dB: out-of-channel, CESSB on",
+   "value": -55.00684330519939,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "imd.two_tone@6dB",
+   "group": "spectrum",
+   "description": "two_tone@6dB: 2f1-f2 in the opposite sideband, CESSB on",
+   "value": -49.63240859411995,
+   "limit": -40.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.two_tone@9dB",
+   "group": "hold",
+   "description": "two_tone@9dB: peak with CESSB on",
+   "value": -4.565037628347413,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.two_tone@9dB",
+   "group": "spectrum",
+   "description": "two_tone@9dB: out-of-channel, CESSB on",
+   "value": -55.319868730279666,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "imd.two_tone@9dB",
+   "group": "spectrum",
+   "description": "two_tone@9dB: 2f1-f2 in the opposite sideband, CESSB on",
+   "value": -49.60661470999531,
+   "limit": -40.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.vowel_ah@0dB",
+   "group": "hold",
+   "description": "vowel_ah@0dB: peak with CESSB on",
+   "value": 0.3023144384482146,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.vowel_ah@0dB",
+   "group": "spectrum",
+   "description": "vowel_ah@0dB: out-of-channel, CESSB on",
+   "value": -53.68193041015332,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.vowel_ah@0dB",
+   "group": "spectrum",
+   "description": "vowel_ah@0dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -38.09491638901351,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.vowel_ah@3dB",
+   "group": "hold",
+   "description": "vowel_ah@3dB: peak with CESSB on",
+   "value": 3.069606100984701,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.vowel_ah@3dB",
+   "group": "spectrum",
+   "description": "vowel_ah@3dB: out-of-channel, CESSB on",
+   "value": -55.84612923096749,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.vowel_ah@3dB",
+   "group": "spectrum",
+   "description": "vowel_ah@3dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -39.635999697767645,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.vowel_ah@6dB",
+   "group": "hold",
+   "description": "vowel_ah@6dB: peak with CESSB on",
+   "value": 2.32981253439557,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.vowel_ah@6dB",
+   "group": "spectrum",
+   "description": "vowel_ah@6dB: out-of-channel, CESSB on",
+   "value": -56.99978408248811,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.vowel_ah@6dB",
+   "group": "spectrum",
+   "description": "vowel_ah@6dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -41.051701847122345,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.vowel_ah@9dB",
+   "group": "hold",
+   "description": "vowel_ah@9dB: peak with CESSB on",
+   "value": 1.9813187238185703,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.vowel_ah@9dB",
+   "group": "spectrum",
+   "description": "vowel_ah@9dB: out-of-channel, CESSB on",
+   "value": -58.372844634786425,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.vowel_ah@9dB",
+   "group": "spectrum",
+   "description": "vowel_ah@9dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -41.743142805084084,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.syllable_ah@0dB",
+   "group": "hold",
+   "description": "syllable_ah@0dB: peak with CESSB on",
+   "value": 2.495266485723291,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.syllable_ah@0dB",
+   "group": "spectrum",
+   "description": "syllable_ah@0dB: out-of-channel, CESSB on",
+   "value": -46.903440872661776,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.syllable_ah@0dB",
+   "group": "spectrum",
+   "description": "syllable_ah@0dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -33.99867328359628,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.syllable_ah@3dB",
+   "group": "hold",
+   "description": "syllable_ah@3dB: peak with CESSB on",
+   "value": 3.040434348878973,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.syllable_ah@3dB",
+   "group": "spectrum",
+   "description": "syllable_ah@3dB: out-of-channel, CESSB on",
+   "value": -49.44459184997947,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.syllable_ah@3dB",
+   "group": "spectrum",
+   "description": "syllable_ah@3dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -36.686751991275194,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.syllable_ah@6dB",
+   "group": "hold",
+   "description": "syllable_ah@6dB: peak with CESSB on",
+   "value": 2.429653176863522,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.syllable_ah@6dB",
+   "group": "spectrum",
+   "description": "syllable_ah@6dB: out-of-channel, CESSB on",
+   "value": -51.31042348372418,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.syllable_ah@6dB",
+   "group": "spectrum",
+   "description": "syllable_ah@6dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -38.636721641644584,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "gain.syllable_ah@6dB",
+   "group": "talk power",
+   "description": "syllable_ah@6dB: talk-power gain at equal peak",
+   "value": 4.109429771905228,
+   "limit": 3.0,
+   "units": "dB",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "hold.syllable_ah@9dB",
+   "group": "hold",
+   "description": "syllable_ah@9dB: peak with CESSB on",
+   "value": 2.97588479003994,
+   "limit": 5.0,
+   "units": "% over",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "ooc.syllable_ah@9dB",
+   "group": "spectrum",
+   "description": "syllable_ah@9dB: out-of-channel, CESSB on",
+   "value": -52.51689628824166,
+   "limit": -45.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  },
+  {
+   "id": "opp.syllable_ah@9dB",
+   "group": "spectrum",
+   "description": "syllable_ah@9dB: opposite sideband, CESSB on (gross-failure guard)",
+   "value": -39.84250869027844,
+   "limit": -25.0,
+   "units": "dBc",
+   "passed": true,
+   "skipped": false,
+   "message": ""
+  }
+ ],
+ "overall": "PASS",
+ "duration_s": 98.70898138987832
+}

@@ -73,6 +73,14 @@ char *NT_read(  char* cmd );
 char *PC_write( char* cmd );
 char *PC_read(  char* cmd );
 char *PD_read(  char* cmd );
+char *PR_write( char* cmd );
+char *PR_read(  char* cmd );
+char *PL_write( char* cmd );
+char *TT_write( char* cmd );
+char *TT_read(  char* cmd );
+char *PL_read(  char* cmd );
+char *RM_write( char* cmd );
+char *RM_read(  char* cmd );
 char *PS_write( char* cmd );
 char *PS_read(  char* cmd );
 char *RX_write( char* cmd );
@@ -80,20 +88,33 @@ char *TX_write( char* cmd );
 char *VX_write( char* cmd );
 char *VX_read( char* cmd );
 char *ED_read(  char* cmd );
-char *PR_read( char* cmd);
-char *SR_write( char* cmd );
-char *SR_read(  char* cmd );
+char *HR_read( char* cmd);
+char *XS_write( char* cmd );
+char *XS_read(  char* cmd );
 char *DG_write( char* cmd );
 char *DG_read(  char* cmd );
 char *DR_write( char* cmd );
 char *DR_read(  char* cmd );
 char *DS_read(  char* cmd );
+char *DD_write( char* cmd );
+char *DD_read(  char* cmd );
+char *BR_write( char* cmd );
+char *BR_read(  char* cmd );
+char *XA_write( char* cmd );
+char *XA_read(  char* cmd );
 char *CF_write( char* cmd );
 char *CF_read(  char* cmd );
 char *EQ_write( char* cmd );
 char *EQ_read(  char* cmd );
 char *FL_write( char* cmd );
 char *FL_read(  char* cmd );
+char *AC_write( char* cmd );
+char *AC_read(  char* cmd );
+char *AT_write( char* cmd );
+char *AT_read(  char* cmd );
+char *AX_write( char* cmd );
+char *AX_read(  char* cmd );
+char *AY_write( char* cmd );
 
 typedef struct  {
     char name[3];   //two chars plus zero terminator
@@ -114,9 +135,10 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 32
+#define NUM_SUPPORTED_COMMANDS 43
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
+        { "AC", 3+3,3, AC_write, AC_read },  // antenna tuner: TX-AT in/thru, start/stop tuning
         { "AG", 3+4,4, AG_write, AG_read },  //audio gain
         { "AI", 3+1,3, AI_write, AI_read },  //auto information
         { "BD", 3,  0, BD_write, unsupported_cmd }, //band down, no read, only set
@@ -136,6 +158,9 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "NT", 4,  3, NT_write, NT_read }, // Auto Notch 0=off, 1=ON -- NOT a Kenwood keyword
         { "PC", 3+3,3, PC_write, PC_read }, // output power
         { "PD", 0,  3, unsupported_cmd, PD_read }, // read the PSD -- NOT a Kenwood keyword
+        { "PR", 3+1,3, PR_write, PR_read }, // speech processor (CESSB) 0=off 1=on
+        { "PL", 3+6,3, PL_write, PL_read }, // speech processor input/output level 000-100 each
+        { "RM", 3+1,3, RM_write, RM_read }, // meter: select 1/2/3, read; only 2 (COMP) is implemented
         { "PS", 3+1,3, PS_write, PS_read },  // Rig power on/off
         // RX; unkeys; RX0;/RX1; (main/sub receiver) are accepted too and behave
         // identically - Phoenix has one receiver. Both forms are writes.
@@ -149,14 +174,21 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "TX", 3+1,3, TX_write, TX_write }, // set transceiver to transmit.
         { "VX", 3+1, 3, VX_write, VX_read }, // VOX write/read
         { "ED", 0,  3, unsupported_cmd, ED_read }, // print out the state of the EEPROM data -- NOT a Kenwood keyword
-        { "PR", 0,  3, unsupported_cmd, PR_read }, // print out the state of the hardware register -- NOT a Kenwood keyword
-        { "SR", 3+1,3, SR_write, SR_read }, // sample rate 0=176.4k 1=192k -- NOT a Kenwood keyword
+        { "HR", 0,  3, unsupported_cmd, HR_read }, // print out the state of the hardware register -- NOT a Kenwood keyword
+        { "XS", 3+1,3, XS_write, XS_read }, // sample rate 0=176.4k 1=192k -- NOT a Kenwood keyword
         { "CF", 3+1,3, CF_write, CF_read }, // receive CW audio filter index -- NOT a Kenwood keyword
         { "EQ", 3+5,3+2, EQ_write, EQ_read }, // receive equalizer cell -- NOT a Kenwood keyword
         { "FL", 3+4,3, FL_write, FL_read }, // DSP filter low cut -- NOT a Kenwood keyword
         { "DG", 3+1,3, DG_write, DG_read }, // digital (USB audio) mode 0=off 1=on -- NOT a Kenwood keyword
         { "DR", 3+3,3, DR_write, DR_read }, // digital receive level 000-100 -- NOT a Kenwood keyword
-        { "DS", 0,  3, unsupported_cmd, DS_read } // digital TX path stats, read-only -- NOT a Kenwood keyword
+        { "DS", 0,  3, unsupported_cmd, DS_read }, // digital TX path stats, read-only -- NOT a Kenwood keyword
+        { "DD", 3+3,3, DD_write, DD_read }, // digital transmit drive level 000-100 -- NOT a Kenwood keyword
+        { "BR", 3+1,3, BR_write, BR_read }, // raw SWR bridge readings: clear, sample, statistics -- NOT a Kenwood keyword
+        { "XA", 3+3,3, XA_write, XA_read },  // CW transmit attenuation override -- NOT a Kenwood keyword
+        { "AT", 3+9,3, AT_write, AT_read },  // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
+        { "AX", 3+1,3, AX_write, AX_read },  // ATU tuner diagnostics (needs ATU_PRESENT) -- NOT a Kenwood keyword
+        { "AY", 3+2,0, AY_write, unsupported_cmd },  // ATU program readings, a page at a time -- NOT a Kenwood keyword
+        { "TT", 3+1,3, TT_write, TT_read }   // SSB TX test tone 0=mic 1=single 2=two-tone -- NOT a Kenwood keyword
     };
 
 /**
@@ -294,7 +326,9 @@ char *FA_write( char* cmd ){
  * @return Response string with current VFO A frequency
  */
 char *FA_read(  char* cmd  ){
-    sprintf( obuf, "FA%011lld;", GetTXRXFreq(VFO_A) );
+    // Not %lld: the Teensy's printf has no long long support and prints "ld",
+    // shifting every later argument. long is 32 bits there, ample for Hz.
+    sprintf( obuf, "FA%011ld;", (long)GetTXRXFreq(VFO_A) );
     return obuf;
 }
 
@@ -316,7 +350,7 @@ char *FB_write( char* cmd  ){
  * @return Response string with current VFO B frequency
  */
 char *FB_read(  char* cmd  ){
-    sprintf( obuf, "FB%011lld;", GetTXRXFreq(VFO_B) );
+    sprintf( obuf, "FB%011ld;", (long)GetTXRXFreq(VFO_B) );
     return obuf;
 }
 
@@ -479,8 +513,8 @@ char *IF_read(  char* cmd ){
     sprintf( obuf,
             //  P1     P2   P3   P4P5P6P7  P8P9P10 P12 P14 P15
             //                                   P11 P13
-             "IF%011lld     %+05d%d%d%d%02d%d%d%d%d%d%d%02d ;",
-             GetTXRXFreq(ED.activeVFO),  // P1: frequency
+             "IF%011ld     %+05d%d%d%d%02d%d%d%d%d%d%d%02d ;",
+             (long)GetTXRXFreq(ED.activeVFO),  // P1: frequency
              // P2 is 5 spaces
              0, // P3: rit/xit frequency
              0, // P4: rit enabled
@@ -690,14 +724,165 @@ char *NT_read(  char* cmd ){
 }
 
 /**
+ * CAT command PR - speech processor on/off (ts_480_pc.pdf: PR P1; 0=off, 1=on)
+ *
+ * Phoenix's speech processor is Controlled Envelope SSB (DSP_CESSB.h), so this
+ * is the Audio Options "Enable/Disable CESSB" setting. It takes effect on the
+ * next transmit block, so it can be changed while transmitting.
+ *
+ * @param cmd CAT command string, PR0; or PR1;
+ * @return Empty string on success, "?;" for any other parameter
+ */
+char *PR_write( char* cmd ){
+    if ( cmd[2] != '0' && cmd[2] != '1' ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.cessbEnabled = ( cmd[2] == '1' );
+    return empty_string_p;
+}
+
+/**
+ * CAT command PR - read the speech processor (CESSB) state
+ * @param cmd CAT command string
+ * @return "PR0;" (off) or "PR1;" (on)
+ */
+char *PR_read( char* cmd ){
+    sprintf( obuf, "PR%d;", ED.cessbEnabled ? 1 : 0 );
+    return obuf;
+}
+
+/**
+ * CAT command TT - select the SSB transmit audio source (NOT a Kenwood keyword)
+ *
+ * TT0; microphone, TT1; single 1 kHz test tone, TT2; 700 + 1900 Hz two-tone for
+ * intermodulation tests. The same setting as the Microphone menu's "TX src"
+ * item. It takes effect at once, also while transmitting, and is not saved:
+ * the radio always starts on the microphone.
+ *
+ * @param cmd CAT command string, TT0; TT1; or TT2;
+ * @return Empty string on success, "?;" for any other parameter
+ */
+char *TT_write( char* cmd ){
+    if ( cmd[2] < '0' || cmd[2] > '9' || !SetTXAudioSource( cmd[2] - '0' ) ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    return empty_string_p;
+}
+
+/**
+ * CAT command TT - read the SSB transmit audio source
+ * @param cmd CAT command string
+ * @return "TT0;" (microphone), "TT1;" (single tone) or "TT2;" (two-tone)
+ */
+char *TT_read( char* cmd ){
+    sprintf( obuf, "TT%d;", (int)GetTXAudioSource() );
+    return obuf;
+}
+
+// PL's output level. Accepted and echoed so a client reads back what it set, but
+// not acted on: output power belongs to PC.
+static int plOutputLevel = 50;
+
+/**
+ * CAT command PL - speech processor input and output levels
+ * (ts_480_pc.pdf: PL P1P1P1 P2P2P2; each 000-100)
+ *
+ * The input level is the CESSB processor level, ED.cessbDrive_dB, at 10 per dB:
+ * PL060xxx; is 6 dB of drive into the clipper. Values round to the nearest dB.
+ * The output level is stored and read back but changes nothing.
+ *
+ * @param cmd CAT command string, PLnnnmmm;
+ * @return Empty string on success, "?;" if either level is outside 000-100
+ */
+char *PL_write( char* cmd ){
+    for (int i = 2; i < 8; i++){
+        if (cmd[i] < '0' || cmd[i] > '9'){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    const int in  = (cmd[2]-'0')*100 + (cmd[3]-'0')*10 + (cmd[4]-'0');
+    const int out = (cmd[5]-'0')*100 + (cmd[6]-'0')*10 + (cmd[7]-'0');
+    if ( in > 100 || out > 100 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.cessbDrive_dB = ( in * CESSB_DRIVE_MAX_DB + 50 ) / 100;
+    plOutputLevel = out;
+    return empty_string_p;
+}
+
+/**
+ * CAT command PL - read the speech processor levels
+ * @param cmd CAT command string
+ * @return "PLnnnmmm;": nnn is the processor level (10 per dB), mmm the stored output level
+ */
+char *PL_read( char* cmd ){
+    sprintf( obuf, "PL%03ld%03d;", (long)( ED.cessbDrive_dB * 100 / CESSB_DRIVE_MAX_DB ), plOutputLevel );
+    return obuf;
+}
+
+// The meter RM reads. Phoenix implements only COMP (2); SWR (1) and ALC (3) can
+// be selected but read back as errors, rather than as a reading that is not one.
+static int rmSelected = 2;
+
+/**
+ * CAT command RM - select the meter (ts_480_pc.pdf: RM P1; 1=SWR, 2=COMP, 3=ALC)
+ * @param cmd CAT command string, RM1; to RM3;
+ * @return Empty string on success, "?;" otherwise
+ */
+char *RM_write( char* cmd ){
+    if ( cmd[2] < '1' || cmd[2] > '3' ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    rmSelected = cmd[2] - '0';
+    return empty_string_p;
+}
+
+/**
+ * CAT command RM - read the selected meter
+ *
+ * COMP is the CESSB compression meter, GetCESSBCompression_dB(), in the TS-480's
+ * 0-10 dots at 2 dB per dot (0-20 dB). It reads 0 whenever CESSB is not running.
+ *
+ * @param cmd CAT command string
+ * @return "RM2nnnn;" for COMP; "?;" for the meters Phoenix does not have
+ */
+char *RM_read( char* cmd ){
+    if ( rmSelected != 2 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    int dots = (int)( GetCESSBCompression_dB() / 2.0f + 0.5f );
+    if ( dots > 10 ) dots = 10;
+    if ( dots < 0 ) dots = 0;
+    sprintf( obuf, "RM2%04d;", dots );
+    return obuf;
+}
+
+/**
+ * True in the modes whose transmit power is ED.powerOutSSB. Digital mode
+ * transmits through the SSB chain, and TXGain() sets its level from the SSB
+ * power, so PC has to read and write that one there too.
+ */
+static bool UsesSSBPower(void){
+    return ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) ||
+           ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ||
+           ( modeSM.state_id == ModeSm_StateId_DIGITAL_RECEIVE ) ||
+           ( modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT );
+}
+
+/**
  * CAT command PC - Set output power level
- * @param cmd CAT command string with power value (mode-specific: SSB or CW)
+ * @param cmd CAT command string with power value (mode-specific: SSB and digital, or CW)
  * @return Response string with set power value
  */
 char *PC_write( char* cmd ){
-    int requested_power = atoi( &cmd[ 3 ]);
-    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) |
-        ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
+    int requested_power = atoi( &cmd[ 2 ]);   // all three digits: PC100; is 100 W
+    if( UsesSSBPower() ){
         ED.powerOutSSB[ED.currentBand[ED.activeVFO]] = requested_power;
     } else {
         ED.powerOutCW[ED.currentBand[ED.activeVFO]] = requested_power;
@@ -710,12 +895,11 @@ char *PC_write( char* cmd ){
 /**
  * CAT command PC - Read output power level
  * @param cmd CAT command string
- * @return Response string with current power value (mode-specific: SSB or CW)
+ * @return Response string with current power value (mode-specific: SSB and digital, or CW)
  */
 char *PC_read(  char* cmd ){
     unsigned int o_param;
-    if( ( modeSM.state_id == ModeSm_StateId_SSB_RECEIVE ) |
-        ( modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT ) ){
+    if( UsesSSBPower() ){
         o_param = round( ED.powerOutSSB[ED.currentBand[ED.activeVFO]] );
     } else {
         o_param = round( ED.powerOutCW[ED.currentBand[ED.activeVFO]] );
@@ -739,15 +923,24 @@ char *PD_read(  char* cmd ){
 }
 
 /**
- * CAT command PS - Turn radio power off
+ * CAT command PS - Set power status
+ *
+ * `PS0;` turns the radio off. `PS1;` (power on) does nothing: if we can read
+ * it, the radio is already on. Hamlib sends `PS1;` to power a rig on, so it
+ * must never shut down. Kenwood set commands get no answer.
+ *
  * @param cmd CAT command string
- * @return Response "PS0;" (requests shutdown from ATtiny)
+ * @return Empty string for PS0/PS1, "?;" for any other parameter
  */
 char *PS_write( char* cmd ){
-    // Ask the AtTiny to do it
-    ShutdownTeensy();
-    sprintf( obuf, "PS0;");
-    return obuf;    //Nope.  Not doing that.
+    if( cmd[2] == '0' ){
+        // Ask the AtTiny to do it
+        ShutdownTeensy();
+        return empty_string_p;
+    }
+    if( cmd[2] == '1' ) return empty_string_p;
+    sprintf( obuf, "?;");
+    return obuf;
 }
 
 /**
@@ -766,6 +959,12 @@ char *PS_read(  char* cmd ){
  * @return Response "RX0;" after releasing PTT or key depending on current mode
  */
 char *RX_write( char* cmd ){
+#ifdef ATU_PRESENT
+    if (ATUTuneActive()){
+        ATUTuneAbort();
+        return empty_string_p;
+    }
+#endif
     switch (modeSM.state_id){
         case (ModeSm_StateId_DIGITAL_TRANSMIT):
         case (ModeSm_StateId_SSB_TRANSMIT):{
@@ -788,6 +987,13 @@ char *RX_write( char* cmd ){
  * @return Response "TX0;" after pressing PTT or key depending on current mode
  */
 char *TX_write( char* cmd ){
+#ifdef ATU_PRESENT
+    // Keying stops a running ATU program (and does not key)
+    if (ATUTuneActive()){
+        ATUTuneAbort();
+        return empty_string_p;
+    }
+#endif
     switch (modeSM.state_id){
         case (ModeSm_StateId_DIGITAL_RECEIVE):
         case (ModeSm_StateId_SSB_RECEIVE):{
@@ -828,34 +1034,34 @@ char *ED_read(  char* cmd  ){
 }
 
 /**
- * CAT command PR - Pretty print the contents of the hardware register (non-standard Kenwood command)
+ * CAT command HR - Pretty print the contents of the hardware register (non-standard Kenwood command)
  * @param cmd CAT command string
- * @return Response "PR;" after printing hardware register to Serial for debugging
+ * @return Response "HR;" after printing hardware register to Serial for debugging
  */
-char *PR_read(  char* cmd  ){
+char *HR_read(  char* cmd  ){
     buffer_pretty_print_last_entry();
-    sprintf( obuf, "PR;");
+    sprintf( obuf, "HR;");
     return obuf;
 }
 
-/** Sample rates reachable over CAT, in the order the SR parameter selects them.
+/** Sample rates reachable over CAT, in the order the XS parameter selects them.
  *  These are the two rates the front panel menu offers. */
-static const uint8_t SR_CAT_RATES[2] = { SAMPLE_RATE_176K, SAMPLE_RATE_192K };
-#define SR_CAT_RATE_COUNT 2
+static const uint8_t XS_CAT_RATES[2] = { SAMPLE_RATE_176K, SAMPLE_RATE_192K };
+#define XS_CAT_RATE_COUNT 2
 
 /**
- * CAT command SR - set the sample rate (non-standard Kenwood command)
+ * CAT command XS - set the sample rate (non-standard Kenwood command)
  *
- * `SR0;` selects 176.4 ksps, `SR1;` selects 192 ksps. Rejected while transmitting,
+ * `XS0;` selects 176.4 ksps, `XS1;` selects 192 ksps. Rejected while transmitting,
  * because ChangeSampleRate() reconfigures the I2S clock and rebuilds the whole
  * DSP chain.
  *
  * @param cmd CAT command string
  * @return Empty string on success, "?;" if the rate is out of range or the radio is not receiving
  */
-char *SR_write( char* cmd ){
+char *XS_write( char* cmd ){
     int p1 = cmd[2] - '0';
-    if( p1 < 0 || p1 >= SR_CAT_RATE_COUNT ){
+    if( p1 < 0 || p1 >= XS_CAT_RATE_COUNT ){
         sprintf( obuf, "?;");
         return obuf;
     }
@@ -866,19 +1072,19 @@ char *SR_write( char* cmd ){
         sprintf( obuf, "?;");
         return obuf;
     }
-    ChangeSampleRate( SR_CAT_RATES[ p1 ] );
+    ChangeSampleRate( XS_CAT_RATES[ p1 ] );
     return empty_string_p;
 }
 
 /**
- * CAT command SR - read the sample rate (non-standard Kenwood command)
+ * CAT command XS - read the sample rate (non-standard Kenwood command)
  * @param cmd CAT command string
- * @return Response "SRn;" where n indexes SR_CAT_RATES, or "?;" if the radio is at some other rate
+ * @return Response "XSn;" where n indexes XS_CAT_RATES, or "?;" if the radio is at some other rate
  */
-char *SR_read( char* cmd ){
-    for( int i = 0; i < SR_CAT_RATE_COUNT; i++ ){
-        if( SampleRate == SR_CAT_RATES[ i ] ){
-            sprintf( obuf, "SR%d;", i);
+char *XS_read( char* cmd ){
+    for( int i = 0; i < XS_CAT_RATE_COUNT; i++ ){
+        if( SampleRate == XS_CAT_RATES[ i ] ){
+            sprintf( obuf, "XS%d;", i);
             return obuf;
         }
     }
@@ -997,6 +1203,375 @@ char *DS_read( char* cmd ){
     USBAudioGetTxStats(&calls, &under, &trim, &dmin, &dmax);
     sprintf( obuf, "DS%lu,%lu,%lu,%u,%u;", (unsigned long)calls, (unsigned long)under,
              (unsigned long)trim, (unsigned)dmin, (unsigned)dmax);
+    return obuf;
+}
+
+/**
+ * CAT command DD - set the digital-mode transmit drive level (non-standard Kenwood command)
+ *
+ * `DD000;` to `DD100;` scale the USB transmit audio before the transmit chain,
+ * like microphone gain does for SSB. This is the "USB drive" menu setting.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the level is out of range
+ */
+char *DD_write( char* cmd ){
+    int32_t level = atoi( &cmd[2] );
+    if( level < 0 || level > 100 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    ED.digitalDriveLevel = level;
+    return empty_string_p;
+}
+
+/**
+ * CAT command DD - read the digital-mode transmit drive level (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "DDnnn;" with the level from 000 to 100
+ */
+char *DD_read( char* cmd ){
+    sprintf( obuf, "DD%03ld;", (long)ED.digitalDriveLevel);
+    return obuf;
+}
+
+/**
+ * CAT command BR - raw SWR bridge readings (non-standard Kenwood command)
+ *
+ * The radio reads both bridge detectors about every 10 ms while transmitting.
+ * Each raw reading, before the display's 0.1/0.9 running average, is also added
+ * to a set of statistics, so a mean over a steady carrier carries none of the
+ * average's lag.
+ *
+ * `BR0;` discards the readings collected so far. `BR1;` reads both detectors
+ * once, now, and adds the result; use it for readings while receiving, when the
+ * radio does not read the bridge by itself.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the parameter is not 0 or 1
+ */
+char *BR_write( char* cmd ){
+    // The automatic power calibration and the ATU tuner use the same statistics
+    bool bridgeBusy = PowerCalAutoActive();
+#ifdef ATU_PRESENT
+    bridgeBusy = bridgeBusy || ATUTuneActive();
+#endif
+    if (bridgeBusy){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    switch( cmd[2] ){
+        case '0':
+            ClearSWRBridgeStats();
+            return empty_string_p;
+        case '1':
+            SampleSWRBridge();
+            return empty_string_p;
+        default:
+            sprintf( obuf, "?;");
+            return obuf;
+    }
+}
+
+/**
+ * CAT command BR - read the raw SWR bridge statistics (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "BR<n>,<fwd mean>,<fwd sd>,<ref mean>,<ref sd>;": the number of
+ *         readings since the last BR0, then the mean and standard deviation of each
+ *         detector in mV, to 0.1 mV. The means are 0.0 when n is 0.
+ */
+char *BR_read( char* cmd ){
+    SWRBridgeStats st;
+    GetSWRBridgeStats(&st);
+    sprintf( obuf, "BR%lu,%.1f,%.1f,%.1f,%.1f;", (unsigned long)st.n,
+             st.fwdMean_mV, st.fwdSD_mV, st.refMean_mV, st.refSD_mV);
+    return obuf;
+}
+
+/**
+ * CAT command XA - force the CW transmit attenuation (non-standard Kenwood command)
+ *
+ * `XAnnn;` sets the attenuation to nnn tenths of a dB, 000 to 315, in place of
+ * the value the CW power setting would give. The attenuator works in 0.5 dB
+ * steps. It takes effect at the next key-down, and the PA selection still
+ * follows the CW power setting. `XA999;` returns to the power setting. The
+ * override is not saved.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success, "?;" if the value is out of range
+ */
+char *XA_write( char* cmd ){
+    for( int i = 2; i < 5; i++ ){
+        if( cmd[i] < '0' || cmd[i] > '9' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    int32_t tenths = atoi( &cmd[2] );
+    if( tenths == 999 ){
+        SetCWAttenuationOverride( -1 );
+        return empty_string_p;
+    }
+    if( tenths > 315 ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    SetCWAttenuationOverride( tenths / 10.0f );
+    return empty_string_p;
+}
+
+/**
+ * CAT command XA - read the transmit attenuation (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "XAnnn,o;": nnn is the transmit attenuator's present setting in
+ *         tenths of a dB and o is 1 if an override is set. While receiving the
+ *         attenuator sits at 31.5 dB, so read it while keyed to see what the
+ *         transmitter is using.
+ */
+char *XA_read( char* cmd ){
+    sprintf( obuf, "XA%03ld,%d;", (long)lroundf( GetTXAttenuation() * 10.0f ),
+             GetCWAttenuationOverride() >= 0 ? 1 : 0 );
+    return obuf;
+}
+
+/**
+ * CAT command AC - set the antenna tuner (Kenwood TS-480 "AC P1 P2 P3;")
+ *
+ *   P1 RX-AT: ignored (Phoenix's tuner is in line for receive and transmit alike)
+ *   P2 TX-AT: 0 = thru (bypass the ATU on this antenna), 1 = in (enable it: the
+ *      stored setting for this band goes on the relays). Saved per antenna, as the
+ *      menu's Bypass / Enable ATU.
+ *   P3 tuning: 1 = start a retune (as front-panel button 16; enables the ATU on this
+ *      antenna), 0 = stop one
+ *
+ * With P3 = 1, P2 is not acted on. With P3 = 0 a running tune is stopped first, then
+ * P2 applies. Without ATU_PRESENT it is accepted and does nothing, as on a radio with
+ * no tuner.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success; "?;" for a malformed command, a tune that was
+ *         refused, or a change that is not allowed now (transmitting)
+ */
+char *AC_write( char* cmd ){
+    for( int i = 2; i < 5; i++ ){
+        if( cmd[i] != '0' && cmd[i] != '1' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+#ifdef ATU_PRESENT
+    if( cmd[4] == '1' ){
+        if( ATURetune() == ATU_OK ) return empty_string_p;
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    if( ATUTuneActive() ) ATUTuneAbort();
+    bool on = (cmd[3] == '1');
+    int32_t antenna = ATUCurrentAntenna();
+    if( (ATUAntennaEnabled( antenna ) != on) && !ATUSetEnabled( antenna, on ) ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+#endif
+    return empty_string_p;
+}
+
+/**
+ * CAT command AC - read the antenna tuner (Kenwood TS-480)
+ * @param cmd CAT command string
+ * @return "AC0<P2><P3>;": P2 1 if the ATU is enabled on this antenna, P3 1 while a
+ *         tuner program runs. "AC000;" without ATU_PRESENT.
+ */
+char *AC_read( char* cmd ){
+#ifdef ATU_PRESENT
+    sprintf( obuf, "AC0%d%d;", ATUAntennaEnabled( ATUCurrentAntenna() ) ? 1 : 0, ATUTuneActive() ? 1 : 0 );
+#else
+    sprintf( obuf, "AC000;");
+#endif
+    return obuf;
+}
+
+/**
+ * CAT command AT - set every ATU relay at once (non-standard Kenwood command)
+ *
+ * Format "ATnbsLLLCCC;":
+ *   n   1 = L/C network in line (K19+K20), 0 = bypassed
+ *   b   1 = balun (balanced) output (K18), 0 = coax output
+ *   s   1 = capacitor bank at the input side, C-L (K17), 0 = output side, L-C
+ *   LLL inductor mask 000-255, bit k = L(k+1) in series (K1-K8)
+ *   CCC capacitor mask 000-255, bit k = C(k+1) connected (K9-K16)
+ * "AT000000000;" returns the tuner to its safe state. The expanders are written
+ * once, after the whole state is set. Kenwood's own tuner command, AC, drives
+ * the automatic tuner.
+ *
+ * @param cmd CAT command string
+ * @return Empty string on success; "?;" for a malformed command, a mask above
+ *         255, while transmitting (relays must not switch with RF present), or
+ *         when the firmware is built without ATU_PRESENT
+ */
+char *AT_write( char* cmd ){
+#ifdef ATU_PRESENT
+    for( int i = 2; i < 11; i++ ){
+        if( cmd[i] < '0' || cmd[i] > '9' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    for( int i = 2; i < 5; i++ ){
+        if( cmd[i] > '1' ){
+            sprintf( obuf, "?;");
+            return obuf;
+        }
+    }
+    int32_t lMask = (cmd[5]-'0')*100 + (cmd[6]-'0')*10 + (cmd[7]-'0');
+    int32_t cMask = (cmd[8]-'0')*100 + (cmd[9]-'0')*10 + (cmd[10]-'0');
+    if( (lMask > 255) || (cMask > 255) || !ATUChangeAllowed() ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    SetATUState( cmd[2] == '1', cmd[3] == '1', cmd[4] == '1', (uint8_t)lMask, (uint8_t)cMask );
+    return empty_string_p;
+#else
+    sprintf( obuf, "?;");
+    return obuf;
+#endif
+}
+
+/**
+ * CAT command AT - read the ATU relay state (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return Response "ATnbsLLLCCC,RRRRR,HHHHHH,p;": nbsLLLCCC as for AT_write;
+ *         RRRRR is the ATU part of the hardware register in hex (bit 0 = L1 ...
+ *         bit 18 = network in line); HHHHHH is the I/O expander outputs read back
+ *         over I2C in hex (bits 0-7 L, 8-15 C, 16-23 mode relays); p is 1 if both
+ *         expanders answered at startup. With both present, the low 19 bits of
+ *         HHHHHH equal RRRRR. "?;" when built without ATU_PRESENT.
+ */
+char *AT_read( char* cmd ){
+#ifdef ATU_PRESENT
+    bool present = bit_results.ATU_MCP23017_present && bit_results.ATU_MCP23008_present;
+    // Never touch an expander that did not answer at startup
+    uint32_t readback = present ? GetATUMCPRegisters() : 0;
+    sprintf( obuf, "AT%d%d%d%03u%03u,%05lX,%06lX,%d;",
+             ATUNetworkEngaged() ? 1 : 0,
+             ATUBalancedOutput() ? 1 : 0,
+             ATUCapsAtInput() ? 1 : 0,
+             (unsigned)GetATUInductors(),
+             (unsigned)GetATUCapacitors(),
+             (unsigned long)GetATURegisterState(),
+             (unsigned long)readback,
+             present ? 1 : 0 );
+    return obuf;
+#else
+    sprintf( obuf, "?;");
+    return obuf;
+#endif
+}
+
+/**
+ * CAT command AX - ATU tuner control and diagnostics (non-standard Kenwood command)
+ *
+ *   AX0;  stop a running tuner program
+ *   AX2;  run the READ diagnostic: |Gamma| with the network bypassed, then with the
+ *         present setting, three readings each, at the tune power. Result with AX;
+ *   AX3;  tune (ATU_PROG_TUNE). Result with AX;
+ *   AX5;  forget the stored ATU setting for the current band and antenna
+ *
+ * AX2 and AX3 reply nothing if the program started, "AX<code>;" with an
+ * ATUResultCode if it was refused. Everything else, or a build without
+ * ATU_PRESENT, replies "?;".
+ *
+ * @param cmd CAT command string
+ */
+char *AX_write( char* cmd ){
+#ifdef ATU_PRESENT
+    switch( cmd[2] ){
+        case '0':
+            ATUTuneAbort();
+            return empty_string_p;
+        case '5':
+            if( ATUTuneActive() ) break;
+            ATUMemoryForget( ATUCurrentBand(), ATUCurrentAntenna() );
+            return empty_string_p;
+        case '2':
+        case '3':{
+            ATUResultCode rc = (cmd[2] == '2') ? ATUTuneStart( ATU_PROG_READ ) : ATURetune();
+            if( rc == ATU_OK ) return empty_string_p;
+            sprintf( obuf, "AX%d;", (int)rc );
+            return obuf;
+        }
+        default:
+            break;
+    }
+#endif
+    sprintf( obuf, "?;");
+    return obuf;
+}
+
+/**
+ * CAT command AX - read the running or last ATU program's record (non-standard Kenwood command)
+ * @param cmd CAT command string
+ * @return "AX<prog>,<code>,<active>,<n>,<ms>,<final nbsLLLCCC>,<final g>,<predicted g>,
+ *          <R>,<X>,<fwd W x 10>[,<g1>,<g2>...];"
+ *         with |Gamma| values x 1000 (-1 if none) and the first 24 readings' |Gamma|
+ *         (AY has them all, with their settings). The search tuner predicts nothing
+ *         and estimates no load, so <predicted g> is always -1000 and <R>,<X> are 0;
+ *         the fields stay so that the reply keeps its format. "?;" without ATU_PRESENT.
+ */
+char *AX_read( char* cmd ){
+#ifdef ATU_PRESENT
+    const ATUTuneRecord *r = ATUTuneLastRecord();
+    uint32_t f = r->finalSetting;
+    int len = sprintf( obuf, "AX%d,%d,%d,%d,%lu,%d%d%d%03d%03d,%d,%d,%ld,%ld,%d",
+                       (int)r->program, (int)r->code, r->active ? 1 : 0, (int)r->n,
+                       (unsigned long)r->elapsed_ms,
+                       (int)ATU_PACKED_NET(f), (int)ATU_PACKED_BAL(f), (int)ATU_PACKED_CAPSIN(f),
+                       (int)ATU_PACKED_L(f), (int)ATU_PACKED_C(f),
+                       (int)lroundf( r->finalGamma * 1000.0f ),
+                       (int)lroundf( r->predictedGamma * 1000.0f ),
+                       (long)lroundf( r->zRe ), (long)lroundf( r->zIm ),
+                       (int)lroundf( r->fwd_W * 10.0f ) );
+    for( int i = 0; (i < r->n) && (i < 24); i++ ){
+        len += sprintf( obuf + len, ",%d", (int)lroundf( r->gamma[i] * 1000.0f ) );
+    }
+    sprintf( obuf + len, ";" );
+    return obuf;
+#else
+    sprintf( obuf, "?;");
+    return obuf;
+#endif
+}
+
+/**
+ * CAT command AY - the readings of the running or last ATU program, a page at a time
+ * (non-standard Kenwood command)
+ *
+ *   AYpp;  page pp (two digits) of the record, 12 readings a page:
+ *          "AYpp,<n>,<nbsLLLCCC>:<g x 1000>,...;" where n is the number of readings,
+ *          each setting is as for AT and g is its |Gamma|. A page past the end
+ *          replies "AYpp,<n>;". AX; has the rest of the record.
+ *
+ * @param cmd CAT command string
+ * @return the page, or "?;" for a malformed page or a build without ATU_PRESENT
+ */
+char *AY_write( char* cmd ){
+#ifdef ATU_PRESENT
+    if( cmd[2] >= '0' && cmd[2] <= '9' && cmd[3] >= '0' && cmd[3] <= '9' ){
+        int page = 10 * ( cmd[2] - '0' ) + ( cmd[3] - '0' );
+        const ATUTuneRecord *r = ATUTuneLastRecord();
+        int len = sprintf( obuf, "AY%02d,%d", page, (int)r->n );
+        for( int i = page * 12; ( i < r->n ) && ( i < page * 12 + 12 ); i++ ){
+            uint32_t q = r->setting[i];
+            len += sprintf( obuf + len, ",%d%d%d%03d%03d:%d",
+                            (int)ATU_PACKED_NET(q), (int)ATU_PACKED_BAL(q), (int)ATU_PACKED_CAPSIN(q),
+                            (int)ATU_PACKED_L(q), (int)ATU_PACKED_C(q),
+                            (int)lroundf( r->gamma[i] * 1000.0f ) );
+        }
+        sprintf( obuf + len, ";" );
+        return obuf;
+    }
+#endif
+    sprintf( obuf, "?;");
     return obuf;
 }
 

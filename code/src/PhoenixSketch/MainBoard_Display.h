@@ -273,6 +273,12 @@ void DecrementValue(void);
  * @note Ensures menu displays current band-specific settings
  */
 void UpdateArrayVariables(void);
+void CESSBMenuRefreshLabel(void);
+void TXSourceMenuRefreshLabel(void);
+void CycleTXAudioSource(void);
+void CompressionBarWidths(float32_t comp_dB, int16_t *green, int16_t *yellow, int16_t *red);
+void CESSBSettingText(char *text, size_t size);
+void ToggleCESSB(void);
 
 /**
  * @brief Turn button presses into a new frequency selection
@@ -329,6 +335,7 @@ void DrawCalibrateRXIQ(void);
  * @note Minimizes carrier and sideband leakage in transmit path
  */
 void DrawCalibrateTXIQ(void);
+float32_t GetTXIQAttenuation(void);
 
 /**
  * @brief Draw the CW power amplifier calibration interface
@@ -336,6 +343,7 @@ void DrawCalibrateTXIQ(void);
  * @note Maps power settings to actual RF output levels
  */
 void DrawCalibratePower(void);
+void DrawCalibratePowerAuto(void);
 
 /**
  * @brief Start automatic RX IQ calibration procedure
@@ -368,6 +376,21 @@ void ChangeFrequencyCorrectionFactorIncrement(void);
 // External variable declarations (shared between display modules)
 extern size_t primaryMenuIndex;
 extern size_t secondaryMenuIndex;
-extern struct PrimaryMenuOption primaryMenu[9];
+// The ATU menu is appended to the primary menu only when ATU_PRESENT is defined.
+// The definition in MainBoard_DisplayMenus.cpp must have exactly this many entries:
+// a mismatch is a compile error against this declaration.
+#ifdef ATU_PRESENT
+#define NUM_PRIMARY_MENUS 10
+#else
+#define NUM_PRIMARY_MENUS 9
+#endif
+extern struct PrimaryMenuOption primaryMenu[NUM_PRIMARY_MENUS];
+
+#ifdef ATU_PRESENT
+#define ATU_MENU_ITEMS 6
+extern struct SecondaryMenuOption ATUOptions[ATU_MENU_ITEMS];
+void ATUMenuRefreshLabels(void);
+void ATUMenuDisarm(void);
+#endif
 
 #endif

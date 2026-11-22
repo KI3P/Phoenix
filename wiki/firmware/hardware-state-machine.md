@@ -3,17 +3,17 @@ title: Hardware & Calibration Coordinator (HardwareSm)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-07-31
+updated: 2026-11-03
 tags: [hardware, coordinator, relays, tr-switching, calibration, vfo, statesmith]
 source_refs: []
-related: ["[[overview]]", "[[state-machine-architecture]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[rf-board]]", "[[filter-boards]]", "[[iq-imbalance-correction]]", "[[persistent-config]]"]
+related: ["[[overview]]", "[[state-machine-architecture]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[rf-board]]", "[[filter-boards]]", "[[iq-imbalance-correction]]", "[[persistent-config]]", "[[automatic-power-swr-calibration]]"]
 ---
 
 # Hardware & Calibration Coordinator (HardwareSm)
 
-**Files:** `HardwareSm.cpp` (~30 KB) + `HardwareSm.h`, with four calibration partials:
-`HardwareSm_PowerCalibration.cpp`, `_ReceiveIQCalibration.cpp`,
-`_TransmitCarrierCalibration.cpp`, `_TransmitIQCalibration.cpp`.
+**Files:** `HardwareSm.cpp` (~30 KB) + `HardwareSm.h`, with five calibration partials:
+`HardwareSm_PowerCalibration.cpp`, `_PowerAutoCalibration.cpp` (V1.5.0),
+`_ReceiveIQCalibration.cpp`, `_TransmitCarrierCalibration.cpp`, `_TransmitIQCalibration.cpp`.
 
 > ⚠️ **Not StateSmith-generated.** Unlike ModeSm/UISm, `HardwareSm.cpp` is **hand-written**
 > (no `HardwareSm.drawio`, no generated banner). It is a coordinator built around two
@@ -81,12 +81,13 @@ state on every entry and exit (`HardwareSm.cpp:727-741`).
 
 ## 3. Calibration orchestration
 
-Four routines, each a hand-written **partial that wraps a StateSmith-generated sub-machine**
+Four sub-machines, driven by hand-written **partials that wrap StateSmith-generated code**
 (state maps documented in [[calibration-state-machines]]):
 
 | Partial file | Sub-machine (generated) | Calibrates | Theory |
 |---|---|---|---|
-| `HardwareSm_PowerCalibration.cpp` | `PowerCalSm` | PA output power curve | tanh fit, [[tune-frequency-control]] |
+| `HardwareSm_PowerCalibration.cpp` | `PowerCalSm` (MANUAL branch) | PA output power curve | shaped-tanh fit, [[tune-frequency-control]] |
+| `HardwareSm_PowerAutoCalibration.cpp` | `PowerCalSm` (AUTO branch) | PA curve, SSB gain and SWR bridge on every band | [[automatic-power-swr-calibration]] |
 | `HardwareSm_ReceiveIQCalibration.cpp` | `ReceiveIQCalSm` | RX I/Q balance | [[iq-imbalance-correction]] |
 | `HardwareSm_TransmitIQCalibration.cpp` | `TransmitIQCalSm` | TX I/Q balance | [[iq-imbalance-correction]] |
 | `HardwareSm_TransmitCarrierCalibration.cpp` | `TransmitCarrierCalSm` | TX carrier null (LO leakage) | (distinct from image) |
@@ -94,8 +95,10 @@ Four routines, each a hand-written **partial that wraps a StateSmith-generated s
 Each partial: starts its sub-SM (`PowerCalSm_start`, …), dispatches events to step it
 (`…_EventId_AUTO`, `NEXT_POINT`, `RECORD_DATA_POINT`, `RESET`, …), and bridges results back
 into the RF/tune state and the `ED` calibration arrays ([[persistent-config]]). The
-**power-cal** routine records (attenuation, power) points and fits the tanh PA model
-(`CalculatePowerCurveFit` → `FitPowerCurve` in `Tune.cpp`); the **IQ** routines run the
+**power-cal** routine records (attenuation, power) points and fits the shaped-tanh PA model
+(`CalculatePowerCurveFit` → `FitPowerCurve` in `Tune.cpp`). Its AUTO branch keys and unkeys
+through `PowerCalAutoService()`, called from the main loop, never from the timer
+([[automatic-power-swr-calibration]]); the **IQ** routines run the
 sideband-separation sweep documented in [[iq-imbalance-correction]].
 
 Calibration is **entered** when [[mode-state-machine]] takes a `CALIBRATE_*` event into its

@@ -423,6 +423,22 @@ void ChangePowerCalibrationPhase(void); // forward declare from MainBoard_Displa
 void StartPowerAutoCal(void);
 
 /**
+ * @brief Change band during power calibration
+ * @param band Band to tune to, FIRST_BAND to LAST_BAND
+ * @note Tunes to the middle of the band in the band's default mode and
+ *       updates the RF hardware. Used by the band buttons and by the
+ *       automatic power calibration.
+ */
+void SetCalibrationBand(int32_t band){
+    ED.currentBand[ED.activeVFO] = band;
+    ED.centerFreq_Hz[ED.activeVFO] = (bands[band].fBandHigh_Hz+bands[band].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
+    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
+    ED.modulation[ED.activeVFO] = bands[band].mode;
+    UpdateRFHardwareState();
+    Debug("Band is " + String(bands[band].name));
+}
+
+/**
  * Process button press events from the front panel.
  *
  * Routes button presses to appropriate handlers based on button ID. Handles:
@@ -441,8 +457,16 @@ void StartPowerAutoCal(void);
  * @param button Button ID from the front panel (defined in button constants)
  */
 void HandleButtonPress(int32_t button){
+    // The automatic power calibration keys the transmitter itself, and needs
+    // SELECT (wattmeter entry), ZOOM (abort), HOME, and the wattmeter entry's
+    // units (14) and increment (15) while it is keyed
+    bool autoCalButton = PowerCalAutoActive() &&
+                         (uiSM.state_id == UISm_StateId_CALIBRATE_POWER) &&
+                         ((button == MENU_OPTION_SELECT) || (button == ZOOM) ||
+                          (button == HOME_SCREEN) || (button == 14) || (button == 15));
     // Disable all buttons when in an active transmit mode
-    if ((modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
+    if (!autoCalButton && (
+        (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DAH_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_DIT_MARK) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE) ||
         (modeSM.state_id == ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT) ||
@@ -451,7 +475,7 @@ void HandleButtonPress(int32_t button){
         (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_DIGITAL_TRANSMIT) ||
         (modeSM.state_id == ModeSm_StateId_CALIBRATE_POWER_MARK) ||
-        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK))
+        (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_MARK)))
         return;
 
     switch (uiSM.state_id){
@@ -632,6 +656,16 @@ void HandleButtonPress(int32_t button){
                     // Add this later
                     break;
                 }
+#ifdef ATU_PRESENT
+                // You are in UISm_StateId_[HOME,UPDATE] states
+                case ATU_TUNE_BUTTON:{
+                    // Retune the ATU: a fresh search, stored for this band and
+                    // antenna. A refusal is shown by the SWR pane. Pressing any
+                    // button again while it runs stops it (ConsumeInterrupt).
+                    ATURetune();
+                    break;
+                }
+#endif
                 // You are in UISm_StateId_[HOME,UPDATE] states
                 case VFO_TOGGLE:{
                     if (ED.activeVFO == 0)
@@ -740,6 +774,17 @@ void HandleButtonPress(int32_t button){
             }
             break;
         } // end of BIT state
+        case (UISm_StateId_ATU_STATUS):{
+            switch (button){
+                case HOME_SCREEN:{
+                    UISm_dispatch_event(&uiSM,UISm_EventId_HOME);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        } // end of ATU_STATUS state
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             switch (button){
                 case HOME_SCREEN:{
@@ -769,6 +814,8 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_RX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Stop an automatic run, putting back the band it was sweeping
+                    AbortRXIQCalibration();
                     // Force a save here
                     SaveDataToStorage(false);
                     SetInterrupt(iCALIBRATE_EXIT);
@@ -811,6 +858,11 @@ void HandleButtonPress(int32_t button){
         case (UISm_StateId_CALIBRATE_TX_IQ):{
             switch (button){
                 case HOME_SCREEN:{
+                    // Stop an automatic run, putting back the band it was sweeping
+                    // and releasing the PTT it engaged. Leaving while the PTT is
+                    // held is handled by the mode state machine.
+                    AbortTXIQCalibration();
+                    AbortTXCarrierCalibration();
                     RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
@@ -819,8 +871,12 @@ void HandleButtonPress(int32_t button){
                 }
                 case 14:{
                     #ifdef DIRECT_COUPLED_TX
-                    SetInterrupt(iPTT_PRESSED);
-                    TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+                    // The carrier null measures the carrier through the receiver,
+                    // which only dual-VFO radios can do
+                    if (HasDualVFOs()){
+                        SetInterrupt(iPTT_PRESSED);
+                        TransmitCarrierCalSm_dispatch_event(&txcarrSM, TransmitCarrierCalSm_EventId_AUTO);
+                    }
                     #endif
                     break;
                 }
@@ -843,7 +899,6 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
-                    SetTXIQCurrentBand(ED.currentBand[ED.activeVFO]);
                     UpdateRFHardwareState();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
@@ -854,7 +909,6 @@ void HandleButtonPress(int32_t button){
                     ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
                     ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
                     ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
-                    SetTXIQCurrentBand(ED.currentBand[ED.activeVFO]);
                     UpdateRFHardwareState();
                     Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
@@ -871,24 +925,28 @@ void HandleButtonPress(int32_t button){
                     RecordPowerButtonPressed();
                     break;
                 }
-                // Auto power cal is not ready for prime time
-                // The behavior of the SWR bridge needs to be
-                // better characterized.
-                //case (1):{
-                //    StartPowerAutoCal();
-                //    break;
-                //}
+                case (1):{
+                    // Automatic power and SWR bridge calibration
+                    StartPowerAutoCal();
+                    break;
+                }
                 case (ZOOM):{
-                    // Reset and begin again
+                    // Reset and begin again; aborts the automatic calibration
                     ResetPowerCal();
                     break;
                 }
                 case (12):{
-                    ChangePowerCalibrationPhase();
+                    if (PowerCalAutoActive())
+                        SkipPowerCalStage();
+                    else
+                        ChangePowerCalibrationPhase();
                     break;
                 }
                 case (14):{
-                    ChangePowerUnits();
+                    if (powerSM.state_id == PowerCalSm_StateId_REVIEW)
+                        RetryPowerCal();
+                    else
+                        ChangePowerUnits();
                     break;
                 }
                 case (15):{
@@ -897,11 +955,15 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case (16):{
-                    // Change PA selection
-                    ChangeCalibrationPASelection();
+                    // Change PA selection; not during the automatic calibration
+                    if (!PowerCalAutoActive())
+                        ChangeCalibrationPASelection();
                     break;
                 }
                 case HOME_SCREEN:{
+                    // Leave the automatic calibration first, so it unkeys
+                    if (PowerCalAutoActive())
+                        ResetPowerCal();
                     RestoreArray(0,ED.XAttenCW,sizeof(ED.XAttenCW));
                     // Force a save here
                     SaveDataToStorage(false);
@@ -909,33 +971,27 @@ void HandleButtonPress(int32_t button){
                     break;
                 }
                 case BAND_UP:{
-                    if(++ED.currentBand[ED.activeVFO] > LAST_BAND)
-                        ED.currentBand[ED.activeVFO] = FIRST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
-                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    if (PowerCalAutoActive())
+                        break; // the automatic calibration chooses the bands
+                    int32_t band = ED.currentBand[ED.activeVFO] + 1;
+                    SetCalibrationBand((band > LAST_BAND) ? FIRST_BAND : band);
                     ResetPowerCal();
-                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
-                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 case BAND_DN:{
-                    if(--ED.currentBand[ED.activeVFO] < FIRST_BAND)
-                        ED.currentBand[ED.activeVFO] = LAST_BAND;
-                    ED.centerFreq_Hz[ED.activeVFO] = (bands[ED.currentBand[ED.activeVFO]].fBandHigh_Hz+bands[ED.currentBand[ED.activeVFO]].fBandLow_Hz)/2 + SR[SampleRate].rate/4;
-                    ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
-                    ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
+                    if (PowerCalAutoActive())
+                        break; // the automatic calibration chooses the bands
+                    int32_t band = ED.currentBand[ED.activeVFO] - 1;
+                    SetCalibrationBand((band < FIRST_BAND) ? LAST_BAND : band);
                     ResetPowerCal();
-                    UpdateRFHardwareState();
                     // If in CALIBRATE_OFFSET_SPACE mode, transition back to CALIBRATE_POWER_SPACE
                     if (modeSM.state_id == ModeSm_StateId_CALIBRATE_OFFSET_SPACE){
                         ModeSm_dispatch_event(&modeSM,ModeSm_EventId_OFFSET_END);
                     }
-                    Debug("Band is " + String(bands[ED.currentBand[ED.activeVFO]].name));
                     break;
                 }
                 default:
@@ -1057,6 +1113,16 @@ void DecrementDCOffsetQ(void);
 void ConsumeInterrupt(void){
     InterruptType interrupt = GetInterrupt();
     if ( interrupt == iNONE ) return;
+
+#ifdef ATU_PRESENT
+    // Any front-panel action (other than volume) stops a running ATU program,
+    // and is not acted on: the radio is keyed, and the band, frequency or mode
+    // must not change under the tuner
+    if (ATUTuneActive() && ATUTuneAbortsOn(interrupt)){
+        ATUTuneAbort();
+        return;
+    }
+#endif
 
     // Handle the interrupts created by the encoders slightly differently. The outcome
     // of these events depends on the UI state. All other interrupts are ignored by this
@@ -1331,19 +1397,35 @@ void ConsumeInterrupt(void){
         case (UISm_StateId_CALIBRATE_POWER):{
             switch (interrupt){
                 case (iFILTER_INCREASE):{
-                    IncrementCalibrationPower();
+                    // On the automatic calibration's setup screen the filter
+                    // encoder sets the L44 turns; elsewhere the measured power
+                    if (powerSM.state_id == PowerCalSm_StateId_SETUP)
+                        ChangeAutoCalTurns(+1);
+                    else
+                        IncrementCalibrationPower();
                     break;
                 }
                 case (iFILTER_DECREASE):{
-                    DecrementCalibrationPower();
+                    if (powerSM.state_id == PowerCalSm_StateId_SETUP)
+                        ChangeAutoCalTurns(-1);
+                    else
+                        DecrementCalibrationPower();
                     break;
                 }
                 case (iVOLUME_INCREASE):{
-                    IncrementCalibrationTransmitAtt();
+                    // In the automatic calibration the firmware sets the
+                    // attenuation; the volume encoder chooses the level instead
+                    if (PowerCalAutoActive())
+                        ChangeAutoCalLevel(+1);
+                    else
+                        IncrementCalibrationTransmitAtt();
                     break;
                 }
                 case (iVOLUME_DECREASE):{
-                    DecrementCalibrationTransmitAtt();
+                    if (PowerCalAutoActive())
+                        ChangeAutoCalLevel(-1);
+                    else
+                        DecrementCalibrationTransmitAtt();
                     break;
                 }
                 default:
@@ -1384,10 +1466,15 @@ void ConsumeInterrupt(void){
             break;
         }
         case (iPTT_PRESSED):{
+            // The automatic power calibration does its own keying; ignore the PTT
+            if (PowerCalAutoActive())
+                break;
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_PRESSED);
             break;
         }
         case (iPTT_RELEASED):{
+            if (PowerCalAutoActive())
+                break;
             ModeSm_dispatch_event(&modeSM, ModeSm_EventId_PTT_RELEASED);
             break;
         }
@@ -1421,6 +1508,10 @@ void ConsumeInterrupt(void){
         }
         case (iBITDISPLAY):{
             UISm_dispatch_event(&uiSM,UISm_EventId_BIT);
+            break;
+        }
+        case (iATUSTATUSDISPLAY):{
+            UISm_dispatch_event(&uiSM,UISm_EventId_ATU_STATUS);
             break;
         }
         case (iCALIBRATE_FREQUENCY):{
@@ -1620,6 +1711,12 @@ FASTRUN void loop(void){
     CheckForSerialTimeSync();
 #endif
     ConsumeInterrupt();
+    // Work posted by the automatic power calibration's state machine
+    PowerCalAutoService();
+#ifdef ATU_PRESENT
+    // The ATU tuner's readings and relay changes
+    ATUTuneService();
+#endif
 
     // Step 2: Perform signal processing
     PerformSignalProcessing();

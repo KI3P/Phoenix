@@ -73,8 +73,10 @@ void ResetTuning(void);
 struct FitResult {
     float32_t P_sat;        // Saturation power in mW
     float32_t k;            // Drive ratio parameter
+    float32_t shape;        // Knee shape exponent s; 1 is the plain tanh
     int32_t iterations;     // Number of iterations performed
-    float32_t rms_error;    // RMS error of fit
+    float32_t rms_error;    // RMS error of fit, mW
+    float32_t rms_dB;       // RMS error of fit, dB: what the fit minimises
 };
 
 struct FitResult FitPowerCurve(float32_t *att_dB, float32_t *pout_mW, int32_t Npoints,
@@ -84,7 +86,7 @@ float32_t CalculateCWAttenuation(float32_t Power_W, bool *PAsel);
 float32_t CalculateSSBTXGain(float32_t Power_W, bool *PAsel);
 
 // Low-level conversion functions for power calibration
-float32_t attenToPower_mW(float32_t att_dB, float32_t P_sat_mW, float32_t k);
-float32_t powerToAtten_dB(float32_t power_mW, float32_t P_sat_mW, float32_t k);
+float32_t attenToPower_mW(float32_t att_dB, float32_t P_sat_mW, float32_t k, float32_t shape = 1.0f);
+float32_t powerToAtten_dB(float32_t power_mW, float32_t P_sat_mW, float32_t k, float32_t shape = 1.0f);
 
 #endif // TUNE_H

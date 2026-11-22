@@ -23,7 +23,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.4.1"
+#define VERSION "Phx V1.6.0"
 
 #include "BuildInfo.h"
 
@@ -41,6 +41,9 @@ If not, see <https://www.gnu.org/licenses/>.
 #endif
 
 #include <Adafruit_MCP23X17.h>         // Installed via Arduino library manager
+#ifdef ATU_PRESENT
+#include <Adafruit_MCP23X08.h>         // Part of the same Adafruit MCP23017 library
+#endif
 #include <OpenAudio_ArduinoLibrary.h>  // https://github.com/chipaudette/OpenAudio_ArduinoLibrary
 #include <utility/imxrt_hw.h>
 #include <arm_math.h>
@@ -102,6 +105,14 @@ extern uint64_t hardwareRegister;
 #define BPFBAND2BIT  30
 #define BPFBAND3BIT  31
 #define TXVFOBIT     32
+// ATU board (see ATUBoard.cpp). Bits 33-51.
+#define ATULLSB         33  // L1 (K1)  ... MCP23017 GPA0
+#define ATULMSB         40  // L8 (K8)  ... MCP23017 GPA7
+#define ATUCLSB         41  // C1 (K9)  ... MCP23017 GPB0
+#define ATUCMSB         48  // C8 (K16) ... MCP23017 GPB7
+#define ATUCAPINPUTBIT  49  // K17, schematic "LC-CL":   MCP23008 GP0
+#define ATUBALANCEDBIT  50  // K18, schematic "BAL OUT": MCP23008 GP1
+#define ATUNETWORKBIT   51  // K19+K20, schematic "BYPASS": MCP23008 GP2
 
 #define BAND_NF_BCD   0b1111
 #define BAND_6M_BCD   0b1010
@@ -281,6 +292,10 @@ enum MorseStates { state0,
 #define SSB_100W_CAL_POWER_POINT_W 15.0f
 #define CW_20W_CAL_POWER_POINT_W  10.0f
 #define CW_100W_CAL_POWER_POINT_W 75.0f
+#define SWR_CAL_OPEN_ONLY 0x10 // ED.SWR_CalLevel flag: reflected line from the open alone
+#define SWR_CAL_SHORT_ONLY 0x20 // ED.SWR_CalLevel flag: reflected line from the short alone
+#define ATU_NUM_ANTENNAS 4          // ED.antennaSelection is 0 to 3
+#define ATU_MEMORY_VALID 0x80000000u // ED.ATU_State flag: an entry is stored
 
 
 /** Radio configuration parameters that are kept in persistent storage */
@@ -313,6 +328,13 @@ extern struct config_t {
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
     int32_t currentMicGain = 20;   /** Gain of the mic used for SSB */
     int32_t digitalDriveLevel = 50; /** Drive level (0-100) applied to USB transmit audio in digital mode */
+    /** Controlled Envelope SSB on the SSB transmit chain (DSP_CESSB.h). Off by
+     *  default until it has been validated on the bench and on air. */
+    bool cessbEnabled = false;
+    /** CESSB processor level: gain ahead of the clipper, 0 to CESSB_DRIVE_MAX_DB dB.
+     *  The microphone gain sets the voice level; this sets how much of it is
+     *  pushed past the ceiling. */
+    int32_t cessbDrive_dB = 0;
     /** Level (0-100) applied to USB receive audio in digital mode.
      *
      * The receive audio arriving at the USB tap is unregulated: with AGC off the
@@ -350,18 +372,38 @@ extern struct config_t {
     int32_t antennaSelection[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Antenna selection per band */
     bool keyerFlip = KEYER_FLIP; /**false = right paddle = DAH, true = DIT */
     bool PA100Wactive = false;
-    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,14680,0}; /** The saturation power output level when 20W PA is used */
-    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
+    // Uncalibrated defaults for 160-6 m, PA curve and bridge: radio 2's level 2 automatic
+    // calibration of 2026-11-02 (code/docs/PowerCalibration/AutoCalibration.md, "Uncalibrated
+    // defaults"); the forward offsets are the level 1 defaults for 10 turns. The SSB gain
+    // correction stays 0: the calibration keys its SSB tone at the stored correction, so a
+    // default far from a radio's need would overdrive the PA or fail the 10 dB change check
+    float32_t PowerCal_20W_Psat_mW[NUMBER_OF_BANDS] = {12324,17503,17378,17396,11848,10324,6556,8508,3595,4897,1749,14680,0}; /** The saturation power output level when 20W PA is used */
+    float32_t PowerCal_20W_kindex[NUMBER_OF_BANDS] = {50.20,34.71,37.84,24.71,18.09,23.40,24.68,20.24,28.06,39.21,7.43,16.2,0}; /** k index parameterizes the knee location in the Pout vs attenuation */
     float32_t PowerCal_100W_Psat_mW[NUMBER_OF_BANDS] = {86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,86000,0};  /** The saturation power output level when 100W PA is used */
     float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = {10,10,10,10,10,10,10,10,10,10,10,10}; /** k index parameterizes the knee location in the Pout vs attenuation */
+    float32_t PowerCal_20W_shape[NUMBER_OF_BANDS] = {0.594,0.552,0.590,0.523,0.548,0.582,0.561,0.577,0.711,0.708,0.539,1,1}; /** Knee shape exponent s of the 20W PA curve; 1 is the plain tanh */
+    float32_t PowerCal_100W_shape[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Knee shape exponent s of the 100W PA curve; 1 is the plain tanh */
     float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** The power threshold that switches in the 100W amplifier */
     float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
     float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
 
     float32_t SWR_F_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration */
-    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
-    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0.0}; /** SWR calibration */
+    // Uncalibrated bridge: s_f = 0 and o_f the level 1 default for 10 turns
+    // (SWRCalLevel1ForwardOffset()); the reflected line keeps radio 2's place against its
+    // forward line (10 m from the open alone, 6 m from the short alone)
+    float32_t SWR_R_SlopeAdj[NUMBER_OF_BANDS] = {-0.22,0.01,-0.10,-0.18,-0.12,-0.05,-0.15,-0.11,-0.17,-0.18,-0.19,0,0}; /** SWR calibration */
+    float32_t SWR_R_Offset[NUMBER_OF_BANDS] = {-4.68,-3.89,-4.04,-4.16,-4.55,-4.85,-5.02,-4.81,-4.86,-5.26,-3.70,0,0}; /** SWR calibration */
+    float32_t SWR_F_Offset[NUMBER_OF_BANDS] = {-4.03,-3.85,-3.75,-3.68,-4.22,-4.73,-4.62,-4.55,-4.48,-4.42,-4.42,0,0}; /** SWR calibration */
+    uint8_t SWR_CalLevel[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** SWR calibration level: 0 uncalibrated, else 1 to 3; SWR_CAL_OPEN_ONLY or SWR_CAL_SHORT_ONLY set if the reflected line is from one standard alone */
+    uint32_t SWR_CalDate[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** Time of the SWR calibration (seconds since 1970) */
+    uint8_t SWR_CouplerTurns = 10; /** L44 turns per core; selects the level 1 forward offsets */
+    // ATU memory, per band and antenna (used only with ATU_PRESENT)
+    uint32_t ATU_State[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** Packed ATU relays (GetATURegisterState()); ATU_MEMORY_VALID set if stored */
+    int32_t ATU_Freq_kHz[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** Frequency the ATU setting was stored at */
+    float32_t ATU_SWR[NUMBER_OF_BANDS][ATU_NUM_ANTENNAS] = {}; /** SWR measured when stored; 0 if not measured */
+    float32_t ATU_TunePower_W = 2.0f; /** Carrier power the ATU tunes with */
+    bool ATU_Enabled[ATU_NUM_ANTENNAS] = {true,true,true,true}; /** ATU in use on this antenna (else always bypassed) */
+    bool ATU_BalunOut[ATU_NUM_ANTENNAS] = {}; /** This antenna is on the ATU's balun output (K18), not the coax */
 } ED;
 
 // Define a structure to hold the results of built-in-test routine
@@ -373,6 +415,8 @@ struct BIT {
     bool V12_LPF_AD7991_present;
     bool FRONT_PANEL_I2C_present;
     uint8_t AD7991_I2C_ADDR;
+    bool ATU_MCP23017_present;
+    bool ATU_MCP23008_present;
 };
 
 enum BandType {
@@ -722,11 +766,13 @@ struct AGCConfig {
 #include "ParamSave.h"
 #include "Loop.h"
 #include "Tune.h"
+#include "SWRCalibration.h"
 #include "MainBoard_Display.h"
 #include "DSP_FFT.h"
 #include "DSP_Noise.h"
 #include "DSP_CWProcessing.h"
 #include "DSP.h"
+#include "DSP_CESSB.h"
 #include "MainBoard_AudioIO.h"
 #include "USBAudio.h"
 #include "FrontPanel.h"
@@ -734,6 +780,8 @@ struct AGCConfig {
 #include "RFBoard.h"
 #include "LPFBoard.h"
 #include "BPFBoard.h"
+#include "ATUBoard.h"
+#include "ATUTune.h"
 #include "CAT.h"
 #include "Storage.h"
 

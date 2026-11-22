@@ -1387,3 +1387,679 @@ TEST(TransmitChain176k, DigitalPassbandIsFlatInBand){
     // 2.8 dB; if the DSP is much flatter than that the rest is downstream.
     EXPECT_LT(hi-lo, 6.0f) << "digital transmit passband spread over 200-2200 Hz";
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Controlled Envelope SSB (DSP_CESSB.cpp)
+//
+// The stage sits at the Fs/8 node, after TXInterpolateBy2Again(). These tests
+// drive it with the real chain up to that node so the levels are the ones the
+// radio sees. The design and the numbers they check are from
+// code/tools/cessb_model/ (see wiki/roadmap/cessb.md).
+///////////////////////////////////////////////////////////////////////////////
+
+void TXGain(DataBlock *data); // DSP.cpp
+
+// Microphone samples at Fs (2048) -> complex samples at the Fs/8 node (256), in place.
+static void MicToCESSBNode(float32_t *I, float32_t *Q, uint32_t sampleRate_Hz){
+    DataBlock data;
+    data.I = I; data.Q = Q;
+    data.N = 2048;
+    data.sampleRate_Hz = sampleRate_Hz;
+    TXDecimateBy4(&data,&TXfilters);         // 2048 in, 512 out
+    TXDecimateBy2(&data,&TXfilters);         // 512 in, 256 out
+    BandEQ(&data, &RXfilters, TX);
+    arm_copy_f32(data.I,data.Q,256);
+    TXDecimateBy2Again(&data,&TXfilters);    // 256 in, 128 out
+    HilbertTransform(&data,&TXfilters);      // 128
+    TXInterpolateBy2Again(&data,&TXfilters); // 128 in, 256 out
+}
+
+// Sum of tones at the microphone, continuous across blocks.
+static void FillTones(float32_t *I, float32_t *Q, int block, float32_t fs,
+                      const float32_t *f_Hz, const float32_t *amp, int nTones){
+    for (uint32_t i = 0; i < 2048; i++){
+        const double t = (double)(block*2048 + (int)i)/(double)fs;
+        double v = 0.0;
+        for (int k = 0; k < nTones; k++) v += amp[k]*sin(2.0*M_PI*(double)f_Hz[k]*t);
+        I[i] = (float32_t)v;
+        Q[i] = I[i];
+    }
+}
+
+// Amplitude of the complex exponential at f_Hz (signed: negative is the other
+// side of the carrier) in I + jQ, through a Hann window.
+static float32_t ComplexToneLevel(const float32_t *I, const float32_t *Q, uint32_t N,
+                                  float32_t f_Hz, float32_t fs_Hz){
+    double re = 0.0, im = 0.0, wsum = 0.0;
+    for (uint32_t n = 0; n < N; n++){
+        const double w = 0.5*(1.0 - cos(2.0*M_PI*(double)n/(double)(N-1)));
+        const double ph = -2.0*M_PI*(double)f_Hz*(double)n/(double)fs_Hz;
+        // (I + jQ)(cos ph + j sin ph)
+        re += w*((double)I[n]*cos(ph) - (double)Q[n]*sin(ph));
+        im += w*((double)I[n]*sin(ph) + (double)Q[n]*cos(ph));
+        wsum += w;
+    }
+    return (float32_t)(sqrt(re*re + im*im)/wsum);
+}
+
+// Run tones through the chain to the node for settle + capture blocks, keeping
+// the captured node samples (unprocessed) in nodeI/nodeQ and, if cessb, the
+// CESSB output in outI/outQ.
+static void CaptureNode(float32_t fs, const float32_t *f_Hz, const float32_t *amp, int nTones,
+                        int settle, int capture, float32_t *nodeI, float32_t *nodeQ,
+                        float32_t *outI, float32_t *outQ){
+    static float32_t I[2048], Q[2048];
+    ResetCESSB();
+    for (int blk = 0; blk < settle + capture; blk++){
+        FillTones(I, Q, blk, fs, f_Hz, amp, nTones);
+        MicToCESSBNode(I, Q, (uint32_t)fs);
+        const int c = blk - settle;
+        if (c >= 0 && nodeI){
+            memcpy(&nodeI[c*256], I, 256*sizeof(float32_t));
+            memcpy(&nodeQ[c*256], Q, 256*sizeof(float32_t));
+        }
+        if (outI){
+            DataBlock d = {256, (uint32_t)(fs/8), I, Q};
+            CESSBProcess(&d);
+            if (c >= 0){
+                memcpy(&outI[c*256], I, 256*sizeof(float32_t));
+                memcpy(&outQ[c*256], Q, 256*sizeof(float32_t));
+            }
+        }
+    }
+}
+
+static void UseRate(uint8_t rate){
+    SampleRate = rate;
+    InitializeFilters(ED.spectrum_zoom, &RXfilters);
+    InitializeTransmitFilters(&TXfilters);
+}
+
+#define CESSB_CAPTURE 8
+static float32_t cI[256*CESSB_CAPTURE], cQ[256*CESSB_CAPTURE];
+static float32_t oI[256*CESSB_CAPTURE], oQ[256*CESSB_CAPTURE];
+
+/**
+ * The ceiling is the envelope the SSB power calibration tone has at the node,
+ * so that TXGain maps the ceiling onto exactly the requested power (PEP). The
+ * calibration tone is transmitIQcal_oscillator: 800 Hz at amplitude 40/500.
+ */
+TEST(TransmitChainCESSB, CeilingIsTheCalibrationTone){
+    uint8_t saved = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+    const float32_t f[1] = {800.0f}, a[1] = {40.0f/500.0f};
+    for (int r = 0; r < 2; r++){
+        UseRate(rates[r]);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+        CaptureNode(fs, f, a, 1, 12, 4, cI, cQ, NULL, NULL);
+        double env = 0.0;
+        for (int n = 0; n < 4*256; n++) env += sqrt(cI[n]*cI[n] + cQ[n]*cQ[n]);
+        env /= 4*256;
+        printf("  %d sps: calibration tone envelope at the node = %.6f (CESSB_CEILING %.6f)\n",
+               SR[SampleRate].rate, env, CESSB_CEILING);
+        EXPECT_NEAR(env, CESSB_CEILING, 0.01*CESSB_CEILING) << SR[SampleRate].rate << " sps";
+    }
+    UseRate(saved);
+}
+
+// Side of the carrier the audio occupies at the node (+1 or -1), as the stage assumes
+static const float32_t CH = (CESSB_CENTRE_HZ > 0.0f) ? 1.0f : -1.0f;
+
+/**
+ * The stage centres the channel by shifting it by -CESSB_CENTRE_HZ, so the sign
+ * of CESSB_CENTRE_HZ must be the side of the carrier the audio is on at the
+ * node, for either sideband. Get it wrong and the stage filters the voice away.
+ */
+TEST(TransmitChainCESSB, ChannelIsWhereTheStageCentresIt){
+    UseRate(SAMPLE_RATE_192K);
+    const float32_t f[1] = {1000.0f}, a[1] = {0.05f};
+    for (int sb = 0; sb < 2; sb++){
+        ED.modulation[ED.activeVFO] = sb ? USB : LSB;
+        CaptureNode(192000.0f, f, a, 1, 12, 4, cI, cQ, NULL, NULL);
+        const float32_t wanted = ComplexToneLevel(cI, cQ, 1024, CH*1000.0f, 24000.0f);
+        const float32_t other  = ComplexToneLevel(cI, cQ, 1024, -CH*1000.0f, 24000.0f);
+        EXPECT_GT(20.0f*log10f(wanted/other), 30.0f) << (sb ? "USB" : "LSB");
+    }
+    ED.modulation[ED.activeVFO] = LSB;
+}
+
+/**
+ * Below the ceiling the stage is a linear filter that passes the channel at unity gain.
+ */
+TEST(TransmitChainCESSB, TransparentBelowTheCeiling){
+    uint8_t saved = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+    const float32_t tones[4] = {400.0f, 1000.0f, 2000.0f, 2500.0f};
+    for (int r = 0; r < 2; r++){
+        UseRate(rates[r]);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+        for (int k = 0; k < 4; k++){
+            const float32_t f[1] = {tones[k]}, a[1] = {0.04f};  // half the calibration tone
+            CaptureNode(fs, f, a, 1, 12, 4, cI, cQ, oI, oQ);
+            float32_t peak = 0.0f;
+            for (int n = 0; n < 1024; n++) peak = fmaxf(peak, sqrtf(oI[n]*oI[n] + oQ[n]*oQ[n]));
+            ASSERT_LT(peak, CESSB_CEILING) << "test level must not reach the clipper";
+            const float32_t in  = ComplexToneLevel(cI, cQ, 1024, CH*tones[k], fs/8);
+            const float32_t out = ComplexToneLevel(oI, oQ, 1024, CH*tones[k], fs/8);
+            EXPECT_NEAR(20.0f*log10f(out/in), 0.0f, 0.5f)
+                << tones[k] << " Hz at " << SR[SampleRate].rate << " sps";
+        }
+    }
+    UseRate(saved);
+}
+
+/**
+ * Below the ceiling the stage must not image the channel onto the other side
+ * of the carrier: its filters are complex bandpasses centred on the channel,
+ * and an image would add to the exciter's own (analog) image. Compared with the
+ * node's own image level, which is the Hilbert pair's.
+ */
+TEST(TransmitChainCESSB, DoesNotImageTheChannel){
+    uint8_t saved = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+    const float32_t tones[5] = {300.0f, 700.0f, 1000.0f, 1900.0f, 2600.0f};
+    for (int r = 0; r < 2; r++){
+        UseRate(rates[r]);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+        for (int k = 0; k < 5; k++){
+            const float32_t f[1] = {tones[k]}, a[1] = {0.04f};
+            CaptureNode(fs, f, a, 1, 12, 4, cI, cQ, oI, oQ);
+            const float32_t inW  = ComplexToneLevel(cI, cQ, 1024,  CH*tones[k], fs/8);
+            const float32_t inI  = ComplexToneLevel(cI, cQ, 1024, -CH*tones[k], fs/8);
+            const float32_t outW = ComplexToneLevel(oI, oQ, 1024,  CH*tones[k], fs/8);
+            const float32_t outI = ComplexToneLevel(oI, oQ, 1024, -CH*tones[k], fs/8);
+            const float32_t inDb = 20.0f*log10f(inI/inW), outDb = 20.0f*log10f(outI/outW);
+            printf("  %d sps %5.0f Hz: image before CESSB %6.1f dBc, after %6.1f dBc\n",
+                   SR[SampleRate].rate, tones[k], inDb, outDb);
+            EXPECT_LT(outDb, fmaxf(inDb + 1.0f, -60.0f))
+                << tones[k] << " Hz at " << SR[SampleRate].rate << " sps";
+        }
+    }
+    UseRate(saved);
+}
+
+/**
+ * Two equal tones, each at the calibration level, peak at twice the ceiling:
+ * 6 dB of drive. The envelope must come out at the ceiling, at the node and
+ * after the interpolators to the DAC rate.
+ */
+TEST(TransmitChainCESSB, CeilingHoldsWhenOverdriven){
+    UseRate(SAMPLE_RATE_192K);
+    const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {0.08f, 0.08f};
+    CaptureNode(192000.0f, f, a, 2, 12, CESSB_CAPTURE, cI, cQ, oI, oQ);
+
+    float32_t inPeak = 0.0f, outPeak = 0.0f;
+    for (int n = 0; n < 256*CESSB_CAPTURE; n++){
+        inPeak  = fmaxf(inPeak,  sqrtf(cI[n]*cI[n] + cQ[n]*cQ[n]));
+        outPeak = fmaxf(outPeak, sqrtf(oI[n]*oI[n] + oQ[n]*oQ[n]));
+    }
+    printf("  node peak: in %.3f x ceiling, out %.3f x ceiling\n",
+           inPeak/CESSB_CEILING, outPeak/CESSB_CEILING);
+    EXPECT_GT(inPeak, 1.9f*CESSB_CEILING);
+    EXPECT_LT(outPeak, 1.03f*CESSB_CEILING);
+    EXPECT_GT(outPeak, 0.90f*CESSB_CEILING);
+
+    // On through TXInterpolateBy2 and TXInterpolateBy4, as the transmit chain does
+    static float32_t I[2048], Q[2048];
+    float32_t dacPeak = 0.0f;
+    for (int c = 0; c < CESSB_CAPTURE; c++){
+        memcpy(I, &oI[c*256], 256*sizeof(float32_t));
+        memcpy(Q, &oQ[c*256], 256*sizeof(float32_t));
+        DataBlock d = {256, 24000, I, Q};
+        TXInterpolateBy2(&d, &TXfilters);
+        TXInterpolateBy4(&d, &TXfilters);
+        if (c < 2) continue;    // interpolator start-up
+        for (int n = 0; n < 2048; n++) dacPeak = fmaxf(dacPeak, sqrtf(I[n]*I[n] + Q[n]*Q[n]));
+    }
+    printf("  DAC-rate peak %.3f x ceiling\n", dacPeak/CESSB_CEILING);
+    EXPECT_LT(dacPeak, 1.03f*CESSB_CEILING);
+}
+
+/**
+ * Centring is what keeps the clipper's products out of the opposite sideband.
+ * W7PUA's uncentred Z class leaves the 2f1-f2 product, 500 Hz on the far side
+ * of the carrier, at about -11 dBc here; the model puts the centred form near -63 dBc.
+ */
+TEST(TransmitChainCESSB, OppositeSidebandStaysClean){
+    uint8_t saved = SampleRate;
+    const uint8_t rates[2] = {SAMPLE_RATE_192K, SAMPLE_RATE_176K};
+    for (int r = 0; r < 2; r++){
+        UseRate(rates[r]);
+        const float32_t fs = (float32_t)SR[SampleRate].rate;
+        const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {0.08f, 0.08f};
+        CaptureNode(fs, f, a, 2, 12, CESSB_CAPTURE, cI, cQ, oI, oQ);
+        const uint32_t N = 256*CESSB_CAPTURE;
+        const float32_t t1 = ComplexToneLevel(oI, oQ, N, CH*700.0f, fs/8);
+        const float32_t t2 = ComplexToneLevel(oI, oQ, N, CH*1900.0f, fs/8);
+        const float32_t tone = 0.5f*(t1 + t2);
+        const float32_t imdLow  = ComplexToneLevel(oI, oQ, N, -CH*500.0f, fs/8);
+        const float32_t imdHigh = ComplexToneLevel(oI, oQ, N, CH*3100.0f, fs/8);
+        printf("  %d sps: tones %+.2f dB apart; 2f1-f2 (-500 Hz): %.1f dBc, 2f2-f1 (3100 Hz): %.1f dBc\n",
+               SR[SampleRate].rate, 20.0f*log10f(t1/t2),
+               20.0f*log10f(imdLow/tone), 20.0f*log10f(imdHigh/tone));
+        EXPECT_LT(20.0f*log10f(imdLow/tone), -55.0f) << SR[SampleRate].rate << " sps";
+        EXPECT_LT(20.0f*log10f(imdHigh/tone), -24.0f) << SR[SampleRate].rate << " sps";
+    }
+    UseRate(saved);
+}
+
+/**
+ * Only SSB transmit with the menu setting on runs the stage. Digital mode and
+ * the calibration states need the chain linear.
+ */
+TEST(TransmitChainCESSB, ActiveOnlyInSSBTransmitWhenEnabled){
+    const ModeSm_StateId saved = modeSM.state_id;
+    const bool savedEnabled = ED.cessbEnabled;
+    const ModeSm_StateId others[] = {
+        ModeSm_StateId_SSB_RECEIVE, ModeSm_StateId_DIGITAL_TRANSMIT,
+        ModeSm_StateId_CALIBRATE_OFFSET_MARK, ModeSm_StateId_CALIBRATE_TX_IQ_MARK,
+        ModeSm_StateId_CW_TRANSMIT_DIT_MARK};
+    for (int e = 0; e < 2; e++){
+        ED.cessbEnabled = (e == 1);
+        modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
+        EXPECT_EQ(CESSBActive(), ED.cessbEnabled);
+        for (ModeSm_StateId s : others){
+            modeSM.state_id = s;
+            EXPECT_FALSE(CESSBActive()) << "state " << (int)s;
+        }
+    }
+    modeSM.state_id = saved;
+    ED.cessbEnabled = savedEnabled;
+}
+
+/**
+ * A new transmission must not start with the tail of the previous one, which
+ * sits in the stage's filters and delay line if it was skipped in between.
+ */
+TEST(TransmitChainCESSB, StartsCleanAfterBeingSkipped){
+    UseRate(SAMPLE_RATE_192K);
+    const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {0.08f, 0.08f};
+    CaptureNode(192000.0f, f, a, 2, 4, 1, NULL, NULL, oI, oQ);   // history now holds a loud signal
+    CESSBSkipped();
+    static float32_t I[256], Q[256];
+    memset(I, 0, sizeof(I));
+    memset(Q, 0, sizeof(Q));
+    DataBlock d = {256, 24000, I, Q};
+    CESSBProcess(&d);
+    float32_t peak = 0.0f;
+    for (int n = 0; n < 256; n++) peak = fmaxf(peak, fabsf(I[n]) + fabsf(Q[n]));
+    EXPECT_EQ(peak, 0.0f);
+}
+
+/**
+ * TXGain moved from before the Hilbert pair (scaling I, then Q := I) to after
+ * CESSB (scaling I and Q). Everything in between is linear, so with CESSB not
+ * running the transmitted signal must be unchanged.
+ */
+TEST(TransmitChainCESSB, MovingTXGainChangesNothing){
+    UseRate(SAMPLE_RATE_192K);
+    static TransmitFilterConfig TXold;
+    InitializeTransmitFilters(&TXold);
+    InitializeTransmitFilters(&TXfilters);
+    InitializeStorage();
+    ED.PA100Wactive = false;
+    static float32_t I[2048], Q[2048], oldI[256], oldQ[256];
+    const float32_t f[2] = {500.0f, 2300.0f}, a[2] = {0.05f, 0.03f};
+    float32_t worst = 0.0f, scale = 0.0f;
+    for (int blk = 0; blk < 12; blk++){
+        FillTones(I, Q, blk, 192000.0f, f, a, 2);
+        DataBlock d = {2048, 192000, I, Q};
+        TXDecimateBy4(&d, &TXfilters);
+        TXDecimateBy2(&d, &TXfilters);
+        BandEQ(&d, &RXfilters, TX);
+
+        // Old order: gain on I, then copy, on its own filter instances
+        memcpy(oldI, I, 256*sizeof(float32_t));
+        DataBlock o = {256, 24000, oldI, oldQ};
+        TXGain(&o);
+        arm_copy_f32(oldI, oldQ, 256);
+        TXDecimateBy2Again(&o, &TXold);
+        HilbertTransform(&o, &TXold);
+        TXInterpolateBy2Again(&o, &TXold);
+
+        // New order, as TransmitProcessing() now runs it
+        arm_copy_f32(I, Q, 256);
+        TXDecimateBy2Again(&d, &TXfilters);
+        HilbertTransform(&d, &TXfilters);
+        TXInterpolateBy2Again(&d, &TXfilters);
+        TXGain(&d);
+
+        for (int n = 0; n < 256; n++){
+            worst = fmaxf(worst, fmaxf(fabsf(I[n]-oldI[n]), fabsf(Q[n]-oldQ[n])));
+            scale = fmaxf(scale, fabsf(oldI[n]));
+        }
+    }
+    EXPECT_GT(scale, 0.0f);
+    EXPECT_LT(worst, 1e-5f*scale);
+}
+
+TEST(TransmitChainCESSB, MenuTogglesTheSettingAndItsLabel){
+    const bool saved = ED.cessbEnabled;
+    extern struct SecondaryMenuOption MicOptions[6];
+    const SecondaryMenuOption &item = MicOptions[4];
+    ED.cessbEnabled = false;
+    CESSBMenuRefreshLabel();
+    EXPECT_STREQ(item.label, "Enable CESSB");
+    ((void (*)(void))item.func)();
+    EXPECT_TRUE(ED.cessbEnabled);
+    EXPECT_STREQ(item.label, "Disable CESSB");
+    ((void (*)(void))item.func)();
+    EXPECT_FALSE(ED.cessbEnabled);
+    EXPECT_STREQ(item.label, "Enable CESSB");
+    ED.cessbEnabled = saved;
+}
+
+// Peak envelope of a CESSB run's output, and the meter afterwards
+static float32_t RunTwoTone(float32_t eachAmp, int32_t drive_dB, float32_t *meter_dB){
+    const int32_t saved = ED.cessbDrive_dB;
+    ED.cessbDrive_dB = drive_dB;
+    const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {eachAmp, eachAmp};
+    CaptureNode(192000.0f, f, a, 2, 12, CESSB_CAPTURE, NULL, NULL, oI, oQ);
+    float32_t peak = 0.0f;
+    for (int n = 0; n < 256*CESSB_CAPTURE; n++) peak = fmaxf(peak, sqrtf(oI[n]*oI[n] + oQ[n]*oQ[n]));
+    if (meter_dB) *meter_dB = GetCESSBCompression_dB();
+    ED.cessbDrive_dB = saved;
+    return peak;
+}
+
+/**
+ * The processor level is gain ahead of the clipper. A two-tone peaking at half
+ * the ceiling (each tone at a quarter of the calibration level) passes at half
+ * the ceiling with no drive, and is held at the ceiling with 6 dB or more.
+ */
+TEST(TransmitChainCESSB, ProcessorLevelDrivesTheClipper){
+    UseRate(SAMPLE_RATE_192K);
+    const float32_t p0  = RunTwoTone(0.02f, 0, NULL);
+    const float32_t p6  = RunTwoTone(0.02f, 6, NULL);
+    const float32_t p10 = RunTwoTone(0.02f, 10, NULL);
+    printf("  two-tone at half the ceiling: peak %.3f / %.3f / %.3f x ceiling at 0 / 6 / 10 dB\n",
+           p0/CESSB_CEILING, p6/CESSB_CEILING, p10/CESSB_CEILING);
+    EXPECT_NEAR(p0/CESSB_CEILING, 0.5f, 0.05f);
+    EXPECT_GT(p6/CESSB_CEILING, 0.9f);
+    EXPECT_LT(p6/CESSB_CEILING, 1.03f);
+    EXPECT_LT(p10/CESSB_CEILING, 1.03f);
+
+    // Below the ceiling the level is plain gain: a quarter-ceiling tone, +6 dB
+    const int32_t saved = ED.cessbDrive_dB;
+    const float32_t f[1] = {1000.0f}, a[1] = {0.02f};
+    ED.cessbDrive_dB = 0;
+    CaptureNode(192000.0f, f, a, 1, 12, 4, NULL, NULL, oI, oQ);
+    const float32_t g0 = ComplexToneLevel(oI, oQ, 1024, CH*1000.0f, 24000.0f);
+    ED.cessbDrive_dB = 6;
+    CaptureNode(192000.0f, f, a, 1, 12, 4, NULL, NULL, oI, oQ);
+    const float32_t g6 = ComplexToneLevel(oI, oQ, 1024, CH*1000.0f, 24000.0f);
+    ED.cessbDrive_dB = saved;
+    EXPECT_NEAR(20.0f*log10f(g6/g0), 6.0f, 0.1f);
+}
+
+/**
+ * The compression meter reads how far the envelope going into the clipper
+ * exceeds the ceiling. A steady tone has a flat envelope, so it reads exactly
+ * the tone's level above the ceiling, plus the processor level.
+ */
+TEST(TransmitChainCESSB, CompressionMeterReadsDecibelsOverTheCeiling){
+    UseRate(SAMPLE_RATE_192K);
+    const int32_t saved = ED.cessbDrive_dB;
+    const struct { float32_t amp; int32_t drive; float32_t expect; } cases[] = {
+        {0.04f, 0, 0.0f},      // half the ceiling: nothing clipped
+        {0.16f, 0, 6.02f},     // twice the ceiling
+        {0.08f, 4, 4.0f},      // at the ceiling, 4 dB of processor level
+        {0.08f, 10, 10.0f},
+    };
+    for (auto &c : cases){
+        // Flush the transmit filters with silence and clear the meter, so the
+        // previous (louder) case's history cannot set this one's peak
+        const float32_t silent[1] = {0.0f};
+        const float32_t fz[1] = {1000.0f};
+        CaptureNode(192000.0f, fz, silent, 1, 12, 0, NULL, NULL, NULL, NULL);
+        CESSBSkipped();
+        ED.cessbDrive_dB = c.drive;
+        // 800 Hz, the calibration tone's frequency: the ceiling is defined there,
+        // and the default transmit equaliser is not flat
+        const float32_t f[1] = {800.0f}, a[1] = {c.amp};
+        CaptureNode(192000.0f, f, a, 1, 12, 4, NULL, NULL, oI, oQ);
+        const float32_t m = GetCESSBCompression_dB();
+        printf("  tone %.2f, level %ld dB: meter %.2f dB\n", c.amp, (long)c.drive, m);
+        EXPECT_NEAR(m, c.expect, 0.1f) << "amp " << c.amp << " drive " << c.drive;
+    }
+    ED.cessbDrive_dB = saved;
+
+    // Released when CESSB stops running
+    CESSBSkipped();
+    EXPECT_EQ(GetCESSBCompression_dB(), 0.0f);
+}
+
+TEST(TransmitChainCESSB, CompressionBarColours){
+    int16_t g, y, r;
+    CompressionBarWidths(0.0f, &g, &y, &r);
+    EXPECT_EQ(g + y + r, 0);
+    CompressionBarWidths(3.0f, &g, &y, &r);
+    EXPECT_EQ(g, 25); EXPECT_EQ(y, 0); EXPECT_EQ(r, 0);
+    CompressionBarWidths(7.5f, &g, &y, &r);
+    EXPECT_EQ(g, 50); EXPECT_EQ(y, 13); EXPECT_EQ(r, 0);
+    CompressionBarWidths(30.0f, &g, &y, &r);
+    EXPECT_EQ(g, 50); EXPECT_EQ(y, 25); EXPECT_EQ(r, 25);
+    CompressionBarWidths(-5.0f, &g, &y, &r);
+    EXPECT_EQ(g + y + r, 0);
+}
+
+TEST(TransmitChainCESSB, SettingsPaneShowsOffOrTheLevel){
+    const bool savedOn = ED.cessbEnabled;
+    const int32_t savedDrive = ED.cessbDrive_dB;
+    char text[12];
+    ED.cessbEnabled = false;
+    ED.cessbDrive_dB = 6;
+    CESSBSettingText(text, sizeof(text));
+    EXPECT_STREQ(text, "Off");
+    ED.cessbEnabled = true;
+    CESSBSettingText(text, sizeof(text));
+    EXPECT_STREQ(text, "6dB");
+    ED.cessbDrive_dB = CESSB_DRIVE_MAX_DB;
+    CESSBSettingText(text, sizeof(text));
+    EXPECT_STREQ(text, "10dB");
+    EXPECT_LE(strlen(text), 4u); // the pane leaves room for four characters
+    ED.cessbEnabled = savedOn;
+    ED.cessbDrive_dB = savedDrive;
+}
+
+TEST(TransmitChainCESSB, MenuHasTheProcessorLevel){
+    extern struct SecondaryMenuOption MicOptions[6];
+    const SecondaryMenuOption &item = MicOptions[5];
+    EXPECT_STREQ(item.label, "CESSB level (dB)");
+    ASSERT_NE(item.varPam, nullptr);
+    EXPECT_EQ(item.varPam->variable, &ED.cessbDrive_dB);
+    EXPECT_EQ(item.varPam->limits.i32.min, 0);
+    EXPECT_EQ(item.varPam->limits.i32.max, CESSB_DRIVE_MAX_DB);
+}
+
+TEST(TransmitChainCESSB, ProcessorLevelSurvivesSaveAndRestore){
+    InitializeStorage();
+    const int32_t saved = ED.cessbDrive_dB;
+    ED.cessbDrive_dB = 7;
+    SaveDataToStorage(false);
+    ED.cessbDrive_dB = 0;
+    RestoreDataFromStorage();
+    EXPECT_EQ(ED.cessbDrive_dB, 7);
+    ED.cessbDrive_dB = saved;
+    SaveDataToStorage(false);
+}
+
+TEST(TransmitChainCESSB, SettingSurvivesSaveAndRestore){
+    InitializeStorage();
+    ED.cessbEnabled = true;
+    SaveDataToStorage(false);
+    ED.cessbEnabled = false;
+    RestoreDataFromStorage();
+    EXPECT_TRUE(ED.cessbEnabled);
+    ED.cessbEnabled = false;
+    SaveDataToStorage(false);
+    ED.cessbEnabled = true;
+    RestoreDataFromStorage();
+    EXPECT_FALSE(ED.cessbEnabled);
+}
+
+TEST(TransmitChainCESSB, DefaultsToOff){
+    struct config_t fresh;
+    EXPECT_FALSE(fresh.cessbEnabled);
+    EXPECT_EQ(fresh.cessbDrive_dB, 0);
+}
+
+/**
+ * The SGTL5000 takes an unsigned gain; a negative setting used to wrap to the
+ * maximum. CESSB's clipping depends on mic level, so this has to be right.
+ */
+TEST(TransmitChainCESSB, NegativeMicGainNoLongerWrapsToMaximum){
+    EXPECT_EQ(MicGainForCodec(-10), 0u);
+    EXPECT_EQ(MicGainForCodec(-40), 0u);
+    EXPECT_EQ(MicGainForCodec(0), 0u);
+    EXPECT_EQ(MicGainForCodec(20), 20u);
+    EXPECT_EQ(MicGainForCodec(63), 63u);
+    EXPECT_EQ(MicGainForCodec(100), 63u);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// SSB transmit test-tone source (SetTXAudioSource)
+///////////////////////////////////////////////////////////////////////////////
+
+class TXAudioSourceTest : public ::testing::Test {
+protected:
+    ModeSm_StateId savedState;
+    uint8_t savedRate;
+    void SetUp() override {
+        savedState = modeSM.state_id;
+        savedRate = SampleRate;
+        SampleRate = SAMPLE_RATE_192K;
+        modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+        UpdateAudioIOState();
+        SetTXAudioSource(TX_SOURCE_MIC);
+    }
+    void TearDown() override {
+        SetTXAudioSource(TX_SOURCE_MIC);
+        SampleRate = savedRate;
+        UpdateSampleRateDependentOscillators();
+        modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+        UpdateAudioIOState();
+        modeSM.state_id = savedState;
+    }
+    // Enter a mode and let the audio routing follow it
+    void Enter(ModeSm_StateId s){
+        modeSM.state_id = s;
+        UpdateAudioIOState();
+    }
+    // The gains of both microphone mixers must be g0..g3
+    void ExpectMicMixers(float g0, float g1, float g2, float g3){
+        AudioMixer4 *m[2] = {&modeSelectInExL, &modeSelectInExR};
+        for (int k = 0; k < 2; k++){
+            EXPECT_FLOAT_EQ(m[k]->getGain(0), g0) << "mixer " << k;
+            EXPECT_FLOAT_EQ(m[k]->getGain(1), g1) << "mixer " << k;
+            EXPECT_FLOAT_EQ(m[k]->getGain(2), g2) << "mixer " << k;
+            EXPECT_FLOAT_EQ(m[k]->getGain(3), g3) << "mixer " << k;
+        }
+    }
+    // The setting AudioSynthWaveformSine needs for f_Hz at the current rate
+    float Setting(float f_Hz){
+        return f_Hz*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate;
+    }
+};
+
+TEST_F(TXAudioSourceTest, MicrophoneIsTheDefaultAndRoutesPortZero){
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(1, 0, 0, 0);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), 0.0f);
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), 0.0f);
+}
+
+TEST_F(TXAudioSourceTest, SingleToneRoutesPortTwoAtTheCalibrationLevel){
+    ASSERT_TRUE(SetTXAudioSource(TX_SOURCE_SINGLE_TONE));
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(0, 0, 1, 0);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), TEST_TONE_SINGLE_AMPLITUDE);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getFrequency(), Setting(TEST_TONE_SINGLE_HZ));
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), 0.0f);
+    // Same level as the TX IQ / power calibration tone, so output = power setting
+    EXPECT_FLOAT_EQ(TEST_TONE_SINGLE_AMPLITUDE, 40.0f/500.0f);
+}
+
+TEST_F(TXAudioSourceTest, TwoToneSumsPortsTwoAndThreeWithPEPOfTheSingleTone){
+    ASSERT_TRUE(SetTXAudioSource(TX_SOURCE_TWO_TONE));
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(0, 0, 1, 1);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), TEST_TONE_TWO_AMPLITUDE);
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), TEST_TONE_TWO_AMPLITUDE);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getFrequency(), Setting(TEST_TONE_TWO_A_HZ));
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getFrequency(), Setting(TEST_TONE_TWO_B_HZ));
+    // Envelope peak of the two equal tones = the single tone's amplitude
+    EXPECT_FLOAT_EQ(2*TEST_TONE_TWO_AMPLITUDE, TEST_TONE_SINGLE_AMPLITUDE);
+}
+
+TEST_F(TXAudioSourceTest, BackToMicrophoneSilencesTheOscillators){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    SetTXAudioSource(TX_SOURCE_MIC);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), 0.0f);
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), 0.0f);
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(1, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, ChangingSourceDuringTransmitReroutesAtOnce){
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(1, 0, 0, 0);
+    // UpdateAudioIOState() does nothing while the state is unchanged, so the
+    // source change itself must re-route
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    ExpectMicMixers(0, 0, 1, 1);
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    ExpectMicMixers(0, 0, 1, 0);
+    SetTXAudioSource(TX_SOURCE_MIC);
+    ExpectMicMixers(1, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, ChangingSourceDuringReceiveLeavesTheMicMixersMuted){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    ExpectMicMixers(0, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, CalibrationAndDigitalModeIgnoreTheSource){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    Enter(ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    ExpectMicMixers(0, 1, 0, 0);
+    Enter(ModeSm_StateId_CALIBRATE_OFFSET_MARK);
+    ExpectMicMixers(0, 1, 0, 0);
+    Enter(ModeSm_StateId_DIGITAL_TRANSMIT);
+    ExpectMicMixers(0, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, OutOfRangeSourceIsRejected){
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    EXPECT_FALSE(SetTXAudioSource(-1));
+    EXPECT_FALSE(SetTXAudioSource(TX_SOURCE_COUNT));
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+}
+
+TEST_F(TXAudioSourceTest, SampleRateChangeKeepsTheTonesOnFrequency){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    SampleRate = SAMPLE_RATE_176K;
+    UpdateSampleRateDependentOscillators(); // as ChangeSampleRate() does
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getFrequency(), Setting(TEST_TONE_TWO_A_HZ));
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getFrequency(), Setting(TEST_TONE_TWO_B_HZ));
+    // The amplitudes are untouched
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), TEST_TONE_TWO_AMPLITUDE);
+}
+
+TEST_F(TXAudioSourceTest, MicrophoneMenuItemCyclesTheSourceAndItsLabel){
+    extern struct SecondaryMenuOption MicOptions[6];
+    const SecondaryMenuOption &item = MicOptions[3];
+    EXPECT_EQ(item.action, functionOption);
+    TXSourceMenuRefreshLabel();
+    EXPECT_STREQ(item.label, "TX src: Microphone");
+    ((void (*)(void))item.func)();
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+    EXPECT_STREQ(item.label, "TX src: 1 kHz tone");
+    ((void (*)(void))item.func)();
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_TWO_TONE);
+    EXPECT_STREQ(item.label, "TX src: 2-tone IMD");
+    ((void (*)(void))item.func)();
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+    EXPECT_STREQ(item.label, "TX src: Microphone");
+}

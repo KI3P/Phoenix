@@ -46,7 +46,7 @@ static bool redrawSpectrum;
 static uint8_t incindex = 1;
 const float32_t incvals[] = {0.1, 0.01, 0.001};
 static float32_t increment = incvals[incindex];
-float32_t attLevel = 0.0;
+float32_t attLevel = 31.5;
 
 static const int8_t NUMBER_OF_TXIQ_PANES = 6;
 // Forward declaration of the pane drawing functions
@@ -228,6 +228,14 @@ void ChangeTXIQIncrement(void){
     if (incindexTXIQ >= sizeof(incvals)/sizeof(incvals[0]))
         incindexTXIQ = 0;
     increment = incvals[incindexTXIQ];
+}
+
+/**
+ * @brief The transmit attenuation set on the Transmit IQ calibration screen
+ * @note Applied at every key-down on single-VFO radios
+ */
+float32_t GetTXIQAttenuation(void){
+    return attLevel;
 }
 
 /**
@@ -606,9 +614,11 @@ static void DrawTXIQInstructionsPane(void){
     tft.setCursor(x0, y0+delta);
     tft.print("* Center tune: Q DC offset.");
 
-    delta += lineD;
-    tft.setCursor(x0, y0+delta);
-    tft.print("* Button 14: Carrier null.");
+    if (HasDualVFOs()){
+        delta += lineD;
+        tft.setCursor(x0, y0+delta);
+        tft.print("* Button 14: Carrier null.");
+    }
 
     #endif
 
@@ -663,8 +673,10 @@ void DrawCalibrateTXIQ(void){
         ED.fineTuneFreq_Hz[ED.activeVFO] = 0;
         ED.modulation[ED.activeVFO] = bands[ED.currentBand[ED.activeVFO]].mode;
 
-        // Set the initial attenuation to 0
-        attLevel = 0.0;
+        // Start at full attenuation. On single-VFO radios this calibration
+        // transmits through the PA into the antenna connector, so the operator
+        // reduces the attenuation from here until the analyser shows the tone
+        attLevel = 31.5;
         SetTXAttenuation(attLevel);
         ForceUpdateRFHardwareState();
 

@@ -29,6 +29,8 @@ static float32_t DMAMEM last_sample_buffer_R[FFT_LENGTH];
 // Defined as static because we want their values to persist between calls
 static float32_t DMAMEM FFT_ring_buffer_x[SPECTRUM_RES];
 static float32_t DMAMEM FFT_ring_buffer_y[SPECTRUM_RES];
+static float32_t DMAMEM zoom_scratch_x[READ_BUFFER_SIZE]; // ZoomFFTExe scratch
+static float32_t DMAMEM zoom_scratch_y[READ_BUFFER_SIZE];
 // Note: zoom_sample_ptr moved to ReceiveFilterConfig struct so each filter has its own pointer
 static uint32_t iFSF;
 // Rotating-phasor NCO state for FreqShiftPhasor(). Static because the phase
@@ -501,6 +503,7 @@ void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
     // Must come first: the ARM instances below are bound to these arrays. The
     // transmit chain decimates by the same DF1 * DF2 the receive chain does.
     InitializeTransmitFilterCoeffs((float32_t)SR[SampleRate].rate / RXfilters.DF);
+    InitializeCESSB((float32_t)SR[SampleRate].rate / RXfilters.DF);
 
     // ****************************************************************************************
     // *  Decimate by 4: 192K to 48K SPS
@@ -670,8 +673,12 @@ bool ZoomFFTExe(DataBlock *data, uint32_t spectrum_zoom, ReceiveFilterConfig *RX
         CalcPSD512(data->I,data->Q);
         return true;
     }
-    float32_t x_buffer[data->N];
-    float32_t y_buffer[data->N];
+    // Scratch buffers live in OCRAM, not on the stack: as VLAs they put
+    // 2*N*4 = 16 KB on the stack, which overflowed it in builds whose code
+    // takes 11 ITCM banks (e.g. -O2 LTO). Only ever called from the main loop.
+    if (data->N > READ_BUFFER_SIZE) return false;
+    float32_t *x_buffer = zoom_scratch_x;
+    float32_t *y_buffer = zoom_scratch_y;
     // We use a biquad to filter first,
     arm_biquad_cascade_df1_f32 (&(RXfilters->biquadZoomI), data->I, x_buffer, data->N);
     arm_biquad_cascade_df1_f32 (&(RXfilters->biquadZoomQ), data->Q, y_buffer, data->N);

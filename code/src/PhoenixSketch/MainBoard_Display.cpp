@@ -69,6 +69,52 @@ void BlankBox(Rectangle *rect){
     tft.fillRect(rect->x0, rect->y0, rect->width, rect->height, RA8875_BLACK);
 }
 
+#ifdef ATU_PRESENT
+/**
+ * @brief The ATU tuning status table (ATU menu -> Tuning status table)
+ * @note Drawn once on entering the ATU_STATUS UI state; HOME returns. One row per
+ *       amateur band with what is stored for the antenna selected on this band.
+ */
+void DrawATUStatusTable(void){
+    if (!(uiSM.state_id == UISm_StateId_ATU_STATUS) || !uiSM.vars.clearScreen)
+        return;
+    tft.writeTo(L1);
+    tft.fillWindow();
+    tft.writeTo(L2);
+    tft.fillWindow();
+    tft.writeTo(L1);
+    uiSM.vars.clearScreen = false;
+
+    int32_t ant = ATUCurrentAntenna();
+    char buf[64];
+    tft.setFontDefault();
+    tft.setFontScale((enum RA8875tsize)1);
+    tft.setTextColor(RA8875_WHITE);
+    snprintf(buf, sizeof(buf), "ATU memory, antenna %ld, %s output", (long)ant,
+             ATUAntennaBalun(ant) ? "balun" : "coax");
+    tft.setCursor(10, 6);
+    tft.print(buf);
+    tft.setFontScale((enum RA8875tsize)0);
+    tft.setTextColor(ATUAntennaEnabled(ant) ? RA8875_GREEN : RA8875_YELLOW);
+    snprintf(buf, sizeof(buf), "ATU %s on this antenna. Tune power %.1f W. HOME to return.",
+             ATUAntennaEnabled(ant) ? "enabled" : "bypassed", (double)ED.ATU_TunePower_W);
+    tft.setCursor(10, 42);
+    tft.print(buf);
+
+    tft.setFontScale((enum RA8875tsize)1);
+    int16_t y = 66;
+    for (int32_t b = FIRST_BAND; b <= LAST_BAND; b++){
+        if (bands[b].band_type != HAM_BAND) continue;
+        ATUStatusTableRow(b, ant, buf, sizeof(buf));
+        tft.setTextColor((b == ED.currentBand[ED.activeVFO]) ? RA8875_YELLOW : RA8875_WHITE);
+        tft.setCursor(10, y);
+        tft.print(buf);
+        y += 30;
+        if (y > WINDOW_HEIGHT - 30) break;
+    }
+}
+#endif // ATU_PRESENT
+
 /**
  * @brief Main BIT screen rendering function
  * @note Called from DrawDisplay() when in BIT UI state
@@ -204,6 +250,33 @@ void DrawBIT(void){
         }
         yoff += 30;
         #endif  //V12_LPF_SWR_AD7991
+
+        #ifdef ATU_PRESENT
+        // Both ATU expanders are on Wire2 (the front panel's 0x20/0x21 are on Wire1)
+        const bool atuPresent[2] = {bit_results.ATU_MCP23017_present,
+                                    bit_results.ATU_MCP23008_present};
+        const char *atuChip[2] = {"MCP23017", "MCP23008"};
+        const uint8_t atuAddr[2] = {ATU_MCP23017_ADDR, ATU_MCP23008_ADDR};
+        for (int i = 0; i < 2; i++){
+            tft.setCursor(5 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
+            if (!atuPresent[i]) {
+                tft.setTextColor(RA8875_RED);
+                sprintf(tmpbuf, "K9HZ ATU %s I2C not found at 0x%02X", atuChip[i], atuAddr[i]);
+                tft.print(tmpbuf);
+            } else {
+                tft.setTextColor(RA8875_GREEN);
+                tft.setCursor(4 * tft.getFontWidth(), WINDOW_HEIGHT/10 + yoff);
+                sprintf(tmpbuf, "K9HZ ATU %s I2C:", atuChip[i]);
+                tft.print(tmpbuf);
+                sprintf(tmpbuf, "0x%02X", atuAddr[i]);
+                tft.setCursor(col1, WINDOW_HEIGHT/10 + yoff);
+                tft.print(tmpbuf);
+                tft.setCursor(col2, WINDOW_HEIGHT/10 + yoff);
+                tft.print("PASS");
+            }
+            yoff += 30;
+        }
+        #endif  // ATU_PRESENT
     }
 }
 
@@ -213,12 +286,41 @@ void DrawBIT(void){
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
+ * Run the LPSPI peripheral from an in-spec clock root.
+ *
+ * Teensyduino 1.59's SPI.begin() clocks the LPSPI from PLL3 PFD0 / 3 = 240 MHz.
+ * At that rate the LPSPI occasionally loses the received byte of a transfer
+ * (check the i.MX RT1062 datasheet's LPSPI_CLK_ROOT limit); SPIClass::transfer()
+ * then spins forever waiting for it, freezing the main loop inside an RA8875
+ * call while interrupts (USB, audio) keep running. Measured on the bench at
+ * 528 MHz / -Os LTO: 8 such hangs in 10 min at 240 MHz, none at 132 MHz.
+ *
+ * Must run after SPI.begin() (called from tft.begin()), which sets CBCMR.
+ */
+static void SetSPIClockRootInSpec(void){
+#if defined(__IMXRT1062__)
+    __disable_irq();
+    LPSPI4_CR = 0;  // the LPSPI must be disabled while its clock changes
+    CCM_CBCMR = (CCM_CBCMR & ~(CCM_CBCMR_LPSPI_PODF_MASK | CCM_CBCMR_LPSPI_CLK_SEL_MASK))
+              | CCM_CBCMR_LPSPI_PODF(3) | CCM_CBCMR_LPSPI_CLK_SEL(2);  // PLL2 528 MHz / 4
+    LPSPI4_CR = LPSPI_CR_MEN;
+    __enable_irq();
+    // SPIClass caches the divider for the last clock it was asked for, computed
+    // from the old root. Ask for a different clock once so the next RA8875
+    // transaction recomputes its divider from the new root.
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE3));
+    SPI.endTransaction();
+#endif
+}
+
+/**
  * Initialize the RA8875 TFT display hardware and configure layers.
  */
 void InitializeDisplay(void){
     pinMode(TFT_CS, OUTPUT);
     digitalWrite(TFT_CS, HIGH);
     tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);
+    SetSPIClockRootInSpec();
     tft.setRotation(0);
     tft.useLayers(true);
     tft.layerEffect(OR);
@@ -286,6 +388,12 @@ void DrawDisplay(void){
             DrawBIT();
             break;
         }
+#ifdef ATU_PRESENT
+        case (UISm_StateId_ATU_STATUS):{
+            DrawATUStatusTable();
+            break;
+        }
+#endif
         case (UISm_StateId_CALIBRATE_FREQUENCY):{
             DrawCalibrateFrequency();
             break;

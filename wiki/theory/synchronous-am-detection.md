@@ -3,7 +3,7 @@ title: Synchronous AM Detection (SAM)
 type: concept
 status: draft
 created: 2026-06-09
-updated: 2026-06-09
+updated: 2026-11-16
 tags: [sam, am, synchronous-detection, pll, carrier, demodulation, fading]
 source_refs: []
 related: ["[[theory-overview]]", "[[ssb-phasing-method]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]", "[[display-subsystem]]", "[[code-heritage]]"]
@@ -51,14 +51,20 @@ An optional **fade leveler** (`fade_leveler`) tracks two DC averages with time c
 signal fades.
 
 ## Carrier-offset readout
-The detected offset is published for the UI:
+The detected offset is published for the UI, in hertz:
 ```
-SAM_carrier = omega2 · fs / (2·2π);
-SAM_carrier_freq_offset = 0.95·prev + 0.05·(10·SAM_carrier);   // smoothed
+SAM_carrier = omega2 · fs / 2π;                                 // omega2: rad/sample
+SAM_carrier_freq_offset = 0.95·prev + 0.05·SAM_carrier;          // smoothed
 ```
 `GetSAMCarrierOffset()` returns it, and the home-screen **SAM-offset pane** displays it
 ([[display-subsystem]]) — so the operator can see how far the PLL has pulled and zero-beat the
-tuning.
+tuning. The frequency calibration screen shows the same value as its **Error**. It is positive
+when the carrier is above the dial: the unit test's carrier 12 Hz above the centre reads
++11.5 Hz, and in the simulator a carrier 25.1 Hz below the dial reads −25.1 Hz.
+
+Until 2026-11-16 the code divided by `2·2π` and multiplied the smoothed value by 10, so the
+readout was **5× the offset** (the sign was right). The calibration guide's "between −1 and +1"
+target is unchanged, so it is now ±1 Hz rather than ±0.2 Hz.
 
 ## Relationship to other modes
 - **AM** (envelope) vs **SAM** (synchronous) are both AM-family demods in `Demodulate()`.
@@ -67,6 +73,5 @@ tuning.
 
 ## Open questions
 - Exact `zeta` value and the `tauR`/`tauI` fade-leveler constants (and `zeta_help`).
-- Why the `×10` factor in the smoothed `SAM_carrier_freq_offset` (display scaling?).
 - Whether SAM supports selectable sideband (DSB vs single-sideband SAM) — check the `corr`
   combination.

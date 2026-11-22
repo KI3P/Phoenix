@@ -68,6 +68,11 @@ static float32_t dBcVals[NUMBER_OF_BANDS];  // Carrier suppression values for ea
 static float32_t sideband_separation = 0.0;
 static float32_t carrier_suppression = 0.0;
 static int32_t currentBand = -1;
+// The band the automatic run is working on, and its settings before the run
+// started on it, so that an aborted run can put them back
+static int32_t savedBand = -1;
+static float32_t savedAmp = 1.0f;
+static float32_t savedPhase = 0.0f;
 
 /**
  * @brief Calculate parameter value for given iteration and step
@@ -103,31 +108,65 @@ void InitializeTXIQCalibration(void){
     txiqSM.vars.acquisitionDuration_ms = 60;
 }
 
-void SetTXIQCurrentBand(int32_t band){
-    currentBand = band;
+/**
+ * @brief The first band at or after from that the radio may transmit on
+ * @param from Band number to start looking at
+ * @return The band, or -1 if there is none up to LAST_BAND
+ * @note The transmit calibrations (IQ and carrier null) skip the bands where
+ *       transmit is disabled (band_type other than HAM_BAND, as IsTxAllowed()):
+ *       nothing they found there would ever be used.
+ */
+int32_t NextTXCalBand(int32_t from){
+    if (from < FIRST_BAND) from = FIRST_BAND;
+    for (int32_t b = from; b <= LAST_BAND; b++)
+        if (bands[b].band_type == HAM_BAND)
+            return b;
+    return -1;
 }
 
 void ResetTXIQCalBand(void){
     // Mark all the bands as not-completed:
     for (size_t k = FIRST_BAND; k<=LAST_BAND; k++)
         bandCompleted[k] = false;
-    currentBand = FIRST_BAND;
+    currentBand = NextTXCalBand(FIRST_BAND);
+    savedBand = -1;
     ForceUpdateRFHardwareState();
     step = 0;
     iteration = 0;
     maxSBS = 0;
 }
 
+/**
+ * @brief Stop an automatic TX IQ run, if one is in progress
+ * @note The band being swept is left with a trial amplitude or phase, so its
+ *       settings from before the run are restored. Bands already completed keep
+ *       their new values. Releases the PTT the run engaged.
+ */
+void AbortTXIQCalibration(void){
+    if (txiqSM.state_id != TransmitIQCalSm_StateId_STANDBY){
+        if ((savedBand >= FIRST_BAND) && (savedBand <= LAST_BAND) && !bandCompleted[savedBand]){
+            ED.IQXAmpCorrectionFactor[savedBand] = savedAmp;
+            ED.IQXPhaseCorrectionFactor[savedBand] = savedPhase;
+        }
+        SetInterrupt(iPTT_RELEASED);
+    }
+    InitializeTXIQCalibration();
+}
+
+bool TXIQCalibrationAutoActive(void){
+    return txiqSM.state_id != TransmitIQCalSm_StateId_STANDBY;
+}
+
 void AdjustTXIQBand(void){
-    if (bandCompleted[currentBand]){
-        // Was this the last band? If so, exit.
-        if (currentBand == LAST_BAND){
+    if ((currentBand < FIRST_BAND) || bandCompleted[currentBand]){
+        // Go on to the next band the radio may transmit on; if there is none, exit
+        int32_t next = (currentBand < FIRST_BAND) ? -1 : NextTXCalBand(currentBand + 1);
+        if (next < 0){
             TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_AUTO_COMPLETE);
             SetInterrupt(iPTT_RELEASED);
             return;
         }
-        // Increment to the next band.
-        currentBand++;
+        currentBand = next;
     }
     // Set the hardware to the current band
     ED.currentBand[ED.activeVFO] = currentBand;
@@ -138,6 +177,12 @@ void AdjustTXIQBand(void){
     UpdateRFHardwareState();
 
     Debug(String("Calibrating TXIQ band ") + String(bands[currentBand].name));
+    // Remember this band's settings in case the run is aborted
+    if (savedBand != currentBand){
+        savedBand = currentBand;
+        savedAmp = ED.IQXAmpCorrectionFactor[currentBand];
+        savedPhase = ED.IQXPhaseCorrectionFactor[currentBand];
+    }
     // Start by setting the phase to 0
     ED.IQXPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]] = 0.0f;
     // Go to find minimum loop
@@ -184,6 +229,13 @@ void AdjustTXIQCalSetting(void){
         bandCompleted[currentBand] = true;
         TransmitIQCalSm_dispatch_event(&txiqSM, TransmitIQCalSm_EventId_MIN_EXIT);
         return;
+    }
+    // Each pass starts from the setting it sweeps around. If no reading in
+    // the pass is above 0 dB (a broken loopback), the setting stays where it
+    // was, rather than taking the best value of the previous pass
+    if (step == 0){
+        int32_t b = ED.currentBand[ED.activeVFO];
+        maxSBS_parameter = (iteration%2 == 0) ? ED.IQXAmpCorrectionFactor[b] : ED.IQXPhaseCorrectionFactor[b];
     }
     // Change the appropriate parameter
     SetAmpPhase(iteration,step); 

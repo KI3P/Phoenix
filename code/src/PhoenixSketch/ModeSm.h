@@ -18,59 +18,66 @@ void UpdateRXDeltaVal(void);
 typedef enum ModeSm_EventId
 {
     ModeSm_EventId_DO = 0, // The `do` event is special. State event handlers do not consume this event (ancestors all get it too) unless a transition occurs.
-    ModeSm_EventId_CALIBRATE_EXIT = 1,
-    ModeSm_EventId_CALIBRATE_FREQUENCY = 2,
-    ModeSm_EventId_CALIBRATE_POWER = 3,
-    ModeSm_EventId_CALIBRATE_RX_IQ = 4,
-    ModeSm_EventId_CALIBRATE_TX_IQ = 5,
-    ModeSm_EventId_DAH_PRESSED = 6,
-    ModeSm_EventId_DIT_PRESSED = 7,
-    ModeSm_EventId_KEY_PRESSED = 8,
-    ModeSm_EventId_KEY_RELEASED = 9,
-    ModeSm_EventId_OFFSET_END = 10,
-    ModeSm_EventId_OFFSET_START = 11,
-    ModeSm_EventId_PTT_PRESSED = 12,
-    ModeSm_EventId_PTT_RELEASED = 13,
-    ModeSm_EventId_TO_CW_MODE = 14,
-    ModeSm_EventId_TO_DIGITAL_MODE = 15,
-    ModeSm_EventId_TO_SSB_MODE = 16
+    ModeSm_EventId_ATU_CARRIER_OFF = 1,
+    ModeSm_EventId_ATU_CARRIER_ON = 2,
+    ModeSm_EventId_ATU_TUNE_END = 3,
+    ModeSm_EventId_ATU_TUNE_START = 4,
+    ModeSm_EventId_CALIBRATE_EXIT = 5,
+    ModeSm_EventId_CALIBRATE_FREQUENCY = 6,
+    ModeSm_EventId_CALIBRATE_POWER = 7,
+    ModeSm_EventId_CALIBRATE_RX_IQ = 8,
+    ModeSm_EventId_CALIBRATE_TX_IQ = 9,
+    ModeSm_EventId_DAH_PRESSED = 10,
+    ModeSm_EventId_DIT_PRESSED = 11,
+    ModeSm_EventId_KEY_PRESSED = 12,
+    ModeSm_EventId_KEY_RELEASED = 13,
+    ModeSm_EventId_OFFSET_END = 14,
+    ModeSm_EventId_OFFSET_START = 15,
+    ModeSm_EventId_PTT_PRESSED = 16,
+    ModeSm_EventId_PTT_RELEASED = 17,
+    ModeSm_EventId_TO_CW_MODE = 18,
+    ModeSm_EventId_TO_DIGITAL_MODE = 19,
+    ModeSm_EventId_TO_SSB_MODE = 20
 } ModeSm_EventId;
 
 enum
 {
-    ModeSm_EventIdCount = 17
+    ModeSm_EventIdCount = 21
 };
 
 typedef enum ModeSm_StateId
 {
     ModeSm_StateId_ROOT = 0,
-    ModeSm_StateId_CALIBRATION_STATES = 1,
-    ModeSm_StateId_CALIBRATE_FREQUENCY = 2,
-    ModeSm_StateId_CALIBRATE_OFFSET_MARK = 3,
-    ModeSm_StateId_CALIBRATE_OFFSET_SPACE = 4,
-    ModeSm_StateId_CALIBRATE_POWER_MARK = 5,
-    ModeSm_StateId_CALIBRATE_POWER_SPACE = 6,
-    ModeSm_StateId_CALIBRATE_RX_IQ = 7,
-    ModeSm_StateId_CALIBRATE_TX_IQ_MARK = 8,
-    ModeSm_StateId_CALIBRATE_TX_IQ_SPACE = 9,
-    ModeSm_StateId_NORMAL_STATES = 10,
-    ModeSm_StateId_CW_RECEIVE = 11,
-    ModeSm_StateId_CW_TRANSMIT_DAH_MARK = 12,
-    ModeSm_StateId_CW_TRANSMIT_DIT_MARK = 13,
-    ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE = 14,
-    ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 15,
-    ModeSm_StateId_CW_TRANSMIT_MARK = 16,
-    ModeSm_StateId_CW_TRANSMIT_SPACE = 17,
-    ModeSm_StateId_DIGITAL_STATES = 18,
-    ModeSm_StateId_DIGITAL_RECEIVE = 19,
-    ModeSm_StateId_DIGITAL_TRANSMIT = 20,
-    ModeSm_StateId_SSB_RECEIVE = 21,
-    ModeSm_StateId_SSB_TRANSMIT = 22
+    ModeSm_StateId_ATU_TUNE_STATES = 1,
+    ModeSm_StateId_ATU_TUNE_MARK = 2,
+    ModeSm_StateId_ATU_TUNE_SPACE = 3,
+    ModeSm_StateId_CALIBRATION_STATES = 4,
+    ModeSm_StateId_CALIBRATE_FREQUENCY = 5,
+    ModeSm_StateId_CALIBRATE_OFFSET_MARK = 6,
+    ModeSm_StateId_CALIBRATE_OFFSET_SPACE = 7,
+    ModeSm_StateId_CALIBRATE_POWER_MARK = 8,
+    ModeSm_StateId_CALIBRATE_POWER_SPACE = 9,
+    ModeSm_StateId_CALIBRATE_RX_IQ = 10,
+    ModeSm_StateId_CALIBRATE_TX_IQ_MARK = 11,
+    ModeSm_StateId_CALIBRATE_TX_IQ_SPACE = 12,
+    ModeSm_StateId_NORMAL_STATES = 13,
+    ModeSm_StateId_CW_RECEIVE = 14,
+    ModeSm_StateId_CW_TRANSMIT_DAH_MARK = 15,
+    ModeSm_StateId_CW_TRANSMIT_DIT_MARK = 16,
+    ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE = 17,
+    ModeSm_StateId_CW_TRANSMIT_KEYER_WAIT = 18,
+    ModeSm_StateId_CW_TRANSMIT_MARK = 19,
+    ModeSm_StateId_CW_TRANSMIT_SPACE = 20,
+    ModeSm_StateId_DIGITAL_STATES = 21,
+    ModeSm_StateId_DIGITAL_RECEIVE = 22,
+    ModeSm_StateId_DIGITAL_TRANSMIT = 23,
+    ModeSm_StateId_SSB_RECEIVE = 24,
+    ModeSm_StateId_SSB_TRANSMIT = 25
 } ModeSm_StateId;
 
 enum
 {
-    ModeSm_StateIdCount = 23
+    ModeSm_StateIdCount = 26
 };
 
 

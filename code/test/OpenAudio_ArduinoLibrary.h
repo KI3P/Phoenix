@@ -18,6 +18,9 @@ enum AudioInputSource {
 void setAudioInputSource(AudioInputSource source);
 AudioInputSource getAudioInputSource(void);
 const char* getAudioInputSourceName(void);
+// Single-tone source: where the tone sits beyond the Fs/4 carrier (default 1 kHz)
+void setSingleToneOffsetHz(double offset_Hz);
+double getSingleToneOffsetHz(void);
 
 #ifdef USE_SDL_DISPLAY
 // SDL2 Audio support - cross-platform (Linux, Windows, macOS)
@@ -145,10 +148,14 @@ class AudioMixer4
         void begin(void) { }
         void end(void) {  }
         void gain(uint8_t channel, float32_t volume){
-            gn = volume;
+            if (channel < 4) gains[channel] = volume;
+        }
+        // Test helper: the gain last set on a channel
+        float32_t getGain(uint8_t channel) const {
+            return (channel < 4) ? gains[channel] : 0.0f;
         }
     private:
-        uint8_t gn;
+        float32_t gains[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 };
 
 class AudioSynthWaveformSine

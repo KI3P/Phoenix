@@ -94,6 +94,9 @@ static ModeSm_StateId previousRadioState = ModeSm_StateId_ROOT;
 static RFHardwareState rfHardwareState = RFReceive;
 static RFHardwareState oldrfHardwareState = RFInvalid;
 static TuneState tuneState = TuneReceive;
+static float32_t cwAttenOverride_dB = -1;  // negative: CW attenuation follows the power setting
+static bool ssbGainOverrideActive = false; // false: SSB DSP gain follows the power setting
+static float32_t ssbGainOverride_dB = 0;
 
 /**
  * @brief Initialize the RF board by calling the initialization functions for each
@@ -141,6 +144,11 @@ errno_t InitializeRFHardware(void){
     errno_t val = InitializeLPFBoard();
     val += InitializeBPFBoard();
     val += InitializeRFBoard();
+#ifdef ATU_PRESENT
+    // Boots bypassed. Not added to val: a missing tuner is not an RF board fault,
+    // and its absence is reported on the BIT screen.
+    InitializeATUBoard();
+#endif
     return val;
 }
 
@@ -158,6 +166,29 @@ errno_t InitializeRFHardware(void){
  */
 ModeSm_StateId GetRFHardwarePreviousState(void){
     return previousRadioState;
+}
+
+void SetCWAttenuationOverride(float32_t att_dB){
+    cwAttenOverride_dB = (att_dB > 31.5f) ? 31.5f : att_dB;
+}
+
+float32_t GetCWAttenuationOverride(void){
+    return cwAttenOverride_dB;
+}
+
+void SetSSBGainOverride(float32_t gain_dB){
+    ssbGainOverride_dB = gain_dB;
+    ssbGainOverrideActive = true;
+}
+
+void ClearSSBGainOverride(void){
+    ssbGainOverrideActive = false;
+}
+
+bool GetSSBGainOverride(float32_t *gain_dB){
+    if (ssbGainOverrideActive)
+        *gain_dB = ssbGainOverride_dB;
+    return ssbGainOverrideActive;
 }
 
 /**
@@ -297,9 +328,9 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
             DisableCalFeedback();
             MyDelay(10);
 
-            // Start configuring the transmit chain
-            // Don't mess with the transmit attenuation, this is set by the 
-            // calibration loop
+            // Start configuring the transmit chain at the attenuation set on
+            // the calibration screen (receive sets it to 31.5 dB in between)
+            SetTXAttenuation( GetTXIQAttenuation() );
 
             // Set clockEnableCW to LO
             DisableCWVFOOutput();
@@ -370,9 +401,16 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                     // In power calibration mode, use manual attenuation setting
                     // and don't override PA selection
                     att_dB = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+#ifdef ATU_PRESENT
+                } else if (modeSM.state_id == ModeSm_StateId_ATU_TUNE_MARK) {
+                    // The ATU tuner transmits at its own low power
+                    att_dB = ATUTuneAttenuation_dB();
+#endif
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                    if (cwAttenOverride_dB >= 0)
+                        att_dB = cwAttenOverride_dB;
                 }
 
                 RXBypassBPF(); // BPF out of RX path
@@ -419,9 +457,17 @@ void HandleRFHardwareStateChange(RFHardwareState newState){
                     // In power calibration mode, use manual attenuation setting
                     // and don't override PA selection
                     att_dB = ED.XAttenCW[ED.currentBand[ED.activeVFO]];
+#ifdef ATU_PRESENT
+                } else if (modeSM.state_id == ModeSm_StateId_ATU_TUNE_SPACE) {
+                    // The ATU tuner transmits at its own low power. Entering
+                    // ATU_TUNE_SPACE sets it up, as the carrier only toggles after.
+                    att_dB = ATUTuneAttenuation_dB();
+#endif
                 } else {
                     // Normal operation: calculate attenuation based on power level
                     att_dB = CalculateCWAttenuation(ED.powerOutCW[ED.currentBand[ED.activeVFO]],&ED.PA100Wactive);
+                    if (cwAttenOverride_dB >= 0)
+                        att_dB = cwAttenOverride_dB;
                 }
 
                 RXBypassBPF(); // BPF out of RX path
@@ -557,6 +603,7 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFTransmit;
             break;
         }
+        case (ModeSm_StateId_ATU_TUNE_MARK):
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DAH_MARK):
@@ -564,6 +611,9 @@ void UpdateRFHardwareState(void){
             rfHardwareState = RFCWMark;
             break;
         }
+        // ATU tuning: carrier off with the T/R relay held in TX, so the tuner can
+        // switch its relays between readings without cycling the T/R relay
+        case (ModeSm_StateId_ATU_TUNE_SPACE):
         case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_SPACE):
         case (ModeSm_StateId_CW_TRANSMIT_KEYER_SPACE):
@@ -652,6 +702,10 @@ void HandleTuneState(TuneState tuneState){
     SelectLPFBand(ED.currentBand[ED.activeVFO]);
     SelectBPFBand(ED.currentBand[ED.activeVFO]);
     SelectAntenna(ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
+#ifdef ATU_PRESENT
+    // The stored ATU setting for this band and antenna, when either changes
+    ATUApplyStoredIfChanged(ED.currentBand[ED.activeVFO], ED.antennaSelection[ED.currentBand[ED.activeVFO]]);
+#endif
     UpdateFIRFilterMask(&RXfilters);
     switch (tuneState){
         case TuneReceive:{
@@ -743,6 +797,8 @@ void UpdateTuneState(void){
             tuneState = TuneSSBTX;
             break;
         }
+        case (ModeSm_StateId_ATU_TUNE_SPACE):
+        case (ModeSm_StateId_ATU_TUNE_MARK):
         case (ModeSm_StateId_CALIBRATE_POWER_SPACE):
         case (ModeSm_StateId_CALIBRATE_POWER_MARK):
         case (ModeSm_StateId_CW_TRANSMIT_DIT_MARK):

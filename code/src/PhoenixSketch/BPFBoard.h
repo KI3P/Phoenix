@@ -20,7 +20,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #define BPF_CONTROL_H
 
 // BPF control macros
-#define SET_BPF_BAND(val) (hardwareRegister = (hardwareRegister & 0x0FFFFFFF) | (((uint64_t)val & 0x0000000F) << BPFBAND0BIT));buffer_add()
+#define SET_BPF_BAND(val) (hardwareRegister = (hardwareRegister & ~(0xFULL << BPFBAND0BIT)) | (((uint64_t)val & 0x0000000F) << BPFBAND0BIT));buffer_add()
 #define GET_BPF_BAND ((hardwareRegister & 0xF0000000) >> BPFBAND0BIT)
 
 /*

@@ -30,6 +30,14 @@
 static uint8_t mock_device_address = SI5351_DUAL_VFO_ADDR;  // Default to dual VFO for backwards compatibility
 //static uint8_t mock_device_address = SI5351_BUS_BASE_ADDR;
 
+// The correction (ppb) the firmware last gave init() or set_correction()
+static int32_t mock_correction = 0;
+
+/** The correction factor the firmware programmed, in ppb (for the simulator) */
+int32_t Si5351_Mock_GetCorrection(void) {
+    return mock_correction;
+}
+
 // Function to control mock behavior from tests
 void Si5351_Mock_SetDeviceAddress(uint8_t addr) {
     mock_device_address = addr;
@@ -77,6 +85,7 @@ void Si5351::set_address(uint8_t i2c_addr)
  *
  */
 bool Si5351::init(uint8_t xtal_load_c, uint32_t xo_freq, int32_t corr){
+    mock_correction = corr;
     // Only return true if our current address matches the mock device address
     return (i2c_bus_addr == mock_device_address);
 }
@@ -88,6 +97,9 @@ bool Si5351::init(uint8_t xtal_load_c, uint32_t xo_freq, int32_t corr){
  *
  */
 void Si5351::reset(void){
+    // As the real library: no outputs have a frequency after a reset
+    for (uint8_t i = 0; i < 8; i++)
+        clk_freq[i] = 0;
 }
 
 /*
@@ -102,6 +114,19 @@ void Si5351::reset(void){
  */
 uint8_t Si5351::set_freq(uint64_t freq, enum si5351_clock clk){
     clk_freq[clk] = freq;
+    // CLK6 and CLK7 are integer-only dividers. As in the real library, setting one
+    // when the other is unused retunes PLLB to the largest even multiple of freq
+    // that fits the VCO range, which moves every other output on PLLB too.
+    if ((clk == SI5351_CLK6 && clk_freq[SI5351_CLK7] == 0) ||
+        (clk == SI5351_CLK7 && clk_freq[SI5351_CLK6] == 0)){
+        uint64_t a = (SI5351_PLL_VCO_MAX * SI5351_FREQ_MULT - 100000000ULL) / freq;
+        if (a % 2 != 0) a++;
+        if (a < SI5351_MULTISYNTH_A_MIN) a = SI5351_MULTISYNTH_A_MIN;
+        if (a > SI5351_MULTISYNTH67_A_MAX) a = SI5351_MULTISYNTH67_A_MAX;
+        if (a * freq > SI5351_PLL_VCO_MAX * SI5351_FREQ_MULT) a -= 2;
+        else if (a * freq < SI5351_PLL_VCO_MIN * SI5351_FREQ_MULT) a += 2;
+        pllb_freq = a * freq;
+    }
     return 0;
 }
 
@@ -232,7 +257,9 @@ void Si5351::update_status(void)
  * crystal.
  */
 void Si5351::set_correction(int32_t corr, enum si5351_pll_input ref_osc)
-{}
+{
+    mock_correction = corr;
+}
 
 /*
  * set_phase(enum si5351_clock clk, uint8_t phase)
@@ -264,7 +291,7 @@ void Si5351::set_phase(enum si5351_clock clk, uint8_t phase)
  */
 int32_t Si5351::get_correction(enum si5351_pll_input ref_osc)
 {
-	return 0;
+	return mock_correction;
 }
 
 /*

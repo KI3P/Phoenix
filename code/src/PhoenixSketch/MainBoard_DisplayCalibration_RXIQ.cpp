@@ -219,17 +219,20 @@ void DecrementRXIQAmp(void){
 int8_t oldincind = 5;
 float32_t oldamp = -5.0;
 float32_t oldphase = -5.0;
+static int32_t oldRXIQband = -1;
 /**
  * @brief Render the RX IQ current band adjustment values pane
  * @note Shows band name, amplitude, phase, and increment values
  * @note Updates when user adjusts parameters or changes bands
  */
 static void DrawAdjustPane(void){
-    if ((oldincind != incindex) || 
+    if ((oldincind != incindex) ||
+        (oldRXIQband != ED.currentBand[ED.activeVFO]) ||
         (oldamp != ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]]) || 
         (oldphase != ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]]))
         PaneAdjust.stale = true;
     oldincind = incindex;
+    oldRXIQband = ED.currentBand[ED.activeVFO];
     oldamp = ED.IQAmpCorrectionFactor[ED.currentBand[ED.activeVFO]];
     oldphase = ED.IQPhaseCorrectionFactor[ED.currentBand[ED.activeVFO]];
 

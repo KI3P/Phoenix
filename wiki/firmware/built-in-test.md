@@ -3,7 +3,7 @@ title: Built-In Test (BIT) — I²C hardware presence
 type: module
 status: draft
 created: 2026-06-09
-updated: 2026-06-09
+updated: 2026-11-14
 tags: [bit, self-test, i2c, diagnostics, startup, hardware]
 source_refs: []
 related: ["[[overview]]", "[[rf-board]]", "[[filter-boards]]", "[[front-panel]]", "[[ui-state-machine]]", "[[main-loop]]", "[[persistent-config]]", "[[i2c-bus-map]]", "[[hardware-platform]]"]
@@ -28,6 +28,7 @@ One global `bit_results` (`Globals.cpp:69`) of booleans, one per I²C subsystem:
 | `V12_LPF_AD7991_present` | LPF board AD7991 power ADC |
 | `FRONT_PANEL_I2C_present` | front-panel MCP23017(s) ([[front-panel]]) |
 | `AD7991_I2C_ADDR` | detected AD7991 address (uint8) |
+| `ATU_MCP23017_present` / `ATU_MCP23008_present` | ATU control board expanders, 0x20 and 0x21 on Wire2 ([[atu-board]]); shown only when built with `ATU_PRESENT` |
 
 ## How it's populated
 Not a separate test pass — each board's **`Initialize*` routine sets its flag** as a side

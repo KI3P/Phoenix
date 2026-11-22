@@ -320,6 +320,40 @@ TEST(RFBoard, SetCWVFOFrequency_Test) {
     EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702615000);
 }
 
+// Changing the frequency correction resets the Si5351, which leaves every output
+// without a frequency. The TX and CW VFOs must be reprogrammed the next time they
+// are set, even to the frequency they had before the reset.
+TEST(RFBoard, FrequencyCorrectionReprogramsTXAndCWVFOs) {
+    si5351 = Si5351(); // Reset mock
+    ResetVFOState();
+    SetDualVFOs(true);
+    SetRXVFOFrequency(707400000);
+    SetTXVFOFrequency(707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK4], 707400000);
+    SetFrequencyCorrectionFactor(1234);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK0], 707400000); // RX restored by the correction
+    SetTXVFOFrequency(707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK4], 707400000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK5], 707400000);
+
+    SetCWVFOFrequency(702515000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 702515000);
+    SetFrequencyCorrectionFactor(0);
+    SetCWVFOFrequency(702515000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK6], 702515000);
+
+    // Single VFO: the CW output is CLK2
+    si5351 = Si5351();
+    ResetVFOState();
+    SetDualVFOs(false);
+    SetCWVFOFrequency(702615000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702615000);
+    SetFrequencyCorrectionFactor(1234);
+    SetCWVFOFrequency(702615000);
+    EXPECT_EQ(si5351.clk_freq[SI5351_CLK2], 702615000);
+    SetDualVFOs(true);
+}
+
 TEST(RFBoard, EnableCWVFOOutput_Test) {
     si5351 = Si5351(); // Reset mock
     SetDualVFOs(true);
@@ -470,4 +504,18 @@ TEST(RFBoard, CWoff_Test) {
     CWoff();
     EXPECT_EQ(getPinMode(CW_ON_OFF), OUTPUT);
     EXPECT_EQ(digitalRead(CW_ON_OFF),0);
+}
+
+// The attenuator setters must not clear bits 32-63 of hardwareRegister
+// (TXVFOBIT and the ATU bits). They used to, because their masks were 32-bit literals.
+TEST(RFBoard, AttenuatorSettersPreserveUpperRegisterBits) {
+    const uint64_t upper = 0x000FFFFF00000000ULL;   // bits 32-51
+    hardwareRegister |= upper;
+
+    SetRXAttenuation(10.5);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+    SetTXAttenuation(20.0);
+    EXPECT_EQ(hardwareRegister & upper, upper);
+
+    hardwareRegister &= ~upper;
 }

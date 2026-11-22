@@ -95,6 +95,10 @@ If not, see <https://www.gnu.org/licenses/>.
  *  Quad channels | 0                   | 1                   |
  *  Mixer name    | modeSelectInExL[0]  | modeSelectInExR[0]  |
  *  Record queue  | Q_in_L_Ex           | Q_in_R_Ex           |
+ * The microphone mixers have three other sources on their other ports:
+ *  1: transmitIQcal_oscillator (TX IQ and power calibration tone)
+ *  2: testToneA_oscillator     (SSB test tone, single or the lower of two)
+ *  3: testToneB_oscillator     (SSB test tone, the upper of two)
  * 
  * Receive IQ:
  *  Quad channels | 2                   | 3                   |
@@ -163,11 +167,24 @@ AudioConnection          patchCord22(modeSelectOutR, 0, i2s_quadOut, 3);
 AudioControlSGTL5000     pcm5102_mainBoard; //xy=874.75,449
 // GUItool: end automatically generated code
 
+// SSB transmit test tones, in place of the microphone. Added by hand after the
+// GUI tool's output. See SetTXAudioSource().
+AudioSynthWaveformSine   testToneA_oscillator;
+AudioSynthWaveformSine   testToneB_oscillator;
+AudioConnection          patchCord23(testToneA_oscillator, 0, modeSelectInExL, 2);
+AudioConnection          patchCord24(testToneA_oscillator, 0, modeSelectInExR, 2);
+AudioConnection          patchCord25(testToneB_oscillator, 0, modeSelectInExL, 3);
+AudioConnection          patchCord26(testToneB_oscillator, 0, modeSelectInExR, 3);
+
 // Controller for the Teensy Audio Board. The web tool doesn't recognize the class
 // type, so this variable is not included in the web tool's output.
 AudioControlSGTL5000_Extended sgtl5000_teensy;
 
 static ModeSm_StateId previousAudioIOState = ModeSm_StateId_ROOT;
+
+// SSB transmit audio source. Deliberately not part of ED, so it is never saved
+// and the radio always starts on the microphone.
+static TXAudioSource txAudioSource = TX_SOURCE_MIC;
 
 /**
  * Get the previous audio I/O state.
@@ -218,6 +235,103 @@ void MuteMixerChannels(AudioMixer4 *mixer){
 }
 
 /**
+ * Convert a test-tone frequency in Hz to the value AudioSynthWaveformSine wants.
+ * The audio library assumes AUDIO_SAMPLE_RATE_EXACT, so scale for the actual rate.
+ */
+static float ToneFrequencySetting(float f_Hz){
+    return f_Hz*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate;
+}
+
+/**
+ * Set the test-tone oscillators for the current transmit audio source.
+ *
+ * Unused oscillators get amplitude 0: the audio library's sine object then
+ * skips allocating and transmitting a block, so they cost nothing while the
+ * microphone is selected.
+ */
+static void SetTestToneOscillators(void){
+    switch (txAudioSource){
+        case TX_SOURCE_SINGLE_TONE:
+            testToneA_oscillator.frequency(ToneFrequencySetting(TEST_TONE_SINGLE_HZ));
+            testToneA_oscillator.amplitude(TEST_TONE_SINGLE_AMPLITUDE);
+            testToneB_oscillator.frequency(ToneFrequencySetting(TEST_TONE_TWO_B_HZ));
+            testToneB_oscillator.amplitude(0);
+            break;
+        case TX_SOURCE_TWO_TONE:
+            testToneA_oscillator.frequency(ToneFrequencySetting(TEST_TONE_TWO_A_HZ));
+            testToneA_oscillator.amplitude(TEST_TONE_TWO_AMPLITUDE);
+            testToneB_oscillator.frequency(ToneFrequencySetting(TEST_TONE_TWO_B_HZ));
+            testToneB_oscillator.amplitude(TEST_TONE_TWO_AMPLITUDE);
+            break;
+        case TX_SOURCE_MIC:
+        default:
+            testToneA_oscillator.frequency(ToneFrequencySetting(TEST_TONE_SINGLE_HZ));
+            testToneA_oscillator.amplitude(0);
+            testToneB_oscillator.frequency(ToneFrequencySetting(TEST_TONE_TWO_B_HZ));
+            testToneB_oscillator.amplitude(0);
+            break;
+    }
+}
+
+/**
+ * Route the selected SSB transmit audio source through one microphone mixer.
+ * Microphone is port 0, the single tone is port 2, and the two-tone signal is
+ * ports 2 and 3 summed (the two oscillators' amplitudes are halved so the sum
+ * peaks where the single tone does).
+ */
+static void SelectTXAudioInput(AudioMixer4 *mixer){
+    switch (txAudioSource){
+        case TX_SOURCE_SINGLE_TONE:
+            SelectMixerChannel(mixer, 2);
+            break;
+        case TX_SOURCE_TWO_TONE:
+            mixer->gain(0, 0);
+            mixer->gain(1, 0);
+            mixer->gain(2, 1);
+            mixer->gain(3, 1);
+            break;
+        case TX_SOURCE_MIC:
+        default:
+            SelectMixerChannel(mixer, 0);
+            break;
+    }
+}
+
+/**
+ * Select the SSB transmit audio source: the microphone, a single test tone, or
+ * two equal tones for intermodulation tests.
+ *
+ * The tones are injected at the microphone input mixers, so they pass through
+ * the whole transmit chain (equalizer, Hilbert transform, CESSB, power gain) as
+ * a generator plugged into the microphone jack would. The microphone gain is
+ * applied in the codec and does not affect them. Only SSB transmit uses the
+ * source; digital mode and the calibrations have their own.
+ *
+ * Takes effect at once, including during SSB transmit.
+ *
+ * @param source A TXAudioSource value
+ * @return true if accepted, false (and no change) if out of range
+ */
+bool SetTXAudioSource(int32_t source){
+    if ((source < 0) || (source >= TX_SOURCE_COUNT))
+        return false;
+    txAudioSource = (TXAudioSource)source;
+    SetTestToneOscillators();
+    if (modeSM.state_id == ModeSm_StateId_SSB_TRANSMIT){
+        SelectTXAudioInput(&modeSelectInExL);
+        SelectTXAudioInput(&modeSelectInExR);
+    }
+    return true;
+}
+
+/**
+ * The current SSB transmit audio source.
+ */
+TXAudioSource GetTXAudioSource(void){
+    return txAudioSource;
+}
+
+/**
  * Update the microphone gain for SSB transmission.
  *
  * Applies the current microphone gain setting (ED.currentMicGain) to the
@@ -230,7 +344,25 @@ void MuteMixerChannels(AudioMixer4 *mixer){
  * - Restoring settings from storage
  */
 void UpdateTransmitAudioGain(void){
-    sgtl5000_teensy.micGain(ED.currentMicGain);
+    sgtl5000_teensy.micGain(MicGainForCodec(ED.currentMicGain));
+}
+
+/**
+ * Convert the microphone gain setting to the value the SGTL5000 accepts.
+ *
+ * AudioControlSGTL5000::micGain() takes an unsigned dB value, and the codec can
+ * only add gain (preamp 0/20/30/40 dB plus up to 22.5 dB of input gain). The
+ * setting can be negative - the menu goes down to -10 and CAT MG to -40 - and a
+ * negative int passed straight through wraps to a huge unsigned value, which
+ * selects the maximum gain. Clamp instead: anything below 0 dB is 0 dB.
+ *
+ * @param gain_dB Requested microphone gain, ED.currentMicGain
+ * @return Gain for micGain(), 0 to 63 dB
+ */
+uint32_t MicGainForCodec(int32_t gain_dB){
+    if (gain_dB < 0) return 0;
+    if (gain_dB > 63) return 63;
+    return (uint32_t)gain_dB;
 }
 
 /**
@@ -267,7 +399,8 @@ void UpdateSidetoneOscillator(void){
  * - Start microphone input queues (Q_in_L_Ex, Q_in_R_Ex)
  * - Stop RX I/Q input queues
  * - Apply microphone gain setting
- * - Route microphone (channels 0,1) → DSP → TX I/Q output
+ * - Route microphone (channels 0,1) → DSP → TX I/Q output, or the test tone(s)
+ *   in its place if SetTXAudioSource() selected one
  * - Mute speaker and RX I/Q inputs
  *
  * **CW_TRANSMIT_*_MARK (dit, dah, or straight key):**
@@ -332,11 +465,11 @@ void UpdateAudioIOState(void){
             // Microphone input starts
             Q_in_L_Ex.begin(); 
             Q_in_R_Ex.begin();
-            sgtl5000_teensy.micGain(ED.currentMicGain);
+            sgtl5000_teensy.micGain(MicGainForCodec(ED.currentMicGain));
 
-            // Input is microphone
-            SelectMixerChannel(&modeSelectInExL,0);
-            SelectMixerChannel(&modeSelectInExR,0);
+            // Input is the microphone, or a test tone if one is selected
+            SelectTXAudioInput(&modeSelectInExL);
+            SelectTXAudioInput(&modeSelectInExR);
             // Output is samples to RF transmit
             SelectMixerChannel(&modeSelectOutExL,0);
             SelectMixerChannel(&modeSelectOutExR,0);
@@ -530,12 +663,13 @@ void InitializeAudio(void){
 /**
  * Set the frequencies of the synthesized oscillators that are specified relative
  * to the audio sample rate. These must be recomputed whenever the sample rate
- * changes so that the sidetone and TX IQ calibration tones stay at the correct
+ * changes so that the sidetone, TX IQ calibration and test tones stay at the correct
  * audible frequency.
  */
 void UpdateSampleRateDependentOscillators(void){
     sidetone_oscillator.frequency(SIDETONE_FREQUENCY*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate);
     transmitIQcal_oscillator.frequency(800.0f*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate);
+    SetTestToneOscillators();
 }
 
 /**
@@ -580,7 +714,7 @@ void ChangeSampleRate(uint8_t newRate){
     // decimation filters are re-allocated here; InitializeDecimationFilter frees
     // the previous allocations so this does not leak on repeated changes.
     InitializeSignalProcessing();
-    // Keep the sidetone / cal oscillators at the correct audible frequency
+    // Keep the sidetone / cal / test-tone oscillators at the correct audible frequency
     UpdateSampleRateDependentOscillators();
     // Discard samples that were captured at the old rate
     Q_in_L.clear();

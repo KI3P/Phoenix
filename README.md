@@ -16,6 +16,7 @@ Some of the features of the T41 V12 hardware running the Phoenix firmware:
 * Noise reduction via a variety of algorithms.
 * Receive and transmit audio equalizers.
 * Automated calibration routines for receive IQ balance, transmit IQ balance, transmit carrier nulling, and PA output power.
+* Automatic power and SWR calibration of every band from a dummy load, an open and a short, with optional wattmeter readings.
 * Selectable sample rate: 192 or 176.4 ksps, chosen at run time and persisted, with the audio filters redesigned on each change so their frequencies do not move.
 * Digital mode: bi-directional USB audio for FT8 and the other WSJT-X modes, with no external sound card and no resampling.
 * CAT control.
@@ -33,6 +34,7 @@ The hardware design files for the V12 radio modules can be found at the followin
 * [Front panel encoder boards](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_Encoder_Boards)
 * [LPF module](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_LPF_Module)
 * [20W amplifier module](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_20W_PA)
+* [Antenna Tuner](https://github.com/DRWJSCHMIDT/K9HZ/tree/main/K9HZ_Antenna_Tuner)
 
 The latest version (V12.6) of the bare PCBs are available for less than $5 each on the [discussion forum](https://groups.io/g/SoftwareControlledHamRadio) by contacting Bill K9HZ. If you prefer a partially-assembled kit,  Justin AI6YM sells them on his [website](https://ai6ym.radio/t41-ep-sdt/).
 
@@ -60,6 +62,177 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 ![](images/Home_screen_button_map.png)
 
 # Version History
+
+## V1.6.0 Release Notes
+
+### Major New Features
+
+**Controlled Envelope SSB (CESSB)**
+An optional speech processor for SSB voice. It holds the transmitted peaks to the power setting and raises the average power, so the voice carries further for the same PEP. It is off by default: enable it from **Menu → Microphone → Enable CESSB**.
+
+- **The SSB power setting becomes a peak limit.** However hard the voice is driven, PEP stays at the setting. On the bench, a 5 W setting gave 5.06 W PEP over 9 dB of overdrive. Without CESSB, loud peaks could exceed the setting.
+- **More talk power.** The **CESSB level (dB)** item sets how hard the voice is pushed into the limiter. Measured at the antenna on a voice-like test signal, levels 3, 6 and 9 dB gain +2.7, +4.5 and +5.7 dB of average power at the same PEP. 4–6 dB is the usual choice.
+- **Little splatter of its own.** The stage filters what it clips, so its distortion stays inside the channel. In the model, a two-tone at 6 dB of drive leaves −63 dBc in the opposite sideband, against −11 dBc for the zero-IF form used elsewhere. At the antenna the PA's own intermodulation dominates. The one product CESSB adds is 2f₂−f₁ of a two-tone held past the ceiling, just above the channel: −32 dB re PEP at 6 dB of drive, against the PA's −38 dB.
+- **A compression meter.** While CESSB runs, the transmit pane's Q bar becomes a **C** bar: the dB by which the voice peaks are being pushed past the limit, 0–12 dB, green to 6, yellow to 9, red beyond.
+- **Only SSB voice is affected.** Digital (USB audio) modes, CW, tune and the calibrations bypass it automatically. It adds about 5 ms of transmit latency and 0.7 ms of processing per 11.6 ms audio block.
+- **CAT control** with the Kenwood speech-processor commands: `PR` switches it on and off, `PL` sets the level (10 per dB), and `RM2;` then `RM;` read the compression meter (2 dB per dot).
+
+The design, the setup procedure and every bench and RF measurement are in `code/docs/CESSB_Report.html`.
+
+**SSB transmit test tones**
+The SSB transmit audio can now come from a built-in 1 kHz tone or a 700 + 1900 Hz two-tone instead of the microphone, for power checks and intermodulation tests without a signal generator. The tones go through the whole transmit chain, CESSB included.
+
+- Choose the source with the **TX src** item in the Microphone menu (Microphone → 1 kHz tone → 2-tone IMD), or over CAT with `TT0;`, `TT1;`, `TT2;`.
+- With CESSB off, the single tone comes out at the power setting, and the two-tone's PEP is the power setting.
+- The setting is not saved: the radio always starts on the microphone. The settings pane shows the source, in red while a test tone is selected.
+
+**Calibration guide**
+`code/docs/CalibrationGuide/Calibration_Guide.html` takes you through calibrating a finished radio, in order: frequency, receive IQ, transmit IQ, power and SWR, and the S-meter. It covers single- and dual-VFO RF boards, with the equipment for each step, button maps and screenshots.
+
+### Improvements
+
+- **Settings pane.** A new row shows the **Mic Gain** and **CESSB** (Off, or the level). Key Type moves down one row.
+- **The Microphone menu** now holds everything for the transmit audio: mic gain, the USB levels, the transmit source and the two CESSB items.
+- **The automatic carrier null** (button 14, dual-VFO radios with a direct-coupled transmitter) is more reliable.
+  - Each band starts from its stored offsets.
+  - A pass counts only if its best reading stands at least 3 dB above the rest.
+  - The coarse passes wait long enough for the spectrum to settle.
+  - A band that finds nothing keeps its old offsets.
+- **The Transmit IQ automatic run** calibrates every band from 160 m, like the Receive IQ run, whatever band is on screen. Both transmit calibrations skip general-coverage bands, where transmit is disabled.
+
+### Bug Fixes
+
+- **Negative mic gain gave maximum gain.** The codec's mic gain is unsigned, so a setting below 0 dB (the menu goes to −10, CAT `MG` to −40) wrapped to the maximum. It is now held at 0 dB.
+- **Frequency calibration could leave the transmit and CW oscillators off.** Applying the correction resets the Si5351, but only the receive VFO was reprogrammed. The transmit and CW oscillators stayed off until the frequency changed.
+- **A failed automatic IQ or carrier calibration corrupted every band.** A sweep pass with no valid reading wrote the previous pass's value (e.g. an amplitude of −0.049), and leaving the screen saved it. A pass that finds nothing now leaves the setting alone.
+- **Leaving an IQ calibration with HOME** while keyed, or during an automatic run, left the mode machine keyed or the run stepping. The run kept going and saved a trial setting. HOME now stops the run, restores the band being swept and releases the PTT.
+- **Single-VFO Transmit IQ keyed at the wrong attenuation.** The first key-down was at full drive, and later ones at 31.5 dB whatever the screen showed. The screen now opens at 31.5 dB, and every key-down uses the value shown.
+- **The carrier null ran on single-VFO radios,** which can't measure the carrier. It now needs a dual-VFO radio.
+- **The SAM carrier offset read 5× too high.** It is shown as the frequency calibration's Error and the home screen's Err, and now reads in Hz.
+- **The Receive IQ screen kept the previous band's name** when the bands had identical settings.
+- **ATU:** a band or antenna change during a tune (possible over CAT) now ends the tune instead of storing its result under the wrong band. A stopped retune of a bypassed antenna keeps its stored setting. Clearing an antenna's memory while transmitting takes effect on return to receive.
+- **CAT `PS1;` switched the radio off.** Kenwood's power-on command (used by Hamlib) shut the radio down like `PS0;`. It now does nothing.
+
+### Under-the-Hood Changes
+
+- **CAT commands** checked against the Kenwood TS-480 specification; the table now has 43.
+  - Renamed so they no longer clash with Kenwood commands: the sample rate is now `XS` (Kenwood `SR` is a reset), and the hardware-register dump is now `HR` (Kenwood `PR` is the speech processor).
+  - New: `PR`, `PL` and `RM` for CESSB, and `TT` for the transmit test tones.
+- **New stored settings:** CESSB on/off and level.
+- **Test tools:**
+  - `code/tools/cessb_model`: an offline model of the transmit chain, built from the firmware's own filter coefficients.
+  - `code/tools/cessb_hil`: bench suites that drive the microphone input from an Analog Discovery 2 and measure the exciter, or the antenna connector through a CMU200, plus the two-tone splatter matrix.
+  - The radio simulator now provides the test signals and power bridge for every calibration, and `cal_walkthrough` plays through all of them.
+- **Tests:** the unit tests have grown to 1037.
+
+## V1.5.1 Release Notes
+
+### Major New Features
+
+**Support for the K9HZ Automatic Antenna Tuner**
+Phoenix now drives the K9HZ ATU board: an L-network of 8 switched inductors and 8 switched capacitors, which can sit on either side of the inductors, with a bypass and a 4:1 balun output. Support is off by default. Enable it by defining `ATU_PRESENT` in `code/src/PhoenixSketch/Config.h`. The tuner's two I/O expanders appear on the BIT screen.
+
+- **Automatic tuning with no calibration.** The tuner needs no characterisation of the board, no VNA measurements and no model of the network. Hand-wound coils that differ from build to build don't matter.
+  - It transmits a low-power carrier (2 W by default) and ranks relay settings by the SWR the radio's bridge measures.
+  - It first finds, for each inductor, the capacitor that matches best. That traces the narrow valley of good settings across the L/C grid.
+  - It then fine-tunes from the lowest point of the valley.
+  - It stops at SWR 1.2 or better, or after 120 readings. It leaves the best setting it read, and an antenna that is already 1.3 or better stays bypassed.
+- **Bench results.** On the prototype, 100 Ω and 200 Ω loads tuned to SWR 1.05–1.41 on 80–10 m in 3–6 s.
+- **Memory per band and per antenna.** Each tune is stored for the band and the antenna in use (RF Options → Antenna). Selecting a band or an antenna puts its stored setting on the relays, so a setting tuned for one antenna is never used on another. Relays never switch while transmitting.
+- **Button 16 tunes.** Button 16, previously unassigned, starts a fresh tune of the current band and antenna and stores the result. Pressing any button stops a tune and puts the previous setting back.
+- **The home screen shows the tuner.** Two lines to the right of SWR and PWR show:
+
+  | When | Shown | Colour |
+  |---|---|---|
+  | Network in line | Topology and nominal inductance and capacitance, e.g. `CL 0.82uH` / `157pF` | White |
+  | Network bypassed | `ATU BYP` | White |
+  | ATU bypassed on this antenna | `ATU OFF` | White |
+  | Tuning | `TUNING` and the reading count | Yellow |
+  | For 3 s after the tuner refuses or fails | `TUNE` and the reason, e.g. `MODE` or `NO CAL` | Red |
+
+- **A simple ATU menu.** All six items act on the current antenna:
+
+  | Item | Does |
+  |---|---|
+  | **Bypass ATU** / **Enable ATU** | Bypasses or enables the ATU on this antenna. Tuning re-enables it. |
+  | **Tuning status table** | Opens a page showing what is stored on each band. |
+  | **Clear memory, ant N** | Clears the stored settings. Needs a second press to confirm. |
+  | **Tune** | Starts a tune, the same as button 16. |
+  | **Tune power (W)** | Sets the carrier power for tuning. |
+  | **Output: coax** / **Output: balun** | Chooses which ATU output this antenna is on. |
+
+- **CAT control.** The Kenwood `AC` command bypasses or enables the tuner and starts or stops a tune. A radio built without the ATU answers `AC000;`, as a radio with no tuner does.
+
+The tuner starts only from SSB or CW receive, on a band where transmit is allowed and the SWR bridge is calibrated. The balun output, reactive loads and 100 W have not yet been tested. See the wiki pages `firmware/atu-control.md` and `roadmap/atu-auto-tuning.md`.
+
+### Bug Fixes
+
+- **The display could freeze the radio.** The LPSPI that drives the display ran from a 240 MHz clock and occasionally lost a received byte. The main loop then waited forever inside a display call, while USB kept running, so CAT went silent with no reboot. It now runs from 132 MHz, and display writes run at 18.9 MHz instead of 20 MHz. Over 10 minutes the old clock hung 8 times and the new one never did.
+- **Reboot loop with some Optimize settings.** The zoom FFT and the IQ phase correction put 24 KB of scratch buffers on the stack. Builds whose code fills more of the Teensy's fast memory left too little room for that, and -O2 LTO rebooted 8 s after every start. The buffers now live in OCRAM, and peak stack use fell from 17.5 KB to 3.6 KB.
+- **CAT `FA;`, `FB;` and `IF;` replies were garbled on the radio.** The Teensy's `printf` doesn't support `%lld`, so `FA;` answered `FA0000000000ld;`. The same bug showed "ld" on screen for the fine tune step and the power calibration frequency.
+- **Every band, antenna or attenuator change cleared the upper 32 bits of the hardware register.** That reset the transmit VFO bit in the register record. It would also have reset the ATU relays, which live in those bits.
+- **One click of an encoder could jump several menu items.** The encoder decoder counted a step each time the second contact read closed, and stayed armed while steps kept coming. A contact that chatters as it closes then counted once per chatter: one clockwise click of the Filter knob on the KI3P prototype counted +19, while the other direction was clean. The decoder now counts a step only after the full sequence of contact states, so chatter can't add steps; on the same knob every click counts exactly one. Each encoder also keeps its own decoder state, which the four encoders used to share.
+- **Two GCC 15 warnings (Teensyduino 1.62).**
+  - The Si5351 driver freed an array with `delete` instead of `delete[]`. It now uses a local array, which also removes a heap allocation from every PLL change.
+  - The zoom label's buffer was one byte too short.
+
+### Under-the-Hood Changes
+
+- **New CAT commands**, bringing the table to 39:
+  - `AC`: Kenwood antenna tuner control.
+  - `AT`: set or read every ATU relay, for bench work.
+  - `AX`: tuner diagnostics (tune, abort, last result, forget one band).
+  - `AY`: the tuner's readings, 12 per page.
+- **New stored settings:** the ATU memory (setting, frequency and SWR per band and antenna), the tune power, and per antenna the ATU enable and output.
+- **A new UI state, `ATU_STATUS`,** for the tuning status table. `UISm` was regenerated with StateSmith 0.20.
+- **Tests:** the unit tests have grown to 969. `all_ATU_tests` is built with `ATU_PRESENT` and runs the tuner against a circuit model of the board, fitted from VNA measurements. The model is used only in the tests, never in the firmware. The tests tune 15 loads on each of 80–10 m on simulated builds whose coils and capacitors are 5 % and 12 % off, and check the result against the best each build can reach. `code/tools/atu_vna/search_sim.py` runs the same search offline.
+
+## V1.5.0 Release Notes
+
+### Major New Features
+
+**Automatic Power and SWR Calibration**
+A single session now calibrates the PA power curve, the SSB gain and the SWR bridge on every band from 160 m to 6 m. Fit a 50 Ω load, then leave the connector open, then fit a short. The radio keys itself, steps the drive and measures every band on each standard in turn. A review screen then shows each band's result before anything is stored. There are three levels:
+
+| Level | Equipment | Wattmeter readings | Power display accuracy |
+|---|---|---|---|
+| 1 | 50 Ω dummy load, short | none | within about ±1.5 dB |
+| 2 (recommended) | wattmeter with its 50 Ω load, short | 2 per band | about ±0.3 dB, worst ±0.8 dB |
+| 3 | wattmeter with its 50 Ω load, short | 8 per band | about ±0.2 dB |
+
+The SWR reading is almost equally good at every level, because the reflected line is fitted from the open and the short against the forward line. Start it from the power calibration screen with button 1. The automatic calibration runs with the 20 W PA only. It has been run and validated on multiple radios. See [the operator's guide](code/docs/PowerCalibration/AutoCalibration.md) and, for developers, [the design](code/docs/PowerCalibration/AutoCalibrationDesign.md).
+
+The session protects the PA:
+- The open and short are measured with short bursts of SSB tone, with the radio in true receive between bursts.
+- A PA oscillating into the open or the short is detected, and that sweep is abandoned.
+- A missing or loose load fails the band instead of corrupting its PA curve.
+- ZOOM stops transmitting at once.
+
+**Accurate SWR Readings**
+SWR used to read 30–90 % high, and the cause was the radio's AD7991 ADC rather than the bridge: its sampling capacitor still held 15–19 % of the previous channel's voltage, which pulled the forward and reflected readings toward each other. The firmware now discards two conversions after each channel switch. After calibration, a bench radio reads a 2:1 load as 1.97–2.04 and a 4:1 load as 3.96–4.22 on 160 m to 20 m. A bridge reading now takes about 3 ms, while transmitting only.
+
+**More Accurate PA Power Curve**
+The PA's output is now modelled as P = P_sat·tanh((k·x)^s)^(1/s), where the new shape exponent s sets how sharp the knee is. The curve is fitted in dB by Levenberg–Marquardt in double precision. On measured sweeps the curve's rms miss fell from 0.69 dB (worst band 1.64 dB) to 0.16 dB (worst band 0.50 dB). A configuration saved by an earlier version loads with s = 1, its old curve. The manual power calibration, with only three points, still fits the plain tanh.
+
+**Measured Defaults for an Uncalibrated Radio**
+A radio with no saved configuration now starts on 160–6 m from a measured bridge calibration and PA curve, instead of zeros and one generic curve. Before this, an uncalibrated radio's power display read about 4 dB high. Radios with a saved configuration keep their own values.
+
+### Bug Fixes
+
+- **No SSB output after a CW transmit on the same frequency** (dual-VFO boards). The CW output and the SSB transmit outputs share the Si5351's PLLB, and setting the CW frequency retunes it. The SSB transmit VFO skipped what it thought was a repeated write and was left at the wrong frequency. This showed up as no output at step 4 of the manual power calibration.
+- **The manual power calibration's SSB step stored the wrong correction.** It ignored the DSP gain applied during the measurement, so with SSB power at 3 W the radio transmitted about 5 W.
+- **The power calibration screen's Transmit indicator always read Off.**
+- **Serial time sync with the Serial + MIDI + Audio USB type.** CAT and the time sync share the one serial port in this build. The CAT reader swallowed the time packet, so the clock was never set, and the next CAT command was answered `?;`. Newline-terminated input is now recognised as not being CAT. This also fixes CAT clients that end their commands with CRLF.
+- **The CW decoder text grew large** if the fine tune encoder was turned in CW mode with the decoder on *(reported by Rick Price, KN4AIE)*.
+
+### Under-the-Hood Changes
+
+- **New CAT commands**, bringing the table to 35, for taking bench measurements of the SWR bridge: `BR` (statistics of the raw bridge readings), `XA` (CW transmit attenuation override) and `DD` (USB drive level). `PC` now reads all three digits and sets the SSB power in DIGITAL mode. `BR` is refused while the automatic calibration runs.
+- **New stored settings:** the PA curve shape per band and PA, and per band the SWR calibration level and date, plus the number of turns on the coupler L44.
+- **Diagnostics → Print stored data** prints every stored setting over Serial, with the calibrations to 3 decimals.
+- **Cross-platform scripts** set the radio's clock from a PC: `code/tools/set_radio_time.py` (Python) and `code/tools/Set-RadioTime.ps1` (Windows PowerShell).
+- **Tests:** the unit tests have grown to 904. They include an end-to-end suite that runs the firmware's real timer and main loop against a simulated bench, operated only through the buttons and encoders. A monitor checks after every pass that the radio never transmits outside a measurement and never changes band while keyed.
+- **The wiki** has a new page on the automatic calibration and covers the other changes above.
 
 ## V1.4.1 Release Notes
 
@@ -225,7 +398,19 @@ The comprehensive unit tests, mocking functions, and their build files are locat
 * **Unit tests**: `code/test`
 
 The same directory also builds the **desktop radio simulator** (`RadioSimulator_main.cpp` → the
-`radio_simulator` target), which runs the firmware on a PC with an SDL-emulated display.
+`radio_simulator` target), which runs the firmware on a PC with an SDL-emulated display. A
+simulated bench supplies the test signals and the power bridge every calibration needs; run it
+with `--single` for single-VFO hardware. The `cal_walkthrough` target plays an operator through
+every calibration in the simulator and checks the results (`CalWalkthrough_main.cpp`).
+
+The step-by-step guide to calibrating a finished radio (frequency, receive and transmit IQ, power
+and SWR, S-meter; single- and dual-VFO RF boards) is here:
+
+* **Calibration guide**: `code/docs/CalibrationGuide/Calibration_Guide.html`
+
+How CESSB works, how to set it up, and the bench and RF measurements behind it:
+
+* **CESSB report**: `code/docs/CESSB_Report.html`
 
 Useful sketches for testing the boards as you build them are here:
 
@@ -371,16 +556,13 @@ This will compile and run the unit test programs. You should see an output that 
 
 ```bash
 ...
-776/779 Test #776: PowerCalibrationTest.FitPowerCurve_RealWorldData ..............................   Passed    0.01 sec
-        Start 777: PowerCalibrationWalkthroughTest.CompleteCalibrationAllBands
-777/779 Test #777: PowerCalibrationWalkthroughTest.CompleteCalibrationAllBands ...................   Passed    1.75 sec
-        Start 778: PowerCalibrationWalkthroughTest.RemeasuringDataPoints_StateRemainsCorrect
-778/779 Test #778: PowerCalibrationWalkthroughTest.RemeasuringDataPoints_StateRemainsCorrect .....   Passed    0.54 sec
-        Start 779: PowerCalibrationWalkthroughTest.StateTransitions_ResetBehavior
-779/779 Test #779: PowerCalibrationWalkthroughTest.StateTransitions_ResetBehavior ................   Passed    0.60 sec
+        Start 903: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio1
+903/904 Test #903: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio1 ......   Passed   35.35 sec
+        Start 904: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio2
+904/904 Test #904: BenchRadios/PowerAutoCalE2E.Level1AbortRetryAndAccept/Radio2 ......   Passed   33.60 sec
 
-100% tests passed, 0 tests failed out of 779
+100% tests passed, 0 tests failed out of 904
 
-Total Test time (real) =  91.50 sec
+Total Test time (real) = 251.89 sec
 ```
 

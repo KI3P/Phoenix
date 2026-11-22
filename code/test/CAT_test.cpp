@@ -31,6 +31,14 @@ char *NR_write(char* cmd);
 char *NR_read(char* cmd);
 char *NT_write(char* cmd);
 char *NT_read(char* cmd);
+char *PR_write(char* cmd);
+char *PR_read(char* cmd);
+char *TT_write(char* cmd);
+char *TT_read(char* cmd);
+char *PL_write(char* cmd);
+char *PL_read(char* cmd);
+char *RM_write(char* cmd);
+char *RM_read(char* cmd);
 char *PC_write(char* cmd);
 char *PC_read(char* cmd);
 char *PS_write(char* cmd);
@@ -39,12 +47,18 @@ char *RX_write(char* cmd);
 char *TX_write(char* cmd);
 char *FW_write(char* cmd);
 char *FW_read(char* cmd);
-char *SR_write(char* cmd);
-char *SR_read(char* cmd);
+char *XS_write(char* cmd);
+char *XS_read(char* cmd);
 char *DG_write(char* cmd);
 char *DG_read(char* cmd);
 char *DR_write(char* cmd);
 char *DR_read(char* cmd);
+char *DD_write(char* cmd);
+char *DD_read(char* cmd);
+char *BR_write(char* cmd);
+char *BR_read(char* cmd);
+char *XA_write(char* cmd);
+char *XA_read(char* cmd);
 char *CF_write(char* cmd);
 char *CF_read(char* cmd);
 char *EQ_write(char* cmd);
@@ -2080,30 +2094,29 @@ TEST(CAT, PC_read_write_RoundTripConsistency) {
 // CAT Power Status Function Tests (PS)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-TEST(CAT, PS_write_CallsShutdownTeensy) {
-    // Test that PS_write calls ShutdownTeensy function
+TEST(CAT, PS_write_PowerOffShutsDownWithoutAnswer) {
+    // PS0; is Kenwood's power off. ShutdownTeensy() raises SHUTDOWN_COMPLETE
+    // to tell the ATtiny to cut the power. A Kenwood set gets no answer.
+    digitalWrite(SHUTDOWN_COMPLETE, 0);
     char command[] = "PS0;";
-    
-    char *result = PS_write(command);
-    
-    // Should return PS0 response (indicating shutdown initiated)
-    EXPECT_STREQ(result, "PS0;");
-    
-    // Note: We can't easily verify ShutdownTeensy() was called in unit test,
-    // but we can verify the function completes and returns the expected response
+    EXPECT_STREQ(PS_write(command), "");
+    EXPECT_EQ(digitalRead(SHUTDOWN_COMPLETE), 1);
 }
 
-TEST(CAT, PS_write_AcceptsVariousCommands) {
-    // Test that PS_write handles different input commands
-    char command0[] = "PS0;";
-    char command1[] = "PS1;";
-    
-    char *result0 = PS_write(command0);
-    char *result1 = PS_write(command1);
-    
-    // Both should return PS0 (shutdown response)
-    EXPECT_STREQ(result0, "PS0;");
-    EXPECT_STREQ(result1, "PS0;");
+TEST(CAT, PS_write_PowerOnDoesNotShutDown) {
+    // PS1; is Kenwood's power on, which Hamlib sends to power a rig up. The
+    // radio is already on if it can read the command, so it must do nothing.
+    digitalWrite(SHUTDOWN_COMPLETE, 0);
+    char command[] = "PS1;";
+    EXPECT_STREQ(PS_write(command), "");
+    EXPECT_EQ(digitalRead(SHUTDOWN_COMPLETE), 0);
+}
+
+TEST(CAT, PS_write_OtherParametersAreRejected) {
+    digitalWrite(SHUTDOWN_COMPLETE, 0);
+    char command[] = "PS9;";
+    EXPECT_STREQ(PS_write(command), "?;");
+    EXPECT_EQ(digitalRead(SHUTDOWN_COMPLETE), 0);
 }
 
 TEST(CAT, PS_read_ReturnsPowerOnStatus) {
@@ -2131,12 +2144,12 @@ TEST(CAT, PS_read_ConsistentResponse) {
 TEST(CAT, command_parser_RecognizesPSCommands) {
     // Test PS commands through the command parser
     
-    // Test PS write command
-    char ps_write[] = "PS1;"; // Power control command
+    // Test PS write command: power on is a silent no-op
+    digitalWrite(SHUTDOWN_COMPLETE, 0);
+    char ps_write[] = "PS1;";
     char *result = command_parser(ps_write);
-    
-    // Should return PS0 (shutdown initiated)
-    EXPECT_STREQ(result, "PS0;");
+    EXPECT_STREQ(result, "");
+    EXPECT_EQ(digitalRead(SHUTDOWN_COMPLETE), 0);
     
     // Test PS read command
     char ps_read[] = "PS;";
@@ -2240,7 +2253,7 @@ TEST(CAT, command_parser_AllNewCommandsIntegration) {
     // Test PS (Power Status)
     char ps_cmd[] = "PS1;";
     result = command_parser(ps_cmd);
-    EXPECT_STREQ(result, "PS0;");
+    EXPECT_STREQ(result, "");
     
     // Test RX (Receiver Selection) - command length is 3 ("RX;")
     char rx_cmd[] = "RX;";
@@ -2462,7 +2475,7 @@ TEST(CAT, command_parser_ZeroLengthFieldCommandsStillDispatch){
     // Read-only commands carry set_len 0, so the parser must not evaluate the
     // write-length test for them - command[set_len - 1] would be command[-1].
     // Each must reach its read handler and answer something other than "?;".
-    const char *reads[] = { "ID;", "IF;", "PD;", "ED;", "PR;" };
+    const char *reads[] = { "ID;", "IF;", "PD;", "ED;", "HR;" };
 
     for (const char *form : reads) {
         char cmd[8];
@@ -2490,53 +2503,53 @@ TEST(CAT, command_parser_ZeroLengthFieldCommandsStillDispatch){
 // and read_len are equal can never reach its read function.
 // ============================================================================
 
-TEST(CAT, SR_write_SetsSampleRate) {
+TEST(CAT, XS_write_SetsSampleRate) {
     uint8_t saved = SampleRate;
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
 
-    char cmd176[] = "SR0;";
-    EXPECT_STREQ(SR_write(cmd176), "");
+    char cmd176[] = "XS0;";
+    EXPECT_STREQ(XS_write(cmd176), "");
     EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
 
-    char cmd192[] = "SR1;";
-    EXPECT_STREQ(SR_write(cmd192), "");
+    char cmd192[] = "XS1;";
+    EXPECT_STREQ(XS_write(cmd192), "");
     EXPECT_EQ(SampleRate, SAMPLE_RATE_192K);
 
     SampleRate = saved;
 }
 
-TEST(CAT, SR_read_ReturnsSampleRateIndex) {
+TEST(CAT, XS_read_ReturnsSampleRateIndex) {
     uint8_t saved = SampleRate;
 
     SampleRate = SAMPLE_RATE_176K;
-    char cmd[] = "SR;";
-    EXPECT_STREQ(SR_read(cmd), "SR0;");
+    char cmd[] = "XS;";
+    EXPECT_STREQ(XS_read(cmd), "XS0;");
 
     SampleRate = SAMPLE_RATE_192K;
-    EXPECT_STREQ(SR_read(cmd), "SR1;");
+    EXPECT_STREQ(XS_read(cmd), "XS1;");
 
     SampleRate = saved;
 }
 
-TEST(CAT, SR_write_RejectsOutOfRange) {
+TEST(CAT, XS_write_RejectsOutOfRange) {
     uint8_t saved = SampleRate;
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
     SampleRate = SAMPLE_RATE_192K;
 
-    char cmd[] = "SR2;";
-    EXPECT_STREQ(SR_write(cmd), "?;");
+    char cmd[] = "XS2;";
+    EXPECT_STREQ(XS_write(cmd), "?;");
     EXPECT_EQ(SampleRate, SAMPLE_RATE_192K) << "a rejected rate must not change anything";
 
     SampleRate = saved;
 }
 
-TEST(CAT, SR_write_RefusedWhileTransmitting) {
+TEST(CAT, XS_write_RefusedWhileTransmitting) {
     uint8_t saved = SampleRate;
     SampleRate = SAMPLE_RATE_192K;
     modeSM.state_id = ModeSm_StateId_SSB_TRANSMIT;
 
-    char cmd[] = "SR0;";
-    EXPECT_STREQ(SR_write(cmd), "?;");
+    char cmd[] = "XS0;";
+    EXPECT_STREQ(XS_write(cmd), "?;");
     EXPECT_EQ(SampleRate, SAMPLE_RATE_192K)
         << "changing rate mid-transmission would reconfigure the I2S clock underneath the TX chain";
 
@@ -2544,16 +2557,16 @@ TEST(CAT, SR_write_RefusedWhileTransmitting) {
     SampleRate = saved;
 }
 
-TEST(CAT, SR_ParserReachesBothForms) {
+TEST(CAT, XS_ParserReachesBothForms) {
     uint8_t saved = SampleRate;
     modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
 
-    char write_cmd[] = "SR0;";
+    char write_cmd[] = "XS0;";
     EXPECT_STREQ(command_parser(write_cmd), "");
     EXPECT_EQ(SampleRate, SAMPLE_RATE_176K);
 
-    char read_cmd[] = "SR;";
-    EXPECT_STREQ(command_parser(read_cmd), "SR0;");
+    char read_cmd[] = "XS;";
+    EXPECT_STREQ(command_parser(read_cmd), "XS0;");
 
     SampleRate = saved;
 }
@@ -2900,14 +2913,14 @@ TEST(CAT, TX_and_RX_write_KeyDigitalTransmit) {
     ModeSm_dispatch_event(&modeSM, ModeSm_EventId_TO_SSB_MODE);
 }
 
-TEST(CAT, SR_write_RefusedInDigitalMode) {
+TEST(CAT, XS_write_RefusedInDigitalMode) {
     uint8_t saved = SampleRate;
     ModeSm_start(&modeSM);
     modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
     SampleRate = SAMPLE_RATE_176K;
 
-    char cmd[] = "SR1;";
-    EXPECT_STREQ(SR_write(cmd), "?;");
+    char cmd[] = "XS1;";
+    EXPECT_STREQ(XS_write(cmd), "?;");
     EXPECT_EQ(SampleRate, SAMPLE_RATE_176K)
         << "digital mode pins the rate so the USB endpoint needs no resampling";
 
@@ -3156,6 +3169,349 @@ TEST(CAT, DR_ParserReachesBothForms) {
 }
 
 // ============================================================================
+// PC in digital mode
+//
+// Digital mode transmits through the SSB chain, and TXGain() sets its level from
+// ED.powerOutSSB. PC used to write the CW power there, so a client setting power
+// in digital mode changed nothing it could hear.
+// ============================================================================
+
+TEST(CAT, PC_write_SetsSSBPowerInDigitalMode) {
+    ModeSm_start(&modeSM);
+    int32_t band = ED.currentBand[ED.activeVFO];
+    float32_t savedSSB = ED.powerOutSSB[band], savedCW = ED.powerOutCW[band];
+    ED.powerOutSSB[band] = 5;
+    ED.powerOutCW[band] = 5;
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_RECEIVE;
+    char cmd[] = "PC003;";
+    EXPECT_STREQ(PC_write(cmd), "PC003;");
+    EXPECT_FLOAT_EQ(ED.powerOutSSB[band], 3.0f);
+    EXPECT_FLOAT_EQ(ED.powerOutCW[band], 5.0f) << "the CW power must not change in digital mode";
+
+    modeSM.state_id = ModeSm_StateId_DIGITAL_TRANSMIT;
+    char cmd2[] = "PC004;";
+    PC_write(cmd2);
+    EXPECT_FLOAT_EQ(ED.powerOutSSB[band], 4.0f);
+
+    char read[] = "PC;";
+    EXPECT_STREQ(PC_read(read), "PC004;") << "PC; must report the power digital mode uses";
+
+    ED.powerOutSSB[band] = savedSSB;
+    ED.powerOutCW[band] = savedCW;
+}
+
+TEST(CAT, PC_write_ReadsAllThreeDigits) {
+    ModeSm_start(&modeSM);
+    int32_t band = ED.currentBand[ED.activeVFO];
+    float32_t saved = ED.powerOutCW[band];
+    modeSM.state_id = ModeSm_StateId_CW_RECEIVE;
+
+    char cmd[] = "PC100;";
+    EXPECT_STREQ(PC_write(cmd), "PC100;");
+    EXPECT_FLOAT_EQ(ED.powerOutCW[band], 100.0f) << "the hundreds digit was being dropped";
+
+    ED.powerOutCW[band] = saved;
+}
+
+// ============================================================================
+// DD - digital-mode transmit drive level
+// ============================================================================
+
+TEST(CAT, DD_write_SetsDriveLevel) {
+    int32_t saved = ED.digitalDriveLevel;
+
+    char cmd[] = "DD057;";
+    EXPECT_STREQ(DD_write(cmd), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 57);
+
+    char zero[] = "DD000;";
+    EXPECT_STREQ(DD_write(zero), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 0);
+
+    char full[] = "DD100;";
+    EXPECT_STREQ(DD_write(full), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 100);
+
+    ED.digitalDriveLevel = saved;
+}
+
+TEST(CAT, DD_write_RejectsOutOfRange) {
+    int32_t saved = ED.digitalDriveLevel;
+    ED.digitalDriveLevel = 50;
+
+    char cmd[] = "DD101;";
+    EXPECT_STREQ(DD_write(cmd), "?;");
+    EXPECT_EQ(ED.digitalDriveLevel, 50) << "a rejected level must not change anything";
+
+    ED.digitalDriveLevel = saved;
+}
+
+TEST(CAT, DD_ParserReachesBothForms) {
+    int32_t saved = ED.digitalDriveLevel;
+
+    char write_cmd[] = "DD042;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_EQ(ED.digitalDriveLevel, 42);
+
+    char read_cmd[] = "DD;";
+    EXPECT_STREQ(command_parser(read_cmd), "DD042;");
+
+    ED.digitalDriveLevel = saved;
+}
+
+// ============================================================================
+// TT - SSB transmit test tone (not a Kenwood keyword)
+// ============================================================================
+
+TEST(CAT, TT_SelectsAndReadsTheTransmitAudioSource) {
+    char two[] = "TT2;";
+    EXPECT_STREQ(TT_write(two), "");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_TWO_TONE);
+    char read2[] = "TT;";
+    EXPECT_STREQ(TT_read(read2), "TT2;");
+
+    char one[] = "TT1;";
+    EXPECT_STREQ(TT_write(one), "");
+    char read1[] = "TT;";
+    EXPECT_STREQ(TT_read(read1), "TT1;");
+
+    // Through the parser too: TT is in the command table
+    char viaParser[] = "TT0;";
+    EXPECT_STREQ(command_parser(viaParser), "");
+    char readViaParser[] = "TT;";
+    EXPECT_STREQ(command_parser(readViaParser), "TT0;");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+}
+
+TEST(CAT, TT_RejectsOtherValues) {
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    char three[] = "TT3;";
+    EXPECT_STREQ(TT_write(three), "?;");
+    char letter[] = "TTX;";
+    EXPECT_STREQ(TT_write(letter), "?;");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+    SetTXAudioSource(TX_SOURCE_MIC);
+}
+
+// ============================================================================
+// PR - speech processor (CESSB) on/off
+// ============================================================================
+
+TEST(CAT, PR_SwitchesCESSB) {
+    const bool saved = ED.cessbEnabled;
+
+    char on[] = "PR1;";
+    EXPECT_STREQ(PR_write(on), "");
+    EXPECT_TRUE(ED.cessbEnabled);
+    char read1[] = "PR;";
+    EXPECT_STREQ(PR_read(read1), "PR1;");
+
+    char off[] = "PR0;";
+    EXPECT_STREQ(PR_write(off), "");
+    EXPECT_FALSE(ED.cessbEnabled);
+    char read0[] = "PR;";
+    EXPECT_STREQ(PR_read(read0), "PR0;");
+
+    ED.cessbEnabled = saved;
+}
+
+TEST(CAT, PR_RejectsOtherValues) {
+    const bool saved = ED.cessbEnabled;
+    ED.cessbEnabled = true;
+    char bad[] = "PR2;";
+    EXPECT_STREQ(PR_write(bad), "?;");
+    EXPECT_TRUE(ED.cessbEnabled) << "a rejected value must not change anything";
+    ED.cessbEnabled = saved;
+}
+
+TEST(CAT, PR_ParserReachesBothForms) {
+    const bool saved = ED.cessbEnabled;
+    char write_cmd[] = "PR1;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_TRUE(ED.cessbEnabled);
+    char read_cmd[] = "PR;";
+    EXPECT_STREQ(command_parser(read_cmd), "PR1;");
+    ED.cessbEnabled = saved;
+}
+
+// ============================================================================
+// PL - speech processor levels; RM - meter (COMP only)
+// ============================================================================
+
+TEST(CAT, PL_InputLevelIsTheProcessorLevel) {
+    const int32_t saved = ED.cessbDrive_dB;
+    char set6[] = "PL060050;";
+    EXPECT_STREQ(PL_write(set6), "");
+    EXPECT_EQ(ED.cessbDrive_dB, 6);
+    char rd[] = "PL;";
+    EXPECT_STREQ(PL_read(rd), "PL060050;");
+
+    char rounds[] = "PL034020;";        // 3.4 dB -> 3
+    EXPECT_STREQ(PL_write(rounds), "");
+    EXPECT_EQ(ED.cessbDrive_dB, 3);
+    char rd2[] = "PL;";
+    EXPECT_STREQ(PL_read(rd2), "PL030020;");
+
+    char full[] = "PL100100;";
+    EXPECT_STREQ(PL_write(full), "");
+    EXPECT_EQ(ED.cessbDrive_dB, CESSB_DRIVE_MAX_DB);
+    ED.cessbDrive_dB = saved;
+}
+
+TEST(CAT, PL_RejectsOutOfRange) {
+    const int32_t saved = ED.cessbDrive_dB;
+    ED.cessbDrive_dB = 4;
+    char bad1[] = "PL101050;";
+    EXPECT_STREQ(PL_write(bad1), "?;");
+    char bad2[] = "PL050101;";
+    EXPECT_STREQ(PL_write(bad2), "?;");
+    char bad3[] = "PL05x050;";
+    EXPECT_STREQ(PL_write(bad3), "?;");
+    EXPECT_EQ(ED.cessbDrive_dB, 4) << "a rejected value must not change anything";
+    ED.cessbDrive_dB = saved;
+}
+
+TEST(CAT, PL_ParserReachesBothForms) {
+    const int32_t saved = ED.cessbDrive_dB;
+    char w[] = "PL080050;";
+    EXPECT_STREQ(command_parser(w), "");
+    EXPECT_EQ(ED.cessbDrive_dB, 8);
+    char r[] = "PL;";
+    EXPECT_STREQ(command_parser(r), "PL080050;");
+    ED.cessbDrive_dB = saved;
+}
+
+TEST(CAT, RM_ReadsTheCompressionMeterOnly) {
+    char sel2[] = "RM2;";
+    EXPECT_STREQ(RM_write(sel2), "");
+    CESSBSkipped();                    // meter released: nothing being clipped
+    char rd[] = "RM;";
+    EXPECT_STREQ(RM_read(rd), "RM20000;");
+
+    char sel1[] = "RM1;";
+    EXPECT_STREQ(RM_write(sel1), "");
+    char rd1[] = "RM;";
+    EXPECT_STREQ(RM_read(rd1), "?;") << "SWR is not implemented, so it must not read as a value";
+
+    char bad[] = "RM4;";
+    EXPECT_STREQ(RM_write(bad), "?;");
+
+    char sel2again[] = "RM2;";
+    EXPECT_STREQ(command_parser(sel2again), "");
+    char rd2[] = "RM;";
+    EXPECT_STREQ(command_parser(rd2), "RM20000;");
+}
+
+// ============================================================================
+// BR - raw SWR bridge statistics
+// ============================================================================
+
+TEST(CAT, BR_read_ReportsNothingAfterClear) {
+    char clear[] = "BR0;";
+    EXPECT_STREQ(BR_write(clear), "");
+    char read[] = "BR;";
+    EXPECT_STREQ(BR_read(read), "BR0,0.0,0.0,0.0,0.0;");
+}
+
+TEST(CAT, BR_read_ReportsMeanAndDeviation) {
+    char clear[] = "BR0;";
+    BR_write(clear);
+    // Forward 1000 and 1002 mV: mean 1001, population SD 1. Reflected constant.
+    AccumulateSWRBridgeStats(1000.0f, 500.0f);
+    AccumulateSWRBridgeStats(1002.0f, 500.0f);
+    char read[] = "BR;";
+    EXPECT_STREQ(BR_read(read), "BR2,1001.0,1.0,500.0,0.0;");
+
+    BR_write(clear);
+    EXPECT_STREQ(BR_read(read), "BR0,0.0,0.0,0.0,0.0;") << "BR0 must discard the readings";
+}
+
+TEST(CAT, BR_IgnoresFailedADCReads) {
+    char clear[] = "BR0;";
+    BR_write(clear);
+    // readADCsingle() returns 65535 or 65534 when the I2C read fails
+    AccumulateSWRBridgeStats(65535.0f, 500.0f);
+    AccumulateSWRBridgeStats(1200.0f, 65534.0f);
+    AccumulateSWRBridgeStats(1200.0f, 800.0f);
+    char read[] = "BR;";
+    EXPECT_STREQ(BR_read(read), "BR1,1200.0,0.0,800.0,0.0;");
+}
+
+TEST(CAT, BR_write_RejectsUnknownParameter) {
+    char cmd[] = "BR2;";
+    EXPECT_STREQ(BR_write(cmd), "?;");
+}
+
+TEST(CAT, BR_ParserReachesBothForms) {
+    char clear[] = "BR0;";
+    EXPECT_STREQ(command_parser(clear), "");
+    AccumulateSWRBridgeStats(1500.0f, 700.0f);
+    char read[] = "BR;";
+    EXPECT_STREQ(command_parser(read), "BR1,1500.0,0.0,700.0,0.0;");
+    BR_write(clear);
+}
+
+// ============================================================================
+// XA - CW transmit attenuation override
+// ============================================================================
+
+TEST(CAT, XA_write_SetsAndClearsOverride) {
+    char set[] = "XA125;";
+    EXPECT_STREQ(XA_write(set), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 12.5f);
+
+    char max[] = "XA315;";
+    EXPECT_STREQ(XA_write(max), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 31.5f);
+
+    char zero[] = "XA000;";
+    EXPECT_STREQ(XA_write(zero), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 0.0f);
+
+    char clear[] = "XA999;";
+    EXPECT_STREQ(XA_write(clear), "");
+    EXPECT_LT(GetCWAttenuationOverride(), 0.0f);
+}
+
+TEST(CAT, XA_write_RejectsOutOfRange) {
+    char clear[] = "XA999;";
+    XA_write(clear);
+
+    char high[] = "XA316;";
+    EXPECT_STREQ(XA_write(high), "?;");
+    char junk[] = "XA1x5;";
+    EXPECT_STREQ(XA_write(junk), "?;");
+    EXPECT_LT(GetCWAttenuationOverride(), 0.0f) << "a rejected value must not set an override";
+}
+
+TEST(CAT, XA_read_ReportsAttenuatorAndOverride) {
+    char clear[] = "XA999;";
+    XA_write(clear);
+    SetTXAttenuation(12.5);
+    char read[] = "XA;";
+    EXPECT_STREQ(XA_read(read), "XA125,0;");
+
+    char set[] = "XA200;";
+    XA_write(set);
+    EXPECT_STREQ(XA_read(read), "XA125,1;") << "the attenuator only changes at the next key-down";
+
+    XA_write(clear);
+}
+
+TEST(CAT, XA_ParserReachesBothForms) {
+    char set[] = "XA050;";
+    EXPECT_STREQ(command_parser(set), "");
+    EXPECT_FLOAT_EQ(GetCWAttenuationOverride(), 5.0f);
+    char read[] = "XA;";
+    std::string reply = command_parser(read);
+    EXPECT_EQ(reply.substr(0, 2), "XA");
+    EXPECT_EQ(reply.substr(reply.size() - 3), ",1;");
+    char clear[] = "XA999;";
+    command_parser(clear);
+}
+
+// ============================================================================
 // Time-sync packets on the CAT port
 //
 // In a build with a USB audio interface there is one CDC port, CATSerial is
@@ -3256,4 +3612,15 @@ TEST(CAT, StrayNewlineTerminatedBytesAreDiscarded) {
 
     ED.centerFreq_Hz[VFO_A] = savedFreq;
     ED.currentBand[VFO_A] = savedBand;
+}
+
+TEST(CAT, ACWithoutTheTunerAnswersLikeARadioWithNoTuner) {
+    // Kenwood's antenna tuner command: a build without ATU_PRESENT reads "thru,
+    // not tuning" and accepts settings without acting on them
+    char cmd1[] = "AC;";
+    EXPECT_STREQ(command_parser(cmd1), "AC000;");
+    char cmd2[] = "AC011;";
+    EXPECT_STREQ(command_parser(cmd2), "");
+    char cmd3[] = "AC020;";
+    EXPECT_STREQ(command_parser(cmd3), "?;");
 }

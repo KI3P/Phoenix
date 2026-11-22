@@ -3,10 +3,10 @@ title: Frequency Control & Tuning Math (Tune.cpp)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-07-29
+updated: 2026-11-03
 tags: [tuning, vfo, frequency, fs-over-4, cw-offset, fast-tune, power-calibration, sample-rate]
 source_refs: []
-related: ["[[overview]]", "[[hardware-state-machine]]", "[[rf-board]]", "[[mode-state-machine]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]", "[[rapid-tune-mute-freeze]]", "[[sample-rate-switching]]", "[[filter-hil-test]]"]
+related: ["[[overview]]", "[[hardware-state-machine]]", "[[rf-board]]", "[[mode-state-machine]]", "[[iq-quadrature-sampling]]", "[[dsp-chain]]", "[[rapid-tune-mute-freeze]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[automatic-power-swr-calibration]]"]
 ---
 
 # Frequency Control & Tuning Math (Tune.cpp)
@@ -114,22 +114,44 @@ mask before programming the VFO. Highlights:
   [[iq-imbalance-correction]].
 
 ## PA power-calibration math (also in this file)
-Unrelated to tuning but physically co-located. The PA output is modeled as a saturating
-**tanh** curve (`Tune.cpp:168-204`):
+This is unrelated to tuning but lives in the same file. Since V1.5.0 the PA output is modelled
+as a **shaped tanh** curve (`Tune.cpp:152-223`):
 
 ```
-Pout = Psat · tanh( k · 10^(−A/10) )      A = attenuation in dB
+Pout = Psat · tanh( (k · 10^(−A/10))^s )^(1/s)      A = attenuation in dB
 ```
 
-- `attenToPower_mW` / `powerToAtten_dB` — forward/inverse of the model.
-- `CalculateCWAttenuation(P)` / `CalculateSSBTXGain(P)` — pick attenuation (CW) or gain (SSB)
-  for a requested power, and select the 20 W vs 100 W PA at `PowerCal_20W_to_100W_threshold_W`.
-- `FitPowerCurve` / `fitTanhModel` — a **Gauss-Newton least-squares** fit of `(Psat, k)` from
-  measured (attenuation, power) points, used by the power-calibration routine.
+- **The shape s** sets how sharp the knee is; s = 1 is the plain tanh used before V1.5.0. An
+  s of 0 or less is taken as 1, so a configuration saved before the shape existed keeps its
+  curves. The per-band, per-PA shape is stored as `PowerCal_20W_shape[]` /
+  `PowerCal_100W_shape[]` ([[persistent-config]]).
+- `attenToPower_mW` / `powerToAtten_dB` evaluate the model and its inverse; both take the
+  shape.
+- `CalculateCWAttenuation(P)` / `CalculateSSBTXGain(P)` choose the attenuation (CW) or the
+  gain (SSB) for a requested power. They also select the 20 W or the 100 W PA, using
+  `PowerCal_20W_to_100W_threshold_W`.
+- `FitPowerCurve` (with `fitPowerModel`) is a **Levenberg–Marquardt** fit on ln Psat, ln k and
+  ln s, in double precision.
+  - The fit is done in dB, so every point counts by its relative error.
+  - It fits the plain tanh first, then releases s. With fewer than 4 points (the manual flow's
+    3) s stays 1.
+  - It converges in about 20 iterations. The Gauss–Newton fit in mW that it replaced never met
+    its float32 convergence test and always ran 100.
 
-These back `PowerCalSm` in [[hardware-state-machine]]; the per-band `Psat`/`k` coefficients
-live in the `ED` struct ([[persistent-config]]). *(Candidate for its own
-power-calibration theory page.)*
+**Why the shape was added (2026-11-02, radio 2's level 2 sweeps).**
+
+| Fit | rms miss: median band, worst band |
+|---|---|
+| tanh in mW, float32 (before) | 0.69 dB, 1.64 dB |
+| tanh in dB | 0.35 dB, 0.62 dB |
+| shaped tanh in dB (now) | 0.16 dB, 0.50 dB |
+
+This PA's knee is sharper than a plain tanh allows (the fitted s is 0.5–0.75). 6 m is the
+worst band with any model. Full detail is in `code/docs/PowerCalibration/AutoCalibrationDesign.md`.
+
+These functions back `PowerCalSm` ([[calibration-state-machines]],
+[[automatic-power-swr-calibration]]). The per-band `Psat`/`k`/`shape` coefficients live in
+the `ED` struct ([[persistent-config]]).
 
 ## Open questions
 - Confirm the exact DSP site of the fine-tune software mix (`FreqShiftF`) and how `−Fs/4`

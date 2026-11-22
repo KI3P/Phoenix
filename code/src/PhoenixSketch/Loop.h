@@ -51,7 +51,8 @@ typedef enum {
     iMODE_CHANGE,             /**< Operating mode changed (SSB/CW) */
     iPOWER_CHANGE,            /**< Transmit power level changed */
     iEQUALIZER,               /**< Adjust the transmit and receive equalizers */
-    iBITDISPLAY               /**< Display the results of the BIT */
+    iBITDISPLAY,              /**< Display the results of the BIT */
+    iATUSTATUSDISPLAY         /**< Display the ATU tuning status table (ATU_PRESENT) */
 } InterruptType;
 
 /**
@@ -113,6 +114,12 @@ bool ApplyTimeSyncDigits(const char* digits, uint8_t count);
  * @note This function never returns under normal operation
  */
 void loop(void);
+
+/**
+ * @brief Change band during power calibration (mid-band, default mode)
+ * @param band Band to tune to, FIRST_BAND to LAST_BAND
+ */
+void SetCalibrationBand(int32_t band);
 
 /**
  * @brief Configure CW key type for straight key or iambic keyer operation

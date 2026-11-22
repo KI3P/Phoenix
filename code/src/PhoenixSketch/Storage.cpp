@@ -44,6 +44,49 @@ void InitializeStorage(void){
 }
 
 /**
+ * PRIVATE: Add the ATU memory and settings to the configuration document.
+ */
+static void SaveATUFields(JsonDocument &doc){
+    doc["ATU_TunePower_W"] = ED.ATU_TunePower_W;
+    for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+        doc["ATU_Enabled"][j] = ED.ATU_Enabled[j];
+        doc["ATU_BalunOut"][j] = ED.ATU_BalunOut[j];
+    }
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            doc["ATU_State"][i][j] = ED.ATU_State[i][j];
+            doc["ATU_Freq_kHz"][i][j] = ED.ATU_Freq_kHz[i][j];
+            doc["ATU_SWR"][i][j] = ED.ATU_SWR[i][j];
+        }
+    }
+}
+
+/**
+ * PRIVATE: Read the ATU memory and settings back. A file saved before these fields
+ * existed leaves the defaults (memory empty, 2 W, enabled, coax output on every
+ * antenna). The old "ATU_AutoApply" key is ignored.
+ */
+static void RestoreATUFields(JsonDocument &doc){
+    ED.ATU_TunePower_W = doc["ATU_TunePower_W"] | ED.ATU_TunePower_W;
+    for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+        if (doc["ATU_Enabled"].is<JsonArray>())
+            ED.ATU_Enabled[j] = doc["ATU_Enabled"][j] | ED.ATU_Enabled[j];
+        if (doc["ATU_BalunOut"].is<JsonArray>())
+            ED.ATU_BalunOut[j] = doc["ATU_BalunOut"][j] | ED.ATU_BalunOut[j];
+    }
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            if (doc["ATU_State"][i].is<JsonArray>())
+                ED.ATU_State[i][j] = doc["ATU_State"][i][j] | ED.ATU_State[i][j];
+            if (doc["ATU_Freq_kHz"][i].is<JsonArray>())
+                ED.ATU_Freq_kHz[i][j] = doc["ATU_Freq_kHz"][i][j] | ED.ATU_Freq_kHz[i][j];
+            if (doc["ATU_SWR"][i].is<JsonArray>())
+                ED.ATU_SWR[i][j] = doc["ATU_SWR"][i][j] | ED.ATU_SWR[i][j];
+        }
+    }
+}
+
+/**
  * Save config_t struct to flash memory as a file using the LittleFS.h
  * file system. This also saves the file to the SD card, if it is present,
  * if the parameter is set to true
@@ -56,6 +99,8 @@ void SaveDataToStorage(bool savetosd){
     // Assign the elements of ED to doc
     doc["agc"] = ED.agc;
     doc["audioVolume"] = ED.audioVolume;
+    doc["SWR_CouplerTurns"] = ED.SWR_CouplerTurns;
+    SaveATUFields(doc);
     doc["rfGainAllBands_dB"] = ED.rfGainAllBands_dB;
     doc["stepFineTune"] = ED.stepFineTune;
     doc["nrOptionSelect"] = ED.nrOptionSelect;
@@ -95,6 +140,8 @@ void SaveDataToStorage(bool savetosd){
 
     doc["currentMicGain"] = ED.currentMicGain;
     doc["digitalDriveLevel"] = ED.digitalDriveLevel;
+    doc["cessbEnabled"] = ED.cessbEnabled;
+    doc["cessbDrive_dB"] = ED.cessbDrive_dB;
     doc["digitalRxLevel"] = ED.digitalRxLevel;
 
     // Band-specific arrays
@@ -115,6 +162,8 @@ void SaveDataToStorage(bool savetosd){
         doc["SWR_R_SlopeAdj"][i] = ED.SWR_R_SlopeAdj[i];
         doc["SWR_R_Offset"][i] = ED.SWR_R_Offset[i];
         doc["SWR_F_Offset"][i] = ED.SWR_F_Offset[i];
+        doc["SWR_CalLevel"][i] = ED.SWR_CalLevel[i];
+        doc["SWR_CalDate"][i] = ED.SWR_CalDate[i];
 
         // Last frequencies array (3 values per band)
         for(int j = 0; j < 3; j++) {
@@ -131,6 +180,8 @@ void SaveDataToStorage(bool savetosd){
         doc["PowerCal_20W_kindex"][i] = ED.PowerCal_20W_kindex[i];
         doc["PowerCal_100W_Psat_mW"][i] = ED.PowerCal_100W_Psat_mW[i];
         doc["PowerCal_100W_kindex"][i] = ED.PowerCal_100W_kindex[i];
+        doc["PowerCal_20W_shape"][i] = ED.PowerCal_20W_shape[i];
+        doc["PowerCal_100W_shape"][i] = ED.PowerCal_100W_shape[i];
         doc["PowerCal_20W_DSP_Gain_correction_dB"][i] = ED.PowerCal_20W_DSP_Gain_correction_dB[i];
         doc["PowerCal_100W_DSP_Gain_correction_dB"][i] = ED.PowerCal_100W_DSP_Gain_correction_dB[i];
     }
@@ -265,6 +316,8 @@ void RestoreDataFromStorage(void){
     // Restore scalar values with defaults if not present
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
+    ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
+    RestoreATUFields(doc);
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -320,6 +373,8 @@ void RestoreDataFromStorage(void){
 
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
     ED.digitalDriveLevel = doc["digitalDriveLevel"] | ED.digitalDriveLevel;
+    ED.cessbEnabled = doc["cessbEnabled"] | ED.cessbEnabled;
+    ED.cessbDrive_dB = doc["cessbDrive_dB"] | ED.cessbDrive_dB;
     ED.digitalRxLevel = doc["digitalRxLevel"] | ED.digitalRxLevel;
 
     if (doc["dbm_calibration"].is<JsonArray>()) {
@@ -404,6 +459,16 @@ void RestoreDataFromStorage(void){
             ED.SWR_F_Offset[i] = doc["SWR_F_Offset"][i] | ED.SWR_F_Offset[i];
         }
     }
+    if (doc["SWR_CalLevel"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalLevel[i] = doc["SWR_CalLevel"][i] | ED.SWR_CalLevel[i];
+        }
+    }
+    if (doc["SWR_CalDate"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalDate[i] = doc["SWR_CalDate"][i] | ED.SWR_CalDate[i];
+        }
+    }
 
     // Restore multi-dimensional lastFrequencies array
     if (doc["lastFrequencies"].is<JsonArray>()) {
@@ -438,6 +503,17 @@ void RestoreDataFromStorage(void){
     if (doc["PowerCal_100W_kindex"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
+        }
+    }
+    // A configuration saved before the shape existed keeps the plain tanh (s = 1)
+    if (doc["PowerCal_20W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_shape[i] = doc["PowerCal_20W_shape"][i] | ED.PowerCal_20W_shape[i];
+        }
+    }
+    if (doc["PowerCal_100W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_shape[i] = doc["PowerCal_100W_shape"][i] | ED.PowerCal_100W_shape[i];
         }
     }
     if (doc["PowerCal_20W_DSP_Gain_correction_dB"].is<JsonArray>()) {
@@ -493,6 +569,8 @@ void RestoreDataFromSDCard(void){
     // Restore scalar values with defaults if not present
     ED.agc = (AGCMode)(doc["agc"] | (int)ED.agc);
     ED.audioVolume = doc["audioVolume"] | ED.audioVolume;
+    ED.SWR_CouplerTurns = doc["SWR_CouplerTurns"] | ED.SWR_CouplerTurns;
+    RestoreATUFields(doc);
     ED.rfGainAllBands_dB = doc["rfGainAllBands_dB"] | ED.rfGainAllBands_dB;
     ED.stepFineTune = doc["stepFineTune"] | ED.stepFineTune;
     ED.nrOptionSelect = (NoiseReductionType)(doc["nrOptionSelect"] | (int)ED.nrOptionSelect);
@@ -548,6 +626,8 @@ void RestoreDataFromSDCard(void){
 
     ED.currentMicGain = doc["currentMicGain"] | ED.currentMicGain;
     ED.digitalDriveLevel = doc["digitalDriveLevel"] | ED.digitalDriveLevel;
+    ED.cessbEnabled = doc["cessbEnabled"] | ED.cessbEnabled;
+    ED.cessbDrive_dB = doc["cessbDrive_dB"] | ED.cessbDrive_dB;
     ED.digitalRxLevel = doc["digitalRxLevel"] | ED.digitalRxLevel;
 
     if (doc["dbm_calibration"].is<JsonArray>()) {
@@ -632,6 +712,16 @@ void RestoreDataFromSDCard(void){
             ED.SWR_F_Offset[i] = doc["SWR_F_Offset"][i] | ED.SWR_F_Offset[i];
         }
     }
+    if (doc["SWR_CalLevel"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalLevel[i] = doc["SWR_CalLevel"][i] | ED.SWR_CalLevel[i];
+        }
+    }
+    if (doc["SWR_CalDate"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.SWR_CalDate[i] = doc["SWR_CalDate"][i] | ED.SWR_CalDate[i];
+        }
+    }
 
     // Restore multi-dimensional lastFrequencies array
     if (doc["lastFrequencies"].is<JsonArray>()) {
@@ -668,6 +758,17 @@ void RestoreDataFromSDCard(void){
             ED.PowerCal_100W_kindex[i] = doc["PowerCal_100W_kindex"][i] | ED.PowerCal_100W_kindex[i];
         }
     }
+    // A configuration saved before the shape existed keeps the plain tanh (s = 1)
+    if (doc["PowerCal_20W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_20W_shape[i] = doc["PowerCal_20W_shape"][i] | ED.PowerCal_20W_shape[i];
+        }
+    }
+    if (doc["PowerCal_100W_shape"].is<JsonArray>()) {
+        for(int i = 0; i < NUMBER_OF_BANDS; i++) {
+            ED.PowerCal_100W_shape[i] = doc["PowerCal_100W_shape"][i] | ED.PowerCal_100W_shape[i];
+        }
+    }
     if (doc["PowerCal_20W_DSP_Gain_correction_dB"].is<JsonArray>()) {
         for(int i = 0; i < NUMBER_OF_BANDS; i++) {
             ED.PowerCal_20W_DSP_Gain_correction_dB[i] = doc["PowerCal_20W_DSP_Gain_correction_dB"][i] | ED.PowerCal_20W_DSP_Gain_correction_dB[i];
@@ -684,6 +785,24 @@ void RestoreDataFromSDCard(void){
     // Save the data to flash/SD storage so that it matches
     SaveDataToStorage(false);
     Serial.println("Config data restored successfully");
+}
+
+/**
+ * @brief Print one per-band array of the stored configuration on one line
+ * @param name The field's name
+ * @param values NUMBER_OF_BANDS values
+ * @param decimals Decimal places: Serial.print(float) gives 2, too few for a slope adjustment
+ */
+static void PrintFloatArray(const char *name, const float32_t *values, int decimals){
+    char buff[24];
+    Serial.print(name);
+    Serial.print(": ");
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        snprintf(buff, sizeof(buff), "%.*f", decimals, values[i]);
+        Serial.print(buff);
+        if (i < NUMBER_OF_BANDS - 1) Serial.print(",");
+    }
+    Serial.println();
 }
 
 void PrintEDToSerial(void){
@@ -724,6 +843,8 @@ void PrintEDToSerial(void){
     Serial.print("fineTuneFreq_Hz[1]: "); Serial.println(ED.fineTuneFreq_Hz[1]);
     Serial.print("currentMicGain:    "); Serial.println(ED.currentMicGain);
     Serial.print("digitalDriveLevel: "); Serial.println(ED.digitalDriveLevel);
+    Serial.print("cessbEnabled:      "); Serial.println(ED.cessbEnabled);
+    Serial.print("cessbDrive_dB:     "); Serial.println(ED.cessbDrive_dB);
     Serial.print("digitalRxLevel:    "); Serial.println(ED.digitalRxLevel);
     Serial.print("dbm_calibration: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
@@ -837,78 +958,56 @@ void PrintEDToSerial(void){
         Serial.println(ED.lastFrequencies[i][2]);
     }
 
-    Serial.print("PowerCal_20W_Psat_mW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_Psat_mW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_kindex: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_kindex[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_Psat_mW: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_Psat_mW[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_kindex: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_kindex[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_20W_DSP_Gain_correction_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_20W_DSP_Gain_correction_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
-    Serial.print("PowerCal_100W_DSP_Gain_correction_dB: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.PowerCal_100W_DSP_Gain_correction_dB[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
-
+    PrintFloatArray("PowerCal_20W_Psat_mW", ED.PowerCal_20W_Psat_mW, 1);
+    PrintFloatArray("PowerCal_20W_kindex", ED.PowerCal_20W_kindex, 3);
+    PrintFloatArray("PowerCal_100W_Psat_mW", ED.PowerCal_100W_Psat_mW, 1);
+    PrintFloatArray("PowerCal_100W_kindex", ED.PowerCal_100W_kindex, 3);
+    PrintFloatArray("PowerCal_20W_shape", ED.PowerCal_20W_shape, 3);
+    PrintFloatArray("PowerCal_100W_shape", ED.PowerCal_100W_shape, 3);
+    PrintFloatArray("PowerCal_20W_DSP_Gain_correction_dB", ED.PowerCal_20W_DSP_Gain_correction_dB, 3);
+    PrintFloatArray("PowerCal_100W_DSP_Gain_correction_dB", ED.PowerCal_100W_DSP_Gain_correction_dB, 3);
     Serial.print("PowerCal_20W_to_100W_threshold_W: ");
     Serial.println(ED.PowerCal_20W_to_100W_threshold_W);
 
-    Serial.print("SWR_F_SlopeAdj: ");
+    PrintFloatArray("SWR_F_SlopeAdj", ED.SWR_F_SlopeAdj, 3);
+    PrintFloatArray("SWR_R_SlopeAdj", ED.SWR_R_SlopeAdj, 3);
+    PrintFloatArray("SWR_R_Offset", ED.SWR_R_Offset, 3);
+    PrintFloatArray("SWR_F_Offset", ED.SWR_F_Offset, 3);
+    Serial.print("SWR_CalLevel: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_F_SlopeAdj[i]);
+        Serial.print(ED.SWR_CalLevel[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
 
-    Serial.print("SWR_R_SlopeAdj: ");
+    Serial.print("SWR_CalDate: ");
     for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_R_SlopeAdj[i]);
+        Serial.print(ED.SWR_CalDate[i]);
         if(i < NUMBER_OF_BANDS-1) Serial.print(",");
     }
     Serial.println();
 
-    Serial.print("SWR_R_Offset: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_R_Offset[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
-    }
-    Serial.println();
 
-    Serial.print("SWR_F_Offset: ");
-    for(int i = 0; i < NUMBER_OF_BANDS; i++) {
-        Serial.print(ED.SWR_F_Offset[i]);
-        if(i < NUMBER_OF_BANDS-1) Serial.print(",");
+    Serial.print("SWR_CouplerTurns: ");
+    Serial.println(ED.SWR_CouplerTurns);
+
+    sprintf(buff, "%4.1f", ED.ATU_TunePower_W);
+    Serial.print("ATU_TunePower_W: "); Serial.println(buff);
+    Serial.print("ATU_Enabled / ATU_BalunOut (antenna 0-3):");
+    for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+        Serial.print(" "); Serial.print((int)ED.ATU_Enabled[j]); Serial.print("/"); Serial.print((int)ED.ATU_BalunOut[j]);
     }
     Serial.println();
+    Serial.println("ATU memory (band: antenna 0-3 as state/kHz/SWR):");
+    for (int i = 0; i < NUMBER_OF_BANDS; i++){
+        Serial.print("  "); Serial.print(i); Serial.print(":");
+        for (int j = 0; j < ATU_NUM_ANTENNAS; j++){
+            sprintf(buff, " %lX/%ld/%4.2f", (unsigned long)ED.ATU_State[i][j],
+                    (long)ED.ATU_Freq_kHz[i][j], ED.ATU_SWR[i][j]);
+            Serial.print(buff);
+        }
+        Serial.println();
+    }
 
     Serial.println("=== End ED Struct ===");
 }
