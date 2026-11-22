@@ -63,6 +63,68 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 # Version History
 
+## V1.6.0 Release Notes
+
+### Major New Features
+
+**Controlled Envelope SSB (CESSB)**
+An optional speech processor for SSB voice. It holds the transmitted peaks to the power setting and raises the average power, so the voice carries further for the same PEP. It is off by default: enable it from **Menu → Microphone → Enable CESSB**.
+
+- **The SSB power setting becomes a peak limit.** However hard the voice is driven, PEP stays at the setting. On the bench, a 5 W setting gave 5.06 W PEP over 9 dB of overdrive. Without CESSB, loud peaks could exceed the setting.
+- **More talk power.** The **CESSB level (dB)** item sets how hard the voice is pushed into the limiter. Measured at the antenna on a voice-like test signal, levels 3, 6 and 9 dB gain +2.7, +4.5 and +5.7 dB of average power at the same PEP. 4–6 dB is the usual choice.
+- **Little splatter of its own.** The stage filters what it clips, so its distortion stays inside the channel. In the model, a two-tone at 6 dB of drive leaves −63 dBc in the opposite sideband, against −11 dBc for the zero-IF form used elsewhere. At the antenna the PA's own intermodulation dominates. The one product CESSB adds is 2f₂−f₁ of a two-tone held past the ceiling, just above the channel: −32 dB re PEP at 6 dB of drive, against the PA's −38 dB.
+- **A compression meter.** While CESSB runs, the transmit pane's Q bar becomes a **C** bar: the dB by which the voice peaks are being pushed past the limit, 0–12 dB, green to 6, yellow to 9, red beyond.
+- **Only SSB voice is affected.** Digital (USB audio) modes, CW, tune and the calibrations bypass it automatically. It adds about 5 ms of transmit latency and 0.7 ms of processing per 11.6 ms audio block.
+- **CAT control** with the Kenwood speech-processor commands: `PR` switches it on and off, `PL` sets the level (10 per dB), and `RM2;` then `RM;` read the compression meter (2 dB per dot).
+
+The design, the setup procedure and every bench and RF measurement are in `code/docs/CESSB_Report.html`.
+
+**SSB transmit test tones**
+The SSB transmit audio can now come from a built-in 1 kHz tone or a 700 + 1900 Hz two-tone instead of the microphone, for power checks and intermodulation tests without a signal generator. The tones go through the whole transmit chain, CESSB included.
+
+- Choose the source with the **TX src** item in the Microphone menu (Microphone → 1 kHz tone → 2-tone IMD), or over CAT with `TT0;`, `TT1;`, `TT2;`.
+- With CESSB off, the single tone comes out at the power setting, and the two-tone's PEP is the power setting.
+- The setting is not saved: the radio always starts on the microphone. The settings pane shows the source, in red while a test tone is selected.
+
+**Calibration guide**
+`code/docs/CalibrationGuide/Calibration_Guide.html` takes you through calibrating a finished radio, in order: frequency, receive IQ, transmit IQ, power and SWR, and the S-meter. It covers single- and dual-VFO RF boards, with the equipment for each step, button maps and screenshots.
+
+### Improvements
+
+- **Settings pane.** A new row shows the **Mic Gain** and **CESSB** (Off, or the level). Key Type moves down one row.
+- **The Microphone menu** now holds everything for the transmit audio: mic gain, the USB levels, the transmit source and the two CESSB items.
+- **The automatic carrier null** (button 14, dual-VFO radios with a direct-coupled transmitter) is more reliable.
+  - Each band starts from its stored offsets.
+  - A pass counts only if its best reading stands at least 3 dB above the rest.
+  - The coarse passes wait long enough for the spectrum to settle.
+  - A band that finds nothing keeps its old offsets.
+- **The Transmit IQ automatic run** calibrates every band from 160 m, like the Receive IQ run, whatever band is on screen. Both transmit calibrations skip general-coverage bands, where transmit is disabled.
+
+### Bug Fixes
+
+- **Negative mic gain gave maximum gain.** The codec's mic gain is unsigned, so a setting below 0 dB (the menu goes to −10, CAT `MG` to −40) wrapped to the maximum. It is now held at 0 dB.
+- **Frequency calibration could leave the transmit and CW oscillators off.** Applying the correction resets the Si5351, but only the receive VFO was reprogrammed. The transmit and CW oscillators stayed off until the frequency changed.
+- **A failed automatic IQ or carrier calibration corrupted every band.** A sweep pass with no valid reading wrote the previous pass's value (e.g. an amplitude of −0.049), and leaving the screen saved it. A pass that finds nothing now leaves the setting alone.
+- **Leaving an IQ calibration with HOME** while keyed, or during an automatic run, left the mode machine keyed or the run stepping. The run kept going and saved a trial setting. HOME now stops the run, restores the band being swept and releases the PTT.
+- **Single-VFO Transmit IQ keyed at the wrong attenuation.** The first key-down was at full drive, and later ones at 31.5 dB whatever the screen showed. The screen now opens at 31.5 dB, and every key-down uses the value shown.
+- **The carrier null ran on single-VFO radios,** which can't measure the carrier. It now needs a dual-VFO radio.
+- **The SAM carrier offset read 5× too high.** It is shown as the frequency calibration's Error and the home screen's Err, and now reads in Hz.
+- **The Receive IQ screen kept the previous band's name** when the bands had identical settings.
+- **ATU:** a band or antenna change during a tune (possible over CAT) now ends the tune instead of storing its result under the wrong band. A stopped retune of a bypassed antenna keeps its stored setting. Clearing an antenna's memory while transmitting takes effect on return to receive.
+- **CAT `PS1;` switched the radio off.** Kenwood's power-on command (used by Hamlib) shut the radio down like `PS0;`. It now does nothing.
+
+### Under-the-Hood Changes
+
+- **CAT commands** checked against the Kenwood TS-480 specification; the table now has 43.
+  - Renamed so they no longer clash with Kenwood commands: the sample rate is now `XS` (Kenwood `SR` is a reset), and the hardware-register dump is now `HR` (Kenwood `PR` is the speech processor).
+  - New: `PR`, `PL` and `RM` for CESSB, and `TT` for the transmit test tones.
+- **New stored settings:** CESSB on/off and level.
+- **Test tools:**
+  - `code/tools/cessb_model`: an offline model of the transmit chain, built from the firmware's own filter coefficients.
+  - `code/tools/cessb_hil`: bench suites that drive the microphone input from an Analog Discovery 2 and measure the exciter, or the antenna connector through a CMU200, plus the two-tone splatter matrix.
+  - The radio simulator now provides the test signals and power bridge for every calibration, and `cal_walkthrough` plays through all of them.
+- **Tests:** the unit tests have grown to 1037.
+
 ## V1.5.1 Release Notes
 
 ### Major New Features
@@ -345,6 +407,10 @@ The step-by-step guide to calibrating a finished radio (frequency, receive and t
 and SWR, S-meter; single- and dual-VFO RF boards) is here:
 
 * **Calibration guide**: `code/docs/CalibrationGuide/Calibration_Guide.html`
+
+How CESSB works, how to set it up, and the bench and RF measurements behind it:
+
+* **CESSB report**: `code/docs/CESSB_Report.html`
 
 Useful sketches for testing the boards as you build them are here:
 
