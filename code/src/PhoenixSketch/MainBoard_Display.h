@@ -274,7 +274,10 @@ void DecrementValue(void);
  */
 void UpdateArrayVariables(void);
 void CESSBMenuRefreshLabel(void);
+void TXSourceMenuRefreshLabel(void);
+void CycleTXAudioSource(void);
 void CompressionBarWidths(float32_t comp_dB, int16_t *green, int16_t *yellow, int16_t *red);
+void CESSBSettingText(char *text, size_t size);
 void ToggleCESSB(void);
 
 /**

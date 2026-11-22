@@ -445,6 +445,72 @@ void StartEqualizerAdjust(void){
     SetInterrupt(iEQUALIZER);
 }
 
+struct SecondaryMenuOption AudioOptions[11] = {
+    "AGC Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
+    "AGC Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
+    "AGC Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
+    "AGC Medium", functionOption, NULL, (void *)SelectAGCMedium, NULL,
+    "AGC Fast", functionOption, NULL, (void *)SelectAGCFast, NULL,
+    "Adjust Equalizers",functionOption, NULL, (void *)StartEqualizerAdjust, NULL,
+    "Toggle Autonotch", functionOption, NULL, (void *)ToggleAutonotch, NULL,
+    "Noise Reduction Off", functionOption, NULL, (void *)SelectNROff, NULL,
+    "Kim Noise Reduction", functionOption, NULL, (void *)SelectNRKim, NULL,
+    "Spectral Noise Reduc.", functionOption, NULL, (void *)SelectNRSpectral, NULL,
+    "LMS Noise Reduction", functionOption, NULL, (void *)SelectNRLMS, NULL,
+};
+
+// Microphone Options
+VariableParameter micg = {
+    .variable = &ED.currentMicGain,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = -10, .max=30, .step=1}}
+};
+
+// Drive level applied in software to the USB transmit audio in digital mode -
+// the digital-mode equivalent of microphone gain.
+VariableParameter digdrive = {
+    .variable = &ED.digitalDriveLevel,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max=100, .step=1}}
+};
+
+// Level applied to the USB receive audio sent to the host. With AGC off the
+// receive chain applies a fixed gain, so this is the only thing standing between
+// a strong signal and a clipped USB stream.
+VariableParameter digrx = {
+    .variable = &ED.digitalRxLevel,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max=100, .step=1}}
+};
+
+// The SSB transmit audio source item cycles microphone -> single tone ->
+// two-tone, and its label shows the source in use. Not saved (see
+// SetTXAudioSource()). TXSourceMenuRefreshLabel() keeps it in step.
+static char txSourceLabel[24];
+
+/**
+ * Write the transmit audio source menu item's label for the current source.
+ */
+void TXSourceMenuRefreshLabel(void){
+    const char *name;
+    switch (GetTXAudioSource()){
+        case TX_SOURCE_SINGLE_TONE: name = "1 kHz tone"; break;
+        case TX_SOURCE_TWO_TONE:    name = "2-tone IMD"; break;
+        case TX_SOURCE_MIC:
+        default:                    name = "Microphone"; break;
+    }
+    snprintf(txSourceLabel, sizeof(txSourceLabel), "TX src: %s", name);
+}
+
+/**
+ * Menu callback to step the SSB transmit audio source to the next one:
+ * microphone, 1 kHz test tone, 700 + 1900 Hz two-tone, then back to microphone.
+ */
+void CycleTXAudioSource(void){
+    SetTXAudioSource(((int32_t)GetTXAudioSource() + 1) % TX_SOURCE_COUNT);
+    TXSourceMenuRefreshLabel();
+}
+
 // The CESSB item is a toggle whose label says what selecting it will do, as the
 // ATU menu's toggles do. CESSBMenuRefreshLabel() keeps it in step with ED.
 static char cessbLabel[16];
@@ -472,50 +538,13 @@ VariableParameter cessbDrive = {
     .limits = {.i32 = {.min = 0, .max = CESSB_DRIVE_MAX_DB, .step = 1}}
 };
 
-struct SecondaryMenuOption AudioOptions[13] = {
-    "AGC Off", functionOption, NULL, (void *)SelectAGCOff, NULL,
-    "AGC Long", functionOption, NULL, (void *)SelectAGCLong, NULL,
-    "AGC Slow", functionOption, NULL, (void *)SelectAGCSlow, NULL,
-    "AGC Medium", functionOption, NULL, (void *)SelectAGCMedium, NULL,
-    "AGC Fast", functionOption, NULL, (void *)SelectAGCFast, NULL,
-    "Adjust Equalizers",functionOption, NULL, (void *)StartEqualizerAdjust, NULL,
-    "Toggle Autonotch", functionOption, NULL, (void *)ToggleAutonotch, NULL,
-    "Noise Reduction Off", functionOption, NULL, (void *)SelectNROff, NULL,
-    "Kim Noise Reduction", functionOption, NULL, (void *)SelectNRKim, NULL,
-    "Spectral Noise Reduc.", functionOption, NULL, (void *)SelectNRSpectral, NULL,
-    "LMS Noise Reduction", functionOption, NULL, (void *)SelectNRLMS, NULL,
-    cessbLabel, functionOption, NULL, (void *)ToggleCESSB, NULL,
-    "CESSB level (dB)", variableOption, &cessbDrive, NULL, NULL,
-};
-
-// Microphone Options
-VariableParameter micg = {
-    .variable = &ED.currentMicGain,
-    .type = TYPE_I32,
-    .limits = {.i32 = {.min = -10, .max=30, .step=1}}
-};
-
-// Drive level applied in software to the USB transmit audio in digital mode -
-// the digital-mode equivalent of microphone gain.
-VariableParameter digdrive = {
-    .variable = &ED.digitalDriveLevel,
-    .type = TYPE_I32,
-    .limits = {.i32 = {.min = 0, .max=100, .step=1}}
-};
-
-// Level applied to the USB receive audio sent to the host. With AGC off the
-// receive chain applies a fixed gain, so this is the only thing standing between
-// a strong signal and a clipped USB stream.
-VariableParameter digrx = {
-    .variable = &ED.digitalRxLevel,
-    .type = TYPE_I32,
-    .limits = {.i32 = {.min = 0, .max=100, .step=1}}
-};
-
-struct SecondaryMenuOption MicOptions[3] = {
+struct SecondaryMenuOption MicOptions[6] = {
     "Mic gain", variableOption, &micg, NULL, NULL,
     "USB drive", variableOption, &digdrive, NULL, NULL,
     "USB RX level", variableOption, &digrx, NULL, NULL,
+    txSourceLabel, functionOption, NULL, (void *)CycleTXAudioSource, NULL,
+    cessbLabel, functionOption, NULL, (void *)ToggleCESSB, NULL,
+    "CESSB level (dB)", variableOption, &cessbDrive, NULL, NULL,
 };
 
 // Calibration Menu
@@ -786,6 +815,7 @@ void UpdateArrayVariables(void){
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
     CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif
@@ -1005,6 +1035,7 @@ void DrawMainMenu(void){
         return;
     redrawMenu = false;
     CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif
@@ -1045,6 +1076,7 @@ void DrawSecondaryMenu(void){
         return;
     redrawMenu = false;
     CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif

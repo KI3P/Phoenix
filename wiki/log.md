@@ -1800,3 +1800,35 @@ Also brought the rest of the wiki up to date with the built feature:
 - [[controlled-envelope-ssb]]: added the measured results and CPU cost.
 - [[real-time-constraints]]: added the transmit DSP cost, and the smallest stack is now
   13 KB.
+
+## [2026-11-21] decision | SSB transmit test-tone source (menu "TX src", CAT `TT`)
+Added a transmit audio source setting for testing SSB performance: microphone, a single
+1 kHz tone, or a 700 + 1900 Hz two-tone signal. Decided with the user:
+- The tones are injected at the microphone input mixers (ports 2/3), so they pass through
+  the whole chain, EQ and CESSB included.
+- The setting is not saved; the radio always starts on the microphone.
+- Frequencies and levels are fixed. The single tone is at the calibration-tone level, so
+  the output equals the power setting; for the two-tone, PEP equals the power setting.
+- A non-Kenwood CAT command `TT` sets and reads it.
+
+The sidetone and calibration oscillators were not reused, because their levels belong to
+other settings. See [[cat-control]] "SSB transmit test tone".
+
+## [2026-11-21] query | Test-tone source checked at RF on radio 2
+Flashed radio 2 (no KI3P patch). With the CMU200 on the 60 dB tap:
+- `TT1`/`TT2` give the expected spectra and power.
+- At 2–5 W the two-tone PEP is the setting within 0.25 dB, with max − avg 3.0 dB.
+- IMD3 is about −38 dB re PEP. At the 10 W setting the output compresses to 8.1–8.4 W PEP
+  and IMD3 rises to −33.5 dB re PEP.
+- The tones are unbalanced by 0.6 dB (passband), and switching while keyed works.
+
+Corrected an earlier claim that the −500 Hz IMD3 product is filtered: it is RF-chain
+distortion and measures the same as +3100 Hz. Details in [[cat-control]].
+
+
+## [2026-11-22] decision | CESSB menu items moved to the Microphone menu
+At the user's request, "Enable/Disable CESSB" and "CESSB level (dB)" moved from Audio Options
+to the Microphone menu, after "TX src" (`MicOptions[4]` and `[5]` in
+`MainBoard_DisplayMenus.cpp`; Audio Options is back to 11 items). Behaviour, storage and CAT
+`PR`/`PL` are unchanged. The `TransmitChainCESSB` menu tests now index `MicOptions`. Updated
+[[dsp-chain]], [[cessb]] and `code/docs/CESSB_Report.html`.

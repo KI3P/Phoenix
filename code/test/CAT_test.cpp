@@ -33,6 +33,8 @@ char *NT_write(char* cmd);
 char *NT_read(char* cmd);
 char *PR_write(char* cmd);
 char *PR_read(char* cmd);
+char *TT_write(char* cmd);
+char *TT_read(char* cmd);
 char *PL_write(char* cmd);
 char *PL_read(char* cmd);
 char *RM_write(char* cmd);
@@ -3256,6 +3258,40 @@ TEST(CAT, DD_ParserReachesBothForms) {
     EXPECT_STREQ(command_parser(read_cmd), "DD042;");
 
     ED.digitalDriveLevel = saved;
+}
+
+// ============================================================================
+// TT - SSB transmit test tone (not a Kenwood keyword)
+// ============================================================================
+
+TEST(CAT, TT_SelectsAndReadsTheTransmitAudioSource) {
+    char two[] = "TT2;";
+    EXPECT_STREQ(TT_write(two), "");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_TWO_TONE);
+    char read2[] = "TT;";
+    EXPECT_STREQ(TT_read(read2), "TT2;");
+
+    char one[] = "TT1;";
+    EXPECT_STREQ(TT_write(one), "");
+    char read1[] = "TT;";
+    EXPECT_STREQ(TT_read(read1), "TT1;");
+
+    // Through the parser too: TT is in the command table
+    char viaParser[] = "TT0;";
+    EXPECT_STREQ(command_parser(viaParser), "");
+    char readViaParser[] = "TT;";
+    EXPECT_STREQ(command_parser(readViaParser), "TT0;");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+}
+
+TEST(CAT, TT_RejectsOtherValues) {
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    char three[] = "TT3;";
+    EXPECT_STREQ(TT_write(three), "?;");
+    char letter[] = "TTX;";
+    EXPECT_STREQ(TT_write(letter), "?;");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+    SetTXAudioSource(TX_SOURCE_MIC);
 }
 
 // ============================================================================

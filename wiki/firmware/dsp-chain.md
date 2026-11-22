@@ -69,7 +69,7 @@ measuring the transmit chain:
   Hilbert pair rebuilds the quadrature relationship downstream ([[ssb-phasing-method]]).
 - **CESSB and `TXGain` follow the interpolate-by-2 at the Fs/8 node** (branch
   `cessb-proposal`, #35). `CESSBProcess()` runs only in `SSB_TRANSMIT` with
-  `ED.cessbEnabled` set (Audio Options → Enable/Disable CESSB; off by default). It limits
+  `ED.cessbEnabled` set (Microphone → Enable/Disable CESSB; off by default). It limits
   the envelope to the calibration tone's level, and `TXGain`, now scaling both I and Q
   after it, maps that level onto the requested power. With CESSB off, nothing limits PEP:
   past full scale, `arm_float_to_q15` in `PlayIQData` saturates I and Q separately, a

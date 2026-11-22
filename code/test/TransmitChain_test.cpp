@@ -1735,8 +1735,8 @@ TEST(TransmitChainCESSB, MovingTXGainChangesNothing){
 
 TEST(TransmitChainCESSB, MenuTogglesTheSettingAndItsLabel){
     const bool saved = ED.cessbEnabled;
-    extern struct SecondaryMenuOption AudioOptions[13];
-    const SecondaryMenuOption &item = AudioOptions[11];
+    extern struct SecondaryMenuOption MicOptions[6];
+    const SecondaryMenuOption &item = MicOptions[4];
     ED.cessbEnabled = false;
     CESSBMenuRefreshLabel();
     EXPECT_STREQ(item.label, "Enable CESSB");
@@ -1843,9 +1843,28 @@ TEST(TransmitChainCESSB, CompressionBarColours){
     EXPECT_EQ(g + y + r, 0);
 }
 
+TEST(TransmitChainCESSB, SettingsPaneShowsOffOrTheLevel){
+    const bool savedOn = ED.cessbEnabled;
+    const int32_t savedDrive = ED.cessbDrive_dB;
+    char text[12];
+    ED.cessbEnabled = false;
+    ED.cessbDrive_dB = 6;
+    CESSBSettingText(text, sizeof(text));
+    EXPECT_STREQ(text, "Off");
+    ED.cessbEnabled = true;
+    CESSBSettingText(text, sizeof(text));
+    EXPECT_STREQ(text, "6dB");
+    ED.cessbDrive_dB = CESSB_DRIVE_MAX_DB;
+    CESSBSettingText(text, sizeof(text));
+    EXPECT_STREQ(text, "10dB");
+    EXPECT_LE(strlen(text), 4u); // the pane leaves room for four characters
+    ED.cessbEnabled = savedOn;
+    ED.cessbDrive_dB = savedDrive;
+}
+
 TEST(TransmitChainCESSB, MenuHasTheProcessorLevel){
-    extern struct SecondaryMenuOption AudioOptions[13];
-    const SecondaryMenuOption &item = AudioOptions[12];
+    extern struct SecondaryMenuOption MicOptions[6];
+    const SecondaryMenuOption &item = MicOptions[5];
     EXPECT_STREQ(item.label, "CESSB level (dB)");
     ASSERT_NE(item.varPam, nullptr);
     EXPECT_EQ(item.varPam->variable, &ED.cessbDrive_dB);
@@ -1896,4 +1915,151 @@ TEST(TransmitChainCESSB, NegativeMicGainNoLongerWrapsToMaximum){
     EXPECT_EQ(MicGainForCodec(20), 20u);
     EXPECT_EQ(MicGainForCodec(63), 63u);
     EXPECT_EQ(MicGainForCodec(100), 63u);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// SSB transmit test-tone source (SetTXAudioSource)
+///////////////////////////////////////////////////////////////////////////////
+
+class TXAudioSourceTest : public ::testing::Test {
+protected:
+    ModeSm_StateId savedState;
+    uint8_t savedRate;
+    void SetUp() override {
+        savedState = modeSM.state_id;
+        savedRate = SampleRate;
+        SampleRate = SAMPLE_RATE_192K;
+        modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+        UpdateAudioIOState();
+        SetTXAudioSource(TX_SOURCE_MIC);
+    }
+    void TearDown() override {
+        SetTXAudioSource(TX_SOURCE_MIC);
+        SampleRate = savedRate;
+        UpdateSampleRateDependentOscillators();
+        modeSM.state_id = ModeSm_StateId_SSB_RECEIVE;
+        UpdateAudioIOState();
+        modeSM.state_id = savedState;
+    }
+    // Enter a mode and let the audio routing follow it
+    void Enter(ModeSm_StateId s){
+        modeSM.state_id = s;
+        UpdateAudioIOState();
+    }
+    // The gains of both microphone mixers must be g0..g3
+    void ExpectMicMixers(float g0, float g1, float g2, float g3){
+        AudioMixer4 *m[2] = {&modeSelectInExL, &modeSelectInExR};
+        for (int k = 0; k < 2; k++){
+            EXPECT_FLOAT_EQ(m[k]->getGain(0), g0) << "mixer " << k;
+            EXPECT_FLOAT_EQ(m[k]->getGain(1), g1) << "mixer " << k;
+            EXPECT_FLOAT_EQ(m[k]->getGain(2), g2) << "mixer " << k;
+            EXPECT_FLOAT_EQ(m[k]->getGain(3), g3) << "mixer " << k;
+        }
+    }
+    // The setting AudioSynthWaveformSine needs for f_Hz at the current rate
+    float Setting(float f_Hz){
+        return f_Hz*AUDIO_SAMPLE_RATE_EXACT/SR[SampleRate].rate;
+    }
+};
+
+TEST_F(TXAudioSourceTest, MicrophoneIsTheDefaultAndRoutesPortZero){
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(1, 0, 0, 0);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), 0.0f);
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), 0.0f);
+}
+
+TEST_F(TXAudioSourceTest, SingleToneRoutesPortTwoAtTheCalibrationLevel){
+    ASSERT_TRUE(SetTXAudioSource(TX_SOURCE_SINGLE_TONE));
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(0, 0, 1, 0);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), TEST_TONE_SINGLE_AMPLITUDE);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getFrequency(), Setting(TEST_TONE_SINGLE_HZ));
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), 0.0f);
+    // Same level as the TX IQ / power calibration tone, so output = power setting
+    EXPECT_FLOAT_EQ(TEST_TONE_SINGLE_AMPLITUDE, 40.0f/500.0f);
+}
+
+TEST_F(TXAudioSourceTest, TwoToneSumsPortsTwoAndThreeWithPEPOfTheSingleTone){
+    ASSERT_TRUE(SetTXAudioSource(TX_SOURCE_TWO_TONE));
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(0, 0, 1, 1);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), TEST_TONE_TWO_AMPLITUDE);
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), TEST_TONE_TWO_AMPLITUDE);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getFrequency(), Setting(TEST_TONE_TWO_A_HZ));
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getFrequency(), Setting(TEST_TONE_TWO_B_HZ));
+    // Envelope peak of the two equal tones = the single tone's amplitude
+    EXPECT_FLOAT_EQ(2*TEST_TONE_TWO_AMPLITUDE, TEST_TONE_SINGLE_AMPLITUDE);
+}
+
+TEST_F(TXAudioSourceTest, BackToMicrophoneSilencesTheOscillators){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    SetTXAudioSource(TX_SOURCE_MIC);
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), 0.0f);
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getAmplitude(), 0.0f);
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(1, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, ChangingSourceDuringTransmitReroutesAtOnce){
+    Enter(ModeSm_StateId_SSB_TRANSMIT);
+    ExpectMicMixers(1, 0, 0, 0);
+    // UpdateAudioIOState() does nothing while the state is unchanged, so the
+    // source change itself must re-route
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    ExpectMicMixers(0, 0, 1, 1);
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    ExpectMicMixers(0, 0, 1, 0);
+    SetTXAudioSource(TX_SOURCE_MIC);
+    ExpectMicMixers(1, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, ChangingSourceDuringReceiveLeavesTheMicMixersMuted){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    ExpectMicMixers(0, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, CalibrationAndDigitalModeIgnoreTheSource){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    Enter(ModeSm_StateId_CALIBRATE_TX_IQ_MARK);
+    ExpectMicMixers(0, 1, 0, 0);
+    Enter(ModeSm_StateId_CALIBRATE_OFFSET_MARK);
+    ExpectMicMixers(0, 1, 0, 0);
+    Enter(ModeSm_StateId_DIGITAL_TRANSMIT);
+    ExpectMicMixers(0, 0, 0, 0);
+}
+
+TEST_F(TXAudioSourceTest, OutOfRangeSourceIsRejected){
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    EXPECT_FALSE(SetTXAudioSource(-1));
+    EXPECT_FALSE(SetTXAudioSource(TX_SOURCE_COUNT));
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+}
+
+TEST_F(TXAudioSourceTest, SampleRateChangeKeepsTheTonesOnFrequency){
+    SetTXAudioSource(TX_SOURCE_TWO_TONE);
+    SampleRate = SAMPLE_RATE_176K;
+    UpdateSampleRateDependentOscillators(); // as ChangeSampleRate() does
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getFrequency(), Setting(TEST_TONE_TWO_A_HZ));
+    EXPECT_FLOAT_EQ(testToneB_oscillator.getFrequency(), Setting(TEST_TONE_TWO_B_HZ));
+    // The amplitudes are untouched
+    EXPECT_FLOAT_EQ(testToneA_oscillator.getAmplitude(), TEST_TONE_TWO_AMPLITUDE);
+}
+
+TEST_F(TXAudioSourceTest, MicrophoneMenuItemCyclesTheSourceAndItsLabel){
+    extern struct SecondaryMenuOption MicOptions[6];
+    const SecondaryMenuOption &item = MicOptions[3];
+    EXPECT_EQ(item.action, functionOption);
+    TXSourceMenuRefreshLabel();
+    EXPECT_STREQ(item.label, "TX src: Microphone");
+    ((void (*)(void))item.func)();
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+    EXPECT_STREQ(item.label, "TX src: 1 kHz tone");
+    ((void (*)(void))item.func)();
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_TWO_TONE);
+    EXPECT_STREQ(item.label, "TX src: 2-tone IMD");
+    ((void (*)(void))item.func)();
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+    EXPECT_STREQ(item.label, "TX src: Microphone");
 }

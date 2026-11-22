@@ -228,7 +228,7 @@ after CESSB. Every stage it moved past is linear, so with CESSB off the output i
 
 <h3>Controls added</h3>
 <ul>
-  <li><strong>Menu:</strong> Audio Options → <em>Enable CESSB</em> / <em>Disable CESSB</em> (the label names
+  <li><strong>Menu:</strong> Microphone → <em>Enable CESSB</em> / <em>Disable CESSB</em> (the label names
   the action), and <em>CESSB level (dB)</em>. Both are saved with the configuration. CESSB defaults to off.</li>
   <li><strong>CAT</strong> (Kenwood TS-480 commands):
     <ul>
@@ -517,7 +517,7 @@ CESSB level to set the amount of processing. The level is then repeatable, and i
 <h3>Setting up</h3>
 <ol>
   <li>Set the <strong>SSB power</strong> to the peak power you want. With CESSB on, this is the PEP.</li>
-  <li>Menu → Audio Options → <strong>Enable CESSB</strong>. Set <strong>CESSB level (dB)</strong> to 0.</li>
+  <li>Menu → Microphone → <strong>Enable CESSB</strong>. Set <strong>CESSB level (dB)</strong> to 0.</li>
   <li>Into a dummy load, talk normally. Adjust the <strong>mic gain</strong> until the C bar
   (below) just flickers on your loudest syllables, 0–2 dB. Your peaks now reach the set
   power.</li>
@@ -580,7 +580,7 @@ recent syllable rather than the average. It goes empty as soon as CESSB is not r
 <tr><th>What</th><th>Where</th></tr>
 <tr><td>The stage</td><td><code>code/src/PhoenixSketch/DSP_CESSB.{h,cpp}</code></td></tr>
 <tr><td>Chain, <code>TXGain</code></td><td><code>DSP.cpp</code> <code>TransmitProcessing()</code>, <code>TXGain()</code></td></tr>
-<tr><td>Menu, display</td><td><code>MainBoard_DisplayMenus.cpp</code> (Audio Options), <code>MainBoard_DisplayHome.cpp</code> (C bar)</td></tr>
+<tr><td>Menu, display</td><td><code>MainBoard_DisplayMenus.cpp</code> (Microphone menu), <code>MainBoard_DisplayHome.cpp</code> (C bar)</td></tr>
 <tr><td>CAT</td><td><code>CAT.cpp</code>: <code>PR</code>, <code>PL</code>, <code>RM</code></td></tr>
 <tr><td>Unit tests</td><td><code>code/test/TransmitChain_test.cpp</code> (<code>TransmitChainCESSB.*</code>), <code>CAT_test.cpp</code></td></tr>
 <tr><td>Offline model</td><td><code>code/tools/cessb_model/</code> (<code>run_model.py</code>, <code>test_cessb_model.py</code>)</td></tr>

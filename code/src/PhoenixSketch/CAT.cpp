@@ -76,6 +76,8 @@ char *PD_read(  char* cmd );
 char *PR_write( char* cmd );
 char *PR_read(  char* cmd );
 char *PL_write( char* cmd );
+char *TT_write( char* cmd );
+char *TT_read(  char* cmd );
 char *PL_read(  char* cmd );
 char *RM_write( char* cmd );
 char *RM_read(  char* cmd );
@@ -133,7 +135,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 42
+#define NUM_SUPPORTED_COMMANDS 43
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AC", 3+3,3, AC_write, AC_read },  // antenna tuner: TX-AT in/thru, start/stop tuning
@@ -185,7 +187,8 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "XA", 3+3,3, XA_write, XA_read },  // CW transmit attenuation override -- NOT a Kenwood keyword
         { "AT", 3+9,3, AT_write, AT_read },  // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
         { "AX", 3+1,3, AX_write, AX_read },  // ATU tuner diagnostics (needs ATU_PRESENT) -- NOT a Kenwood keyword
-        { "AY", 3+2,0, AY_write, unsupported_cmd }   // ATU program readings, a page at a time -- NOT a Kenwood keyword
+        { "AY", 3+2,0, AY_write, unsupported_cmd },  // ATU program readings, a page at a time -- NOT a Kenwood keyword
+        { "TT", 3+1,3, TT_write, TT_read }   // SSB TX test tone 0=mic 1=single 2=two-tone -- NOT a Kenwood keyword
     };
 
 /**
@@ -746,6 +749,35 @@ char *PR_write( char* cmd ){
  */
 char *PR_read( char* cmd ){
     sprintf( obuf, "PR%d;", ED.cessbEnabled ? 1 : 0 );
+    return obuf;
+}
+
+/**
+ * CAT command TT - select the SSB transmit audio source (NOT a Kenwood keyword)
+ *
+ * TT0; microphone, TT1; single 1 kHz test tone, TT2; 700 + 1900 Hz two-tone for
+ * intermodulation tests. The same setting as the Microphone menu's "TX src"
+ * item. It takes effect at once, also while transmitting, and is not saved:
+ * the radio always starts on the microphone.
+ *
+ * @param cmd CAT command string, TT0; TT1; or TT2;
+ * @return Empty string on success, "?;" for any other parameter
+ */
+char *TT_write( char* cmd ){
+    if ( cmd[2] < '0' || cmd[2] > '9' || !SetTXAudioSource( cmd[2] - '0' ) ){
+        sprintf( obuf, "?;");
+        return obuf;
+    }
+    return empty_string_p;
+}
+
+/**
+ * CAT command TT - read the SSB transmit audio source
+ * @param cmd CAT command string
+ * @return "TT0;" (microphone), "TT1;" (single tone) or "TT2;" (two-tone)
+ */
+char *TT_read( char* cmd ){
+    sprintf( obuf, "TT%d;", (int)GetTXAudioSource() );
     return obuf;
 }
 

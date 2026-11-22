@@ -203,7 +203,7 @@ delay line), so **5.2 ms** at 192k and 5.6 ms at 176.4k.
 - **`ED` fields:** `cessbEnabled` (bool) and `cessbDrive_dB` (int, 0–10). Persist them next to
   `currentMicGain` in `Storage.cpp` (`:141`, `:372`, `:623`, `:838`), with defaults
   "enabled" and a starting drive of 4–6 dB, to be tuned on air (Phase 3).
-- **Menu:** *(superseded for on/off: the toggle is under Audio Options, see [Phase 1 as built](#phase-1-as-built))* in the Microphone menu, add "Processor" (on/off) and "Proc level" next to
+- **Menu:** *(as built: both items are in the Microphone menu, as "Enable/Disable CESSB" and "CESSB level (dB)"; they were first under Audio Options and moved on 2026-11-22, see [Phase 1 as built](#phase-1-as-built))* in the Microphone menu, add "Processor" (on/off) and "Proc level" next to
   "Mic gain" (`MainBoard_DisplayMenus.cpp:463-475`).
 - **Meter:** a processing meter on the TX state-of-health pane, beside the existing VU bar
   (`MainBoard_DisplayHome.cpp:1012`). Per block, show the pre-clip peak envelope relative to
@@ -278,7 +278,7 @@ firmware. Its −3 dB corner must match the gtest's to within 5 Hz; it does to a
 - `DSP_CESSB.cpp/.h` (new): the stage.
 - `DSP.cpp`: `TransmitProcessing()` and `TXGain()`.
 - `DSP_FFT.cpp`: `InitializeTransmitFilters()` calls `InitializeCESSB()`.
-- `MainBoard_DisplayMenus.cpp`: the Audio Options item.
+- `MainBoard_DisplayMenus.cpp`: the Microphone menu items (moved from Audio Options on 2026-11-22).
 - `Storage.cpp`: the setting.
 - `MainBoard_AudioIO.cpp`: `MicGainForCodec()`.
 - `SDT.h`: the `ED.cessbEnabled` field.
@@ -289,7 +289,7 @@ firmware. Its −3 dB corner must match the gtest's to within 5 Hz; it does to a
 
 Where the build departs from the design above:
 
-- **The menu toggle is under Audio Options, and "disable" means bypass** (the user's
+- **The menu toggle is in the Microphone menu (first built under Audio Options, moved 2026-11-22), and "disable" means bypass** (the user's
   decision). The item's label states the action, "Enable CESSB" or "Disable CESSB", as the
   ATU menu's toggles do. When disabled, the stage does not run at all; the "limiter at 0 dB
   drive" idea in section 4 is not used. `ED.cessbEnabled` defaults to `false` and persists
@@ -462,7 +462,7 @@ What the results show:
 ## Open questions
 
 1. ~~**On by default?**~~ **Decided 2026-11-19: off by default.** CESSB is opt-in through
-   Audio Options or CAT `PR1;`, so existing users' on-air sound does not change. This is
+   the Microphone menu or CAT `PR1;`, so existing users' on-air sound does not change. This is
    what Phase 1 shipped (`ED.cessbEnabled = false`), and the gtest
    `TransmitChainCESSB.DefaultsToOff` checks it.
 2. **`A_ref` and the equaliser.** The SSB power calibration tone passes through `BandEQ`, so
