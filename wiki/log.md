@@ -1832,3 +1832,21 @@ to the Microphone menu, after "TX src" (`MicOptions[4]` and `[5]` in
 `MainBoard_DisplayMenus.cpp`; Audio Options is back to 11 items). Behaviour, storage and CAT
 `PR`/`PL` are unchanged. The `TransmitChainCESSB` menu tests now index `MicOptions`. Updated
 [[dsp-chain]], [[cessb]] and `code/docs/CESSB_Report.html`.
+
+## [2026-11-22] query | CESSB two-tone splatter matrix at RF, radio 2
+At the user's request, a two-tone splatter matrix at the antenna connector: mic gain 10/15/20 dB
+× CESSB off/3 dB/6 dB, 14.100 MHz USB, 5 W, 176.4 ksps, 60 dB coupler to CMU200 RF1.
+- **Stimulus:** the firmware two-tone (`TT2`). A temporary firmware change, reverted and
+  reflashed afterwards, scaled it by 10^((MG − 20)/20). At 20 dB it is at its normal level
+  (PEP = setting), so CESSB off never overdrives the PA.
+- **Script:** `code/tools/cessb_hil/cessb_splatter_matrix.py`; table and figure from
+  `splatter_report.py`.
+- **Results:** in `code/docs/CESSB_Report.html` §5.5.
+  - The PA sets most of the splatter: outside-channel power is −43 dB re PEP at 0.6 W and
+    −34 dB at 4.8 W with CESSB off.
+  - When CESSB clips, the lower side and the IMD5/IMD7 products do not change.
+  - Only 2f2−f1 at 3100 Hz grows: −38.0 dB re PEP (off) → −34.1 (+3 dB drive) → −31.9 (+6).
+    It sits in the transition band above CESSB's 2950 Hz filter edge. Total outside-channel
+    power rises 2.1 / 3.7 dB.
+- **CAT quirk:** `MG` doesn't round-trip. `MG086` sets 20 dB but reads back as `MG085`, and
+  writing `MG085` sets 19 dB.
