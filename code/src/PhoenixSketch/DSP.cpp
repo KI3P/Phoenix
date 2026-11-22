@@ -1144,6 +1144,32 @@ void TXGain(DataBlock *data){
 }
 
 /**
+ * Feed the transmit power meter (PowerMeter.h) with one block taken right after
+ * TXGain(). The power calibration sets the band's gain correction so that an
+ * envelope of CESSB_CEILING at the CESSB node, passed through TXGain() with the
+ * power set to the calibration point, is the calibration point's power. Every
+ * sample here is therefore a calibrated instantaneous power, whatever the power
+ * setting or a calibration's gain override.
+ */
+void MeterTransmitBlock(DataBlock *data){
+    int32_t band = ED.currentBand[ED.activeVFO];
+    float32_t corr_dB, calPoint_W;
+    if (ED.PA100Wactive){
+        corr_dB = ED.PowerCal_100W_DSP_Gain_correction_dB[band];
+        calPoint_W = SSB_100W_CAL_POWER_POINT_W;
+    } else {
+        corr_dB = ED.PowerCal_20W_DSP_Gain_correction_dB[band];
+        calPoint_W = SSB_20W_CAL_POWER_POINT_W;
+    }
+    float32_t peak_W, sum_W;
+    PowerMeterBlockPower(data->I, data->Q, data->N,
+                         PowerMeterDigitalScale(calPoint_W, corr_dB, CESSB_CEILING),
+                         &peak_W, &sum_W);
+    PowerMeterSetContext(band, ED.PA100Wactive);
+    PowerMeterAddDigitalBlock(peak_W, sum_W, data->N, millis());
+}
+
+/**
  * Read a block of transmit audio from the USB audio link for digital mode.
  *
  * The microphone queues are still what paces this: they fill from the I2S DMA at
@@ -1230,6 +1256,7 @@ DataBlock * TransmitProcessing(const char *fname){
     else
         CESSBSkipped();
     TXGain(&data); // apply the DSP gain factor; linear, so after CESSB is equivalent
+    MeterTransmitBlock(&data);
     // Perform IQ correction
     ApplyIQCorrection(&data,
         ED.IQXAmpCorrectionFactor[ED.currentBand[ED.activeVFO]],

@@ -1850,3 +1850,27 @@ At the user's request, a two-tone splatter matrix at the antenna connector: mic 
     power rises 2.1 / 3.7 dB.
 - **CAT quirk:** `MG` doesn't round-trip. `MG086` sets 20 dB but reads back as `MG085`, and
   writing `MG085` sets 19 dB.
+
+## [2026-11-22] decision | SSB power meter: true PEP and average
+The user asked how well the displayed power tracks PEP or average on SSB voice.
+- **Finding:** neither. The firmware averaged the AD8307 readings in dB, so the display showed
+  the mean of the log of the envelope. Modelled (`code/tools/power_meter_eval/model.py`, W9GR
+  clip), the median reading was −15 dB re PEP and −6 dB re average, and the 10th percentile was
+  −26 dB. ~60 bridge samples per second can't give a PEP: a peak hold misses it by about 2 dB.
+- **Change:**
+  - The bridge now averages in watts and drops failed I²C reads.
+  - New `PowerMeter.cpp`: PEP (1.5 s hold) and average (1 s) from the TX I/Q after `TXGain()`,
+    scaled by the SSB power calibration. A slow bridge correction k (±3 dB, per band and PA)
+    adjusts both.
+  - The SWR pane shows PEP and AVG on SSB and digital mode, with '*' when |k| > 1.5 dB.
+  - New CAT command `PW;`.
+- **Bench, same day (radio 2, 20 m, CMU200 NPOWer via the 60 dB tap):**
+  - Old meter on speech: −9.5 dB re average, −18 dB re PEP.
+  - New meter: within −0.8…+0.6 dB everywhere, tones and speech, at 5 and 10 W.
+  - Digital side alone: within ±0.3 dB while the PA is linear.
+  - The bridge reads two tones 0.6–0.8 dB lower than a steady carrier: the AD7991 readout
+    partly log-averages a fast envelope. So k now learns only from steady-carrier seconds
+    (τ 1 s), not from all transmit (τ 5 s).
+  - Also fixed: a sample stamped just before the current bin cleared the meter.
+  - Table in [[log-amp-power-detection]]. Not done: SWR on speech into a 2:1 load.
+- Updated [[log-amp-power-detection]], [[cat-control]] (`PW`).

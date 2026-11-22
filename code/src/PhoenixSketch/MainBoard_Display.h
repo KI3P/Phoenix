@@ -180,6 +180,14 @@ struct PrimaryMenuOption {
 void DrawDisplay(void);
 
 /**
+ * @brief Format a transmit power for the SWR pane, e.g. "PEP 98W" or "AVG 4.2W*"
+ * @param label "PEP" or "AVG"
+ * @param W Power in watts; one decimal below 10 W, whole watts above
+ * @param flag Append '*': the bridge disagrees with the digital meter (PowerMeter.h)
+ */
+void FormatPowerReading(char *buf, size_t n, const char *label, float32_t W, bool flag);
+
+/**
  * @brief Initialize display hardware and draw initial screen
  * @note Configures RA8875 display controller, initializes all panes
  * @note Displays splash screen then transitions to home screen

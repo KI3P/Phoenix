@@ -83,6 +83,13 @@ void TransmitIQReceiveProcessing(void);
 DataBlock * TransmitProcessing(const char *fname);
 
 /**
+ * @brief Pass one transmit block, taken right after TXGain(), to the power meter
+ * @param data Block whose I/Q samples are scaled to the requested power
+ * @note See PowerMeter.h. Each sample is a calibrated instantaneous power.
+ */
+void MeterTransmitBlock(DataBlock *data);
+
+/**
  * @brief Read I/Q samples from ADC input buffer
  * @param data Pointer to DataBlock to fill with I/Q samples
  * @return ESUCCESS on success, error code on buffer overflow

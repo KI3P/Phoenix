@@ -767,6 +767,7 @@ struct AGCConfig {
 #include "Loop.h"
 #include "Tune.h"
 #include "SWRCalibration.h"
+#include "PowerMeter.h"
 #include "MainBoard_Display.h"
 #include "DSP_FFT.h"
 #include "DSP_Noise.h"
