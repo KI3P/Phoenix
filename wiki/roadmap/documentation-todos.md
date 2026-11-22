@@ -21,6 +21,29 @@ is tagged **⚠ possible bug** so it stands out.
 
 ## Code/comment discrepancies & possible bugs
 
+### Transmit audio (2026-11-18)
+- ~~⚠ **Negative mic gain wraps to maximum gain.**~~ **Fixed (2026-11-18, `cessb-proposal`):**
+  `MicGainForCodec()` clamps the setting to 0–63 dB before `micGain()`. The three different
+  ranges remain. Original note: `AudioControlSGTL5000::micGain(unsigned int dB)`
+  takes an unsigned value, but `ED.currentMicGain` can be negative: the menu allows −10…30
+  (`MainBoard_DisplayMenus.cpp:463`) and CAT `MG` maps down to −40. A negative value reaches
+  `micGain()` (`MainBoard_AudioIO.cpp:233`, `:335`) as a huge number, which selects the 40 dB
+  preamp and the maximum input gain. The encoder, menu and CAT also use three different
+  ranges. Found while scoping [[cessb]]; fix in its Phase 1, because CESSB drive depends on
+  mic level.
+
+- ⚠ **Exciter image rejection jumps between captures (KI3P prototype).** Measured at the
+  exciter I/Q with the AD2 (`code/tools/cessb_hil`, 176.4 ksps, USB, 5 W): the image of a
+  steady tone reads anywhere from about −40 to −63 dBc from one 0.5 s capture to the next,
+  at 300, 700, 1000, 2000 and 2600 Hz alike, with CESSB on or off. A one-sample I/Q skew
+  was ruled out, since the image does not rise with frequency. The −63 dBc end matches the
+  Hilbert pair's own image (gtest: −64.6 dBc at 700 Hz), so the TX IQ correction sometimes
+  cancels the analog imbalance and sometimes does not. Not yet investigated: something
+  in the exciter's I/Q timing or the DAC, or a measurement artefact.
+- **`all_CAT_tests` run as one process fails 11 tests** (`BU`/`BD`/`MD`/`PC` writes);
+  each passes under ctest, which runs them separately, and they fail identically without
+  the new `PR` tests. Some test leaves state the next depends on. Pre-existing.
+
 ### Unit-test mocks (2026-11-14)
 - **⚠ The `Adafruit_MCP23X17` mock has GPIOA and GPIOB swapped in `readGPIOAB()`.** It returns
   GPIOA in the high byte. The real library (`Adafruit_BusIO_Register`, LSB first) and

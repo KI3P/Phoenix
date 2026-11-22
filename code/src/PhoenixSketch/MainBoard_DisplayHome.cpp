@@ -985,6 +985,42 @@ void DrawVUBar(int16_t x0, int16_t y0, float32_t RMSval){
         tft.fillRect(x0+1+widthgreen+widthyellow, y0+1,widthred, 20, RA8875_RED);
 }
 
+/** Full scale of the CESSB compression bar, dB above the ceiling. */
+#define COMP_BAR_FULL_DB   12.0f
+/** Green up to here: the 3-6 dB of processing W7PUA and W9GR recommend. */
+#define COMP_BAR_GREEN_DB  6.0f
+/** Yellow up to here; red beyond, where the voice starts to sound processed. */
+#define COMP_BAR_YELLOW_DB 9.0f
+
+/**
+ * Width in pixels (0-100) of each colour of the CESSB compression bar.
+ * Separated from the drawing so it can be tested.
+ */
+void CompressionBarWidths(float32_t comp_dB, int16_t *green, int16_t *yellow, int16_t *red){
+    float32_t db = comp_dB;
+    if (db < 0.0f) db = 0.0f;
+    if (db > COMP_BAR_FULL_DB) db = COMP_BAR_FULL_DB;
+    const int16_t total  = (int16_t)(100.0f * db / COMP_BAR_FULL_DB + 0.5f);
+    const int16_t gLimit = (int16_t)(100.0f * COMP_BAR_GREEN_DB / COMP_BAR_FULL_DB + 0.5f);
+    const int16_t yLimit = (int16_t)(100.0f * COMP_BAR_YELLOW_DB / COMP_BAR_FULL_DB + 0.5f);
+    *green  = (total < gLimit) ? total : gLimit;
+    *yellow = (total < yLimit) ? total - *green : yLimit - gLimit;
+    if (*yellow < 0) *yellow = 0;
+    *red    = total - *green - *yellow;
+}
+
+/**
+ * The CESSB compression meter: how far the voice is pushed past the ceiling.
+ */
+void DrawCompressionBar(int16_t x0, int16_t y0, float32_t comp_dB){
+    int16_t g, y, r;
+    CompressionBarWidths(comp_dB, &g, &y, &r);
+    tft.drawRect(x0, y0, 100, 22, RA8875_WHITE);
+    if (g > 0) tft.fillRect(x0+1, y0+1, g, 20, RA8875_GREEN);
+    if (y > 0) tft.fillRect(x0+1+g, y0+1, y, 20, RA8875_YELLOW);
+    if (r > 0) tft.fillRect(x0+1+g+y, y0+1, r, 20, RA8875_RED);
+}
+
 /**
  * Render the state of health pane showing DSP load and system status. Use this pane for
  * VU meters of transmit amplitude in SSB transmit mode.
@@ -1007,10 +1043,17 @@ void DrawStateOfHealthPane(void) {
         tft.setCursor(PaneStateOfHealth.x0, PaneStateOfHealth.y0);
         tft.print("I");
         tft.setCursor(PaneStateOfHealth.x0+PaneStateOfHealth.width/2, PaneStateOfHealth.y0);
-        tft.print("Q");
+        // With CESSB running, Q (which tracks I closely) gives way to the
+        // compression meter: "C", dB of clipping, 0-12 dB across the bar
+        const bool cessb = CESSBActive();
+        tft.print(cessb ? "C" : "Q");
         //Debug(GetOutIRMS()); // uncomment to print the RMS values on the Serial line
         DrawVUBar(PaneStateOfHealth.x0+20, PaneStateOfHealth.y0+7, GetOutIRMS());
-        DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
+        if (cessb)
+            DrawCompressionBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20,
+                               PaneStateOfHealth.y0+7, GetCESSBCompression_dB());
+        else
+            DrawVUBar(PaneStateOfHealth.x0+PaneStateOfHealth.width/2+20, PaneStateOfHealth.y0+7, GetOutQRMS());
 
         PaneStateOfHealth.stale = false;
         return;
@@ -1665,6 +1708,53 @@ void UpdateKeyTypeSetting(void){
     UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
         (char *)"Key Type:", 9,
         valueText, 15,
+        PaneSettings.height/5 + 7*tft.getFontHeight() + 1,true,true);
+}
+
+// State tracking for mic gain setting display
+static int32_t oldMicGainSetting = INT32_MIN;
+
+void UpdateMicGainSetting(void){
+    if ((oldMicGainSetting == ED.currentMicGain) && (!PaneSettings.stale))
+        return;
+    oldMicGainSetting = ED.currentMicGain;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[12];
+    snprintf(valueText, sizeof(valueText), "%ld", (long)ED.currentMicGain);
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column1x,
+        (char *)"Mic Gain:", 9,
+        valueText, 3,
+        PaneSettings.height/5 + 6*tft.getFontHeight() + 1,true,true);
+}
+
+/**
+ * Write the settings pane's CESSB value: "Off" when CESSB is disabled, otherwise
+ * the processor level in dB, e.g. "6dB".
+ */
+void CESSBSettingText(char *text, size_t size){
+    if (ED.cessbEnabled)
+        snprintf(text, size, "%lddB", (long)ED.cessbDrive_dB);
+    else
+        snprintf(text, size, "Off");
+}
+
+// State tracking for CESSB setting display
+static int8_t oldCESSBEnabled = -1;
+static int32_t oldCESSBDrive_dB = INT32_MIN;
+
+void UpdateCESSBSetting(void){
+    if ((oldCESSBEnabled == (int8_t)ED.cessbEnabled) &&
+        (oldCESSBDrive_dB == ED.cessbDrive_dB) &&
+        (!PaneSettings.stale))
+        return;
+    oldCESSBEnabled = (int8_t)ED.cessbEnabled;
+    oldCESSBDrive_dB = ED.cessbDrive_dB;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[12];
+    CESSBSettingText(valueText, sizeof(valueText));
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+        (char *)"CESSB:", 6,
+        valueText, 4,
         PaneSettings.height/5 + 6*tft.getFontHeight() + 1,true,true);
 }
 
@@ -1751,6 +1841,40 @@ void UpdateAntennaSetting(void){
         PaneSettings.height/5 + 4*tft.getFontHeight() + 1,true,true);
 }
 
+// State tracking for the transmit audio source display
+static int32_t oldTXAudioSource = -1;
+
+/**
+ * Show the SSB transmit audio source. "Mic" in the usual green; a test tone
+ * ("Tone" for the single tone, "IMD" for the two-tone) in red, so nobody puts a
+ * test tone on the air without noticing.
+ */
+void UpdateTXSourceSetting(void){
+    TXAudioSource source = GetTXAudioSource();
+    if ((oldTXAudioSource == (int32_t)source) && (!PaneSettings.stale))
+        return;
+    oldTXAudioSource = (int32_t)source;
+    tft.setFontScale((enum RA8875tsize)0);
+    char valueText[5];
+    switch (source){
+        case TX_SOURCE_SINGLE_TONE: sprintf(valueText,"Tone"); break;
+        case TX_SOURCE_TWO_TONE:    sprintf(valueText,"IMD");  break;
+        case TX_SOURCE_MIC:
+        default:                    sprintf(valueText,"Mic");  break;
+    }
+    int16_t yoff = PaneSettings.height/5 + 5*tft.getFontHeight() + 1;
+    UpdateSetting(tft.getFontWidth(), tft.getFontHeight(), column2x,
+        (char *)"TX src:", 7,
+        valueText, 4,
+        yoff,true,true);
+    if (source != TX_SOURCE_MIC){
+        // UpdateSetting always prints the value in green; overprint it in red
+        tft.setCursor(PaneSettings.x0 + column2x + tft.getFontWidth(), PaneSettings.y0 + yoff);
+        tft.setTextColor(RA8875_RED);
+        tft.print(valueText);
+    }
+}
+
 void DrawSettingsPane(void) {
     // The individual settings only set the font scale, so select the built-in font here
     // for all of them rather than inheriting whatever font was last installed.
@@ -1771,9 +1895,12 @@ void DrawSettingsPane(void) {
     UpdateZoomSetting();
     UpdateSampleRateSetting();
     UpdateKeyTypeSetting();
+    UpdateMicGainSetting();
+    UpdateCESSBSetting();
     UpdateDecoderSetting();
     UpdateDSPGainSetting();
     UpdateAntennaSetting();
+    UpdateTXSourceSetting();
 
     if (PaneSettings.stale){
         tft.drawRect(PaneSettings.x0, PaneSettings.y0, PaneSettings.width, PaneSettings.height, RA8875_WHITE);

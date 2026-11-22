@@ -503,6 +503,7 @@ void InitializeTransmitFilters(TransmitFilterConfig *TXfilters) {
     // Must come first: the ARM instances below are bound to these arrays. The
     // transmit chain decimates by the same DF1 * DF2 the receive chain does.
     InitializeTransmitFilterCoeffs((float32_t)SR[SampleRate].rate / RXfilters.DF);
+    InitializeCESSB((float32_t)SR[SampleRate].rate / RXfilters.DF);
 
     // ****************************************************************************************
     // *  Decimate by 4: 192K to 48K SPS

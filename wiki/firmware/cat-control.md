@@ -3,7 +3,7 @@ title: CAT Control (Kenwood emulation)
 type: module
 status: draft
 created: 2026-06-08
-updated: 2026-11-14
+updated: 2026-11-21
 tags: [cat, kenwood, ts-480, ts-2000, serial, rig-control, usb]
 source_refs: []
 related: ["[[digital-mode]]", "[[overview]]", "[[main-loop]]", "[[mode-state-machine]]", "[[tune-frequency-control]]", "[[persistent-config]]", "[[sample-rate-switching]]", "[[filter-hil-test]]", "[[audio-equalizer]]", "[[cw-processing]]", "[[tx-filter-hil-test]]", "[[filter-board-electronics]]", "[[log-amp-power-detection]]", "[[spi-display-hang]]"]
@@ -61,7 +61,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 > handler** — it becomes silently write-only. This is not hypothetical: it is exactly the bug
 > that made `FW;` unreadable for as long as `FW` has existed (see below).
 
-## Implemented commands (36)
+## Implemented commands (39)
 
 | Group | Commands |
 |---|---|
@@ -72,11 +72,11 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
 | SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
 | Antenna tuner | `AC` (Kenwood: start/stop tuning, network in/thru), `AT` (raw ATU relay state), `AX`/`AY` (tuner diagnostics); need `ATU_PRESENT` except `AC`, which reads `AC000;` without it; see [[atu-control]] |
-| DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX) |
+| DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX), `PR` (speech processor = CESSB on/off, `PR0;`/`PR1;`/`PR;`), `PL` (processor input level = CESSB level, 10 per dB; output level stored, not used), `RM` (meter: only `RM2` COMP, the CESSB compression meter at 2 dB per dot; `RM1`/`RM3` read `?;`). Branch `cessb-proposal`, see [[cessb]] |
 | Keyer | `KS` (keyer speed / WPM) |
 | PTT | `TX` (transmit), `RX` (receive) |
 | Misc | `AI` (auto-info), `PS` (`PS0;` powers off, `PS1;` is a silent no-op), `PD`, `DB` |
-| **Custom (non-Kenwood)** | `ED` (dump the `ED` config), `HR` (dump the `hardwareRegister`), **`XS`**, **`CF`**, **`EQ`**, **`FL`** |
+| **Custom (non-Kenwood)** | `ED` (dump the `ED` config), `HR` (dump the `hardwareRegister`), **`XS`**, **`CF`**, **`EQ`**, **`FL`**, **`TT`** (SSB transmit test tone, see below) |
 
 `ED` and `HR` are Phoenix extensions explicitly marked "NOT a Kenwood keyword" — handy debug
 dumps of [[persistent-config]] and the [[filter-boards]] `hardwareRegister`.
@@ -89,7 +89,9 @@ sending the real command gets our meaning instead.
 - **Renamed 2026-11-15:** `SR` → `XS` (sample rate). Kenwood `SR1;`/`SR2;` is a VFO/full reset
   (Hamlib `rig_reset`), which used to change the sample rate. `PR` → `HR` (hardware-register
   dump). Kenwood `PR` is the speech processor on/off, so a client polling the compressor got a
-  malformed `PR;` reply and caused a register dump on every poll.
+  malformed `PR;` reply and caused a register dump on every poll. Since 2026-11-18 (branch
+  `cessb-proposal`) `PR` is the real Kenwood command again: the speech processor, which in
+  Phoenix is CESSB ([[cessb]]).
 - **Fixed 2026-11-15:** `PS_write` ignored its parameter and shut the radio down on any `PSx;`,
   including Kenwood's power-*on* `PS1;` (Hamlib `set_powerstat(ON)`). It now shuts down only on
   `PS0;`, ignores `PS1;`, rejects anything else, and sends no answer (Kenwood set commands get none).
@@ -100,6 +102,43 @@ sending the real command gets our meaning instead.
     the passband high cut in every mode.
   - `NR`: Kenwood allows 0–2. We accept 3 (LMS), and `NR_write` doesn't validate the digit.
   - `DB` is not a TS-480 command, though the table comment doesn't say so.
+
+### SSB transmit test tone: `TT` (added 2026-11-21, branch `cessb-proposal`)
+
+`TT0;` selects the microphone, `TT1;` a single 1 kHz tone, and `TT2;` a two-tone signal
+(700 + 1900 Hz, equal amplitude) for IMD tests. `TT;` reads the setting back. This is the same
+setting as the Microphone menu's "TX src" item. Neither the menu nor `TT` saves it, so the radio always
+starts on the microphone. The setting takes effect at once, also while transmitting, and is
+used only in SSB transmit; digital mode and the calibrations keep their own sources.
+
+- **Where the tones enter:** two `AudioSynthWaveformSine` objects on ports 2 and 3 of the
+  microphone input mixers (`MainBoard_AudioIO.cpp`, `SetTXAudioSource()`). Port 1 is the
+  TX IQ calibration oscillator. The tones therefore pass through the whole chain: TX EQ,
+  Hilbert, CESSB and TXGain. Mic gain is set in the codec, so it does not affect them.
+- **Levels:** the single tone has amplitude 0.08, the same as the TX IQ / power calibration
+  tone (40/500), so it comes out at the power setting. Each of the two tones has 0.04, so
+  the two-tone PEP equals the power setting and each tone is 6 dB below PEP.
+- On the home screen, the Settings pane shows `TX src:` as `Mic` in green, or `Tone` / `IMD`
+  in red.
+- **Products to read on USB:** the tones are at dial +700 / +1900 Hz, IMD3 at −500 / +3100 Hz
+  and IMD5 at −1700 / +4300 Hz. The products come from the RF chain, after the sideband
+  filter, so both sides are equally valid: the −500 Hz product is *not* suppressed (measured
+  equal to within 0.2 dB).
+- **Bench, radio 2, 2026-11-21** (14.100 MHz USB, dummy load, 60 dB tap to the CMU200 RF1,
+  NPOWer and 100 Hz RBW spectra):
+  - Single tone at a 10 W setting: PEP 8.35 W, max − avg 0.13 dB. The image is −59 dBc, the
+    carrier −58 dBc, and the 2nd/3rd audio harmonics −60 / −68 dBc.
+  - Two-tone at 2 W and 5 W: PEP 2.08 W and 4.74 W (within 0.25 dB of the setting), max − avg
+    3.0 dB. IMD3 is −32 dBc re one tone (−38 dB re PEP) at both levels.
+  - Two-tone at 10 W: PEP 8.1 W, max − avg 2.72 dB, IMD3 −27.5 dBc. The output stage
+    compresses above about 5 W.
+  - The 1900 Hz tone is 0.6 dB below the 700 Hz tone at every level, i.e. the transmit
+    audio passband.
+  - CESSB on at 0 dB changed nothing (no clipping). Switching `TT` while keyed took effect
+    at once.
+  - The tone source isn't the IMD source. A single tone has a constant envelope, so an
+    RF-chain (AM/AM) nonlinearity leaves it clean, yet its audio harmonics are ≤ −60 dBc.
+    The two-tone products therefore arise after SSB generation.
 
 ### DSP-settings commands (added 2026-07, `CAT.cpp:132-135`)
 

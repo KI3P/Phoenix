@@ -23,7 +23,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.5.1"
+#define VERSION "Phx V1.6.0"
 
 #include "BuildInfo.h"
 
@@ -328,6 +328,13 @@ extern struct config_t {
     int32_t equalizerXmt[EQUALIZER_CELL_COUNT] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 }; /** Transmit audio equalizer amplitudes */
     int32_t currentMicGain = 20;   /** Gain of the mic used for SSB */
     int32_t digitalDriveLevel = 50; /** Drive level (0-100) applied to USB transmit audio in digital mode */
+    /** Controlled Envelope SSB on the SSB transmit chain (DSP_CESSB.h). Off by
+     *  default until it has been validated on the bench and on air. */
+    bool cessbEnabled = false;
+    /** CESSB processor level: gain ahead of the clipper, 0 to CESSB_DRIVE_MAX_DB dB.
+     *  The microphone gain sets the voice level; this sets how much of it is
+     *  pushed past the ceiling. */
+    int32_t cessbDrive_dB = 0;
     /** Level (0-100) applied to USB receive audio in digital mode.
      *
      * The receive audio arriving at the USB tap is unregulated: with AGC off the
@@ -765,6 +772,7 @@ struct AGCConfig {
 #include "DSP_Noise.h"
 #include "DSP_CWProcessing.h"
 #include "DSP.h"
+#include "DSP_CESSB.h"
 #include "MainBoard_AudioIO.h"
 #include "USBAudio.h"
 #include "FrontPanel.h"

@@ -6,7 +6,7 @@ created: 2026-06-08
 updated: 2026-07-29
 tags: [ssb, phasing, hilbert, usb, lsb, demodulation, modulation, sample-rate, hil]
 source_refs: []
-related: ["[[theory-overview]]", "[[iq-quadrature-sampling]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[mode-state-machine]]", "[[tx-filter-hil-test]]", "[[runtime-filter-design]]", "[[iq-imbalance-correction]]"]
+related: ["[[theory-overview]]", "[[iq-quadrature-sampling]]", "[[fast-convolution-filtering]]", "[[dsp-chain]]", "[[mode-state-machine]]", "[[tx-filter-hil-test]]", "[[runtime-filter-design]]", "[[iq-imbalance-correction]]", "[[controlled-envelope-ssb]]"]
 ---
 
 # SSB by the Phasing (Hilbert) Method
@@ -113,4 +113,6 @@ read from (`DSP_FFT.cpp:748-754`).
   high-Q filter; Phoenix avoids it.
 - **Weaver / third method**: mix audio to a low IF, low-pass, mix again. No wideband Hilbert
   needed, but two extra mixers. Phoenix is **not** Weaver — confirm if any module hints
-  otherwise before claiming it.
+  otherwise before claiming it. The proposed CESSB stage borrows Weaver's one useful property,
+  a channel centred on DC, only inside the clipper: shift down, clip and filter, shift back,
+  so the output stays zero-IF ([[controlled-envelope-ssb]], [[cessb]]).

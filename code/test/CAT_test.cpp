@@ -31,6 +31,14 @@ char *NR_write(char* cmd);
 char *NR_read(char* cmd);
 char *NT_write(char* cmd);
 char *NT_read(char* cmd);
+char *PR_write(char* cmd);
+char *PR_read(char* cmd);
+char *TT_write(char* cmd);
+char *TT_read(char* cmd);
+char *PL_write(char* cmd);
+char *PL_read(char* cmd);
+char *RM_write(char* cmd);
+char *RM_read(char* cmd);
 char *PC_write(char* cmd);
 char *PC_read(char* cmd);
 char *PS_write(char* cmd);
@@ -3250,6 +3258,149 @@ TEST(CAT, DD_ParserReachesBothForms) {
     EXPECT_STREQ(command_parser(read_cmd), "DD042;");
 
     ED.digitalDriveLevel = saved;
+}
+
+// ============================================================================
+// TT - SSB transmit test tone (not a Kenwood keyword)
+// ============================================================================
+
+TEST(CAT, TT_SelectsAndReadsTheTransmitAudioSource) {
+    char two[] = "TT2;";
+    EXPECT_STREQ(TT_write(two), "");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_TWO_TONE);
+    char read2[] = "TT;";
+    EXPECT_STREQ(TT_read(read2), "TT2;");
+
+    char one[] = "TT1;";
+    EXPECT_STREQ(TT_write(one), "");
+    char read1[] = "TT;";
+    EXPECT_STREQ(TT_read(read1), "TT1;");
+
+    // Through the parser too: TT is in the command table
+    char viaParser[] = "TT0;";
+    EXPECT_STREQ(command_parser(viaParser), "");
+    char readViaParser[] = "TT;";
+    EXPECT_STREQ(command_parser(readViaParser), "TT0;");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_MIC);
+}
+
+TEST(CAT, TT_RejectsOtherValues) {
+    SetTXAudioSource(TX_SOURCE_SINGLE_TONE);
+    char three[] = "TT3;";
+    EXPECT_STREQ(TT_write(three), "?;");
+    char letter[] = "TTX;";
+    EXPECT_STREQ(TT_write(letter), "?;");
+    EXPECT_EQ(GetTXAudioSource(), TX_SOURCE_SINGLE_TONE);
+    SetTXAudioSource(TX_SOURCE_MIC);
+}
+
+// ============================================================================
+// PR - speech processor (CESSB) on/off
+// ============================================================================
+
+TEST(CAT, PR_SwitchesCESSB) {
+    const bool saved = ED.cessbEnabled;
+
+    char on[] = "PR1;";
+    EXPECT_STREQ(PR_write(on), "");
+    EXPECT_TRUE(ED.cessbEnabled);
+    char read1[] = "PR;";
+    EXPECT_STREQ(PR_read(read1), "PR1;");
+
+    char off[] = "PR0;";
+    EXPECT_STREQ(PR_write(off), "");
+    EXPECT_FALSE(ED.cessbEnabled);
+    char read0[] = "PR;";
+    EXPECT_STREQ(PR_read(read0), "PR0;");
+
+    ED.cessbEnabled = saved;
+}
+
+TEST(CAT, PR_RejectsOtherValues) {
+    const bool saved = ED.cessbEnabled;
+    ED.cessbEnabled = true;
+    char bad[] = "PR2;";
+    EXPECT_STREQ(PR_write(bad), "?;");
+    EXPECT_TRUE(ED.cessbEnabled) << "a rejected value must not change anything";
+    ED.cessbEnabled = saved;
+}
+
+TEST(CAT, PR_ParserReachesBothForms) {
+    const bool saved = ED.cessbEnabled;
+    char write_cmd[] = "PR1;";
+    EXPECT_STREQ(command_parser(write_cmd), "");
+    EXPECT_TRUE(ED.cessbEnabled);
+    char read_cmd[] = "PR;";
+    EXPECT_STREQ(command_parser(read_cmd), "PR1;");
+    ED.cessbEnabled = saved;
+}
+
+// ============================================================================
+// PL - speech processor levels; RM - meter (COMP only)
+// ============================================================================
+
+TEST(CAT, PL_InputLevelIsTheProcessorLevel) {
+    const int32_t saved = ED.cessbDrive_dB;
+    char set6[] = "PL060050;";
+    EXPECT_STREQ(PL_write(set6), "");
+    EXPECT_EQ(ED.cessbDrive_dB, 6);
+    char rd[] = "PL;";
+    EXPECT_STREQ(PL_read(rd), "PL060050;");
+
+    char rounds[] = "PL034020;";        // 3.4 dB -> 3
+    EXPECT_STREQ(PL_write(rounds), "");
+    EXPECT_EQ(ED.cessbDrive_dB, 3);
+    char rd2[] = "PL;";
+    EXPECT_STREQ(PL_read(rd2), "PL030020;");
+
+    char full[] = "PL100100;";
+    EXPECT_STREQ(PL_write(full), "");
+    EXPECT_EQ(ED.cessbDrive_dB, CESSB_DRIVE_MAX_DB);
+    ED.cessbDrive_dB = saved;
+}
+
+TEST(CAT, PL_RejectsOutOfRange) {
+    const int32_t saved = ED.cessbDrive_dB;
+    ED.cessbDrive_dB = 4;
+    char bad1[] = "PL101050;";
+    EXPECT_STREQ(PL_write(bad1), "?;");
+    char bad2[] = "PL050101;";
+    EXPECT_STREQ(PL_write(bad2), "?;");
+    char bad3[] = "PL05x050;";
+    EXPECT_STREQ(PL_write(bad3), "?;");
+    EXPECT_EQ(ED.cessbDrive_dB, 4) << "a rejected value must not change anything";
+    ED.cessbDrive_dB = saved;
+}
+
+TEST(CAT, PL_ParserReachesBothForms) {
+    const int32_t saved = ED.cessbDrive_dB;
+    char w[] = "PL080050;";
+    EXPECT_STREQ(command_parser(w), "");
+    EXPECT_EQ(ED.cessbDrive_dB, 8);
+    char r[] = "PL;";
+    EXPECT_STREQ(command_parser(r), "PL080050;");
+    ED.cessbDrive_dB = saved;
+}
+
+TEST(CAT, RM_ReadsTheCompressionMeterOnly) {
+    char sel2[] = "RM2;";
+    EXPECT_STREQ(RM_write(sel2), "");
+    CESSBSkipped();                    // meter released: nothing being clipped
+    char rd[] = "RM;";
+    EXPECT_STREQ(RM_read(rd), "RM20000;");
+
+    char sel1[] = "RM1;";
+    EXPECT_STREQ(RM_write(sel1), "");
+    char rd1[] = "RM;";
+    EXPECT_STREQ(RM_read(rd1), "?;") << "SWR is not implemented, so it must not read as a value";
+
+    char bad[] = "RM4;";
+    EXPECT_STREQ(RM_write(bad), "?;");
+
+    char sel2again[] = "RM2;";
+    EXPECT_STREQ(command_parser(sel2again), "");
+    char rd2[] = "RM;";
+    EXPECT_STREQ(command_parser(rd2), "RM20000;");
 }
 
 // ============================================================================

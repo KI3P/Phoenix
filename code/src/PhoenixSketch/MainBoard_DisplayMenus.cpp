@@ -483,10 +483,68 @@ VariableParameter digrx = {
     .limits = {.i32 = {.min = 0, .max=100, .step=1}}
 };
 
-struct SecondaryMenuOption MicOptions[3] = {
+// The SSB transmit audio source item cycles microphone -> single tone ->
+// two-tone, and its label shows the source in use. Not saved (see
+// SetTXAudioSource()). TXSourceMenuRefreshLabel() keeps it in step.
+static char txSourceLabel[24];
+
+/**
+ * Write the transmit audio source menu item's label for the current source.
+ */
+void TXSourceMenuRefreshLabel(void){
+    const char *name;
+    switch (GetTXAudioSource()){
+        case TX_SOURCE_SINGLE_TONE: name = "1 kHz tone"; break;
+        case TX_SOURCE_TWO_TONE:    name = "2-tone IMD"; break;
+        case TX_SOURCE_MIC:
+        default:                    name = "Microphone"; break;
+    }
+    snprintf(txSourceLabel, sizeof(txSourceLabel), "TX src: %s", name);
+}
+
+/**
+ * Menu callback to step the SSB transmit audio source to the next one:
+ * microphone, 1 kHz test tone, 700 + 1900 Hz two-tone, then back to microphone.
+ */
+void CycleTXAudioSource(void){
+    SetTXAudioSource(((int32_t)GetTXAudioSource() + 1) % TX_SOURCE_COUNT);
+    TXSourceMenuRefreshLabel();
+}
+
+// The CESSB item is a toggle whose label says what selecting it will do, as the
+// ATU menu's toggles do. CESSBMenuRefreshLabel() keeps it in step with ED.
+static char cessbLabel[16];
+
+/**
+ * Write the CESSB menu item's label for the current setting.
+ */
+void CESSBMenuRefreshLabel(void){
+    snprintf(cessbLabel, sizeof(cessbLabel), "%s", ED.cessbEnabled ? "Disable CESSB" : "Enable CESSB");
+}
+
+/**
+ * Menu callback to turn Controlled Envelope SSB on or off for SSB transmit.
+ * Flips ED.cessbEnabled; the transmit chain reads it every block.
+ */
+void ToggleCESSB(void){
+    ED.cessbEnabled = !ED.cessbEnabled;
+    CESSBMenuRefreshLabel();
+}
+
+// CESSB processor level: dB of gain ahead of the clipper (DSP_CESSB.h)
+VariableParameter cessbDrive = {
+    .variable = &ED.cessbDrive_dB,
+    .type = TYPE_I32,
+    .limits = {.i32 = {.min = 0, .max = CESSB_DRIVE_MAX_DB, .step = 1}}
+};
+
+struct SecondaryMenuOption MicOptions[6] = {
     "Mic gain", variableOption, &micg, NULL, NULL,
     "USB drive", variableOption, &digdrive, NULL, NULL,
     "USB RX level", variableOption, &digrx, NULL, NULL,
+    txSourceLabel, functionOption, NULL, (void *)CycleTXAudioSource, NULL,
+    cessbLabel, functionOption, NULL, (void *)ToggleCESSB, NULL,
+    "CESSB level (dB)", variableOption, &cessbDrive, NULL, NULL,
 };
 
 // Calibration Menu
@@ -756,6 +814,8 @@ void UpdateArrayVariables(void){
     antenna.variable = &ED.antennaSelection[ED.currentBand[ED.activeVFO]];
     spectrumfloor.variable = &ED.spectrumNoiseFloor[ED.currentBand[ED.activeVFO]];
     rflevelcal.variable = &ED.dbm_calibration[ED.currentBand[ED.activeVFO]];
+    CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif
@@ -974,6 +1034,8 @@ void DrawMainMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif
@@ -1013,6 +1075,8 @@ void DrawSecondaryMenu(void){
     if (!redrawMenu)
         return;
     redrawMenu = false;
+    CESSBMenuRefreshLabel();
+    TXSourceMenuRefreshLabel();
 #ifdef ATU_PRESENT
     ATUMenuRefreshLabels();
 #endif

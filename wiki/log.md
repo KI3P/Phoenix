@@ -1700,3 +1700,153 @@ and counted every reclose: +19, +6, 0, +2, 0 for five clockwise clicks, −1 eac
 `Rotary_V12` is now Buxton's full-step state table per encoder, plus two rules for skipped states
 (fast spin, missed first edge). Rerun on the radio: ±1 on all ten clicks; fast spins of the
 Tune and Fine Tune knobs felt good to the user. Tests replay the recording. See [[front-panel]].
+
+## [2026-11-18] decision | CESSB proposal (#35)
+Proposal for Controlled Envelope SSB written on branch `cessb-proposal`: [[cessb]] (plan) and
+[[controlled-envelope-ssb]] (theory). It is backed by an offline model, `code/tools/cessb_model/`,
+built from the firmware's own coefficients. Its −3 dB transmit corner matches the gtest's
+(2726.9 against 2725.9 Hz at 192k, 2759.6 against 2759.7 Hz at 176.4k).
+
+Finding: W7PUA's zero-IF Z class filters with a real lowpass, so clip products in the opposite
+sideband survive. On W9GR voice at 6 dB drive they sit at −27 dBc, and the two-tone 2f₁−f₂
+product 500 Hz into the opposite sideband at −11 dBc. A "centred" variant (shift the channel to
+straddle DC, clip and filter at 1500 ± 1450 Hz, shift back; gc 1.9, 40 dB filter) gives
+−71 / −63 dBc, 1.3 % overshoot after the interpolators and +4.6 dB wanted-sideband power at
+equal PEP, against Z's +4.9 dB. Overdriving today's chain by the same 6 dB gives +2.5 dB, 41 %
+overshoot and −36 dBc out of channel, from the I/Q-separate q15 saturation.
+
+Recommended: a native `DataBlock` stage between `TXInterpolateBy2Again` and IQ correction,
+filters generated in Hz, `TXGain` moved after it so the ceiling equals the power setting (PEP),
+bypassed in digital and the calibration states, and Kenwood `PR`/`PL` over CAT. Also found a
+mic-gain unsigned wrap, logged in [[documentation-todos]]. No firmware changed.
+
+## [2026-11-18] decision | CESSB Phase 1 built: stage, TXGain move, Audio Options toggle
+On branch `cessb-proposal`, after the user asked for a menu option under Audio Options to enable
+or disable CESSB:
+- **The stage:** `DSP_CESSB.cpp` runs in `TransmitProcessing()` after `TXInterpolateBy2Again`,
+  only in `SSB_TRANSMIT` with `ED.cessbEnabled` set. Disabled means bypassed. The setting is
+  off by default and persisted. `TXGain` now follows the stage and scales I and Q, so the
+  ceiling (`CESSB_CEILING` 0.1295, the calibration tone's node envelope) maps onto
+  `powerOutSSB` as PEP. Mic gain is clamped to 0–63 dB (`MicGainForCodec`).
+- **Two findings:**
+  - The audio is on *negative* frequencies at the node. CMSIS FIR coefficient tables are
+    time-reversed, which mirrors the Hilbert pair. The first build shifted the wrong way
+    and filtered the voice out, and the Phase 0 model had been mirrored as well.
+  - `CalcFIRCoeffs` centres odd-length filters on a half sample. The fix is to design 124
+    taps and drop the first, giving an exactly symmetric 123-tap filter that the overshoot
+    controller's delay line lines up with.
+- **Results:** 12 new gtests. The firmware's two-tone figures match the model to about
+  0.6 dB (−62.7 / −29.2 dBc against −62.5 / −28.6). See [[cessb]] "Phase 1 as built".
+
+## [2026-11-18] query | CESSB on the bench: AD2 suite, 43/43 at the exciter
+Added CAT `PR` (speech processor = CESSB) and `code/tools/cessb_hil/`. The suite:
+- drives the mic from the AD2 with a 1 kHz tone sweep and three periodic stimuli (two-tone,
+  steady vowel, syllable-shaped vowel as the voice stand-in);
+- captures the exciter I/Q and A/Bs CESSB at every point;
+- reports the model's prediction for the identical signal.
+
+Results on the KI3P prototype:
+- the ceiling holds flat over 9 dB of overdrive and tracks the power setting
+  (−3.97 dB for −3.98 expected);
+- peaks stay within 3.1 % of the ceiling after the codec and analog exciter;
+- the voice stand-in gains +4.11 dB of talk power at 6 dB drive (model +4.08).
+
+The opposite sideband could not be resolved: the exciter's image moves between −40 and
+−63 dBc from capture to capture, CESSB on or off (logged in [[documentation-todos]]). New
+gtests cover both rates for 2f₁−f₂ (7 dB worse at 176.4 ksps) and check that the stage
+does not image the channel. See [[cessb]] Phase 3.
+
+## [2026-11-18] decision | CESSB Phase 2 built: processor level, compression meter, PL and RM
+On branch `cessb-proposal`:
+- **Processor level:** `ED.cessbDrive_dB`, 0–10 dB of gain into the clipper, default 0.
+  It is the Audio Options item "CESSB level (dB)", persisted, and set over CAT `PL`
+  (10 per dB).
+- **Compression meter:** dB over the ceiling, peak-held, released at about 9 dB/s. It is
+  shown as a "C" bar in place of Q on the transmit pane while CESSB runs, and read over
+  CAT `RM2` at 2 dB per dot.
+- **Results:** gtests read the meter to within 0.03 dB. On the KI3P prototype the bench
+  suite's new section confirms the level is gain up to the ceiling (worst error 0.24 dB)
+  and the meter's dots are exact. 45/45 checks pass. See [[cessb]] "Phase 2 as built".
+
+## [2026-11-19] query | CESSB at RF: 25/25 at the antenna connector on 20 m
+Added `code/tools/cessb_hil/cessb_rf_test.py`, which measures peak and average power with
+the CMU200's NPOWer meter and spectra through a 60 dB tap. Results on the KI3P prototype
+at 14.175 MHz, 5 W:
+- the held PEP is 5.06 W for a 5 W setting;
+- there is no peak regrowth through the PA;
+- the voice stand-in gains +4.48 dB of talk power at 6 dB drive (model +4.08).
+
+The PA sets the spectrum: its linear two-tone IMD3 is −36 dB re PEP, and voice processed
+by CESSB splatters 12 dB or more less than that two-tone. On the way, found a faulty
+main-board-to-RF-board cable (double sideband) and that CAT `BU;` is band up. See [[cessb]]
+"Phase 3: RF results".
+
+## [2026-11-19] decision | CESSB CPU time measured; off by default
+CESSB's CPU time was measured on the KI3P prototype with the M7 cycle counter (temporary
+instrumentation, reverted):
+- `CESSBProcess`: 678 µs mean, 690 µs maximum, per 2048-sample block (11.6 ms at
+  176.4 ksps).
+- `TransmitProcessing`: from 1.48 ms with CESSB off to 2.16 ms with it on, about 19 % of
+  real time.
+- No change to the longest interval between blocks.
+- The 0.2 ms design estimate was low by a factor of 3.4; the four 123-tap FIRs dominate.
+
+Decided with the user: CESSB stays **off by default**, as built. Open questions 3
+(regrowth) and 6 (`gainCompensate`) are closed by the bench and RF results. See [[cessb]]
+"Budget" and "Open questions".
+Also brought the rest of the wiki up to date with the built feature:
+- [[development-backlog]]: #35 was still listed as a proposal.
+- [[cessb]]: the status line and the Phase 4 row.
+- [[controlled-envelope-ssb]]: added the measured results and CPU cost.
+- [[real-time-constraints]]: added the transmit DSP cost, and the smallest stack is now
+  13 KB.
+
+## [2026-11-21] decision | SSB transmit test-tone source (menu "TX src", CAT `TT`)
+Added a transmit audio source setting for testing SSB performance: microphone, a single
+1 kHz tone, or a 700 + 1900 Hz two-tone signal. Decided with the user:
+- The tones are injected at the microphone input mixers (ports 2/3), so they pass through
+  the whole chain, EQ and CESSB included.
+- The setting is not saved; the radio always starts on the microphone.
+- Frequencies and levels are fixed. The single tone is at the calibration-tone level, so
+  the output equals the power setting; for the two-tone, PEP equals the power setting.
+- A non-Kenwood CAT command `TT` sets and reads it.
+
+The sidetone and calibration oscillators were not reused, because their levels belong to
+other settings. See [[cat-control]] "SSB transmit test tone".
+
+## [2026-11-21] query | Test-tone source checked at RF on radio 2
+Flashed radio 2 (no KI3P patch). With the CMU200 on the 60 dB tap:
+- `TT1`/`TT2` give the expected spectra and power.
+- At 2–5 W the two-tone PEP is the setting within 0.25 dB, with max − avg 3.0 dB.
+- IMD3 is about −38 dB re PEP. At the 10 W setting the output compresses to 8.1–8.4 W PEP
+  and IMD3 rises to −33.5 dB re PEP.
+- The tones are unbalanced by 0.6 dB (passband), and switching while keyed works.
+
+Corrected an earlier claim that the −500 Hz IMD3 product is filtered: it is RF-chain
+distortion and measures the same as +3100 Hz. Details in [[cat-control]].
+
+
+## [2026-11-22] decision | CESSB menu items moved to the Microphone menu
+At the user's request, "Enable/Disable CESSB" and "CESSB level (dB)" moved from Audio Options
+to the Microphone menu, after "TX src" (`MicOptions[4]` and `[5]` in
+`MainBoard_DisplayMenus.cpp`; Audio Options is back to 11 items). Behaviour, storage and CAT
+`PR`/`PL` are unchanged. The `TransmitChainCESSB` menu tests now index `MicOptions`. Updated
+[[dsp-chain]], [[cessb]] and `code/docs/CESSB_Report.html`.
+
+## [2026-11-22] query | CESSB two-tone splatter matrix at RF, radio 2
+At the user's request, a two-tone splatter matrix at the antenna connector: mic gain 10/15/20 dB
+× CESSB off/3 dB/6 dB, 14.100 MHz USB, 5 W, 176.4 ksps, 60 dB coupler to CMU200 RF1.
+- **Stimulus:** the firmware two-tone (`TT2`). A temporary firmware change, reverted and
+  reflashed afterwards, scaled it by 10^((MG − 20)/20). At 20 dB it is at its normal level
+  (PEP = setting), so CESSB off never overdrives the PA.
+- **Script:** `code/tools/cessb_hil/cessb_splatter_matrix.py`; table and figure from
+  `splatter_report.py`.
+- **Results:** in `code/docs/CESSB_Report.html` §5.5.
+  - The PA sets most of the splatter: outside-channel power is −43 dB re PEP at 0.6 W and
+    −34 dB at 4.8 W with CESSB off.
+  - When CESSB clips, the lower side and the IMD5/IMD7 products do not change.
+  - Only 2f2−f1 at 3100 Hz grows: −38.0 dB re PEP (off) → −34.1 (+3 dB drive) → −31.9 (+6).
+    It sits in the transition band above CESSB's 2950 Hz filter edge. Total outside-channel
+    power rises 2.1 / 3.7 dB.
+- **CAT quirk:** `MG` doesn't round-trip. `MG086` sets 20 dB but reads back as `MG085`, and
+  writing `MG085` sets 19 dB.
