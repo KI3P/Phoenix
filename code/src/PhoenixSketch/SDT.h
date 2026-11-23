@@ -23,7 +23,7 @@ If not, see <https://www.gnu.org/licenses/>.
 #include "Config.h"
 
 #define RIGNAME "T41-EP SDT"
-#define VERSION "Phx V1.6.0"
+#define VERSION "Phx V1.6.1"
 
 #include "BuildInfo.h"
 
@@ -383,7 +383,7 @@ extern struct config_t {
     float32_t PowerCal_100W_kindex[NUMBER_OF_BANDS] = {10,10,10,10,10,10,10,10,10,10,10,10}; /** k index parameterizes the knee location in the Pout vs attenuation */
     float32_t PowerCal_20W_shape[NUMBER_OF_BANDS] = {0.594,0.552,0.590,0.523,0.548,0.582,0.561,0.577,0.711,0.708,0.539,1,1}; /** Knee shape exponent s of the 20W PA curve; 1 is the plain tanh */
     float32_t PowerCal_100W_shape[NUMBER_OF_BANDS] = {1,1,1,1,1,1,1,1,1,1,1,1,1}; /** Knee shape exponent s of the 100W PA curve; 1 is the plain tanh */
-    float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** The power threshold that switches in the 100W amplifier */
+    float32_t PowerCal_20W_to_100W_threshold_W = 20.0; /** Powers strictly above this threshold switch in the 100W amplifier */
     float32_t PowerCal_20W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
     float32_t PowerCal_100W_DSP_Gain_correction_dB[NUMBER_OF_BANDS] = {0,0,0,0,0,0,0,0,0,0,0,0,0}; /** DSP gain applied to the TX SSB chain to fix band-to-band gain differences */
 
@@ -767,6 +767,7 @@ struct AGCConfig {
 #include "Loop.h"
 #include "Tune.h"
 #include "SWRCalibration.h"
+#include "PowerMeter.h"
 #include "MainBoard_Display.h"
 #include "DSP_FFT.h"
 #include "DSP_Noise.h"

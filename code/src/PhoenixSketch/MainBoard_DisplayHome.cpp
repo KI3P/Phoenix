@@ -1165,6 +1165,18 @@ void DrawTimePane(void) {
 // SWR PANE
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Format a power for the SWR pane: "PEP 98W", "AVG 4.2W", with a trailing '*'
+ * when flagged. One decimal below 10 W, whole watts above.
+ */
+void FormatPowerReading(char *buf, size_t n, const char *label, float32_t W, bool flag){
+    if (W < 0.0f) W = 0.0f;
+    if (W < 9.95f)
+        snprintf(buf, n, "%s %.1fW%s", label, W, flag ? "*" : "");
+    else
+        snprintf(buf, n, "%s %.0fW%s", label, W, flag ? "*" : "");
+}
+
 void DrawSWRPane(void) {
 
     // Refresh rate
@@ -1176,7 +1188,13 @@ void DrawSWRPane(void) {
     const uint32_t age_ms = millis() - ReadSWRLastUpdateMs();
     const bool txActive = (age_ms < 600);   // adjust 400..1000 as desired
 
-    float32_t s  = txActive ? ReadSWR() : 1.0f;
+    // SSB and digital-mode transmit feed the power meter's digital side: show its
+    // PEP and average. CW, tune and the calibrations show the bridge's forward
+    // power, which on a steady carrier is the same as both.
+    const uint32_t now = millis();
+    const bool voice = txActive && PowerMeterHasDigital(now);
+
+    float32_t s  = txActive ? (voice ? PowerMeterSWR(now) : ReadSWR()) : 1.0f;
     float32_t pf = txActive ? ReadForwardPower() : 0.0f;
 
     // Guard rails
@@ -1198,11 +1216,25 @@ void DrawSWRPane(void) {
     tft.print("SWR ");
     tft.print(s, 1);
 
-    // Line 2: Forward power (1 decimal)
-    tft.setCursor(PaneSWR.x0, PaneSWR.y0 + 12);
-    tft.print("PWR ");
-    tft.print(pf, 1);
-    tft.print("W");
+    if (voice){
+        // Lines 2 and 3: PEP and average power. A '*' marks a reading the
+        // bridge disagrees with by more than PM_FLAG_DB: the band's power
+        // calibration is off, or the PA is compressing.
+        char buf[16];
+        const bool flag = fabsf(PowerMeterCorrection_dB()) > PM_FLAG_DB;
+        FormatPowerReading(buf, sizeof(buf), "PEP", PowerMeterPEP_W(now), flag);
+        tft.setCursor(PaneSWR.x0, PaneSWR.y0 + 12);
+        tft.print(buf);
+        FormatPowerReading(buf, sizeof(buf), "AVG", PowerMeterAvg_W(now), flag);
+        tft.setCursor(PaneSWR.x0, PaneSWR.y0 + 24);
+        tft.print(buf);
+    } else {
+        // Line 2: Forward power (1 decimal)
+        tft.setCursor(PaneSWR.x0, PaneSWR.y0 + 12);
+        tft.print("PWR ");
+        tft.print(pf, 1);
+        tft.print("W");
+    }
 
 #ifdef ATU_PRESENT
     // The ATU setting (nominal values) or the tuner's status, to the right

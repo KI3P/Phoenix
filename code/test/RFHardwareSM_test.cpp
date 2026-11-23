@@ -1009,3 +1009,32 @@ TEST(RFHardwareState, SingleVFO_BufferLogsCWVFOStateChanges) {
     EXPECT_EQ(buffer.count, 2);
     EXPECT_NE(buffer.entries[0].register_value, buffer.entries[1].register_value);
 }
+/**
+ * Regression: a 20.0 W setting (the menu maximum, equal to the default 20W->100W
+ * threshold) must keep the 100 W PA bypassed in SSB and CW transmit. Previously it
+ * switched in the 100 W PA, giving 0 W on radios without one.
+ */
+TEST(RFHardwareState, MaxMenuPowerKeeps100WPABypassed){
+    int32_t band = ED.currentBand[ED.activeVFO];
+    float32_t savedSSB = ED.powerOutSSB[band];
+    float32_t savedCW = ED.powerOutCW[band];
+    float32_t savedThreshold = ED.PowerCal_20W_to_100W_threshold_W;
+    ED.PowerCal_20W_to_100W_threshold_W = 20.0f;
+    ED.powerOutSSB[band] = 20.0f;
+    ED.powerOutCW[band] = 20.0f;
+
+    for (auto st : {ModeSm_StateId_SSB_TRANSMIT, ModeSm_StateId_CW_TRANSMIT_MARK}){
+        Si5351_Mock_SetDeviceAddress(SI5351_DUAL_VFO_ADDR);
+        InitializeRFHardware();
+        ED.PA100Wactive = true; // must be recomputed on entry to transmit
+        modeSM.state_id = st;
+        UpdateRFHardwareState();
+        EXPECT_FALSE(ED.PA100Wactive) << "state " << st;
+        EXPECT_EQ(GET_BIT(hardwareRegister, PA100WBIT), 0) << "state " << st;
+    }
+
+    ED.powerOutSSB[band] = savedSSB;
+    ED.powerOutCW[band] = savedCW;
+    ED.PowerCal_20W_to_100W_threshold_W = savedThreshold;
+    ED.PA100Wactive = false;
+}

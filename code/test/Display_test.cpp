@@ -3058,3 +3058,15 @@ TEST_F(DisplayTest, Equalizer_CompleteWorkflow) {
     loop(); MyDelay(10);
     EXPECT_EQ(uiSM.state_id, UISm_StateId_HOME);
 }
+// ================== SWR PANE: POWER READINGS ==================
+TEST(SWRPanePower, FormatsOneDecimalBelowTenWatts){
+    char buf[16];
+    FormatPowerReading(buf, sizeof(buf), "AVG", 4.24f, false);
+    EXPECT_STREQ(buf, "AVG 4.2W");
+    FormatPowerReading(buf, sizeof(buf), "PEP", 98.4f, false);
+    EXPECT_STREQ(buf, "PEP 98W");
+    FormatPowerReading(buf, sizeof(buf), "PEP", 9.97f, true);
+    EXPECT_STREQ(buf, "PEP 10W*");
+    FormatPowerReading(buf, sizeof(buf), "AVG", -1.0f, false);
+    EXPECT_STREQ(buf, "AVG 0.0W");
+}

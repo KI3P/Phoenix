@@ -563,16 +563,33 @@ static float32_t Pr_dBm;
 #define PAD_ATTENUATION_DB 26 // attenuation of the pad
 #define COUPLER_ATTENUATION_DB 20 // attenuation of the binocular toroid coupler
 
+#define SWR_POWER_EMA_ALPHA 0.1f   // weight of each new reading in the running averages
+
+/** SWR from average forward and reflected powers; 1.0 with no forward power */
+static float32_t SWRFromPowers(float32_t fwd_W, float32_t ref_W){
+    if (fwd_W <= 0.001f) return 1.0f;
+    float32_t A = sqrtf((ref_W > 0.0f ? ref_W : 0.0f) / fwd_W);   // |Gamma|
+    if (A >= 0.999f) A = 0.999f;        // avoid divide-by-zero / infinity
+    return (1.0f + A) / (1.0f - A);
+}
+
 /**
- * Read and calculate SWR, forward power, and reflected power.  
+ * Read and calculate SWR, forward power, and reflected power.
  *
  * Measurement Process:
  * 1. Read forward and reflected voltage from AD7991 ADC (channels 0 and 1)
- * 2. Apply exponential moving average filter (10% new, 90% old) for smoothing
- * 3. Convert ADC readings to millivolts
- * 4. Calculate power in dBm using calibrated slope and offset per band
- * 5. Compensate for directional coupler and pad attenuation
- * 6. Convert to watts and calculate SWR from voltage reflection coefficient
+ * 2. Convert each reading to mV, then to power in dBm with the band's calibrated
+ *    slope and offset (compensating the directional coupler and pad), then to W
+ * 3. Average the powers *in watts* (0.1 new, 0.9 old)
+ * 4. Calculate SWR from the averaged powers
+ * 5. Pass the reading to the transmit power meter (PowerMeter.h)
+ *
+ * Why watts. The AD8307 detectors follow the RF envelope and the ADC samples them
+ * at random points of it. A mean of the readings in watts is the average power
+ * for any envelope; a mean in mV (which is dB) is the mean of the log of the
+ * envelope, which reads 3 dB low on two tones and 5-20 dB low on speech
+ * (code/tools/power_meter_eval). On a steady carrier the two agree. The ratio of
+ * the two averages is |Gamma|^2 whatever the envelope, so the SWR holds on speech.
  *
  * Calibration parameters (per-band):
  * - ED.SWR_F_SlopeAdj[band]: Forward channel slope adjustment
@@ -593,60 +610,58 @@ void PerformSWRBridgeReading(void) {
     float32_t rawFwd = (float32_t)analogRead(SWR_FWD_PIN);
     float32_t rawRev = (float32_t)analogRead(SWR_REV_PIN);
 
+    // counts -> volts
+    float32_t Vfwd = (rawFwd / ADC_COUNTS) * ADC_VREF;
+    float32_t Vrev = (rawRev / ADC_COUNTS) * ADC_VREF;
 
-    // simple smoothing (match your old behavior; tweak if desired)
-    float32_t avgFwd = 0.01f * rawFwd + 0.99f * rawFwdOld;
-    float32_t avgRev = 0.10f * rawRev + 0.90f * rawRevOld;
+    // 20 dB coupler assumed => x10 voltage. Square before averaging: the mean
+    // of the voltage is not the mean power on a modulated signal.
+    float32_t pf = powf(Vfwd * 10.0f, 2.0f) / 50.0f;
+    float32_t pr = powf(Vrev * 10.0f, 2.0f) / 50.0f;
+    Pf_W = SWR_POWER_EMA_ALPHA * pf + (1.0f - SWR_POWER_EMA_ALPHA) * Pf_W;
+    Pr_W = SWR_POWER_EMA_ALPHA * pr + (1.0f - SWR_POWER_EMA_ALPHA) * Pr_W;
     rawFwdOld = rawFwd;
     rawRevOld = rawRev;
+    PowerMeterAddBridgeSample(pf, pr, millis());
 
-    // counts -> volts
-    float32_t Vfwd = (avgFwd / ADC_COUNTS) * ADC_VREF;
-    float32_t Vrev = (avgRev / ADC_COUNTS) * ADC_VREF;
-
-    // 20 dB coupler assumed => x10 voltage
-    Pf_W = powf(Vfwd * 10.0f, 2.0f) / 50.0f;
-    Pr_W = powf(Vrev * 10.0f, 2.0f) / 50.0f;
-
-    // guard rails
-    if (Pf_W <= 0.001f) {   // essentially no forward power
-        swr = 1.0f;
-        return;
-    }
-    float32_t A = sqrtf(Pr_W / Pf_W);   // |Gamma|
-    if (A >= 0.999f) A = 0.999f;        // avoid divide-by-zero / infinity
-    if (A < 0.0f)    A = 0.0f;
-
-    swr = (1.0f + A) / (1.0f - A);
+    swr = SWRFromPowers(Pf_W, Pr_W);
     swr_last_update_ms = millis();
 
 #else
 
-    // ===== DIGITAL SWR (AD7991) - developer code unchanged =====
-    // Step 1. Measure the peak forward and Reverse voltages
-    adcF_sRaw = (float32_t)swrADC.readADCsingle(0);
-    adcR_sRaw = (float32_t)swrADC.readADCsingle(1);
-    AccumulateSWRBridgeStats(adcF_sRaw * VREF_MV / 4096., adcR_sRaw * VREF_MV / 4096.);
+    // ===== DIGITAL SWR (AD7991) =====
+    // Step 1. Measure the forward and reverse detector voltages
+    float32_t rawF = (float32_t)swrADC.readADCsingle(0);
+    float32_t rawR = (float32_t)swrADC.readADCsingle(1);
+    float32_t rawF_mV = rawF * VREF_MV / 4096.;
+    float32_t rawR_mV = rawR * VREF_MV / 4096.;
+    AccumulateSWRBridgeStats(rawF_mV, rawR_mV);
+    swr_last_update_ms = millis();
+    // A failed I2C read comes back as 65535 or 65534. In dB it was a small upset
+    // to the average; in watts it would swamp it, so leave it out.
+    if (rawF_mV < 0 || rawF_mV > VREF_MV || rawR_mV < 0 || rawR_mV > VREF_MV)
+        return;
 
-    adcF_sRaw = 0.1 * adcF_sRaw + 0.9 * adcF_sRawOld;  //Running average
-    adcR_sRaw = 0.1 * adcR_sRaw + 0.9 * adcR_sRawOld;
+    // Running average of the raw counts, for ReadADCFwdRaw() / ReadADCRefRaw() only
+    adcF_sRaw = 0.1 * rawF + 0.9 * adcF_sRawOld;
+    adcR_sRaw = 0.1 * rawR + 0.9 * adcR_sRawOld;
     adcF_sRawOld = adcF_sRaw;
     adcR_sRawOld = adcR_sRaw;
 
-    // Convert ADC reading to mV
-    float32_t adcF_sRaw_mV = adcF_sRaw * VREF_MV / 4096.;
-    float32_t adcR_sRaw_mV = adcR_sRaw * VREF_MV / 4096.;
+    // Step 2. Convert this reading to power in dBm, then to Watts
+    int32_t band = ED.currentBand[ED.activeVFO];
+    Pf_dBm = rawF_mV/(25 + ED.SWR_F_SlopeAdj[band]) - 84 + ED.SWR_F_Offset[band] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+    Pr_dBm = rawR_mV/(25 + ED.SWR_R_SlopeAdj[band]) - 84 + ED.SWR_R_Offset[band] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
+    float32_t pf = powf(10.0f, Pf_dBm/10.0f)/1000.0f;
+    float32_t pr = powf(10.0f, Pr_dBm/10.0f)/1000.0f;
 
-    // Convert to power in dBm, then to Watts
-    Pf_dBm = adcF_sRaw_mV/(25 + ED.SWR_F_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_F_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
-    Pr_dBm = adcR_sRaw_mV/(25 + ED.SWR_R_SlopeAdj[ED.currentBand[ED.activeVFO]]) - 84 + ED.SWR_R_Offset[ED.currentBand[ED.activeVFO]] + PAD_ATTENUATION_DB + COUPLER_ATTENUATION_DB;
-    Pf_W = (float32_t)pow(10.0f,Pf_dBm/10.0f)/1000.0f;
-    Pr_W = (float32_t)pow(10.0f,Pr_dBm/10.0f)/1000.0f;
+    // Step 3. Average in watts
+    Pf_W = SWR_POWER_EMA_ALPHA * pf + (1.0f - SWR_POWER_EMA_ALPHA) * Pf_W;
+    Pr_W = SWR_POWER_EMA_ALPHA * pr + (1.0f - SWR_POWER_EMA_ALPHA) * Pr_W;
+    PowerMeterAddBridgeSample(pf, pr, millis());
 
-    // Finally, calculate the standing wave ratio
-    float32_t A = pow(Pr_W / Pf_W, 0.5);
-    swr = (1.0 + A) / (1.0 - A);
-    swr_last_update_ms = millis();   
+    // Step 4. The standing wave ratio
+    swr = SWRFromPowers(Pf_W, Pr_W);
 #endif
 }
 

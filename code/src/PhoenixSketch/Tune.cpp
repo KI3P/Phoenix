@@ -263,6 +263,7 @@ float32_t CalculateCWPowerLevel(float32_t atten_dB, int8_t PAsel){
  * 
  * @param Power_W Desired power in W
  * @param *PAsel Pointer to PA setting, we set this to 1 if 100W amp is needed
+ *               (Power_W strictly above ED.PowerCal_20W_to_100W_threshold_W)
  * @return Attenuation setting in dB (float32_t)
  */
 float32_t CalculateCWAttenuation(float32_t Power_W, bool *PAsel){
@@ -274,7 +275,9 @@ float32_t CalculateCWAttenuation(float32_t Power_W, bool *PAsel){
         Debug("Power must be <100!");
         return 0;
     }
-    if (Power_W >= ED.PowerCal_20W_to_100W_threshold_W){
+    // Strictly greater: the menu tops out at the threshold (20 W), and that
+    // setting must stay on the 20 W PA, or radios without the 100 W PA put out 0 W.
+    if (Power_W > ED.PowerCal_20W_to_100W_threshold_W){
         *PAsel = true;
     } else {
         *PAsel = false;
@@ -297,6 +300,7 @@ float32_t CalculateCWAttenuation(float32_t Power_W, bool *PAsel){
  * Return the gain required to produce the requested output power in SSB mode.
  * @param power_W The desired setpoint in W
  * @param *PAsel Pointer to PA setting, we set this to 1 if 100W amp is needed
+ *               (Power_W strictly above ED.PowerCal_20W_to_100W_threshold_W)
  * @return The gain in dB
  */
 float32_t CalculateSSBTXGain(float32_t Power_W, bool *PAsel){
@@ -308,7 +312,9 @@ float32_t CalculateSSBTXGain(float32_t Power_W, bool *PAsel){
         Debug("Power must be <100!");
         return 0;
     }
-    if (Power_W >= ED.PowerCal_20W_to_100W_threshold_W){
+    // Strictly greater: the menu tops out at the threshold (20 W), and that
+    // setting must stay on the 20 W PA, or radios without the 100 W PA put out 0 W.
+    if (Power_W > ED.PowerCal_20W_to_100W_threshold_W){
         *PAsel = true;
     } else {
         *PAsel = false;

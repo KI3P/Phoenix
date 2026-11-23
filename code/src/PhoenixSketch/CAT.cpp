@@ -100,6 +100,7 @@ char *DD_write( char* cmd );
 char *DD_read(  char* cmd );
 char *BR_write( char* cmd );
 char *BR_read(  char* cmd );
+char *PW_read(  char* cmd );
 char *XA_write( char* cmd );
 char *XA_read(  char* cmd );
 char *CF_write( char* cmd );
@@ -135,7 +136,7 @@ typedef struct  {
 // omitted is expressed by putting the *write* function in BOTH slots, with
 // set_len covering the parameterised form and read_len the bare one. TX and RX
 // below are the only such commands. Do not "fix" them by writing a read handler.
-#define NUM_SUPPORTED_COMMANDS 43
+#define NUM_SUPPORTED_COMMANDS 44
 valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
     {
         { "AC", 3+3,3, AC_write, AC_read },  // antenna tuner: TX-AT in/thru, start/stop tuning
@@ -184,6 +185,7 @@ valid_command valid_commands[ NUM_SUPPORTED_COMMANDS ] =
         { "DS", 0,  3, unsupported_cmd, DS_read }, // digital TX path stats, read-only -- NOT a Kenwood keyword
         { "DD", 3+3,3, DD_write, DD_read }, // digital transmit drive level 000-100 -- NOT a Kenwood keyword
         { "BR", 3+1,3, BR_write, BR_read }, // raw SWR bridge readings: clear, sample, statistics -- NOT a Kenwood keyword
+        { "PW", 0,  3, unsupported_cmd, PW_read }, // transmit power meter: PEP, average, bridge average -- NOT a Kenwood keyword
         { "XA", 3+3,3, XA_write, XA_read },  // CW transmit attenuation override -- NOT a Kenwood keyword
         { "AT", 3+9,3, AT_write, AT_read },  // ATU relay state (needs ATU_PRESENT) -- NOT a Kenwood keyword
         { "AX", 3+1,3, AX_write, AX_read },  // ATU tuner diagnostics (needs ATU_PRESENT) -- NOT a Kenwood keyword
@@ -1285,6 +1287,27 @@ char *BR_read( char* cmd ){
     GetSWRBridgeStats(&st);
     sprintf( obuf, "BR%lu,%.1f,%.1f,%.1f,%.1f;", (unsigned long)st.n,
              st.fwdMean_mV, st.fwdSD_mV, st.refMean_mV, st.refSD_mV);
+    return obuf;
+}
+
+/**
+ * CAT command PW - read the transmit power meter (non-standard Kenwood command)
+ *
+ * The meter the SWR pane shows on SSB and digital-mode transmit (PowerMeter.h).
+ * @param cmd CAT command string
+ * @return Response "PW<pep>,<avg>,<bridge>,<k>,<swr>;": PEP over the last 1.5 s,
+ *         average power over the last 1 s and the bridge's forward average over
+ *         the same second, each in mW; the bridge correction k in dB, to 0.01 dB;
+ *         and the SWR from the averages, to 0.01. The powers are 0 when the radio
+ *         has not transmitted SSB or digital mode within the window.
+ */
+char *PW_read( char* cmd ){
+    uint32_t now = millis();
+    sprintf( obuf, "PW%lu,%lu,%lu,%.2f,%.2f;",
+             (unsigned long)lroundf(1000.0f * PowerMeterPEP_W(now)),
+             (unsigned long)lroundf(1000.0f * PowerMeterAvg_W(now)),
+             (unsigned long)lroundf(1000.0f * PowerMeterBridgeAvg_W(now)),
+             PowerMeterCorrection_dB(), PowerMeterSWR(now));
     return obuf;
 }
 

@@ -463,9 +463,9 @@ TEST_F(PowerCalibrationTest, CalculateCWAttenuation_ThresholdBoundary) {
     CalculateCWAttenuation(9.9f, &PAsel);
     EXPECT_FALSE(PAsel);
 
-    // At threshold (10.0W) - should use 100W PA
+    // At threshold (10.0W) - should still use 20W PA (switch is strictly above)
     CalculateCWAttenuation(10.0f, &PAsel);
-    EXPECT_TRUE(PAsel);
+    EXPECT_FALSE(PAsel);
 
     // Just above threshold (10.1W) - should use 100W PA
     CalculateCWAttenuation(10.1f, &PAsel);
@@ -599,8 +599,8 @@ TEST_F(PowerCalibrationTest, CalculateCWAttenuation_AttenuationLimits_Sweep) {
         EXPECT_FALSE(std::isinf(atten)) << "Attenuation is infinite at power " << power << "W";
     }
 
-    // Sweep through power values for 100W PA (10W to 100W)
-    for (float32_t power = 10.0f; power <= 100.0f; power += 5.0f) {
+    // Sweep through power values for 100W PA (strictly above the 10W threshold, to 100W)
+    for (float32_t power = 10.5f; power <= 100.0f; power += 5.0f) {
         atten = CalculateCWAttenuation(power, &PAsel);
         EXPECT_TRUE(PAsel) << "PA selection failed at power " << power << "W";
         EXPECT_GE(atten, 0.0f) << "Attenuation is negative at power " << power << "W";
@@ -1365,6 +1365,31 @@ TEST_F(PowerCalibrationTest, CalculateSSBTXGain_100W_VariousPowers) {
 
     // Higher power should require more gain
     EXPECT_GT(gain_50W, gain_15W);
+}
+
+/**
+ * Regression: with the default 20W threshold, the maximum menu setting of 20.0W
+ * must stay on the 20W PA in both CW and SSB. Previously 20.0W selected the
+ * 100W PA, so radios without one transmitted 0W at a 20W setting.
+ */
+TEST_F(PowerCalibrationTest, MaxMenuPowerAtDefaultThresholdUses20WPA) {
+    bool PAsel;
+    ED.PowerCal_20W_to_100W_threshold_W = 20.0f;
+
+    PAsel = true;
+    CalculateCWAttenuation(20.0f, &PAsel);
+    EXPECT_FALSE(PAsel);
+
+    PAsel = true;
+    ED.PA100Wactive = false;
+    CalculateSSBTXGain(20.0f, &PAsel);
+    EXPECT_FALSE(PAsel);
+
+    // Just above the threshold the 100W PA is still selected
+    CalculateCWAttenuation(20.5f, &PAsel);
+    EXPECT_TRUE(PAsel);
+    CalculateSSBTXGain(20.5f, &PAsel);
+    EXPECT_TRUE(PAsel);
 }
 
 /**

@@ -1696,3 +1696,106 @@ TEST_F(LPFBoardTest, SettersPreserveUpperRegisterBits) {
 
     hardwareRegister &= ~upper;
 }
+
+// ================== SWR BRIDGE: POWERS AVERAGED IN WATTS ==================
+// The AD8307 readings are linear in dB. On a modulated signal the mean of the
+// readings in dB is not the mean power; the mean in watts is. See
+// PerformSWRBridgeReading() and code/tools/power_meter_eval.
+
+#define PAD_ATT_DB_TEST 26.0f       // LPFBoard.cpp PAD_ATTENUATION_DB
+#define COUPLER_ATT_DB_TEST 20.0f   // LPFBoard.cpp COUPLER_ATTENUATION_DB
+static uint16_t bridgeFwd_mV[2];
+static uint16_t bridgeRef_mV[2];
+static int bridgePhase = 0;   // which of the two levels the next pair reads
+
+static uint16_t BridgeADC(uint8_t channel){
+    return (channel == 0) ? bridgeFwd_mV[bridgePhase] : bridgeRef_mV[bridgePhase];
+}
+
+/** mV the forward detector reads for a line power, with no calibration correction */
+static uint16_t LineDbmToMV(float32_t dBm){
+    return (uint16_t)lroundf(25.0f * (dBm + 84.0f - PAD_ATT_DB_TEST - COUPLER_ATT_DB_TEST));
+}
+
+class SWRBridgePowerTest : public ::testing::Test {
+protected:
+    int32_t band;
+    float32_t saved[4];
+
+    void SetUp() override {
+        Adafruit_I2CDevice::resetMockState();
+        Adafruit_I2CDevice::setMockDevicePresent(true);
+        Adafruit_I2CDevice::setMockADCProvider(BridgeADC);
+        ASSERT_EQ(InitSWRControl(), ESUCCESS);
+        band = ED.currentBand[ED.activeVFO];
+        saved[0] = ED.SWR_F_SlopeAdj[band]; saved[1] = ED.SWR_F_Offset[band];
+        saved[2] = ED.SWR_R_SlopeAdj[band]; saved[3] = ED.SWR_R_Offset[band];
+        ED.SWR_F_SlopeAdj[band] = 0; ED.SWR_F_Offset[band] = 0;
+        ED.SWR_R_SlopeAdj[band] = 0; ED.SWR_R_Offset[band] = 0;
+        PowerMeterReset();
+        bridgePhase = 0;
+    }
+
+    void TearDown() override {
+        Adafruit_I2CDevice::setMockADCProvider(nullptr);
+        Adafruit_I2CDevice::setFailAfter(-1);
+        ED.SWR_F_SlopeAdj[band] = saved[0]; ED.SWR_F_Offset[band] = saved[1];
+        ED.SWR_R_SlopeAdj[band] = saved[2]; ED.SWR_R_Offset[band] = saved[3];
+    }
+
+    /** n bridge readings 16 ms apart, alternating between the two levels */
+    void Read(int n){
+        for (int i = 0; i < n; i++){
+            bridgePhase = i & 1;
+            PerformSWRBridgeReading();
+            AddMillisTime(16);
+        }
+    }
+
+    /** Both levels the same: forward at P dBm, reflected rl dB below it */
+    void Steady(float32_t P_dBm, float32_t rl_dB){
+        bridgeFwd_mV[0] = bridgeFwd_mV[1] = LineDbmToMV(P_dBm);
+        bridgeRef_mV[0] = bridgeRef_mV[1] = LineDbmToMV(P_dBm - rl_dB);
+    }
+};
+
+TEST_F(SWRBridgePowerTest, SteadyCarrierReadsItsPower){
+    Steady(40.0f, 9.54f);                 // 10 W, SWR 2
+    Read(300);
+    EXPECT_NEAR(ReadForwardPower(), 10.0f, 0.05f);
+    EXPECT_NEAR(ReadSWR(), 2.0f, 0.02f);
+}
+
+TEST_F(SWRBridgePowerTest, ModulatedSignalAveragesInWatts){
+    // Half the readings at 10 W, half at 1 W: the average power is 5.5 W. The
+    // mean in dB would be 35 dBm, 3.2 W.
+    bridgeFwd_mV[0] = LineDbmToMV(40.0f); bridgeFwd_mV[1] = LineDbmToMV(30.0f);
+    bridgeRef_mV[0] = LineDbmToMV(40.0f - 9.54f); bridgeRef_mV[1] = LineDbmToMV(30.0f - 9.54f);
+    Read(300);
+    EXPECT_NEAR(ReadForwardPower(), 5.5f, 0.3f);
+    EXPECT_NEAR(ReadSWR(), 2.0f, 0.02f);
+    // The power meter's bridge side: a 1 s mean of the same readings
+    EXPECT_NEAR(PowerMeterBridgeAvg_W(millis()), 5.5f, 0.1f);
+    EXPECT_NEAR(PowerMeterSWR(millis()), 2.0f, 0.02f);
+}
+
+TEST_F(SWRBridgePowerTest, FailedReadIsLeftOut){
+    Steady(40.0f, 20.0f);
+    Read(300);
+    // One pair of reads fails: readADCsingle() returns 65535, which in watts
+    // would be astronomically large
+    Adafruit_I2CDevice::setFailAfter(Adafruit_I2CDevice::getWriteThenReadCount());
+    PerformSWRBridgeReading();
+    Adafruit_I2CDevice::setFailAfter(-1);
+    EXPECT_NEAR(ReadForwardPower(), 10.0f, 0.05f);
+    EXPECT_TRUE(std::isfinite(ReadSWR()));
+    EXPECT_LT(ReadSWR(), 1.3f);
+}
+
+TEST_F(SWRBridgePowerTest, SWRStaysFiniteWhenReflectedExceedsForward){
+    bridgeFwd_mV[0] = bridgeFwd_mV[1] = LineDbmToMV(30.0f);
+    bridgeRef_mV[0] = bridgeRef_mV[1] = LineDbmToMV(31.0f);
+    Read(300);
+    EXPECT_TRUE(std::isfinite(ReadSWR()));
+    EXPECT_GT(ReadSWR(), 100.0f);
+}

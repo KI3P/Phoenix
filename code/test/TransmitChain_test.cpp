@@ -1733,6 +1733,63 @@ TEST(TransmitChainCESSB, MovingTXGainChangesNothing){
     EXPECT_LT(worst, 1e-5f*scale);
 }
 
+/**
+ * Run tones through the chain to the node, TXGain() and the power meter's
+ * digital tap (MeterTransmitBlock), as TransmitProcessing() does, for 1.7 s at
+ * a power setting of setW, and read the meter.
+ */
+static void MeterTones(const float32_t *f, const float32_t *a, int nTones, float32_t setW,
+                       float32_t *pep_W, float32_t *avg_W){
+    UseRate(SAMPLE_RATE_192K);
+    const int32_t band = ED.currentBand[ED.activeVFO];
+    const bool savedPA = ED.PA100Wactive;
+    const float32_t savedP = ED.powerOutSSB[band];
+    const float32_t savedCorr = ED.PowerCal_20W_DSP_Gain_correction_dB[band];
+    ED.PA100Wactive = false;
+    ED.powerOutSSB[band] = setW;
+    ED.PowerCal_20W_DSP_Gain_correction_dB[band] = -2.0f;   // any band correction
+    PowerMeterReset();
+    ResetCESSB();
+    static float32_t I[2048], Q[2048];
+    for (int blk = 0; blk < 160; blk++){
+        FillTones(I, Q, blk, 192000.0f, f, a, nTones);
+        MicToCESSBNode(I, Q, 192000);
+        DataBlock d = {256, 24000, I, Q};
+        TXGain(&d);
+        if (blk >= 12) MeterTransmitBlock(&d);   // past the filters' start-up
+        AddMillisTime(11);
+    }
+    *pep_W = PowerMeterPEP_W(millis());
+    *avg_W = PowerMeterAvg_W(millis());
+    ED.PA100Wactive = savedPA;
+    ED.powerOutSSB[band] = savedP;
+    ED.PowerCal_20W_DSP_Gain_correction_dB[band] = savedCorr;
+}
+
+/**
+ * The digital power meter reads the calibration tone as the power setting: the
+ * scale it uses (PowerMeterDigitalScale) is the inverse of the one TXGain applies.
+ */
+TEST(TransmitChainPowerMeter, CalibrationToneReadsThePowerSetting){
+    const float32_t f[1] = {800.0f}, a[1] = {40.0f/500.0f};
+    float32_t pep, avg;
+    MeterTones(f, a, 1, 10.0f, &pep, &avg);
+    EXPECT_NEAR(10.0f*log10f(pep/10.0f), 0.0f, 0.2f) << pep << " W";
+    EXPECT_NEAR(10.0f*log10f(avg/10.0f), 0.0f, 0.2f) << avg << " W";
+}
+
+/**
+ * Two equal tones whose envelope peak is the calibration tone's: PEP is the
+ * power setting and the average is half of it.
+ */
+TEST(TransmitChainPowerMeter, TwoTonesAverageIsHalfThePEP){
+    const float32_t f[2] = {700.0f, 1900.0f}, a[2] = {20.0f/500.0f, 20.0f/500.0f};
+    float32_t pep, avg;
+    MeterTones(f, a, 2, 10.0f, &pep, &avg);
+    EXPECT_NEAR(10.0f*log10f(pep/avg), 3.01f, 0.2f) << pep << " W PEP, " << avg << " W average";
+    EXPECT_NEAR(10.0f*log10f(pep/10.0f), 0.0f, 0.5f) << pep << " W";
+}
+
 TEST(TransmitChainCESSB, MenuTogglesTheSettingAndItsLabel){
     const bool saved = ED.cessbEnabled;
     extern struct SecondaryMenuOption MicOptions[6];

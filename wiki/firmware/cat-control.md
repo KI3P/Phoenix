@@ -70,7 +70,7 @@ bare command (e.g. `FA;`), a set carries a payload (`FA00014200000;`). Read hand
 | Band | `BU`/`BD` (band up/down) |
 | Gain / audio | `AG` (AF gain), `MG` (mic gain), `PC` (power control) |
 | Digital mode | `DG` (enter/leave), `DR` (receive level 000-100), `DD` (transmit drive 000-100), `DS` (TX path counters, read-only) |
-| SWR bridge / transmit level | `BR` (raw bridge statistics), `XA` (CW attenuation override) |
+| SWR bridge / transmit level | `BR` (raw bridge statistics), `PW` (transmit power meter), `XA` (CW attenuation override) |
 | Antenna tuner | `AC` (Kenwood: start/stop tuning, network in/thru), `AT` (raw ATU relay state), `AX`/`AY` (tuner diagnostics); need `ATU_PRESENT` except `AC`, which reads `AC000;` without it; see [[atu-control]] |
 | DSP | `NR` (noise reduction), `NT` (notch), `VX` (VOX), `PR` (speech processor = CESSB on/off, `PR0;`/`PR1;`/`PR;`), `PL` (processor input level = CESSB level, 10 per dB; output level stored, not used), `RM` (meter: only `RM2` COMP, the CESSB compression meter at 2 dB per dot; `RM1`/`RM3` read `?;`). Branch `cessb-proposal`, see [[cessb]] |
 | Keyer | `KS` (keyer speed / WPM) |
@@ -196,6 +196,15 @@ non-Kenwood. Uncommitted as of 2026-10-24.
   `BR<n>,<fwd mean>,<fwd sd>,<ref mean>,<ref sd>;` in mV to 0.1 mV. Failed I²C reads, which
   `readADCsingle()` returns as 65535 or 65534, are left out. A growing `n` also proves the radio
   really keyed, because `TX;` is silently ignored during the CW hang time.
+- **`PW`** (2026-11-22, read-only): the transmit power meter that the SWR pane shows on SSB and
+  digital-mode TX (`PowerMeter.cpp`, [[log-amp-power-detection]]). `PW;` returns
+  `PW<pep>,<avg>,<bridge>,<k>,<swr>;`:
+  - PEP over the last 1.5 s, average over the last 1 s, and the bridge's forward average in
+    watts over the same second, each in mW;
+  - the bridge correction k in dB;
+  - the SWR from the averages.
+  The powers are 0 when nothing was transmitted within the window. Intended for HIL logging
+  against the CMU200.
 - **`XA`** — CW transmit attenuation override. `XAnnn;` forces nnn tenths of a dB (000–315) in
   place of the power-curve value at the next key-down; `XA999;` returns to the power setting.
   The PA selection still follows `powerOutCW`. Not saved. `XA;` returns `XAnnn,o;`: the

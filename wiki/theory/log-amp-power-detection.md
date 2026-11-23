@@ -3,7 +3,7 @@ title: Log-Amp Power Detection (how the SWR bridge measures power)
 type: concept
 status: draft
 created: 2026-10-23
-updated: 2026-10-24
+updated: 2026-11-22
 tags: [ad8307, log-amp, detector, swr, power-sensing, calibration, theory]
 source_refs: [sources/ad8307-datasheet, sources/t41-ep-schematics]
 related: ["[[ad8307-datasheet]]", "[[swr-bridge-measured-behaviour]]", "[[filter-board-electronics]]", "[[filter-boards]]", "[[calibration-state-machines]]", "[[theory-overview]]"]
@@ -100,19 +100,83 @@ power. The coupler's directivity leakage adds as a vector and depends on the loa
 neither the slope term nor the offset term. The notebook models it separately.
 
 ## Modulated signals: the mean of the log
-The AD8307 output follows the RF envelope within about 0.5 µs. The firmware averages the ADC
-counts, which are linear in dB (`LPFBoard.cpp:657`, 0.1/0.9 running average). The displayed
-power is therefore the **mean of the log of the envelope**, not the log of the mean power. By
-Jensen's inequality it reads low for any signal whose envelope varies. *(Derived, not stated in
-the datasheet.)*
+The AD8307 output follows the RF envelope within about 0.5 µs. Up to V1.6.0 the firmware
+averaged the ADC counts, which are linear in dB (0.1/0.9 running average), and converted to watts
+afterwards. The displayed power was therefore the **mean of the log of the envelope**, not the
+log of the mean power. By Jensen's inequality it reads low for any signal whose envelope varies.
+*(Derived, not stated in the datasheet.)*
 - **CW or a single steady tone:** exact. This is what all calibration points must use.
 - **Two equal tones:** the envelope is ∝ |cos θ|, and mean(20·log₁₀|cos θ|) = −6.02 dB. The
   reading is therefore 6 dB below PEP, which is **3 dB below the true average power**. In
   practice it is slightly less low, because the detector's floor clips the envelope nulls.
-- **SSB speech:** lower still, by an amount that depends on the speech and the processing.
-  Forward-power and SWR readings during speech are indicative only. The SWR survives better,
-  because the forward and reflected readings share the same envelope, so the bias cancels in
-  the ratio, as long as both detectors stay inside their log range.
+- **SSB speech:** much lower, and it moves with the talking rhythm. Pauses sit at the detector
+  floor (about −29 dBm on the line) and pull the log mean down hard.
+
+**Modelled (2026-11-22, `code/tools/power_meter_eval/model.py`).** The model takes the W9GR
+voice clip and synthetic signals through the real TX chain (`cessb_model`), then an AD8307 model
+(floor, 2×RF ripple), then AD7991 samples about every 16 ms. Error in dB, median [10th, 90th
+percentile], at 4 Hz display instants during talk:
+
+| Signal | Old reading vs PEP | Old vs average | Bridge mean in W vs average | Bridge peak hold vs PEP | Digital PEP / AVG |
+|---|---|---|---|---|---|
+| Two tones | −6.0 [−8.0, −4.4] | −2.9 [−5.0, −1.4] | −0.1 [−0.5, +0.3] | +0.4 | 0.0 / 0.0 |
+| W9GR voice | −14.8 [−26, −9.9] | −5.7 [−17.9, −0.9] | +0.1 [−0.4, +0.8] | −2.0 [−2.5, −0.8] | 0.0 / 0.0 [±0.4] |
+| W9GR voice, CESSB 6 dB | −10.2 [−20.9, −4.7] | −5.7 [−16.8, −1.2] | −0.1 [−0.6, +0.3] | +0.3 | 0.0 / 0.0 [±0.4] |
+
+The old SWR, from the two log averages, scattered 1.6–2.9 on two tones into a 2:1 load. From
+averages in watts it reads 1.9–2.2: both detectors share the envelope, so the ratio of the mean
+powers is |Γ|².
+
+**The fix (2026-11-22).**
+- **Bridge:** `PerformSWRBridgeReading()` converts each reading to watts before averaging, and
+  leaves out failed I²C reads (65535 would swamp a mean in watts).
+- **Display:** the PEP and average shown on SSB and digital-mode TX come from the digital
+  I/Q after `TXGain()` (`PowerMeter.cpp`). The calibration makes an envelope of `CESSB_CEILING`
+  equal `ED.powerOutSSB`, so every 24 kHz sample is a calibrated instantaneous power.
+- **Correction:** the bridge's mean in watts scales that reading by a correction k (±3 dB,
+  kept per band and PA). This catches band-calibration error and PA compression, which the
+  digital side cannot see. k learns only from fully keyed seconds of **steady carrier**
+  (PEP/AVG < 1 dB: a single tone, FT8), with τ = 1 s. The reason is the readout effect below.
+- **Why not the bridge alone for PEP:** ~60 random samples a second miss voice peaks by about
+  2 dB. A peak hold also catches the +0.5 dB ripple crests on a steady carrier.
+- **CAT:** `PW;` reads PEP, average and bridge average (mW), k (dB) and the SWR.
+
+**Bench (2026-11-22, radio 2, 20 m, 60 dB tap to CMU200 NPOWer; `power_meter_eval/bench.py`).**
+Error in dB against the CMU200. Speech is the W9GR clip over USB audio in digital mode. k is
+learned from the single tone at each power.
+
+| Point | Old vs avg / vs PEP | Digital PEP / AVG | Bridge AVG (W) | Shown PEP / AVG | k |
+|---|---|---|---|---|---|
+| Tone, 5 W | −0.46 / −0.63 | −0.31 / −0.14 | −0.46 | −0.52 / −0.39 | −0.29 |
+| Two tones, 5 W | −2.33 / −5.31 | −0.19 / −0.22 | −1.18 | −0.48 / −0.51 | −0.29 |
+| Two tones + CESSB 6 dB, 5 W | −2.56 / −5.44 | −0.18 / −0.22 | −1.04 | −0.47 / −0.51 | −0.29 |
+| Speech, 5 W | **−9.50 / −18.03** | +0.77 / +0.06 | −0.37 | +0.48 / −0.23 | −0.29 |
+| Tone, 10 W (PA compresses to 8.3 W) | −0.43 / −0.55 | +0.49 / +0.60 | −0.43 | −0.33 / −0.29 | −0.97 |
+| Two tones, 10 W | −2.81 / −5.55 | +0.46 / +0.20 | −1.26 | −0.51 / −0.77 | −0.97 |
+| Speech, 10 W | **−9.68 / −17.74** | +1.54 / +0.35 | −0.32 | +0.57 / −0.62 | −0.97 |
+
+- **The old meter on speech:** about 9.5 dB below the average power and 18 dB below PEP, as
+  modelled.
+- **Digital meter:** within ±0.3 dB on tones while the PA is linear. On speech its average is
+  within +0.06 dB.
+  - Its speech PEP is the more repeatable measurement: 5.93 / 5.92 W in two runs, against the
+    CMU's 5.45 / 4.96 W. NPOWer samples only part of the time, so it misses some rare peaks.
+    Treat the CMU's speech PEP as ±0.4 dB.
+  - In digital mode the clip's peaks drive 0.7 dB past the ceiling, because there is no CESSB
+    there.
+- **Bridge, steady carrier:** reads 0.46 dB below the CMU on this band. That is the level-2
+  calibration error (or the tap's), and k carries it into the shown values.
+- **Bridge, fast envelope:** reads lower again, by 0.6–0.8 dB on two tones and about 0 dB on
+  speech. The AD7991 readout causes it ([[filter-board-electronics]], "Readout crosstalk"):
+  - each conversion keeps 15–19 % of the one before, about 0.5 ms earlier, through the 12.5 kΩ
+    OUT;
+  - so a reading is a short average of the *log* envelope, and the 1.2 kHz two-tone beat
+    is partly log-averaged before the watts conversion.
+- **Why k learns only from steady carriers:** before that rule, k learned from the two-tone
+  points and pulled the shown values about 1 dB low.
+- **Compression:** at 10 W, k = −0.97 dB (learned on the tone) brings the PEP within 0.6 dB.
+  It over-corrects the average by up to 0.8 dB, because speech and two-tone averages are
+  compressed less than a carrier at full PEP.
 
 **Measured (2026-10-24, [[swr-bridge-measured-behaviour]]).** Radio 2's detector shows the
 conformance error as a smooth ±0.4–0.5 dB curve across a 30 dB fit, which a slope and offset
@@ -127,6 +191,9 @@ above is the one that matters.
 ## Output ripple
 The output is unbuffered, with an internal pole near 5 MHz. It therefore carries ripple at
 twice the RF frequency: ±0.5 dB at 10.7 MHz, ±0.02 dB at 50 MHz, and more on 160 m and 80 m.
-The AD7991 samples asynchronously, so the ripple is zero-mean noise. It averages out in the
-running average and adds scatter, not bias. A capacitor from OUT to ground would remove it,
-at the cost of response time.
+The AD7991 samples asynchronously, so the ripple is zero-mean noise in dB. Since the
+firmware averages in watts (2026-11-22), a sinusoidal ripple of ±r dB reads slightly high:
++0.014 dB at ±0.5 dB, +0.06 dB at ±1 dB, +0.23 dB at ±2 dB. That is negligible above 80 m.
+A capacitor from OUT to ground would remove the ripple, at the cost of response time. Keep its
+time constant well under the speech envelope's (≲ 20 µs), or the reading becomes a log mean
+again.

@@ -155,6 +155,35 @@ CESSB's own out-of-channel output is −97 dBc in the model.
   linear voice. Also, a ratio to the wanted-band power scattered by several dB between runs
   for the bursty syllable (4-sweep averages).
 
+## Adjacent-channel power on speech: `cessb_acp_*.py`
+
+How much of the W9GR speech clip lands in the neighbouring SSB channels, CESSB off and at
+levels 0-10 dB (report §5.6). The clip (`W9GR48.WAV`, 12.2 s) loops from AD2 W1, streamed by
+`ad2_play.py` (the AWG's play mode; the custom buffer is only 4096 samples).
+
+```
+AD2 W1    ------> radio 2 microphone input
+TX output ------> dummy load, 60 dB tap ------> CMU200 RF1   (cessb_acp_test.py)
+                                        \-----> 20 dB pad -> radio 1 RX, RAtten 10 dB  (cessb_acp_rx.py)
+```
+
+1. `cessb_acp_calibrate.py --cessb 0 --amps ...`: find the drive where PEP stops rising with
+   CESSB at 0 dB, i.e. the voice peaks reach the ceiling (42 mV at mic gain 10 dB on radio 2).
+   Do not set it by PEP with CESSB off: the voice's peaks do not clip there.
+2. `cessb_acp_test.py`: the CMU200 spectrum through Phoenix's receive filter (300-2700 Hz,
+   `acp_analysis.py`), channels every 3 kHz. A swept analyzer samples each frequency only
+   1/560 of a sweep, so each point is swept in segments that each cover the whole clip
+   (tiled with seeks, or back to back for several loops at the 2950-3550 Hz edge), every
+   sweep fetched and averaged in linear power. **The CMU200's Average trace is a mean of dB
+   values**: never use it on speech.
+3. `cessb_acp_rx.py --rx-audio <radio 1 USB serial>`: a second Phoenix as the receiver. AGC
+   off on its touchscreen; mind its overload (at RAtten 0 with a 20 dB pad it compresses
+   ~20 dB and its noise rises in every channel). The script sets the PipeWire capture
+   volume to 100 % for the run (anything less hides clipping in the radio's stream).
+   `--cessb none` runs only the tone, floor, timing and retune-latency checks.
+4. `acp_report.py <cmu json> --rx <radio 1 json>`: figures and table rows.
+   `test_acp_analysis.py`: self-tests, no hardware.
+
 ## Files
 
 | File | Purpose |
@@ -170,3 +199,11 @@ CESSB's own out-of-channel output is −97 dBc in the model.
 | `ad2_custom.py` | `TxAd2` plus custom-waveform playback on W1 |
 | `report.py` | Markdown and plots |
 | `test_cessb_hil.py` | Self-tests on synthetic captures |
+| `cessb_acp_calibrate.py` | ACP: drive calibration against the ceiling |
+| `cessb_acp_test.py` | ACP with the CMU200 spectrum |
+| `cessb_acp_rx.py` | ACP with a second Phoenix as the receiver |
+| `acp_analysis.py`, `acp_rx_analysis.py` | Receiver filter, channel powers, ratios |
+| `acp_report.py` | ACP figures and table rows |
+| `acp_bench.py` | Clip player wrapper, NPOWer over long runs, CMU200 sweepers |
+| `ad2_play.py` | Streams a WAV out of AD2 W1 (play mode) |
+| `test_acp_analysis.py` | Self-tests for the ACP analysis |
