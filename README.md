@@ -63,6 +63,25 @@ The mapping of the buttons to various functions is defined in `code/src/PhoenixS
 
 # Version History
 
+## V1.6.1 Release Notes
+
+### Bug Fixes
+
+- **A 20 W power setting gave 0 W output.** The CW and SSB power menus go up to 20 W, which is also the level at which the radio switches in the 100 W amplifier. A setting of exactly 20 W (or CAT `PC020;`) therefore switched in the 100 W amplifier, and radios without one transmitted nothing on any band, while 19.5 W worked normally. The 100 W amplifier now switches in only above 20 W. Thanks to Greg, KM5GT, for the report.
+- **The transmit power reading followed neither PEP nor average power on voice.** The SWR pane averaged the power detector's readings before converting them to watts, so it showed the average of the log of the envelope. On the bench, speech read 9.5 dB below its average power and 18 dB below its PEP, and a two-tone 2.5 dB below its average. Each reading is now converted to watts before averaging, failed readings are left out, and the SWR stays finite when the reflected power reaches the forward power.
+
+### Improvements
+
+- **PEP and average power on SSB.** On SSB and digital-mode transmit, the SWR pane shows **PEP** (held for 1.5 s) and **AVG** (over 1 s), worked out from the transmit signal itself, which the SSB power calibration already scales to watts. The power bridge keeps the reading honest: a correction of up to ±3 dB per band and amplifier learns from steady-carrier transmissions, and a **\*** appears when it exceeds 1.5 dB, a sign that the band's power calibration is off. On the bench the readings are within −0.8 to +0.6 dB of a CMU200 on tones and speech at 5 and 10 W. CW, tune and the calibrations still show the bridge power.
+- **CAT `PW;`** (not a Kenwood command) reads the power meter: PEP, average and bridge average in mW, the bridge correction in dB and the SWR.
+
+### Under-the-Hood Changes
+
+- **Test tools:**
+  - `code/tools/power_meter_eval`: an offline model of the power meter and a bench comparison against a CMU200.
+  - `code/tools/cessb_hil`: adjacent-channel power of CESSB on recorded speech, measured with a CMU200 and with a second Phoenix as the receiver (CESSB report section 5.6).
+- **Tests:** the unit tests have grown to 1067.
+
 ## V1.6.0 Release Notes
 
 ### Major New Features
